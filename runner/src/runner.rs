@@ -78,15 +78,6 @@ async fn run_one(test_path: &Path, mysql_url: &str) -> Result<()> {
         parse(&test_src).with_context(|| format!("parsing {}", test_path.display()))?;
 
     let opts = mysql_async::Opts::from_url(mysql_url)?;
-    // Pre-populate the session settings mysql_async would otherwise probe
-    // via `SELECT @@socket, @@max_allowed_packet, @@wait_timeout` — zeta
-    // returns empty bytes for those and the conversion panics. Tracked
-    // upstream as zeta issue #932.
-    let opts: mysql_async::Opts = mysql_async::OptsBuilder::from_opts(opts)
-        .prefer_socket(false)
-        .max_allowed_packet(Some(16 * 1024 * 1024))
-        .wait_timeout(Some(28800))
-        .into();
     let mut conn = mysql_async::Conn::new(opts).await?;
 
     let mut actual = String::new();
