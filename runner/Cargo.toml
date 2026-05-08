@@ -14,6 +14,9 @@ mysql_async = "0.34"
 regex = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tempfile = "3"
+walkdir = "2"
+nix = { version = "0.27", features = ["signal"] }
 
 [[bin]]
 name = "zeta-mysql-compat-mtr-runner"

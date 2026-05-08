@@ -6,7 +6,7 @@ This repo holds the **GPL-licensed** half of Zeta's MySQL-compat test material â
 
 ## Status
 
-Skeleton. Runner stub builds; `tests/` directories are empty placeholders. Will be populated as suites are adapted from upstream MTR.
+**M0 â€” first .test green.** The runner parses MTR-format `.test` files (subset: comments, multi-line SQL, `--sorted_result`, `--error <code>`, `--echo <text>`), executes statements over zeta's MySQL wire, captures output as tab-separated `.result`-format text, and diffs against the matching `.result` file. `tests/main/select.test` passes against the current `zeta` binary. Other suites (`funcs_1/`, `funcs_2/`, `information_schema/`, `json/`, `binlog/`, `replication/`) are still empty placeholders.
 
 ## Layout
 
@@ -30,9 +30,14 @@ tests/
 
 ## Running
 
+Build a `zeta` binary in the main repo (`cargo build -p zeta-server-bin`), then:
+
 ```
-cargo run --release -- --zeta-bin <path-to-zeta-binary> --suite main,binlog
+cd runner
+cargo run -- --zeta-bin /path/to/zeta --suite main
 ```
+
+`--suite` accepts a comma-separated list (e.g. `main,binlog`) or `all`. `--filter <substring>` limits to matching `.test` paths. The runner picks a free port, spawns `zeta --no-pg --bind 127.0.0.1 --mysql-port <port> --storage-backend memory`, waits for the listener-ready banner, then runs each `.test` file with a fresh `mysql_async` connection.
 
 The runner is **independently re-derived** from public MTR documentation. It does not copy from MySQL's `mysql-test-run.pl`. It connects to a running `zeta` server over the MySQL wire protocol and never links to Zeta as a library.
 

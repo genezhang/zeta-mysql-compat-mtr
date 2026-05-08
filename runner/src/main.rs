@@ -5,6 +5,7 @@ use std::path::PathBuf;
 mod harness;
 mod mtr_parser;
 mod result_diff;
+mod runner;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "MTR-dialect MySQL-compat test runner for Zeta")]
@@ -18,7 +19,7 @@ struct Args {
     #[arg(long, default_value = "all")]
     suite: String,
 
-    /// Optional: limit to .test files matching this glob pattern.
+    /// Optional substring filter applied to the .test path.
     #[arg(long)]
     filter: Option<String>,
 }
@@ -33,19 +34,25 @@ async fn main() -> Result<()> {
         .init();
 
     let args = Args::parse();
-    let _zeta = harness::ZetaServer::start(&args.zeta_bin).await?;
+    let mut zeta = harness::ZetaServer::start(&args.zeta_bin).await?;
+    let url_base = format!("mysql://root@127.0.0.1:{}", zeta.port());
 
-    for suite in args.suite.split(',') {
-        run_suite(suite, args.filter.as_deref()).await?;
+    let mut had_failure = false;
+    for suite in args
+        .suite
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if let Err(e) = runner::run_suite(suite, &url_base, args.filter.as_deref()).await {
+            eprintln!("suite {suite} failed: {e}");
+            had_failure = true;
+        }
     }
 
+    let _ = zeta.shutdown().await;
+    if had_failure {
+        std::process::exit(1);
+    }
     Ok(())
-}
-
-async fn run_suite(_suite: &str, _filter: Option<&str>) -> Result<()> {
-    // TODO: glob tests/<suite>/**/*.test, parse with mtr_parser, execute
-    // each statement against the running zeta-mysqlwire endpoint, capture
-    // output, diff with the matching .result file via result_diff, honor
-    // skip_list.toml.
-    anyhow::bail!("run_suite: not yet implemented")
 }

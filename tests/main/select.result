@@ -1,0 +1,23 @@
+SELECT 1;
+?column?
+1
+SELECT 1 + 1;
+?column?
+2
+SELECT 'hello';
+?column?
+hello
+=== multi-column ===
+SELECT 1, 2, 3;
+?column?	?column?	?column?
+1	2	3
+=== sorted block ===
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (id INT PRIMARY KEY, name VARCHAR(20));
+INSERT INTO t1 VALUES (3, 'c'), (1, 'a'), (2, 'b');
+SELECT id, name FROM t1;
+id	name
+1	a
+2	b
+3	c
+DROP TABLE t1;
