@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-runner:
+    name: build runner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: runner
+      - name: cargo check
+        working-directory: runner
+        run: cargo check --all-targets
+      - name: cargo fmt
+        working-directory: runner
+        run: cargo fmt --all -- --check
+
+  # TODO: add a job that downloads a zeta release artifact and runs the
+  # MTR-derived suites. Wired up once the main zeta repo publishes a binary
+  # artifact this repo can consume, and once at least one suite has
+  # adapted MTR content.

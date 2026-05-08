@@ -1,0 +1,20 @@
+[package]
+name = "zeta-mysql-compat-mtr-runner"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-2.0-only"
+description = "MTR-dialect MySQL compatibility test runner for Zeta"
+repository = "https://github.com/genezhang/zeta-mysql-compat-mtr"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"
+mysql_async = "0.34"
+regex = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[[bin]]
+name = "zeta-mysql-compat-mtr-runner"
+path = "src/main.rs"

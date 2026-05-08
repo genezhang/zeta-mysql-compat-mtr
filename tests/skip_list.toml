@@ -1,0 +1,11 @@
+# Known-failing tests. A passing test that starts failing without an entry
+# here is a regression.
+#
+# Schema:
+#   [[entries]]
+#   path     = "tests/main/select.test"
+#   reason   = "bug" | "not-yet-implemented" | "intentional-divergence"
+#   ticket   = "https://github.com/genezhang/zeta/issues/NNN"
+#   note     = "free-form short explanation"
+
+entries = []
