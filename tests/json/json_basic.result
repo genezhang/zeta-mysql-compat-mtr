@@ -1,0 +1,46 @@
+# Verify CREATE TABLE with a JSON column.
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
+# Insert a mix of JSON shapes: object, array, scalar, null literal.
+INSERT INTO t1 VALUES (1, '{"a": 2}');
+INSERT INTO t1 VALUES (2, '[1, 2, 3]');
+INSERT INTO t1 VALUES (3, '"scalar string"');
+INSERT INTO t1 VALUES (4, 'true');
+INSERT INTO t1 VALUES (5, 'false');
+INSERT INTO t1 VALUES (6, 'null');
+INSERT INTO t1 VALUES (7, '-1');
+INSERT INTO t1 VALUES (8, '3.14');
+INSERT INTO t1 VALUES (9, '{}');
+INSERT INTO t1 VALUES (10, '[]');
+# SQL NULL — distinct from the JSON null literal in row 6.
+INSERT INTO t1 VALUES (11, NULL);
+# Read back, ordered by the integer key for stable output.
+SELECT i, j FROM t1 ORDER BY i;
+i	j
+1	{"a":2}
+2	[1,2,3]
+3	"scalar string"
+4	true
+5	false
+6	null
+7	-1
+8	3.14
+9	{}
+10	[]
+11	NULL
+# Nested object with mixed value types.
+INSERT INTO t1 VALUES (12, '{"a":"b", "c":"d", "ab":"abc", "bc": ["x", "y"]}');
+SELECT j FROM t1 WHERE i = 12;
+j
+{"a":"b","ab":"abc","bc":["x","y"],"c":"d"}
+# Count by JSON-null vs SQL-null to confirm they are distinct rows.
+SELECT COUNT(*) AS total FROM t1;
+total
+12
+SELECT COUNT(*) AS with_json_null FROM t1 WHERE i = 6;
+with_json_null
+1
+SELECT COUNT(*) AS with_sql_null FROM t1 WHERE j IS NULL;
+with_sql_null
+1
+DROP TABLE t1;
