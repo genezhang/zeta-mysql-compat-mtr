@@ -6,10 +6,18 @@ INSERT INTO t1 VALUES
   (3, '"hello"'),
   (4, 'null'),
   (5, 'true');
-# ---- JSON_TYPE ----   zeta #1063
-# MySQL: scalar tag ("OBJECT","ARRAY","STRING","NULL","BOOLEAN", etc.)
+# ---- JSON_TYPE ----   zeta #1063 FIXED
+# MySQL: uppercase scalar tag. zeta covers the seven types its
+# JsonbType carries (OBJECT/ARRAY/STRING/NULL/BOOLEAN/INTEGER/
+# DOUBLE). MySQL's binary-format-only tags (BLOB/DATE/TIME/
+# DATETIME/TIMESTAMP/DECIMAL/OPAQUE) are out of scope.
 SELECT i, JSON_TYPE(j) AS t FROM t1 ORDER BY i;
-ERROR 1105: execution error: unknown function: JSON_TYPE
+i	t
+1	OBJECT
+2	ARRAY
+3	STRING
+4	NULL
+5	BOOLEAN
 # ---- JSON_OBJECT(k,v[,k,v]...) ----   zeta #1063 FIXED
 # MySQL / zeta: builds a JSON object literal. zeta canonicalizes
 # keys alphabetically (#1062) — `a` precedes `b` either way.
