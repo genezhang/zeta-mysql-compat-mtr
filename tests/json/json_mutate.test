@@ -1,0 +1,75 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/json/inc/json_functions.inc
+#   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/inc/json_functions.inc
+#
+# Probes the JSON mutator family — JSON_SET, JSON_INSERT, JSON_REPLACE,
+# JSON_REMOVE — the four functions MySQL apps use to modify a JSON
+# document in-place. (Distinct from JSON_OBJECT/_ARRAY, which build a
+# JSON value from scratch, and from JSON_EXTRACT, which only reads —
+# both covered by json_funcs.test.)
+#
+# The semantics differ subtly between the four:
+#   JSON_SET     — overwrite if path exists, create if not
+#   JSON_INSERT  — create if path does NOT exist, no-op if it does
+#   JSON_REPLACE — overwrite if path exists, no-op if not
+#   JSON_REMOVE  — delete element at path, no-op if not present
+#
+# Apps lean on this distinction to avoid race-y read-modify-write
+# patterns when mutating shared documents, so all four matter.
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy; surface probe written to fit
+#     the M0 runner. Upstream coverage of these functions in
+#     json_functions.inc is dense and intermixed with directives the
+#     runner does not implement.
+#   # zeta-adapt: zeta has Postgres-flavored `jsonb_set` (takes a path
+#     array like `'{a,b}'`) but no MySQL `JSON_*` aliases for any of
+#     the four mutators here. All four currently surface as ERROR 1105
+#     unknown function and are pinned with `--error 1105`. Filed as
+#     part of zeta #1063 (broader function-alias gap).
+#   # zeta-adapt: .result is pinned to zeta's *observed* output. When a
+#     fix lands, drop the matching `--error` line; the next run will
+#     capture success output and the diff will document the upgrade.
+# ----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
+INSERT INTO t1 VALUES (1, '{"a": 1, "b": "two"}');
+
+--echo # ---- JSON_SET — overwrite-or-create at path ----   zeta #1063
+--echo # MySQL: returns {"a": 99, "b": "two", "c": "new"}
+--error 1105
+SELECT JSON_SET(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_INSERT — create-only-if-absent at path ----   zeta #1063
+--echo # MySQL: returns {"a": 1, "b": "two", "c": "new"} (a unchanged)
+--error 1105
+SELECT JSON_INSERT(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_REPLACE — overwrite-only-if-present at path ----   zeta #1063
+--echo # MySQL: returns {"a": 99, "b": "two"} (c not added)
+--error 1105
+SELECT JSON_REPLACE(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_REMOVE — delete element at path ----   zeta #1063
+--echo # MySQL: returns {"b": "two"}
+--error 1105
+SELECT JSON_REMOVE(j, '$.a') AS out FROM t1 WHERE i = 1;
+
+DROP TABLE t1;
