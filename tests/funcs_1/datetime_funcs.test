@@ -78,13 +78,12 @@ SELECT TO_CHAR('2024-03-15'::date, 'YYYY-MM-DD') AS formatted;
 
 --echo === MySQL aliases for already-supported functions ===
 --echo # Pure renames — one match arm each.
+--echo # Slice 1 of zeta #1086 — FIXED. Pin via shape-only checks
+--echo # since the exact wall-clock value isn't deterministic.
 
---error 1105
-SELECT CURDATE() AS v;
---error 1105
-SELECT CURTIME() AS v;
---error 1105
-SELECT SYSDATE() AS v;
+SELECT LENGTH(CAST(CURDATE() AS TEXT)) AS date_str_len;
+SELECT SUBSTRING(CAST(CURTIME() AS TEXT), 1, 6) LIKE '__:__:' AS shape_ok;
+SELECT SUBSTRING(CAST(SYSDATE() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
 
 --echo === MySQL-only direct accessor functions ===
 --echo # These map onto EXTRACT(<unit> FROM d) but are the names
