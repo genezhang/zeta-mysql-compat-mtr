@@ -39,12 +39,13 @@
 #     (ER_UNKNOWN_ERROR), not 1305 (ER_SP_DOES_NOT_EXIST). Noted in
 #     zeta #1063 as a follow-up to the alias work.
 #   # zeta-adapt: filed gaps:
-#       - zeta #1063 — MySQL JSON function-alias family. JSON_OBJECT
-#         and JSON_ARRAY are now FIXED (constructor-alias slice).
-#         JSON_TYPE and JSON_EXTRACT are still pinned to ERROR 1105
-#         pending their slices (JSON_TYPE needs return-value
-#         canonicalization; JSON_EXTRACT couples to the path-syntax
-#         work that landed for `->` / `->>` in #1064).
+#       - zeta #1063 — MySQL JSON function-alias family. JSON_OBJECT,
+#         JSON_ARRAY, and JSON_EXTRACT are now FIXED. JSON_EXTRACT
+#         reuses the `$.path` parser that landed in #1064 (so it's
+#         a function-call form of `->`). JSON_TYPE is still pinned
+#         to ERROR 1105 pending the return-value canonicalization
+#         slice (MySQL OBJECT/ARRAY/INTEGER/DOUBLE/etc. vs PG
+#         `jsonb_typeof`'s object/array/number).
 #       - zeta #1064 — FIXED. `\$.path` syntax now resolves in `->` and
 #         `->>` operators; the two relevant assertions below are
 #         tightened to the actual values.
@@ -73,10 +74,12 @@ SELECT JSON_OBJECT('a', 1, 'b', 'two') AS o;
 --echo # MySQL / zeta: [1, "two", null, true]
 SELECT JSON_ARRAY(1, 'two', NULL, true) AS a;
 
---echo # ---- JSON_EXTRACT(json, path[, path...]) ----   zeta #1063
---echo # MySQL: extracts via $.-rooted JSON path.
---error 1105
+--echo # ---- JSON_EXTRACT(json, path[, path...]) ----   zeta #1063 FIXED
+--echo # MySQL / zeta: $.-rooted JSON path; single match returns the
+--echo # value, multi-match returns a JSON array. Path parser shared
+--echo # with `->` (zeta #1064).
 SELECT JSON_EXTRACT(j, '$.a') AS a FROM t1 WHERE i = 1;
+SELECT JSON_EXTRACT(j, '$.a', '$.b') AS ab FROM t1 WHERE i = 1;
 
 --echo # ---- `->` operator with MySQL `$.<key>` path syntax ----   zeta #1064 FIXED
 --echo # MySQL / zeta: shorthand for JSON_EXTRACT → 1
