@@ -1,0 +1,106 @@
+=== Functions zeta supports (PG-flavored, MySQL-compatible) ===
+SELECT UPPER('hello') AS v;
+v
+HELLO
+SELECT LOWER('WORLD') AS v;
+v
+world
+SELECT CONCAT('a','b','c') AS v;
+v
+abc
+SELECT SUBSTRING('abcdef', 2, 3) AS v;
+v
+bcd
+SELECT REPLACE('abcabc','b','XX') AS v;
+v
+aXXcaXXc
+SELECT LEFT('abcdef', 3) AS v;
+v
+abc
+SELECT RIGHT('abcdef', 3) AS v;
+v
+def
+SELECT REPEAT('ab', 3) AS v;
+v
+ababab
+SELECT REVERSE('abcdef') AS v;
+v
+fedcba
+SELECT TRIM('  spaced  ') AS v;
+v
+spaced
+SELECT LTRIM('  left') AS v;
+v
+left
+SELECT RTRIM('right  ') AS v;
+v
+right
+=== LENGTH semantics divergence ===
+# MySQL: byte count → 5 for 'café' (c+a+f+0xC3+0xA9)
+# zeta:  char count → 4 (PG-style; LENGTH behaves like CHAR_LENGTH)
+SELECT LENGTH('café') AS v;
+v
+4
+=== Character-length aliases (work) ===
+SELECT CHAR_LENGTH('café') AS v;
+v
+4
+SELECT CHARACTER_LENGTH('café') AS v;
+v
+4
+=== Search-position functions (work) ===
+# LOCATE(needle, haystack[, start]) — 1-based, 0 if not found
+SELECT LOCATE('cd', 'abcdef') AS v;
+v
+3
+# INSTR(haystack, needle) — same result, reversed args
+SELECT INSTR('abcdef', 'cd') AS v;
+v
+3
+=== Codepoint conversion (ASCII works; CHAR missing) ===
+SELECT ASCII('A') AS v;
+v
+65
+SELECT CHAR(65, 66, 67) AS v;
+ERROR 1105: execution error: unknown function: CHAR
+=== Number formatting (works) ===
+# FORMAT(num, decimals) — US-style groupings
+SELECT FORMAT(1234567.891, 2) AS v;
+v
+1,234,567.89
+=== MySQL-flavored aliases for already-supported functions ===
+# These are pure renames — fix is one match arm each.
+SELECT LCASE('WORLD') AS v;
+ERROR 1105: execution error: unknown function: LCASE
+SELECT UCASE('hello') AS v;
+ERROR 1105: execution error: unknown function: UCASE
+# MID — alias for SUBSTRING (same arg order)
+SELECT MID('abcdef', 2, 3) AS v;
+ERROR 1105: execution error: unknown function: MID
+=== MySQL functions with no PG equivalent ===
+# FIELD(x, v1, v2, ...) — 1-based index of x in v-list, 0 if absent
+SELECT FIELD('b', 'a', 'b', 'c') AS v;
+ERROR 1105: execution error: unknown function: FIELD
+# FIND_IN_SET(needle, csv) — 1-based index of needle in CSV
+SELECT FIND_IN_SET('two', 'one,two,three') AS v;
+ERROR 1105: execution error: unknown function: FIND_IN_SET
+# ELT(N, str1, str2, ...) — pick the N-th argument (1-based)
+SELECT ELT(2, 'a', 'b', 'c') AS v;
+ERROR 1105: execution error: unknown function: ELT
+# INSERT(str, pos, len, newstr) — splice newstr into str
+SELECT INSERT('abcdef', 2, 3, 'XYZ') AS v;
+ERROR 1105: execution error: unknown function: INSERT
+# HEX / UNHEX — hex encoding
+SELECT HEX('AB') AS v;
+ERROR 1105: execution error: unknown function: HEX
+SELECT UNHEX('4142') AS v;
+ERROR 1105: execution error: unknown function: UNHEX
+# SPACE(n) — n spaces (alias for REPEAT(' ', n))
+SELECT SPACE(3) AS v;
+ERROR 1105: execution error: unknown function: SPACE
+# QUOTE — SQL-escape and wrap in single quotes
+SELECT QUOTE('its') AS v;
+ERROR 1105: execution error: unknown function: QUOTE
+# SOUNDEX — phonetic encoding
+SELECT SOUNDEX('Robert') AS v;
+ERROR 1105: execution error: unknown function: SOUNDEX
