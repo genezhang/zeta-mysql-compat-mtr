@@ -43,8 +43,9 @@
 #   # zeta-adapt: JSON_SEARCH depends on the `$.path` parser from
 #     zeta #1064 — implementations land together since the return
 #     value IS path strings.
-#   # zeta-adapt: .result is pinned to zeta's *observed* output
-#     (ERROR 1105 for each).
+#   # zeta-adapt: .result is pinned to zeta's *observed* output —
+#     JSON_VALID rows now show the implemented success values
+#     (1 / 0 / NULL); the JSON_SEARCH rows remain ERROR 1105.
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
