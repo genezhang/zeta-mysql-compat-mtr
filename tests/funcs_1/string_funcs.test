@@ -1,0 +1,132 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/funcs_1/t/  (functional test suite for built-in
+#   functions, dense and helper-heavy)
+#
+# Independently authored probe of the most-used MySQL string-function
+# surface — the aliases and shaped-only-in-MySQL functions that don't
+# show up in zeta's Postgres-flavored set. Reuses the same M0
+# pinning convention as tests/json/json_funcs.test.
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy of any MySQL .test file. The
+#     probe selects functions by MySQL/PG divergence, not by upstream
+#     coverage order.
+#   # zeta-adapt: each probe is pinned to zeta's *current* behavior.
+#     For absent functions we pin `--error 1105` (ER_UNKNOWN_ERROR);
+#     for functions zeta supports we pin the actual value. When a
+#     fix lands, drop the `--error` line so the next run captures the
+#     upgrade in the diff.
+#   # zeta-adapt: zeta returns "unknown function" as MySQL errno 1105
+#     not 1305 (ER_SP_DOES_NOT_EXIST) — same pattern as
+#     tests/json/json_funcs.test.
+#   # zeta-adapt: filed gaps:
+#       - zeta #1076 — MySQL string-function aliases & missing
+#         functions (LCASE, UCASE, MID, FIELD, FIND_IN_SET, ELT,
+#         INSERT, HEX, UNHEX, CHAR, SPACE, QUOTE, SOUNDEX), plus
+#         the LENGTH bytes-vs-chars semantic divergence.
+# ----------------------------------------------------------------------
+
+--echo === Functions zeta supports (PG-flavored, MySQL-compatible) ===
+
+SELECT UPPER('hello') AS v;
+SELECT LOWER('WORLD') AS v;
+SELECT CONCAT('a','b','c') AS v;
+SELECT SUBSTRING('abcdef', 2, 3) AS v;
+SELECT REPLACE('abcabc','b','XX') AS v;
+SELECT LEFT('abcdef', 3) AS v;
+SELECT RIGHT('abcdef', 3) AS v;
+SELECT REPEAT('ab', 3) AS v;
+SELECT REVERSE('abcdef') AS v;
+SELECT TRIM('  spaced  ') AS v;
+SELECT LTRIM('  left') AS v;
+SELECT RTRIM('right  ') AS v;
+
+--echo === LENGTH semantics divergence ===
+--echo # MySQL: byte count → 5 for 'café' (c+a+f+0xC3+0xA9)
+--echo # zeta:  char count → 4 (PG-style; LENGTH behaves like CHAR_LENGTH)
+SELECT LENGTH('café') AS v;
+
+--echo === Character-length aliases (work) ===
+SELECT CHAR_LENGTH('café') AS v;
+SELECT CHARACTER_LENGTH('café') AS v;
+
+--echo === Search-position functions (work) ===
+--echo # LOCATE(needle, haystack[, start]) — 1-based, 0 if not found
+SELECT LOCATE('cd', 'abcdef') AS v;
+--echo # INSTR(haystack, needle) — same result, reversed args
+SELECT INSTR('abcdef', 'cd') AS v;
+
+--echo === Codepoint conversion (ASCII works; CHAR missing) ===
+SELECT ASCII('A') AS v;
+--error 1105
+SELECT CHAR(65, 66, 67) AS v;
+
+--echo === Number formatting (works) ===
+--echo # FORMAT(num, decimals) — US-style groupings
+SELECT FORMAT(1234567.891, 2) AS v;
+
+--echo === MySQL-flavored aliases for already-supported functions ===
+--echo # These are pure renames — fix is one match arm each.
+
+--error 1105
+SELECT LCASE('WORLD') AS v;
+--error 1105
+SELECT UCASE('hello') AS v;
+--echo # MID — alias for SUBSTRING (same arg order)
+--error 1105
+SELECT MID('abcdef', 2, 3) AS v;
+
+--echo === MySQL functions with no PG equivalent ===
+
+--echo # FIELD(x, v1, v2, ...) — 1-based index of x in v-list, 0 if absent
+--error 1105
+SELECT FIELD('b', 'a', 'b', 'c') AS v;
+
+--echo # FIND_IN_SET(needle, csv) — 1-based index of needle in CSV
+--error 1105
+SELECT FIND_IN_SET('two', 'one,two,three') AS v;
+
+--echo # ELT(N, str1, str2, ...) — pick the N-th argument (1-based)
+--error 1105
+SELECT ELT(2, 'a', 'b', 'c') AS v;
+
+--echo # INSERT(str, pos, len, newstr) — splice newstr into str
+--error 1105
+SELECT INSERT('abcdef', 2, 3, 'XYZ') AS v;
+
+--echo # HEX / UNHEX — hex encoding
+--error 1105
+SELECT HEX('AB') AS v;
+--error 1105
+SELECT UNHEX('4142') AS v;
+
+--echo # SPACE(n) — n spaces (alias for REPEAT(' ', n))
+--error 1105
+SELECT SPACE(3) AS v;
+
+--echo # QUOTE — SQL-escape and wrap in single quotes. Pick an input
+--echo # with characters MySQL actually has to escape (apostrophe,
+--echo # backslash) so the future pinned result exercises the escape
+--echo # logic, not just the wrap.
+--error 1105
+SELECT QUOTE('it''s a\test') AS v;
+
+--echo # SOUNDEX — phonetic encoding
+--error 1105
+SELECT SOUNDEX('Robert') AS v;
