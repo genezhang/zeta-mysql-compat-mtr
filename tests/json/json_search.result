@@ -15,16 +15,19 @@ ERROR 1105: execution error: unknown function: JSON_SEARCH
 # MySQL: "$[0]"
 SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 2;
 ERROR 1105: execution error: unknown function: JSON_SEARCH
-# ---- JSON_VALID — well-formed JSON string returns 1 ----   zeta #1063
-# MySQL: 1
+# ---- JSON_VALID — well-formed JSON string returns 1 ----   zeta #1063 (JSON_VALID slice FIXED)
+# MySQL / zeta: 1
 SELECT JSON_VALID('{"a": 1}') AS v;
-ERROR 1105: execution error: unknown function: JSON_VALID
-# ---- JSON_VALID — malformed string returns 0 ----   zeta #1063
-# MySQL: 0
+v
+1
+# ---- JSON_VALID — malformed string returns 0 ----   zeta #1063 (JSON_VALID slice FIXED)
+# MySQL / zeta: 0
 SELECT JSON_VALID('{not json}') AS v;
-ERROR 1105: execution error: unknown function: JSON_VALID
-# ---- JSON_VALID — NULL passes through as NULL ----   zeta #1063
-# MySQL: NULL (function is NULL-preserving)
+v
+0
+# ---- JSON_VALID — NULL passes through as NULL ----   zeta #1063 (JSON_VALID slice FIXED)
+# MySQL / zeta: NULL (function is NULL-preserving)
 SELECT JSON_VALID(NULL) AS v;
-ERROR 1105: execution error: unknown function: JSON_VALID
+v
+NULL
 DROP TABLE t1;
