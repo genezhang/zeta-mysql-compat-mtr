@@ -21,17 +21,16 @@ ERROR 1105: execution error: unknown function: JSON_ARRAY
 # MySQL: extracts via $.-rooted JSON path.
 SELECT JSON_EXTRACT(j, '$.a') AS a FROM t1 WHERE i = 1;
 ERROR 1105: execution error: unknown function: JSON_EXTRACT
-# ---- `->` operator with MySQL `$.<key>` path syntax ----   zeta #1064
-# MySQL: shorthand for JSON_EXTRACT (expected: 1).
-# zeta currently treats `$.a` as a literal key, returns NULL.
+# ---- `->` operator with MySQL `$.<key>` path syntax ----   zeta #1064 FIXED
+# MySQL / zeta: shorthand for JSON_EXTRACT → 1
 SELECT j->'$.a' AS a FROM t1 WHERE i = 1;
 a
-NULL
-# ---- `->>` operator with MySQL `$.<key>` path syntax ----   zeta #1064
-# MySQL: shorthand for JSON_UNQUOTE(JSON_EXTRACT(...)) (expected: two).
+1
+# ---- `->>` operator with MySQL `$.<key>` path syntax ----   zeta #1064 FIXED
+# MySQL / zeta: shorthand for JSON_UNQUOTE(JSON_EXTRACT(...)) → two
 SELECT j->>'$.b' AS b FROM t1 WHERE i = 1;
 b
-NULL
+two
 # Same `->` operator with a bare key (PG shape) — currently
 # the only form zeta resolves correctly.
 SELECT j->'a' AS a_bare FROM t1 WHERE i = 1;
