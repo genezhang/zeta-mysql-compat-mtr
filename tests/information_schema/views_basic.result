@@ -40,43 +40,66 @@ INDEX_NAME	SEQ_IN_INDEX	COLUMN_NAME	NON_UNIQUE
 PRIMARY	1	id	0
 customers_email_uk	1	email	0
 customers_name_idx	1	name	1
-=== Unsupported: information_schema.key_column_usage ===
-# MySQL apps query this to discover foreign keys. zeta's
-# stub returns no rows AND no columns. MySQL would emit
-# CONSTRAINT_CATALOG/SCHEMA/NAME, TABLE_*, COLUMN_NAME,
-# ORDINAL_POSITION, POSITION_IN_UNIQUE_CONSTRAINT,
-# REFERENCED_TABLE_SCHEMA/NAME/COLUMN. KNOWN DIVERGENCE.
-SELECT * FROM information_schema.key_column_usage WHERE table_schema='test';
-=== Unsupported: information_schema.table_constraints ===
-# Schema-migration tooling (Liquibase, Flyway) reads this
-# to find PRIMARY KEY / UNIQUE / FOREIGN KEY constraint
-# names. KNOWN DIVERGENCE.
-SELECT * FROM information_schema.table_constraints WHERE table_schema='test';
-=== Unsupported: information_schema.referential_constraints ===
-# MySQL apps cross-reference this with KEY_COLUMN_USAGE
-# to get UPDATE_RULE / DELETE_RULE for foreign keys.
-# KNOWN DIVERGENCE.
-SELECT * FROM information_schema.referential_constraints WHERE constraint_schema='test';
-=== Unsupported: information_schema.views ===
-# Distinguishing BASE TABLE from VIEW currently requires
-# `information_schema.tables.table_type` — VIEW metadata
-# (definition / check_option / is_updatable) is not
-# exposed. KNOWN DIVERGENCE.
-SELECT * FROM information_schema.views WHERE table_schema='test';
+=== Supported: information_schema.key_column_usage (#1100 Phase 1) ===
+# MySQL apps query this to discover foreign keys. zeta now
+# emits one row per PK / UK / FK column. FK rows carry
+# REFERENCED_TABLE_NAME / REFERENCED_COLUMN_NAME and the
+# POSITION_IN_UNIQUE_CONSTRAINT of the referenced column in
+# the parent's PK/UK (NULL for PK / UK rows themselves).
+# KNOWN DIVERGENCE: FK constraint_name is the fully-qualified
+# internal name (`test.public.orders_customer_id_fkey`); MySQL
+# would emit the bare auto-generated name.
+SELECT constraint_name, table_name, column_name, ordinal_position, position_in_unique_constraint, referenced_table_name, referenced_column_name FROM information_schema.key_column_usage WHERE table_schema='test' ORDER BY table_name, constraint_name, ordinal_position;
+CONSTRAINT_NAME	TABLE_NAME	COLUMN_NAME	ORDINAL_POSITION	POSITION_IN_UNIQUE_CONSTRAINT	REFERENCED_TABLE_NAME	REFERENCED_COLUMN_NAME
+PRIMARY	customers	id	1	NULL	NULL	NULL
+customers_email_uk	customers	email	1	NULL	NULL	NULL
+PRIMARY	orders	id	1	NULL	NULL	NULL
+test.public.orders_customer_id_fkey	orders	customer_id	1	1	customers	id
+=== Supported: information_schema.table_constraints (#1100 Phase 1) ===
+# Schema-migration tooling (Liquibase, Flyway) reads this to
+# find PRIMARY KEY / UNIQUE / FOREIGN KEY constraint names.
+SELECT constraint_name, table_name, constraint_type FROM information_schema.table_constraints WHERE table_schema='test' ORDER BY table_name, constraint_type, constraint_name;
+CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
+PRIMARY	customers	PRIMARY KEY
+customers_email_uk	customers	UNIQUE
+PRIMARY	orders	PRIMARY KEY
+test.public.orders_customer_id_fkey	orders	FOREIGN KEY
+=== Supported: information_schema.referential_constraints (#1100 Phase 1) ===
+# MySQL apps cross-reference this with KEY_COLUMN_USAGE to get
+# UPDATE_RULE / DELETE_RULE for foreign keys.
+# UNIQUE_CONSTRAINT_NAME resolves to "PRIMARY" when the FK
+# targets the parent PK; to the matching unique-index name
+# otherwise; NULL when the parent isn't resolvable.
+# KNOWN DIVERGENCE: default referential action when none was
+# specified is NO ACTION (matches MySQL/SQL-standard); zeta
+# parses MySQL's omitted-clause shape the same way.
+SELECT constraint_name, table_name, referenced_table_name, unique_constraint_name, update_rule, delete_rule FROM information_schema.referential_constraints WHERE constraint_schema='test';
+CONSTRAINT_NAME	TABLE_NAME	REFERENCED_TABLE_NAME	UNIQUE_CONSTRAINT_NAME	UPDATE_RULE	DELETE_RULE
+test.public.orders_customer_id_fkey	orders	customers	PRIMARY	NO ACTION	NO ACTION
+=== Supported: information_schema.views (#1100 Phase 1) ===
+# VIEWS now exposes definition / check_option / is_updatable.
+# Probe the empty case first, then create a view and probe again.
+SELECT table_name, is_updatable FROM information_schema.views WHERE table_schema='test';
+CREATE VIEW customer_emails AS SELECT id, email FROM customers;
+SELECT table_name, view_definition, check_option, is_updatable FROM information_schema.views WHERE table_schema='test';
+TABLE_NAME	VIEW_DEFINITION	CHECK_OPTION	IS_UPDATABLE
+customer_emails	SELECT id, email FROM customers	NONE	NO
 === Unsupported: information_schema.character_sets ===
 # Connection-time probe by many MySQL drivers. KNOWN
 # DIVERGENCE — character_set is hardcoded to utf8mb4 in
 # the wire shim but the directory isn't exposed.
+# Tracked as zeta #1100 Phase 2.
 SELECT * FROM information_schema.character_sets WHERE character_set_name='utf8mb4';
 === Unsupported: information_schema.collations ===
-# Common ORM probe. KNOWN DIVERGENCE.
+# Common ORM probe. KNOWN DIVERGENCE. Tracked as #1100 Phase 2.
 SELECT * FROM information_schema.collations WHERE collation_name='utf8mb4_general_ci';
 === Unsupported: information_schema.engines ===
 # MySQL `SHOW ENGINES` / engine-introspection tooling.
-# KNOWN DIVERGENCE.
+# KNOWN DIVERGENCE. Tracked as #1100 Phase 2.
 SELECT * FROM information_schema.engines;
 === Unsupported: information_schema.routines ===
 # PROCEDURE / FUNCTION metadata. KNOWN DIVERGENCE.
+# Tracked as #1100 Phase 3.
 SELECT * FROM information_schema.routines WHERE routine_schema='test';
 === Function-call projection gap ===
 # zeta's info_schema query parser does not accept COUNT(*)
