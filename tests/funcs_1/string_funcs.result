@@ -37,9 +37,11 @@ v
 right
 === LENGTH semantics divergence ===   zeta #1083 FIXED
 # zeta `LENGTH` keeps PG semantics (char count) — 4 for 'café'.
-# MySQL apps that need the byte count now have explicit
-# escape hatches: OCTET_LENGTH (PG name), LENGTHB
-# (Oracle/MySQL convention), and BIT_LENGTH (8 * bytes).
+# MySQL apps that need byte count have explicit escape
+# hatches: OCTET_LENGTH (standard SQL — present in both
+# PG and MySQL) and BIT_LENGTH (PG, 8 * bytes). zeta also
+# ships LENGTHB (Oracle-only convention; nonstandard but
+# ergonomic when porting from Oracle).
 # Build the multi-byte input via CONCAT('caf', CHAR(195, 169))
 # — the SQL parser handles raw 'café' literals with a
 # latin-1 re-encoding step that breaks byte counts in tests.

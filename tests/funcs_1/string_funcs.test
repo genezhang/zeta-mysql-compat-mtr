@@ -65,9 +65,11 @@ SELECT RTRIM('right  ') AS v;
 
 --echo === LENGTH semantics divergence ===   zeta #1083 FIXED
 --echo # zeta `LENGTH` keeps PG semantics (char count) — 4 for 'café'.
---echo # MySQL apps that need the byte count now have explicit
---echo # escape hatches: OCTET_LENGTH (PG name), LENGTHB
---echo # (Oracle/MySQL convention), and BIT_LENGTH (8 * bytes).
+--echo # MySQL apps that need byte count have explicit escape
+--echo # hatches: OCTET_LENGTH (standard SQL — present in both
+--echo # PG and MySQL) and BIT_LENGTH (PG, 8 * bytes). zeta also
+--echo # ships LENGTHB (Oracle-only convention; nonstandard but
+--echo # ergonomic when porting from Oracle).
 --echo # Build the multi-byte input via CONCAT('caf', CHAR(195, 169))
 --echo # — the SQL parser handles raw 'café' literals with a
 --echo # latin-1 re-encoding step that breaks byte counts in tests.
