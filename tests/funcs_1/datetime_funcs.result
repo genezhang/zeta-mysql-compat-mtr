@@ -117,11 +117,20 @@ SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
 ERROR 1105: execution error: unknown function: DATE_FORMAT
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
 ERROR 1105: execution error: unknown function: STR_TO_DATE
-# Epoch conversions.
-SELECT UNIX_TIMESTAMP() AS v;
-ERROR 1105: execution error: unknown function: UNIX_TIMESTAMP
+# Epoch conversions. Slice 3c of zeta #1086 — FIXED.
+# UNIX_TIMESTAMP() is wall-clock; pin shape (>= 10 digit
+# epoch is good through year 2286).
+SELECT LENGTH(CAST(UNIX_TIMESTAMP() AS TEXT)) >= 10 AS shape_ok;
+shape_ok
+1
+# UNIX_TIMESTAMP(d) — fixed-date conversion.
+SELECT UNIX_TIMESTAMP('2024-03-15') AS v;
+v
+1710460800
+# FROM_UNIXTIME — inverse round-trip.
 SELECT FROM_UNIXTIME(1700000000) AS v;
-ERROR 1105: execution error: unknown function: FROM_UNIXTIME
+v
+2023-11-14 22:13:20
 # Day/month names. Slice 3a of zeta #1086 — FIXED.
 SELECT DAYNAME('2024-03-15') AS v;
 v
@@ -129,9 +138,10 @@ Friday
 SELECT MONTHNAME('2024-03-15') AS v;
 v
 March
-# LAST_DAY — end-of-month accessor.
+# LAST_DAY — end-of-month accessor. Slice 3c of #1086 — FIXED.
 SELECT LAST_DAY('2024-02-15') AS v;
-ERROR 1105: execution error: unknown function: LAST_DAY
+v
+2024-02-29
 # TIMESTAMPDIFF — configurable-unit diff. The unit is a bare
 # identifier, not a string — zeta's parser reads it as a
 # column reference (errno 1054), so this is BOTH a missing
@@ -139,6 +149,13 @@ ERROR 1105: execution error: unknown function: LAST_DAY
 # parser support before the function arm helps.
 SELECT TIMESTAMPDIFF(DAY, '2024-03-01', '2024-03-15') AS v;
 ERROR 1054: column not found: DAY
-# TIMEDIFF — time-only diff.
+# TIMEDIFF — signed duration. Slice 3c of #1086 — function
+# exists, but the MySQL shim has no encoder for Interval, so
+# the wire format is currently zeta's debug-rendered
+# `Interval { months: ..., days: ..., microseconds: ... }`.
+# MySQL would emit `02:15:15`. Tracking shim-side formatting
+# as a separate follow-up; pin current output to surface
+# regressions. KNOWN DIVERGENCE.
 SELECT TIMEDIFF('14:30:45', '12:15:30') AS v;
-ERROR 1105: execution error: unknown function: TIMEDIFF
+v
+Interval { months: 0, days: 0, microseconds: 8115000000 }
