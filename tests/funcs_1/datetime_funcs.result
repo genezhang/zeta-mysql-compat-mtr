@@ -62,33 +62,54 @@ SELECT SUBSTRING(CAST(SYSDATE() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
 shape_ok
 1
 === MySQL-only direct accessor functions ===
-# These map onto EXTRACT(<unit> FROM d) but are the names
-# MySQL apps use heavily. PG calls these `extract` only;
-# MySQL apps would need a code rewrite without them.
+# Slice 2 of zeta #1086 — FIXED. These delegate through
+# the existing EXTRACT path with string-literal auto-
+# coercion (MySQL apps don't write `::date` casts).
+# 2024-03-15 is a Friday.
+# MySQL DAYOFWEEK: Sunday=1..Sat=7 → Friday=6
+# MySQL WEEKDAY:   Monday=0..Sun=6 → Friday=4
+# KNOWN DIVERGENCE: WEEK(d) uses ISO/PG week numbering
+# (Mon-start, week 1 contains Jan 4). MySQL default mode 0
+# is Sun-start with different boundary rules — for
+# 2024-03-15 MySQL mode 0 returns 10, zeta/PG returns 11.
+# Pinning the zeta-side value to surface the divergence;
+# add a `mode` arg + mode 0 algorithm in a follow-up.
 SELECT YEAR('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: YEAR
+v
+2024
 SELECT MONTH('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: MONTH
+v
+3
 SELECT DAY('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: DAY
+v
+15
 SELECT HOUR('14:30:45') AS v;
-ERROR 1105: execution error: unknown function: HOUR
+v
+14
 SELECT MINUTE('14:30:45') AS v;
-ERROR 1105: execution error: unknown function: MINUTE
+v
+30
 SELECT SECOND('14:30:45') AS v;
-ERROR 1105: execution error: unknown function: SECOND
+v
+45
 SELECT DAYOFWEEK('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: DAYOFWEEK
+v
+6
 SELECT DAYOFMONTH('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: DAYOFMONTH
+v
+15
 SELECT DAYOFYEAR('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: DAYOFYEAR
+v
+75
 SELECT WEEKDAY('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: WEEKDAY
+v
+4
 SELECT WEEK('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: WEEK
+v
+11
 SELECT QUARTER('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: QUARTER
+v
+1
 === MySQL-only formatting / conversion ===
 # DATE_FORMAT / STR_TO_DATE — MySQL %-format DSL. No PG
 # equivalent (PG uses TO_CHAR / TO_DATE with different syntax).
