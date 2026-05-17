@@ -1,0 +1,89 @@
+=== Setup ===
+CREATE TABLE customers (
+  id INTEGER PRIMARY KEY,
+  email TEXT NOT NULL,
+  name VARCHAR(100)
+);
+CREATE UNIQUE INDEX customers_email_uk ON customers(email);
+CREATE INDEX customers_name_idx ON customers(name);
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY,
+  customer_id INTEGER NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+=== Supported: information_schema.schemata ===
+# MySQL tools call this at connection setup. zeta returns
+# `test` (current DB) and `zeta` (default), pinning shape.
+SELECT schema_name FROM information_schema.schemata WHERE schema_name='test';
+SCHEMA_NAME
+test
+=== Supported: information_schema.tables ===
+# Probe filters by table_schema (the conventional WHERE).
+SELECT table_name FROM information_schema.tables WHERE table_schema='test' ORDER BY table_name;
+TABLE_NAME
+customers
+orders
+=== Supported: information_schema.columns ===
+# Column metadata for `customers` — pin column_name +
+# data_type + key + nullable since they're what every
+# ORM autoload reads.
+SELECT column_name, data_type, is_nullable, column_key FROM information_schema.columns WHERE table_schema='test' AND table_name='customers' ORDER BY ordinal_position;
+COLUMN_NAME	DATA_TYPE	IS_NULLABLE	COLUMN_KEY
+id	int	NO	PRI
+email	text	NO	UNI
+name	varchar	YES	MUL
+=== Supported: information_schema.statistics ===
+# Index metadata for `customers` — pin PRIMARY +
+# secondary indexes with their cardinality info.
+SELECT index_name, seq_in_index, column_name, non_unique FROM information_schema.statistics WHERE table_schema='test' AND table_name='customers' ORDER BY index_name, seq_in_index;
+INDEX_NAME	SEQ_IN_INDEX	COLUMN_NAME	NON_UNIQUE
+PRIMARY	1	id	0
+customers_email_uk	1	email	0
+customers_name_idx	1	name	1
+=== Unsupported: information_schema.key_column_usage ===
+# MySQL apps query this to discover foreign keys. zeta's
+# stub returns no rows AND no columns. MySQL would emit
+# CONSTRAINT_CATALOG/SCHEMA/NAME, TABLE_*, COLUMN_NAME,
+# ORDINAL_POSITION, POSITION_IN_UNIQUE_CONSTRAINT,
+# REFERENCED_TABLE_SCHEMA/NAME/COLUMN. KNOWN DIVERGENCE.
+SELECT * FROM information_schema.key_column_usage WHERE table_schema='test';
+=== Unsupported: information_schema.table_constraints ===
+# Schema-migration tooling (Liquibase, Flyway) reads this
+# to find PRIMARY KEY / UNIQUE / FOREIGN KEY constraint
+# names. KNOWN DIVERGENCE.
+SELECT * FROM information_schema.table_constraints WHERE table_schema='test';
+=== Unsupported: information_schema.referential_constraints ===
+# MySQL apps cross-reference this with KEY_COLUMN_USAGE
+# to get UPDATE_RULE / DELETE_RULE for foreign keys.
+# KNOWN DIVERGENCE.
+SELECT * FROM information_schema.referential_constraints WHERE constraint_schema='test';
+=== Unsupported: information_schema.views ===
+# Distinguishing BASE TABLE from VIEW currently requires
+# `information_schema.tables.table_type` — VIEW metadata
+# (definition / check_option / is_updatable) is not
+# exposed. KNOWN DIVERGENCE.
+SELECT * FROM information_schema.views WHERE table_schema='test';
+=== Unsupported: information_schema.character_sets ===
+# Connection-time probe by many MySQL drivers. KNOWN
+# DIVERGENCE — character_set is hardcoded to utf8mb4 in
+# the wire shim but the directory isn't exposed.
+SELECT * FROM information_schema.character_sets WHERE character_set_name='utf8mb4';
+=== Unsupported: information_schema.collations ===
+# Common ORM probe. KNOWN DIVERGENCE.
+SELECT * FROM information_schema.collations WHERE collation_name='utf8mb4_general_ci';
+=== Unsupported: information_schema.engines ===
+# MySQL `SHOW ENGINES` / engine-introspection tooling.
+# KNOWN DIVERGENCE.
+SELECT * FROM information_schema.engines;
+=== Unsupported: information_schema.routines ===
+# PROCEDURE / FUNCTION metadata. KNOWN DIVERGENCE.
+SELECT * FROM information_schema.routines WHERE routine_schema='test';
+=== Function-call projection gap ===
+# zeta's info_schema query parser does not accept COUNT(*)
+# (or any function-call / expression projection) in any
+# info_schema view. ORMs / migration tools that issue
+# `SELECT COUNT(*) FROM information_schema.tables` to size
+# a connection pool will get errno 1235 instead of a row.
+# Note: errno 1235 (ER_NOT_SUPPORTED_YET) rather than 1054.
+SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='test';
+ERROR 1235: information_schema queries with function call or expression are not yet supported by zeta's MySQL wire shim

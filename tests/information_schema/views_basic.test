@@ -1,0 +1,144 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/funcs_1/t/ (information_schema coverage —
+#   independently authored probe of the views MySQL apps and
+#   ORMs lean on most).
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy of any MySQL .test file.
+#     Probe selected from the views MySQL tools and ORMs hit at
+#     connection setup (SCHEMATA / TABLES / COLUMNS / STATISTICS)
+#     plus the schema-introspection views (KEY_COLUMN_USAGE,
+#     TABLE_CONSTRAINTS, REFERENTIAL_CONSTRAINTS, VIEWS) that
+#     Liquibase / Flyway / SQLAlchemy autoload use.
+#   # zeta-adapt: pinned to zeta's *current* behavior. Supported
+#     views get the actual returned rows; unsupported views get
+#     a "returns 0 rows / 0 cols" pin so the divergence is visible.
+#   # zeta-adapt: file follow-up: zeta info_schema queries don't
+#     accept COUNT(*) or other function-call projections (errno
+#     1235). And the stub for unimplemented views returns an
+#     empty row set with no column header at all — MySQL would
+#     emit the column schema with zero rows. Both are real
+#     compat gaps for tools that introspect schema by COUNT or
+#     by reading column metadata.
+# ----------------------------------------------------------------------
+
+--echo === Setup ===
+
+CREATE TABLE customers (
+  id INTEGER PRIMARY KEY,
+  email TEXT NOT NULL,
+  name VARCHAR(100)
+);
+CREATE UNIQUE INDEX customers_email_uk ON customers(email);
+CREATE INDEX customers_name_idx ON customers(name);
+
+CREATE TABLE orders (
+  id INTEGER PRIMARY KEY,
+  customer_id INTEGER NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+
+--echo === Supported: information_schema.schemata ===
+--echo # MySQL tools call this at connection setup. zeta returns
+--echo # `test` (current DB) and `zeta` (default), pinning shape.
+
+SELECT schema_name FROM information_schema.schemata WHERE schema_name='test';
+
+--echo === Supported: information_schema.tables ===
+--echo # Probe filters by table_schema (the conventional WHERE).
+
+SELECT table_name FROM information_schema.tables WHERE table_schema='test' ORDER BY table_name;
+
+--echo === Supported: information_schema.columns ===
+--echo # Column metadata for `customers` — pin column_name +
+--echo # data_type + key + nullable since they're what every
+--echo # ORM autoload reads.
+
+SELECT column_name, data_type, is_nullable, column_key FROM information_schema.columns WHERE table_schema='test' AND table_name='customers' ORDER BY ordinal_position;
+
+--echo === Supported: information_schema.statistics ===
+--echo # Index metadata for `customers` — pin PRIMARY +
+--echo # secondary indexes with their cardinality info.
+
+SELECT index_name, seq_in_index, column_name, non_unique FROM information_schema.statistics WHERE table_schema='test' AND table_name='customers' ORDER BY index_name, seq_in_index;
+
+--echo === Unsupported: information_schema.key_column_usage ===
+--echo # MySQL apps query this to discover foreign keys. zeta's
+--echo # stub returns no rows AND no columns. MySQL would emit
+--echo # CONSTRAINT_CATALOG/SCHEMA/NAME, TABLE_*, COLUMN_NAME,
+--echo # ORDINAL_POSITION, POSITION_IN_UNIQUE_CONSTRAINT,
+--echo # REFERENCED_TABLE_SCHEMA/NAME/COLUMN. KNOWN DIVERGENCE.
+
+SELECT * FROM information_schema.key_column_usage WHERE table_schema='test';
+
+--echo === Unsupported: information_schema.table_constraints ===
+--echo # Schema-migration tooling (Liquibase, Flyway) reads this
+--echo # to find PRIMARY KEY / UNIQUE / FOREIGN KEY constraint
+--echo # names. KNOWN DIVERGENCE.
+
+SELECT * FROM information_schema.table_constraints WHERE table_schema='test';
+
+--echo === Unsupported: information_schema.referential_constraints ===
+--echo # MySQL apps cross-reference this with KEY_COLUMN_USAGE
+--echo # to get UPDATE_RULE / DELETE_RULE for foreign keys.
+--echo # KNOWN DIVERGENCE.
+
+SELECT * FROM information_schema.referential_constraints WHERE constraint_schema='test';
+
+--echo === Unsupported: information_schema.views ===
+--echo # Distinguishing BASE TABLE from VIEW currently requires
+--echo # `information_schema.tables.table_type` — VIEW metadata
+--echo # (definition / check_option / is_updatable) is not
+--echo # exposed. KNOWN DIVERGENCE.
+
+SELECT * FROM information_schema.views WHERE table_schema='test';
+
+--echo === Unsupported: information_schema.character_sets ===
+--echo # Connection-time probe by many MySQL drivers. KNOWN
+--echo # DIVERGENCE — character_set is hardcoded to utf8mb4 in
+--echo # the wire shim but the directory isn't exposed.
+
+SELECT * FROM information_schema.character_sets WHERE character_set_name='utf8mb4';
+
+--echo === Unsupported: information_schema.collations ===
+--echo # Common ORM probe. KNOWN DIVERGENCE.
+
+SELECT * FROM information_schema.collations WHERE collation_name='utf8mb4_general_ci';
+
+--echo === Unsupported: information_schema.engines ===
+--echo # MySQL `SHOW ENGINES` / engine-introspection tooling.
+--echo # KNOWN DIVERGENCE.
+
+SELECT * FROM information_schema.engines;
+
+--echo === Unsupported: information_schema.routines ===
+--echo # PROCEDURE / FUNCTION metadata. KNOWN DIVERGENCE.
+
+SELECT * FROM information_schema.routines WHERE routine_schema='test';
+
+--echo === Function-call projection gap ===
+--echo # zeta's info_schema query parser does not accept COUNT(*)
+--echo # (or any function-call / expression projection) in any
+--echo # info_schema view. ORMs / migration tools that issue
+--echo # `SELECT COUNT(*) FROM information_schema.tables` to size
+--echo # a connection pool will get errno 1235 instead of a row.
+--echo # Note: errno 1235 (ER_NOT_SUPPORTED_YET) rather than 1054.
+
+--error 1235
+SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='test';
