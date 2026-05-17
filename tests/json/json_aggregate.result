@@ -25,12 +25,15 @@ grp	arr
 SELECT JSON_OBJECTAGG(i, val) AS obj FROM t1;
 obj
 {"1":"apple","2":"banana","3":"cherry","4":"date"}
-# ---- JSON_QUOTE — escape a string for JSON ----   zeta #1063
-# MySQL: returns "hello \"world\"" (with surrounding double quotes)
+# ---- JSON_QUOTE — escape a string for JSON ----   zeta #1063 FIXED
+# MySQL / zeta: returns "hello \"world\"" (with surrounding double quotes)
 SELECT JSON_QUOTE('hello "world"') AS q;
-ERROR 1105: execution error: unknown function: JSON_QUOTE
-# ---- JSON_UNQUOTE — strip the surrounding quotes from a JSON string ----   zeta #1063
-# MySQL: returns "hello" (without surrounding quotes)
+q
+"hello \"world\""
+# ---- JSON_UNQUOTE — strip the surrounding quotes from a JSON string ----   zeta #1063 FIXED
+# MySQL / zeta: returns hello (the unwrapped 5-char text — no
+# surrounding double-quotes, as the .result row below shows).
 SELECT JSON_UNQUOTE('"hello"') AS u;
-ERROR 1105: execution error: unknown function: JSON_UNQUOTE
+u
+hello
 DROP TABLE t1;
