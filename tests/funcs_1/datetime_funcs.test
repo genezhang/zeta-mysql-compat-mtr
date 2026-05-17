@@ -1,0 +1,154 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/funcs_1/t/  (functional test suite for built-in
+#   date/time functions)
+#
+# Independently authored probe of the most-used MySQL date/time
+# function surface. Same M0 runner conventions as
+# tests/funcs_1/string_funcs.test.
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy of any MySQL .test file.
+#     Probe selected by MySQL/PG divergence — the MySQL accessor
+#     names (YEAR, MONTH, DAY...) and the format-string family
+#     (DATE_FORMAT, STR_TO_DATE) that MySQL apps lean on most.
+#   # zeta-adapt: pinned to zeta's *current* behavior. For absent
+#     functions we pin `--error 1105`; for functions that exist
+#     but need explicit casts we pin the working-with-cast form
+#     and note the divergence.
+#   # zeta-adapt: filed gap: zeta #1086 — MySQL date/time function
+#     aliases & missing functions. Spec lays out 4 fix slices:
+#     (1) CURDATE/CURTIME/SYSDATE renames, (2) direct accessor
+#     functions (YEAR/MONTH/DAY/...) delegating to EXTRACT,
+#     (3) DATE_FORMAT/STR_TO_DATE %-format DSL plus DAY/MONTHNAME,
+#     (4) epoch + TIMESTAMPDIFF (the last needs parser work for
+#     bare-identifier unit args).
+# ----------------------------------------------------------------------
+
+--echo === Functions zeta already supports ===
+
+--echo # CURRENT_DATE — works as both with and without parens in MySQL/PG.
+--echo # Pin the year-month-day shape; ignore the specific date since
+--echo # it changes daily.
+SELECT LENGTH(CAST(CURRENT_DATE() AS TEXT)) AS date_str_len;
+
+--echo # CURRENT_TIME — zeta returns microseconds (HH:MM:SS.NNNNNN);
+--echo # MySQL returns HH:MM:SS by default. Pin via SUBSTRING for the
+--echo # HH:MM: prefix that both engines share.
+SELECT SUBSTRING(CAST(CURRENT_TIME() AS TEXT), 1, 6) LIKE '__:__:' AS shape_ok;
+
+--echo # NOW — same microsecond divergence as CURRENT_TIME.
+SELECT SUBSTRING(CAST(NOW() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
+
+--echo === Date arithmetic (works, requires explicit cast) ===
+
+--echo # DATE_ADD — implementation present but parser doesn't auto-
+--echo # coerce string-literal dates. With `::date` it works.
+--echo # MySQL would accept DATE_ADD('2024-03-15', INTERVAL 7 DAY).
+SELECT DATE_ADD('2024-03-15'::date, INTERVAL '7' DAY) AS v;
+SELECT DATE_SUB('2024-03-15'::date, INTERVAL '7' DAY) AS v;
+SELECT ADDDATE('2024-03-15'::date, 7) AS v;
+
+--echo # DATEDIFF — works directly on string dates (no cast needed).
+SELECT DATEDIFF('2024-03-15','2024-03-01') AS v;
+
+--echo === Component extraction (PG-flavored only) ===
+--echo # zeta provides EXTRACT and TO_CHAR (PG syntax). MySQL apps
+--echo # typically call YEAR(d) / MONTH(d) / DAY(d) — those are
+--echo # missing in zeta (probed below).
+SELECT EXTRACT(YEAR FROM '2024-03-15'::date) AS year;
+SELECT EXTRACT(MONTH FROM '2024-03-15'::date) AS month;
+SELECT EXTRACT(DAY FROM '2024-03-15'::date) AS day;
+SELECT TO_CHAR('2024-03-15'::date, 'YYYY-MM-DD') AS formatted;
+
+--echo === MySQL aliases for already-supported functions ===
+--echo # Pure renames — one match arm each.
+
+--error 1105
+SELECT CURDATE() AS v;
+--error 1105
+SELECT CURTIME() AS v;
+--error 1105
+SELECT SYSDATE() AS v;
+
+--echo === MySQL-only direct accessor functions ===
+--echo # These map onto EXTRACT(<unit> FROM d) but are the names
+--echo # MySQL apps use heavily. PG calls these `extract` only;
+--echo # MySQL apps would need a code rewrite without them.
+
+--error 1105
+SELECT YEAR('2024-03-15') AS v;
+--error 1105
+SELECT MONTH('2024-03-15') AS v;
+--error 1105
+SELECT DAY('2024-03-15') AS v;
+--error 1105
+SELECT HOUR('14:30:45') AS v;
+--error 1105
+SELECT MINUTE('14:30:45') AS v;
+--error 1105
+SELECT SECOND('14:30:45') AS v;
+--error 1105
+SELECT DAYOFWEEK('2024-03-15') AS v;
+--error 1105
+SELECT DAYOFMONTH('2024-03-15') AS v;
+--error 1105
+SELECT DAYOFYEAR('2024-03-15') AS v;
+--error 1105
+SELECT WEEKDAY('2024-03-15') AS v;
+--error 1105
+SELECT WEEK('2024-03-15') AS v;
+--error 1105
+SELECT QUARTER('2024-03-15') AS v;
+
+--echo === MySQL-only formatting / conversion ===
+
+--echo # DATE_FORMAT / STR_TO_DATE — MySQL %-format DSL. No PG
+--echo # equivalent (PG uses TO_CHAR / TO_DATE with different syntax).
+--error 1105
+SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
+--error 1105
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
+
+--echo # Epoch conversions.
+--error 1105
+SELECT UNIX_TIMESTAMP() AS v;
+--error 1105
+SELECT FROM_UNIXTIME(1700000000) AS v;
+
+--echo # Day/month names (Sunday, March, etc.).
+--error 1105
+SELECT DAYNAME('2024-03-15') AS v;
+--error 1105
+SELECT MONTHNAME('2024-03-15') AS v;
+
+--echo # LAST_DAY — end-of-month accessor.
+--error 1105
+SELECT LAST_DAY('2024-02-15') AS v;
+
+--echo # TIMESTAMPDIFF — configurable-unit diff. The unit is a bare
+--echo # identifier, not a string — zeta's parser reads it as a
+--echo # column reference (errno 1054), so this is BOTH a missing
+--echo # function and a parser-grammar gap. MySQL apps would need
+--echo # parser support before the function arm helps.
+--error 1054
+SELECT TIMESTAMPDIFF(DAY, '2024-03-01', '2024-03-15') AS v;
+
+--echo # TIMEDIFF — time-only diff.
+--error 1105
+SELECT TIMEDIFF('14:30:45', '12:15:30') AS v;

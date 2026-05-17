@@ -1,0 +1,116 @@
+=== Functions zeta already supports ===
+# CURRENT_DATE — works as both with and without parens in MySQL/PG.
+# Pin the year-month-day shape; ignore the specific date since
+# it changes daily.
+SELECT LENGTH(CAST(CURRENT_DATE() AS TEXT)) AS date_str_len;
+date_str_len
+10
+# CURRENT_TIME — zeta returns microseconds (HH:MM:SS.NNNNNN);
+# MySQL returns HH:MM:SS by default. Pin via SUBSTRING for the
+# HH:MM: prefix that both engines share.
+SELECT SUBSTRING(CAST(CURRENT_TIME() AS TEXT), 1, 6) LIKE '__:__:' AS shape_ok;
+shape_ok
+1
+# NOW — same microsecond divergence as CURRENT_TIME.
+SELECT SUBSTRING(CAST(NOW() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
+shape_ok
+1
+=== Date arithmetic (works, requires explicit cast) ===
+# DATE_ADD — implementation present but parser doesn't auto-
+# coerce string-literal dates. With `::date` it works.
+# MySQL would accept DATE_ADD('2024-03-15', INTERVAL 7 DAY).
+SELECT DATE_ADD('2024-03-15'::date, INTERVAL '7' DAY) AS v;
+v
+2024-03-22 00:00:00
+SELECT DATE_SUB('2024-03-15'::date, INTERVAL '7' DAY) AS v;
+v
+2024-03-08 00:00:00
+SELECT ADDDATE('2024-03-15'::date, 7) AS v;
+v
+2024-03-22
+# DATEDIFF — works directly on string dates (no cast needed).
+SELECT DATEDIFF('2024-03-15','2024-03-01') AS v;
+v
+14
+=== Component extraction (PG-flavored only) ===
+# zeta provides EXTRACT and TO_CHAR (PG syntax). MySQL apps
+# typically call YEAR(d) / MONTH(d) / DAY(d) — those are
+# missing in zeta (probed below).
+SELECT EXTRACT(YEAR FROM '2024-03-15'::date) AS year;
+year
+2024
+SELECT EXTRACT(MONTH FROM '2024-03-15'::date) AS month;
+month
+3
+SELECT EXTRACT(DAY FROM '2024-03-15'::date) AS day;
+day
+15
+SELECT TO_CHAR('2024-03-15'::date, 'YYYY-MM-DD') AS formatted;
+formatted
+2024-03-15
+=== MySQL aliases for already-supported functions ===
+# Pure renames — one match arm each.
+SELECT CURDATE() AS v;
+ERROR 1105: execution error: unknown function: CURDATE
+SELECT CURTIME() AS v;
+ERROR 1105: execution error: unknown function: CURTIME
+SELECT SYSDATE() AS v;
+ERROR 1105: execution error: unknown function: SYSDATE
+=== MySQL-only direct accessor functions ===
+# These map onto EXTRACT(<unit> FROM d) but are the names
+# MySQL apps use heavily. PG calls these `extract` only;
+# MySQL apps would need a code rewrite without them.
+SELECT YEAR('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: YEAR
+SELECT MONTH('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: MONTH
+SELECT DAY('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: DAY
+SELECT HOUR('14:30:45') AS v;
+ERROR 1105: execution error: unknown function: HOUR
+SELECT MINUTE('14:30:45') AS v;
+ERROR 1105: execution error: unknown function: MINUTE
+SELECT SECOND('14:30:45') AS v;
+ERROR 1105: execution error: unknown function: SECOND
+SELECT DAYOFWEEK('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: DAYOFWEEK
+SELECT DAYOFMONTH('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: DAYOFMONTH
+SELECT DAYOFYEAR('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: DAYOFYEAR
+SELECT WEEKDAY('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: WEEKDAY
+SELECT WEEK('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: WEEK
+SELECT QUARTER('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: QUARTER
+=== MySQL-only formatting / conversion ===
+# DATE_FORMAT / STR_TO_DATE — MySQL %-format DSL. No PG
+# equivalent (PG uses TO_CHAR / TO_DATE with different syntax).
+SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
+ERROR 1105: execution error: unknown function: DATE_FORMAT
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
+ERROR 1105: execution error: unknown function: STR_TO_DATE
+# Epoch conversions.
+SELECT UNIX_TIMESTAMP() AS v;
+ERROR 1105: execution error: unknown function: UNIX_TIMESTAMP
+SELECT FROM_UNIXTIME(1700000000) AS v;
+ERROR 1105: execution error: unknown function: FROM_UNIXTIME
+# Day/month names (Sunday, March, etc.).
+SELECT DAYNAME('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: DAYNAME
+SELECT MONTHNAME('2024-03-15') AS v;
+ERROR 1105: execution error: unknown function: MONTHNAME
+# LAST_DAY — end-of-month accessor.
+SELECT LAST_DAY('2024-02-15') AS v;
+ERROR 1105: execution error: unknown function: LAST_DAY
+# TIMESTAMPDIFF — configurable-unit diff. The unit is a bare
+# identifier, not a string — zeta's parser reads it as a
+# column reference (errno 1054), so this is BOTH a missing
+# function and a parser-grammar gap. MySQL apps would need
+# parser support before the function arm helps.
+SELECT TIMESTAMPDIFF(DAY, '2024-03-01', '2024-03-15') AS v;
+ERROR 1054: column not found: DAY
+# TIMEDIFF — time-only diff.
+SELECT TIMEDIFF('14:30:45', '12:15:30') AS v;
+ERROR 1105: execution error: unknown function: TIMEDIFF
