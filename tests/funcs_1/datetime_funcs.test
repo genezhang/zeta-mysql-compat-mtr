@@ -155,11 +155,13 @@ SELECT LAST_DAY('2024-02-15') AS v;
 --error 1054
 SELECT TIMESTAMPDIFF(DAY, '2024-03-01', '2024-03-15') AS v;
 
---echo # TIMEDIFF — signed duration. Slice 3c of #1086 — function
---echo # exists, but the MySQL shim has no encoder for Interval, so
---echo # the wire format is currently zeta's debug-rendered
---echo # `Interval { months: ..., days: ..., microseconds: ... }`.
---echo # MySQL would emit `02:15:15`. Tracking shim-side formatting
---echo # as a separate follow-up; pin current output to surface
---echo # regressions. KNOWN DIVERGENCE.
+--echo # TIMEDIFF — signed duration. Slice 3c of #1086 + the
+--echo # Interval→TIME MySQL wire encoder from zeta #1096. The
+--echo # earlier KNOWN DIVERGENCE (debug-rendered Interval wire
+--echo # shape) is now CLOSED — the encoder folds days into hours
+--echo # and emits MySQL TIME (`[-]HH:MM:SS[.ffffff]`).
 SELECT TIMEDIFF('14:30:45', '12:15:30') AS v;
+--echo # Negative diff.
+SELECT TIMEDIFF('12:00:00', '14:00:00') AS v;
+--echo # Sub-second precision.
+SELECT TIMEDIFF('2024-03-15 14:30:45', '2024-03-15 12:15:30.123456') AS v;
