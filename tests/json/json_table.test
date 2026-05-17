@@ -15,7 +15,7 @@
 #
 # ----------------------------------------------------------------------
 # Inspired by MySQL 8.0 source:
-#   mysql-test/suite/json/inc/json_table.test
+#   mysql-test/suite/json/t/json_table.test
 #   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/t/json_table.test
 #
 # Probes the SIMPLE shape of JSON_TABLE — the lateral-expansion
@@ -32,7 +32,7 @@
 #
 # JSON_TABLE has its own SQL grammar (it's not a regular function
 # call), so absent support typically shows up as a parser-level
-# error (1064 / SQLSTATE 42000) rather than the runtime
+# error (errno 1064, SQLSTATE 42000) rather than the runtime
 # "unknown function 1105" we see elsewhere. The probe pins whichever
 # zeta emits.
 #
@@ -45,11 +45,11 @@
 #     deferred to follow-up probes once the base parser support
 #     lands.
 #   # zeta-adapt: zeta rejects JSON_TABLE at parse time with error
-#     1064 (HY000) — the parser's FROM-clause grammar doesn't accept
-#     JSON_TABLE's COLUMNS subclause syntax. Tracked as zeta #1065,
-#     filed separately from #1063 (which is about runtime function
-#     aliases). When parser support lands, drop the `--error 1064`
-#     line so the .result captures actual rows.
+#     1064 (SQLSTATE 42000) — the parser's FROM-clause grammar
+#     doesn't accept JSON_TABLE's COLUMNS subclause syntax. Tracked
+#     as zeta #1065, filed separately from #1063 (which is about
+#     runtime function aliases). When parser support lands, drop
+#     the `--error 1064` line so the .result captures actual rows.
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
