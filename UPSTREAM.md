@@ -27,7 +27,7 @@ recorded here; individual test files retain their original GPL v2 headers.
 - Source: https://github.com/mysql/mysql-server (`mysql-test/suite/json/inc/`
   and `mysql-test/suite/json/t/`; pure `mysql-test/t/json*.test` are
   EXPLAIN-focused and not relevant to function/storage coverage)
-- Tracking version: MySQL 8.0 (branch tip)
+- Tracking version: mysql-8.0.46 (tag, commit `0a7df2e4693d8f10901a26034ae6257699356e30`)
 - Last sync: 2026-05-16
 - Notes: First seed is `json_basic.test`, a hand-trimmed subset of
   `inc/json_insert.inc` covering CREATE/INSERT/SELECT on a JSON column.

@@ -16,19 +16,19 @@
 # ----------------------------------------------------------------------
 # Adapted (subset) from MySQL 8.0 source:
 #   mysql-test/suite/json/inc/json_insert.inc
-#   https://github.com/mysql/mysql-server/blob/8.0/mysql-test/suite/json/inc/json_insert.inc
+#   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/inc/json_insert.inc
 #
-# Adaptation notes (search `zeta-adapt:` below):
-#   * Trimmed to the core "CREATE table with JSON column, INSERT, SELECT"
-#     surface. Prepared-statement, charset/collation, and geometry slices
-#     deferred to follow-up tests.
-#   * MySQL-specific options (`CHARSET utf8mb4`) removed; zeta defaults
-#     match the test's expectations.
-#   * `--error ER_INVALID_JSON_TEXT` cases deferred — zeta's MySQL shim
-#     error code mapping for malformed JSON literals is a separate gap to
-#     characterize before pinning expectations.
-#   * The companion .result is pinned to zeta's *observed* output, not
-#     MySQL's canonical output. Known divergences:
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: trimmed to the core "CREATE table with JSON column,
+#     INSERT, SELECT" surface. Prepared-statement, charset/collation, and
+#     geometry slices are deferred to follow-up tests.
+#   # zeta-adapt: removed MySQL-specific options (`CHARSET utf8mb4`);
+#     zeta defaults match the test's expectations.
+#   # zeta-adapt: dropped `--error ER_INVALID_JSON_TEXT` cases — zeta's
+#     MySQL shim error-code mapping for malformed JSON literals is a
+#     separate gap to characterize before pinning expectations.
+#   # zeta-adapt: companion .result is pinned to zeta's *observed* output,
+#     not MySQL's canonical output. Known divergences:
 #       - Object key ordering: zeta sorts alphabetically; MySQL sorts by
 #         length-then-alphabetically. See zeta #1062. Visible in the
 #         nested-object SELECT (`SELECT j FROM t1 WHERE i = 12`).
