@@ -122,9 +122,12 @@ SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
 
 --echo # Epoch conversions. Slice 3c of zeta #1086 — FIXED.
---echo # UNIX_TIMESTAMP() is wall-clock; pin shape (>= 10 digit
---echo # epoch is good through year 2286).
-SELECT LENGTH(CAST(UNIX_TIMESTAMP() AS TEXT)) >= 10 AS shape_ok;
+--echo # UNIX_TIMESTAMP() is wall-clock; pin exact 10-digit shape
+--echo # so a unit regression (ms = 13 digits, µs = 16) is caught
+--echo # rather than passing the length check. 10-digit epoch is
+--echo # stable from 2001-09-09 (epoch 1_000_000_000) through
+--echo # 2286-11-20 (epoch 9_999_999_999).
+SELECT LENGTH(CAST(UNIX_TIMESTAMP() AS TEXT)) = 10 AS shape_ok;
 --echo # UNIX_TIMESTAMP(d) — fixed-date conversion.
 SELECT UNIX_TIMESTAMP('2024-03-15') AS v;
 --echo # FROM_UNIXTIME — inverse round-trip.

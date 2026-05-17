@@ -118,9 +118,12 @@ ERROR 1105: execution error: unknown function: DATE_FORMAT
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
 ERROR 1105: execution error: unknown function: STR_TO_DATE
 # Epoch conversions. Slice 3c of zeta #1086 — FIXED.
-# UNIX_TIMESTAMP() is wall-clock; pin shape (>= 10 digit
-# epoch is good through year 2286).
-SELECT LENGTH(CAST(UNIX_TIMESTAMP() AS TEXT)) >= 10 AS shape_ok;
+# UNIX_TIMESTAMP() is wall-clock; pin exact 10-digit shape
+# so a unit regression (ms = 13 digits, µs = 16) is caught
+# rather than passing the length check. 10-digit epoch is
+# stable from 2001-09-09 (epoch 1_000_000_000) through
+# 2286-11-20 (epoch 9_999_999_999).
+SELECT LENGTH(CAST(UNIX_TIMESTAMP() AS TEXT)) = 10 AS shape_ok;
 shape_ok
 1
 # UNIX_TIMESTAMP(d) — fixed-date conversion.
