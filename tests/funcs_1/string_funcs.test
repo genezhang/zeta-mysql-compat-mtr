@@ -103,7 +103,8 @@ SELECT FIND_IN_SET('two', 'one,two,three') AS v;
 SELECT ELT(2, 'a', 'b', 'c') AS v;
 
 --echo # INSERT(str, pos, len, newstr) — splice newstr into str
---error 1105
+--echo # Slice 3 of zeta #1076 — FIXED. (Note: MySQL function INSERT,
+--echo # not the SQL INSERT statement — parser disambiguates.)
 SELECT INSERT('abcdef', 2, 3, 'XYZ') AS v;
 
 --echo # HEX / UNHEX — hex encoding
@@ -112,15 +113,15 @@ SELECT HEX('AB') AS v;
 --error 1105
 SELECT UNHEX('4142') AS v;
 
---echo # SPACE(n) — n spaces (alias for REPEAT(' ', n))
---error 1105
-SELECT SPACE(3) AS v;
+--echo # SPACE(n) — n spaces (alias for REPEAT(' ', n)). Bracket the
+--echo # output so trailing-whitespace handling in the .result file
+--echo # doesn't matter.
+SELECT CONCAT('[', SPACE(3), ']') AS v;
 
 --echo # QUOTE — SQL-escape and wrap in single quotes. Pick an input
 --echo # with characters MySQL actually has to escape (apostrophe,
 --echo # backslash) so the future pinned result exercises the escape
 --echo # logic, not just the wrap.
---error 1105
 SELECT QUOTE('it''s a\test') AS v;
 
 --echo # SOUNDEX — phonetic encoding

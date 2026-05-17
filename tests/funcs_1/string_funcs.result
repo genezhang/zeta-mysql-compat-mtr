@@ -96,22 +96,29 @@ SELECT ELT(2, 'a', 'b', 'c') AS v;
 v
 b
 # INSERT(str, pos, len, newstr) — splice newstr into str
+# Slice 3 of zeta #1076 — FIXED. (Note: MySQL function INSERT,
+# not the SQL INSERT statement — parser disambiguates.)
 SELECT INSERT('abcdef', 2, 3, 'XYZ') AS v;
-ERROR 1105: execution error: unknown function: INSERT
+v
+aXYZef
 # HEX / UNHEX — hex encoding
 SELECT HEX('AB') AS v;
 ERROR 1105: execution error: unknown function: HEX
 SELECT UNHEX('4142') AS v;
 ERROR 1105: execution error: unknown function: UNHEX
-# SPACE(n) — n spaces (alias for REPEAT(' ', n))
-SELECT SPACE(3) AS v;
-ERROR 1105: execution error: unknown function: SPACE
+# SPACE(n) — n spaces (alias for REPEAT(' ', n)). Bracket the
+# output so trailing-whitespace handling in the .result file
+# doesn't matter.
+SELECT CONCAT('[', SPACE(3), ']') AS v;
+v
+[   ]
 # QUOTE — SQL-escape and wrap in single quotes. Pick an input
 # with characters MySQL actually has to escape (apostrophe,
 # backslash) so the future pinned result exercises the escape
 # logic, not just the wrap.
 SELECT QUOTE('it''s a\test') AS v;
-ERROR 1105: execution error: unknown function: QUOTE
+v
+'it\'s a\\test'
 # SOUNDEX — phonetic encoding
 SELECT SOUNDEX('Robert') AS v;
 ERROR 1105: execution error: unknown function: SOUNDEX
