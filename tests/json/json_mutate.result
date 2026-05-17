@@ -1,0 +1,20 @@
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
+INSERT INTO t1 VALUES (1, '{"a": 1, "b": "two"}');
+# ---- JSON_SET — overwrite-or-create at path ----   zeta #1063
+# MySQL: returns {"a": 99, "b": "two", "c": "new"}
+SELECT JSON_SET(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
+ERROR 1105: execution error: unknown function: JSON_SET
+# ---- JSON_INSERT — create-only-if-absent at path ----   zeta #1063
+# MySQL: returns {"a": 1, "b": "two", "c": "new"} (a unchanged)
+SELECT JSON_INSERT(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
+ERROR 1105: execution error: unknown function: JSON_INSERT
+# ---- JSON_REPLACE — overwrite-only-if-present at path ----   zeta #1063
+# MySQL: returns {"a": 99, "b": "two"} (c not added)
+SELECT JSON_REPLACE(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
+ERROR 1105: execution error: unknown function: JSON_REPLACE
+# ---- JSON_REMOVE — delete element at path ----   zeta #1063
+# MySQL: returns {"b": "two"}
+SELECT JSON_REMOVE(j, '$.a') AS out FROM t1 WHERE i = 1;
+ERROR 1105: execution error: unknown function: JSON_REMOVE
+DROP TABLE t1;
