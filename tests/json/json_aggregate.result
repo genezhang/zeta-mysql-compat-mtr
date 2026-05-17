@@ -31,7 +31,8 @@ SELECT JSON_QUOTE('hello "world"') AS q;
 q
 "hello \"world\""
 # ---- JSON_UNQUOTE — strip the surrounding quotes from a JSON string ----   zeta #1063 FIXED
-# MySQL / zeta: returns "hello" (without surrounding quotes)
+# MySQL / zeta: returns hello (the unwrapped 5-char text — no
+# surrounding double-quotes, as the .result row below shows).
 SELECT JSON_UNQUOTE('"hello"') AS u;
 u
 hello

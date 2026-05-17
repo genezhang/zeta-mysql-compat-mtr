@@ -26,9 +26,11 @@
 #      JSON string literals (escape quotes/backslashes/control chars
 #      on the way in, unwrap them on the way out).
 #
-# Both pairs are extremely common in MySQL apps. Zeta has Postgres-
-# flavored `JSONB_AGG` and `JSONB_OBJECT_AGG` aggregates but no
-# MySQL aliases, and no equivalent for JSON_QUOTE/JSON_UNQUOTE.
+# Both pairs are extremely common in MySQL apps. zeta now implements
+# all four under their MySQL names — the aggregates as planner-level
+# aliases for the existing PG-flavored JSONB_AGG / JSONB_OBJECT_AGG
+# (zeta #1063 + #1068), and JSON_QUOTE / JSON_UNQUOTE as thin
+# wrappers around the JSONB encoder/decoder (zeta #1063, third slice).
 #
 # Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
 #   # zeta-adapt: not a line-for-line copy; surface probe written to
@@ -74,7 +76,8 @@ SELECT JSON_OBJECTAGG(i, val) AS obj FROM t1;
 SELECT JSON_QUOTE('hello "world"') AS q;
 
 --echo # ---- JSON_UNQUOTE — strip the surrounding quotes from a JSON string ----   zeta #1063 FIXED
---echo # MySQL / zeta: returns "hello" (without surrounding quotes)
+--echo # MySQL / zeta: returns hello (the unwrapped 5-char text — no
+--echo # surrounding double-quotes, as the .result row below shows).
 SELECT JSON_UNQUOTE('"hello"') AS u;
 
 DROP TABLE t1;
