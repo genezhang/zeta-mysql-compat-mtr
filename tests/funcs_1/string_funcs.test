@@ -120,9 +120,12 @@ SELECT UNHEX('4142') AS v;
 --error 1105
 SELECT SPACE(3) AS v;
 
---echo # QUOTE — SQL-escape and wrap in single quotes
+--echo # QUOTE — SQL-escape and wrap in single quotes. Pick an input
+--echo # with characters MySQL actually has to escape (apostrophe,
+--echo # backslash) so the future pinned result exercises the escape
+--echo # logic, not just the wrap.
 --error 1105
-SELECT QUOTE('its') AS v;
+SELECT QUOTE('it''s a\test') AS v;
 
 --echo # SOUNDEX — phonetic encoding
 --error 1105

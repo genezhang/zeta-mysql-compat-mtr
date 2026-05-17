@@ -98,8 +98,11 @@ ERROR 1105: execution error: unknown function: UNHEX
 # SPACE(n) — n spaces (alias for REPEAT(' ', n))
 SELECT SPACE(3) AS v;
 ERROR 1105: execution error: unknown function: SPACE
-# QUOTE — SQL-escape and wrap in single quotes
-SELECT QUOTE('its') AS v;
+# QUOTE — SQL-escape and wrap in single quotes. Pick an input
+# with characters MySQL actually has to escape (apostrophe,
+# backslash) so the future pinned result exercises the escape
+# logic, not just the wrap.
+SELECT QUOTE('it''s a\test') AS v;
 ERROR 1105: execution error: unknown function: QUOTE
 # SOUNDEX — phonetic encoding
 SELECT SOUNDEX('Robert') AS v;
