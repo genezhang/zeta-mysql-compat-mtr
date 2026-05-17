@@ -1,0 +1,24 @@
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, grp INT, val TEXT);
+INSERT INTO t1 VALUES
+  (1, 1, 'apple'),
+  (2, 1, 'banana'),
+  (3, 2, 'cherry'),
+  (4, 2, 'date');
+# ---- JSON_ARRAYAGG — roll rows of a group into a JSON array ----   zeta #1063
+# MySQL: per-group ["apple","banana"] / ["cherry","date"]
+SELECT grp, JSON_ARRAYAGG(val) AS arr FROM t1 GROUP BY grp ORDER BY grp;
+ERROR 1105: execution error: unknown function: JSON_ARRAYAGG
+# ---- JSON_OBJECTAGG — roll k,v rows into a JSON object ----   zeta #1063
+# MySQL: {"1":"apple","2":"banana", ...} (single grouped object)
+SELECT JSON_OBJECTAGG(i, val) AS obj FROM t1;
+ERROR 1105: execution error: unknown function: JSON_OBJECTAGG
+# ---- JSON_QUOTE — escape a string for JSON ----   zeta #1063
+# MySQL: returns "hello \"world\"" (with surrounding double quotes)
+SELECT JSON_QUOTE('hello "world"') AS q;
+ERROR 1105: execution error: unknown function: JSON_QUOTE
+# ---- JSON_UNQUOTE — strip the surrounding quotes from a JSON string ----   zeta #1063
+# MySQL: returns "hello" (without surrounding quotes)
+SELECT JSON_UNQUOTE('"hello"') AS u;
+ERROR 1105: execution error: unknown function: JSON_UNQUOTE
+DROP TABLE t1;
