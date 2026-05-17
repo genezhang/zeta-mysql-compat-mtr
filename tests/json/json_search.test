@@ -1,0 +1,85 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/json/inc/json_functions.inc
+#   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/inc/json_functions.inc
+#
+# Probes two functions that don't fit anywhere else:
+#
+#   JSON_SEARCH(j, one|all, search_str, [esc], [path...])
+#     Find a string value inside the document and return the path(s)
+#     to it. `'one'` returns the first match's path (or NULL if no
+#     match); `'all'` returns a JSON array of all matching paths.
+#     SQL LIKE wildcards are honored in `search_str` (`%`, `_`). The
+#     escape char and path-restriction args mirror LIKE / JSON_EXTRACT.
+#
+#   JSON_VALID(any)
+#     Returns 1 if the argument is a valid JSON string, 0 otherwise.
+#     (Always 1 for actual JSON-typed values, of course; the function
+#     is most useful as a CHECK-constraint predicate on TEXT columns
+#     that should hold JSON.)
+#
+# Both are missing from zeta. Bundled under zeta #1063.
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy; surface probe written to
+#     fit the M0 runner. Upstream coverage is in json_functions.inc
+#     intermixed with directives the runner does not support.
+#   # zeta-adapt: JSON_SEARCH depends on the `$.path` parser from
+#     zeta #1064 — implementations land together since the return
+#     value IS path strings.
+#   # zeta-adapt: .result is pinned to zeta's *observed* output
+#     (ERROR 1105 for each).
+# ----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
+INSERT INTO t1 VALUES
+  (1, '{"a": "apple", "b": "banana", "nested": {"k": "apricot"}}'),
+  (2, '["apple", "berry", "cherry"]');
+
+--echo # ---- JSON_SEARCH one — first matching path ----   zeta #1063
+--echo # MySQL: "$.a"
+--error 1105
+SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_SEARCH all — JSON array of all matching paths ----   zeta #1063
+--echo # MySQL: ["$.a", "$.nested.k"] (LIKE wildcard matches both `ap%`)
+--error 1105
+SELECT JSON_SEARCH(j, 'all', 'ap%') AS p FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_SEARCH — array element match ----   zeta #1063
+--echo # MySQL: "$[0]"
+--error 1105
+SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 2;
+
+--echo # ---- JSON_VALID — well-formed JSON string returns 1 ----   zeta #1063
+--echo # MySQL: 1
+--error 1105
+SELECT JSON_VALID('{"a": 1}') AS v;
+
+--echo # ---- JSON_VALID — malformed string returns 0 ----   zeta #1063
+--echo # MySQL: 0
+--error 1105
+SELECT JSON_VALID('{not json}') AS v;
+
+--echo # ---- JSON_VALID — NULL passes through as NULL ----   zeta #1063
+--echo # MySQL: NULL (function is NULL-preserving)
+--error 1105
+SELECT JSON_VALID(NULL) AS v;
+
+DROP TABLE t1;
