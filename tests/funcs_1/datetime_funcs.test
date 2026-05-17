@@ -121,18 +121,23 @@ SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
 --error 1105
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
 
---echo # Epoch conversions.
---error 1105
-SELECT UNIX_TIMESTAMP() AS v;
---error 1105
+--echo # Epoch conversions. Slice 3c of zeta #1086 — FIXED.
+--echo # UNIX_TIMESTAMP() is wall-clock; pin exact 10-digit shape
+--echo # so a unit regression (ms = 13 digits, µs = 16) is caught
+--echo # rather than passing the length check. 10-digit epoch is
+--echo # stable from 2001-09-09 (epoch 1_000_000_000) through
+--echo # 2286-11-20 (epoch 9_999_999_999).
+SELECT LENGTH(CAST(UNIX_TIMESTAMP() AS TEXT)) = 10 AS shape_ok;
+--echo # UNIX_TIMESTAMP(d) — fixed-date conversion.
+SELECT UNIX_TIMESTAMP('2024-03-15') AS v;
+--echo # FROM_UNIXTIME — inverse round-trip.
 SELECT FROM_UNIXTIME(1700000000) AS v;
 
 --echo # Day/month names. Slice 3a of zeta #1086 — FIXED.
 SELECT DAYNAME('2024-03-15') AS v;
 SELECT MONTHNAME('2024-03-15') AS v;
 
---echo # LAST_DAY — end-of-month accessor.
---error 1105
+--echo # LAST_DAY — end-of-month accessor. Slice 3c of #1086 — FIXED.
 SELECT LAST_DAY('2024-02-15') AS v;
 
 --echo # TIMESTAMPDIFF — configurable-unit diff. The unit is a bare
@@ -143,6 +148,11 @@ SELECT LAST_DAY('2024-02-15') AS v;
 --error 1054
 SELECT TIMESTAMPDIFF(DAY, '2024-03-01', '2024-03-15') AS v;
 
---echo # TIMEDIFF — time-only diff.
---error 1105
+--echo # TIMEDIFF — signed duration. Slice 3c of #1086 — function
+--echo # exists, but the MySQL shim has no encoder for Interval, so
+--echo # the wire format is currently zeta's debug-rendered
+--echo # `Interval { months: ..., days: ..., microseconds: ... }`.
+--echo # MySQL would emit `02:15:15`. Tracking shim-side formatting
+--echo # as a separate follow-up; pin current output to surface
+--echo # regressions. KNOWN DIVERGENCE.
 SELECT TIMEDIFF('14:30:45', '12:15:30') AS v;
