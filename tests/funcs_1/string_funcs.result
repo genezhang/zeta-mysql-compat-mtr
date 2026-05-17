@@ -35,9 +35,11 @@ left
 SELECT RTRIM('right  ') AS v;
 v
 right
-=== LENGTH semantics divergence ===
+=== LENGTH semantics divergence ===   zeta #1083
 # MySQL: byte count → 5 for 'café' (c+a+f+0xC3+0xA9)
 # zeta:  char count → 4 (PG-style; LENGTH behaves like CHAR_LENGTH)
+# Tracked in #1083 — likely fix is adding OCTET_LENGTH /
+# LENGTHB / BIT_LENGTH rather than changing LENGTH itself.
 SELECT LENGTH('café') AS v;
 v
 4
