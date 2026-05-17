@@ -1,0 +1,88 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/json/inc/json_functions.inc
+#   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/inc/json_functions.inc
+#
+# Probes the JSON introspection / containment family: JSON_KEYS,
+# JSON_LENGTH, JSON_DEPTH, JSON_CONTAINS, JSON_CONTAINS_PATH,
+# JSON_OVERLAPS. These are the "what's in this document" functions
+# apps use when validating shapes, building WHERE filters, or
+# computing array-style aggregates without materializing the rows.
+#
+# Notable semantic differences worth tracking when a fix lands:
+#   * JSON_KEYS(j) returns a JSON array. Zeta's nearest analog
+#     `jsonb_object_keys(j)` is set-returning (one text row per key).
+#   * JSON_LENGTH(j) returns the count of top-level elements for both
+#     objects AND arrays. Zeta has `jsonb_array_length` (arrays only);
+#     there is no direct object equivalent.
+#   * JSON_CONTAINS(h, n) returns 0/1. Postgres uses the `@>` operator
+#     (which zeta accepts on jsonb). Folding the function form into
+#     `@>` is the natural mapping.
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy; surface probe written to
+#     fit the M0 runner. Upstream coverage in json_functions.inc is
+#     dense and intermixed with directives the runner does not
+#     implement.
+#   # zeta-adapt: all six MySQL functions probed here are missing
+#     aliases — bundled under zeta #1063 (the general MySQL JSON
+#     function-alias gap, broader than `JSON_TYPE` etc.).
+#   # zeta-adapt: .result is pinned to zeta's *observed* output
+#     (ERROR 1105 for each). When a fix lands, drop the matching
+#     `--error` line and re-run to capture success output.
+# ----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
+INSERT INTO t1 VALUES
+  (1, '{"a": 1, "b": [10, 20, 30], "c": {"nested": true}}'),
+  (2, '[1, 2, [3, 4, [5]]]'),
+  (3, '{"x": "y"}');
+
+--echo # ---- JSON_KEYS — top-level keys as a JSON array ----   zeta #1063
+--echo # MySQL: ["a", "b", "c"]
+--error 1105
+SELECT JSON_KEYS(j) AS k FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_LENGTH — count top-level elements ----   zeta #1063
+--echo # MySQL: 3 for the object, 3 for the array (top-level count).
+--error 1105
+SELECT JSON_LENGTH(j) AS len FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_DEPTH — max nesting depth ----   zeta #1063
+--echo # MySQL: 3 for row 1 (root -> b/c -> nested), 4 for row 2.
+--error 1105
+SELECT JSON_DEPTH(j) AS d FROM t1 WHERE i = 2;
+
+--echo # ---- JSON_CONTAINS — does haystack contain needle? ----   zeta #1063
+--echo # MySQL: 1 (true) when {"a":1} is contained in row 1.
+--error 1105
+SELECT JSON_CONTAINS(j, '{"a": 1}') AS yes FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   zeta #1063
+--echo # MySQL: 1 when "one" of the listed paths resolves.
+--error 1105
+SELECT JSON_CONTAINS_PATH(j, 'one', '$.a', '$.missing') AS yes FROM t1 WHERE i = 1;
+
+--echo # ---- JSON_OVERLAPS — any element in common ----   zeta #1063
+--echo # MySQL 8.0.17+: 1 when any element of two arrays / any key+val
+--echo # of two objects matches.
+--error 1105
+SELECT JSON_OVERLAPS(j, '[2, 3]') AS yes FROM t1 WHERE i = 2;
+
+DROP TABLE t1;
