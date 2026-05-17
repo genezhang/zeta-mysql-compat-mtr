@@ -1,0 +1,86 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/json/inc/json_functions.inc
+#   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/inc/json_functions.inc
+#
+# Probes the JSON merge family. The three functions have distinct
+# semantics that matter for apps composing JSON documents:
+#
+#   JSON_MERGE_PRESERVE(a, b, ...)
+#     Deep-merge, keep BOTH values on key collision:
+#         {"a":1}  +  {"a":2}     ->  {"a":[1,2]}
+#         [1,2]    +  [3,4]       ->  [1,2,3,4]    (array concat)
+#     Useful when you don't want to lose either side.
+#
+#   JSON_MERGE_PATCH(a, b, ...)
+#     RFC 7396 — recursive merge patch, right-hand wins on collision,
+#     NULL value means "delete the key". Recurses into nested objects;
+#     arrays are replaced wholesale (not merged element-wise):
+#         {"a":1}  +  {"a":2}     ->  {"a":2}      (b wins)
+#         {"a":1}  +  {"a":null}  ->  {}           (delete)
+#         [1,2]    +  [3,4]       ->  [3,4]        (replace entirely)
+#     The right primitive for config-style overlays.
+#
+#   JSON_MERGE(a, b, ...)
+#     Deprecated alias for JSON_MERGE_PRESERVE in MySQL 8.0+; kept
+#     because pre-5.7.22 apps emit it.
+#
+# zeta has `jsonb || jsonb` (Postgres-style), which is shallow PATCH-like
+# for objects and concat-like for arrays — not a 1:1 mapping to either
+# MySQL function. All three MySQL aliases currently surface as ERROR
+# 1105. Bundled under zeta #1063.
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy; surface probe written to
+#     fit the M0 runner. Upstream coverage is in json_functions.inc
+#     intermixed with directives the runner does not support.
+#   # zeta-adapt: zeta has `jsonb || jsonb` (PG concat) which is the
+#     closest existing primitive — but it neither preserves duplicates
+#     on object collision (so isn't a JSON_MERGE_PRESERVE drop-in)
+#     nor implements the NULL-means-delete rule (so isn't a
+#     JSON_MERGE_PATCH drop-in either). Bundled under zeta #1063.
+#   # zeta-adapt: .result is pinned to zeta's *observed* output.
+# ----------------------------------------------------------------------
+
+--echo # ---- JSON_MERGE_PRESERVE — keep both values on collision ----   zeta #1063
+--echo # MySQL: {"a": [1, 2], "b": 3}
+--error 1105
+SELECT JSON_MERGE_PRESERVE('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
+
+--echo # MySQL: [1, 2, 3, 4]  (array + array → concat)
+--error 1105
+SELECT JSON_MERGE_PRESERVE('[1, 2]', '[3, 4]') AS arr;
+
+--echo # ---- JSON_MERGE_PATCH — RFC 7396 recursive patch, right-hand wins ----   zeta #1063
+--echo # MySQL: {"a": 2, "b": 3}  (b wins for a)
+--error 1105
+SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
+
+--echo # MySQL: {"b": 3}  (NULL deletes the key)
+--error 1105
+SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": null}') AS deleted;
+
+--echo # MySQL: [3, 4]  (array replaces entirely, NOT concat)
+--error 1105
+SELECT JSON_MERGE_PATCH('[1, 2]', '[3, 4]') AS arr;
+
+--echo # ---- JSON_MERGE — deprecated alias for JSON_MERGE_PRESERVE ----   zeta #1063
+--echo # MySQL: {"a": [1, 2], "b": 3}  (same as PRESERVE)
+--echo # Kept because pre-5.7.22 apps emit it.
+--error 1105
+SELECT JSON_MERGE('{"a": 1, "b": 3}', '{"a": 2}') AS merged;

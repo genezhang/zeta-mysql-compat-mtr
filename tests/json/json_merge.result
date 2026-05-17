@@ -1,0 +1,22 @@
+# ---- JSON_MERGE_PRESERVE — keep both values on collision ----   zeta #1063
+# MySQL: {"a": [1, 2], "b": 3}
+SELECT JSON_MERGE_PRESERVE('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
+ERROR 1105: execution error: unknown function: JSON_MERGE_PRESERVE
+# MySQL: [1, 2, 3, 4]  (array + array → concat)
+SELECT JSON_MERGE_PRESERVE('[1, 2]', '[3, 4]') AS arr;
+ERROR 1105: execution error: unknown function: JSON_MERGE_PRESERVE
+# ---- JSON_MERGE_PATCH — RFC 7396 recursive patch, right-hand wins ----   zeta #1063
+# MySQL: {"a": 2, "b": 3}  (b wins for a)
+SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
+ERROR 1105: execution error: unknown function: JSON_MERGE_PATCH
+# MySQL: {"b": 3}  (NULL deletes the key)
+SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": null}') AS deleted;
+ERROR 1105: execution error: unknown function: JSON_MERGE_PATCH
+# MySQL: [3, 4]  (array replaces entirely, NOT concat)
+SELECT JSON_MERGE_PATCH('[1, 2]', '[3, 4]') AS arr;
+ERROR 1105: execution error: unknown function: JSON_MERGE_PATCH
+# ---- JSON_MERGE — deprecated alias for JSON_MERGE_PRESERVE ----   zeta #1063
+# MySQL: {"a": [1, 2], "b": 3}  (same as PRESERVE)
+# Kept because pre-5.7.22 apps emit it.
+SELECT JSON_MERGE('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
+ERROR 1105: execution error: unknown function: JSON_MERGE
