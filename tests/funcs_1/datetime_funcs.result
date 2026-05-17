@@ -122,11 +122,13 @@ SELECT UNIX_TIMESTAMP() AS v;
 ERROR 1105: execution error: unknown function: UNIX_TIMESTAMP
 SELECT FROM_UNIXTIME(1700000000) AS v;
 ERROR 1105: execution error: unknown function: FROM_UNIXTIME
-# Day/month names (Sunday, March, etc.).
+# Day/month names. Slice 3a of zeta #1086 — FIXED.
 SELECT DAYNAME('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: DAYNAME
+v
+Friday
 SELECT MONTHNAME('2024-03-15') AS v;
-ERROR 1105: execution error: unknown function: MONTHNAME
+v
+March
 # LAST_DAY — end-of-month accessor.
 SELECT LAST_DAY('2024-02-15') AS v;
 ERROR 1105: execution error: unknown function: LAST_DAY

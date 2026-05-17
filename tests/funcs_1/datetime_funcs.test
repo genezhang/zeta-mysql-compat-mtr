@@ -127,10 +127,8 @@ SELECT UNIX_TIMESTAMP() AS v;
 --error 1105
 SELECT FROM_UNIXTIME(1700000000) AS v;
 
---echo # Day/month names (Sunday, March, etc.).
---error 1105
+--echo # Day/month names. Slice 3a of zeta #1086 — FIXED.
 SELECT DAYNAME('2024-03-15') AS v;
---error 1105
 SELECT MONTHNAME('2024-03-15') AS v;
 
 --echo # LAST_DAY — end-of-month accessor.
