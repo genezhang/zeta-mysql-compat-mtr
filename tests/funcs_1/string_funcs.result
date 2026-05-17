@@ -57,12 +57,14 @@ v
 SELECT INSTR('abcdef', 'cd') AS v;
 v
 3
-=== Codepoint conversion (ASCII works; CHAR missing) ===
+=== Codepoint conversion (ASCII and CHAR work) ===
 SELECT ASCII('A') AS v;
 v
 65
+# Slice 4 of zeta #1076 — FIXED.
 SELECT CHAR(65, 66, 67) AS v;
-ERROR 1105: execution error: unknown function: CHAR
+v
+ABC
 === Number formatting (works) ===
 # FORMAT(num, decimals) — US-style groupings
 SELECT FORMAT(1234567.891, 2) AS v;
@@ -102,10 +104,13 @@ SELECT INSERT('abcdef', 2, 3, 'XYZ') AS v;
 v
 aXYZef
 # HEX / UNHEX — hex encoding
+# Slice 4 of zeta #1076 — FIXED.
 SELECT HEX('AB') AS v;
-ERROR 1105: execution error: unknown function: HEX
+v
+4142
 SELECT UNHEX('4142') AS v;
-ERROR 1105: execution error: unknown function: UNHEX
+v
+AB
 # SPACE(n) — n spaces (alias for REPEAT(' ', n)). Bracket the
 # output so trailing-whitespace handling in the .result file
 # doesn't matter.
