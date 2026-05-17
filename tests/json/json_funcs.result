@@ -10,13 +10,17 @@ INSERT INTO t1 VALUES
 # MySQL: scalar tag ("OBJECT","ARRAY","STRING","NULL","BOOLEAN", etc.)
 SELECT i, JSON_TYPE(j) AS t FROM t1 ORDER BY i;
 ERROR 1105: execution error: unknown function: JSON_TYPE
-# ---- JSON_OBJECT(k,v[,k,v]...) ----   zeta #1063
-# MySQL: builds a JSON object literal.
+# ---- JSON_OBJECT(k,v[,k,v]...) ----   zeta #1063 FIXED
+# MySQL / zeta: builds a JSON object literal. zeta canonicalizes
+# keys alphabetically (#1062) — `a` precedes `b` either way.
 SELECT JSON_OBJECT('a', 1, 'b', 'two') AS o;
-ERROR 1105: execution error: unknown function: JSON_OBJECT
-# ---- JSON_ARRAY(v1[,v2]...) ----   zeta #1063
+o
+{"a":1,"b":"two"}
+# ---- JSON_ARRAY(v1[,v2]...) ----   zeta #1063 FIXED
+# MySQL / zeta: [1, "two", null, true]
 SELECT JSON_ARRAY(1, 'two', NULL, true) AS a;
-ERROR 1105: execution error: unknown function: JSON_ARRAY
+a
+[1,"two",null,true]
 # ---- JSON_EXTRACT(json, path[, path...]) ----   zeta #1063
 # MySQL: extracts via $.-rooted JSON path.
 SELECT JSON_EXTRACT(j, '$.a') AS a FROM t1 WHERE i = 1;
