@@ -41,8 +41,9 @@
 #   # zeta-adapt: filed gaps:
 #       - zeta #1063 — JSON_TYPE / JSON_OBJECT / JSON_ARRAY / JSON_EXTRACT
 #         function aliases missing.
-#       - zeta #1064 — `\$.path` syntax not resolved in `->` / `->>`
-#         operators; silently returns NULL instead of the value.
+#       - zeta #1064 — FIXED. `\$.path` syntax now resolves in `->` and
+#         `->>` operators; the two relevant assertions below are
+#         tightened to the actual values.
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
@@ -73,13 +74,12 @@ SELECT JSON_ARRAY(1, 'two', NULL, true) AS a;
 --error 1105
 SELECT JSON_EXTRACT(j, '$.a') AS a FROM t1 WHERE i = 1;
 
---echo # ---- `->` operator with MySQL `$.<key>` path syntax ----   zeta #1064
---echo # MySQL: shorthand for JSON_EXTRACT (expected: 1).
---echo # zeta currently treats `$.a` as a literal key, returns NULL.
+--echo # ---- `->` operator with MySQL `$.<key>` path syntax ----   zeta #1064 FIXED
+--echo # MySQL / zeta: shorthand for JSON_EXTRACT → 1
 SELECT j->'$.a' AS a FROM t1 WHERE i = 1;
 
---echo # ---- `->>` operator with MySQL `$.<key>` path syntax ----   zeta #1064
---echo # MySQL: shorthand for JSON_UNQUOTE(JSON_EXTRACT(...)) (expected: two).
+--echo # ---- `->>` operator with MySQL `$.<key>` path syntax ----   zeta #1064 FIXED
+--echo # MySQL / zeta: shorthand for JSON_UNQUOTE(JSON_EXTRACT(...)) → two
 SELECT j->>'$.b' AS b FROM t1 WHERE i = 1;
 
 --echo # Same `->` operator with a bare key (PG shape) — currently
