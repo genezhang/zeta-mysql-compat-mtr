@@ -37,9 +37,10 @@
 #     tests/json/json_funcs.test.
 #   # zeta-adapt: filed gaps:
 #       - zeta #1076 — MySQL string-function aliases & missing
-#         functions (LCASE, UCASE, MID, FIELD, FIND_IN_SET, ELT,
-#         INSERT, HEX, UNHEX, CHAR, SPACE, QUOTE, SOUNDEX), plus
-#         the LENGTH bytes-vs-chars semantic divergence.
+#         functions. All 13 (LCASE, UCASE, MID, FIELD, FIND_IN_SET,
+#         ELT, INSERT, HEX, UNHEX, CHAR, SPACE, QUOTE, SOUNDEX)
+#         are now FIXED. Only the LENGTH bytes-vs-chars semantic
+#         divergence remains as a separate follow-up.
 # ----------------------------------------------------------------------
 
 --echo === Functions zeta supports (PG-flavored, MySQL-compatible) ===
@@ -123,6 +124,6 @@ SELECT CONCAT('[', SPACE(3), ']') AS v;
 --echo # logic, not just the wrap.
 SELECT QUOTE('it''s a\test') AS v;
 
---echo # SOUNDEX — phonetic encoding
---error 1105
+--echo # SOUNDEX — phonetic encoding (4 chars: first letter + 3
+--echo # digits). Slice 5 of zeta #1076 — FIXED.
 SELECT SOUNDEX('Robert') AS v;
