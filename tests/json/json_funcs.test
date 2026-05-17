@@ -39,13 +39,12 @@
 #     (ER_UNKNOWN_ERROR), not 1305 (ER_SP_DOES_NOT_EXIST). Noted in
 #     zeta #1063 as a follow-up to the alias work.
 #   # zeta-adapt: filed gaps:
-#       - zeta #1063 — MySQL JSON function-alias family. JSON_OBJECT,
-#         JSON_ARRAY, and JSON_EXTRACT are now FIXED. JSON_EXTRACT
-#         reuses the `$.path` parser that landed in #1064 (so it's
-#         a function-call form of `->`). JSON_TYPE is still pinned
-#         to ERROR 1105 pending the return-value canonicalization
-#         slice (MySQL OBJECT/ARRAY/INTEGER/DOUBLE/etc. vs PG
-#         `jsonb_typeof`'s object/array/number).
+#       - zeta #1063 — MySQL JSON function-alias family. ALL DONE:
+#         JSON_OBJECT, JSON_ARRAY, JSON_EXTRACT, JSON_TYPE, JSON_VALID,
+#         JSON_QUOTE, JSON_UNQUOTE, JSON_ARRAYAGG, JSON_OBJECTAGG.
+#         JSON_TYPE returns MySQL's uppercase tags with the
+#         INTEGER/DOUBLE split that PG's `jsonb_typeof` collapses
+#         into "number".
 #       - zeta #1064 — FIXED. `\$.path` syntax now resolves in `->` and
 #         `->>` operators; the two relevant assertions below are
 #         tightened to the actual values.
@@ -58,11 +57,21 @@ INSERT INTO t1 VALUES
   (2, '[10, 20, 30]'),
   (3, '"hello"'),
   (4, 'null'),
-  (5, 'true');
+  (5, 'true'),
+  (6, '42'),
+  (7, '3.14');
 
---echo # ---- JSON_TYPE ----   zeta #1063
---echo # MySQL: scalar tag ("OBJECT","ARRAY","STRING","NULL","BOOLEAN", etc.)
---error 1105
+--echo # ---- JSON_TYPE ----   zeta #1063 FIXED
+--echo # MySQL: uppercase scalar tag. zeta covers the seven types its
+--echo # JsonbType carries (OBJECT/ARRAY/STRING/NULL/BOOLEAN/INTEGER/
+--echo # DOUBLE). MySQL's binary-format-only tags (BLOB/DATE/TIME/
+--echo # DATETIME/TIMESTAMP/DECIMAL/OPAQUE) are out of scope.
+--echo #
+--echo # Known divergence (pinned in zeta integration tests, not here):
+--echo # values like `1.0` / `1e0` / `0.0` are stored as Integer by
+--echo # JsonbValue::from_decimal, so JSON_TYPE returns INTEGER for
+--echo # them rather than DOUBLE. Driven by the storage encoder, not
+--echo # the alias.
 SELECT i, JSON_TYPE(j) AS t FROM t1 ORDER BY i;
 
 --echo # ---- JSON_OBJECT(k,v[,k,v]...) ----   zeta #1063 FIXED
