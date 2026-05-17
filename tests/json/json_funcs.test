@@ -1,0 +1,89 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/json/inc/json_functions.inc
+#   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/inc/json_functions.inc
+#
+# That upstream .inc is ~150k of dense, function-by-function coverage
+# bound up with MySQL test infrastructure that the M0 runner does not
+# support (--exec, --replace_regex, --disable_warnings, --source of
+# helper includes, named ER_* error tokens, prepared statements, etc).
+# So instead of copying a slice, this test independently exercises a
+# small probe of the JSON-function surface that MySQL apps lean on
+# most: JSON_TYPE, JSON_OBJECT, JSON_ARRAY, JSON_EXTRACT, and the
+# MySQL JSON path operators (`->` / `->>` with `$.key`).
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy; surface probe modeled on
+#     json_functions.inc's coverage but rewritten to fit the M0 runner.
+#   # zeta-adapt: each probe is pinned to zeta's *current* behavior.
+#     For absent function aliases we pin `--error 1105`; for the silent
+#     `$.path` divergence we pin to the observed `NULL` result. When a
+#     fix lands, drop the `--error` line (or update the result row) so
+#     the next run makes the upgrade obvious in the diff.
+#   # zeta-adapt: zeta returns "unknown function" as MySQL errno 1105
+#     (ER_UNKNOWN_ERROR), not 1305 (ER_SP_DOES_NOT_EXIST). Noted in
+#     zeta #1063 as a follow-up to the alias work.
+#   # zeta-adapt: filed gaps:
+#       - zeta #1063 — JSON_TYPE / JSON_OBJECT / JSON_ARRAY / JSON_EXTRACT
+#         function aliases missing.
+#       - zeta #1064 — `\$.path` syntax not resolved in `->` / `->>`
+#         operators; silently returns NULL instead of the value.
+# ----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
+INSERT INTO t1 VALUES
+  (1, '{"a": 1, "b": "two", "c": [3, 4]}'),
+  (2, '[10, 20, 30]'),
+  (3, '"hello"'),
+  (4, 'null'),
+  (5, 'true');
+
+--echo # ---- JSON_TYPE ----   zeta #1063
+--echo # MySQL: scalar tag ("OBJECT","ARRAY","STRING","NULL","BOOLEAN", etc.)
+--error 1105
+SELECT i, JSON_TYPE(j) AS t FROM t1 ORDER BY i;
+
+--echo # ---- JSON_OBJECT(k,v[,k,v]...) ----   zeta #1063
+--echo # MySQL: builds a JSON object literal.
+--error 1105
+SELECT JSON_OBJECT('a', 1, 'b', 'two') AS o;
+
+--echo # ---- JSON_ARRAY(v1[,v2]...) ----   zeta #1063
+--error 1105
+SELECT JSON_ARRAY(1, 'two', NULL, true) AS a;
+
+--echo # ---- JSON_EXTRACT(json, path[, path...]) ----   zeta #1063
+--echo # MySQL: extracts via $.-rooted JSON path.
+--error 1105
+SELECT JSON_EXTRACT(j, '$.a') AS a FROM t1 WHERE i = 1;
+
+--echo # ---- `->` operator with MySQL `$.<key>` path syntax ----   zeta #1064
+--echo # MySQL: shorthand for JSON_EXTRACT (expected: 1).
+--echo # zeta currently treats `$.a` as a literal key, returns NULL.
+SELECT j->'$.a' AS a FROM t1 WHERE i = 1;
+
+--echo # ---- `->>` operator with MySQL `$.<key>` path syntax ----   zeta #1064
+--echo # MySQL: shorthand for JSON_UNQUOTE(JSON_EXTRACT(...)) (expected: two).
+SELECT j->>'$.b' AS b FROM t1 WHERE i = 1;
+
+--echo # Same `->` operator with a bare key (PG shape) — currently
+--echo # the only form zeta resolves correctly.
+SELECT j->'a' AS a_bare FROM t1 WHERE i = 1;
+
+DROP TABLE t1;
