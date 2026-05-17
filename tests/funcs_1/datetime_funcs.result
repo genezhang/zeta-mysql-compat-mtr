@@ -50,12 +50,17 @@ formatted
 2024-03-15
 === MySQL aliases for already-supported functions ===
 # Pure renames — one match arm each.
-SELECT CURDATE() AS v;
-ERROR 1105: execution error: unknown function: CURDATE
-SELECT CURTIME() AS v;
-ERROR 1105: execution error: unknown function: CURTIME
-SELECT SYSDATE() AS v;
-ERROR 1105: execution error: unknown function: SYSDATE
+# Slice 1 of zeta #1086 — FIXED. Pin via shape-only checks
+# since the exact wall-clock value isn't deterministic.
+SELECT LENGTH(CAST(CURDATE() AS TEXT)) AS date_str_len;
+date_str_len
+10
+SELECT SUBSTRING(CAST(CURTIME() AS TEXT), 1, 6) LIKE '__:__:' AS shape_ok;
+shape_ok
+1
+SELECT SUBSTRING(CAST(SYSDATE() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
+shape_ok
+1
 === MySQL-only direct accessor functions ===
 # These map onto EXTRACT(<unit> FROM d) but are the names
 # MySQL apps use heavily. PG calls these `extract` only;
