@@ -93,15 +93,13 @@ SELECT MID('abcdef', 2, 3) AS v;
 --echo === MySQL functions with no PG equivalent ===
 
 --echo # FIELD(x, v1, v2, ...) — 1-based index of x in v-list, 0 if absent
---error 1105
+--echo # Slice 2 of zeta #1076 — FIXED.
 SELECT FIELD('b', 'a', 'b', 'c') AS v;
 
 --echo # FIND_IN_SET(needle, csv) — 1-based index of needle in CSV
---error 1105
 SELECT FIND_IN_SET('two', 'one,two,three') AS v;
 
 --echo # ELT(N, str1, str2, ...) — pick the N-th argument (1-based)
---error 1105
 SELECT ELT(2, 'a', 'b', 'c') AS v;
 
 --echo # INSERT(str, pos, len, newstr) — splice newstr into str
