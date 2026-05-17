@@ -36,11 +36,15 @@
 #     intermixed with directives the runner does not support.
 #   # zeta-adapt: aggregates' MySQL-canonical key ordering would
 #     diverge from zeta even after aliases land (see zeta #1062);
-#     when JSON_OBJECTAGG support arrives, the test will need a
-#     `--sorted_result` or an explicit ORDER BY in the GROUP source.
-#   # zeta-adapt: all four functions probed here currently return
-#     ERROR 1105 unknown function; bundled under zeta #1063.
-#   # zeta-adapt: .result is pinned to zeta's *observed* output.
+#     when divergence surfaces in JSON_OBJECTAGG, `--sorted_result`
+#     can keep the .result stable.
+#   # zeta-adapt: JSON_ARRAYAGG / JSON_OBJECTAGG slices of zeta #1063
+#     are now FIXED (#1063 alias landed, #1068 iter_exec dispatch
+#     landed); the two aggregate probes pin to actual values.
+#     JSON_QUOTE / JSON_UNQUOTE are still ERROR 1105 — bundled under
+#     #1063 and the next slice to land.
+#   # zeta-adapt: .result is pinned to zeta's *observed* output —
+#     aggregates show actual JSON; QUOTE/UNQUOTE still show errors.
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
@@ -51,14 +55,21 @@ INSERT INTO t1 VALUES
   (3, 2, 'cherry'),
   (4, 2, 'date');
 
---echo # ---- JSON_ARRAYAGG — roll rows of a group into a JSON array ----   zeta #1063
---echo # MySQL: per-group ["apple","banana"] / ["cherry","date"]
---error 1105
-SELECT grp, JSON_ARRAYAGG(val) AS arr FROM t1 GROUP BY grp ORDER BY grp;
+--echo # ---- JSON_ARRAYAGG — roll rows of a group into a JSON array ----   zeta #1063 FIXED
+--echo # MySQL / zeta: per-group ["apple","banana"] / ["cherry","date"]
+--echo # Use `ORDER BY i` inside the aggregate so element order is
+--echo # deterministic regardless of row-read order. (`--sorted_result`
+--echo # only sorts result *rows*, not array contents — Copilot caught
+--echo # the bug in the original revision of this test.)
+SELECT grp, JSON_ARRAYAGG(val ORDER BY i) AS arr FROM t1 GROUP BY grp ORDER BY grp;
 
---echo # ---- JSON_OBJECTAGG — roll k,v rows into a JSON object ----   zeta #1063
---echo # MySQL: {"1":"apple","2":"banana", ...} (single grouped object)
---error 1105
+--echo # ---- JSON_OBJECTAGG — roll k,v rows into a JSON object ----   zeta #1063 + #1068 FIXED
+--echo # MySQL / zeta: {"1":"apple","2":"banana","3":"cherry","4":"date"}
+--echo # zeta canonicalizes JSON object keys deterministically — see
+--echo # #1062 (alphabetical now, not MySQL's length-then-alpha; the
+--echo # all-1-char-keys case here happens to produce the same order
+--echo # for both schemes, so this assertion is stable on either side
+--echo # of #1062 landing).
 SELECT JSON_OBJECTAGG(i, val) AS obj FROM t1;
 
 --echo # ---- JSON_QUOTE — escape a string for JSON ----   zeta #1063
