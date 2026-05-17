@@ -21,10 +21,16 @@ o
 SELECT JSON_ARRAY(1, 'two', NULL, true) AS a;
 a
 [1,"two",null,true]
-# ---- JSON_EXTRACT(json, path[, path...]) ----   zeta #1063
-# MySQL: extracts via $.-rooted JSON path.
+# ---- JSON_EXTRACT(json, path[, path...]) ----   zeta #1063 FIXED
+# MySQL / zeta: $.-rooted JSON path; single match returns the
+# value, multi-match returns a JSON array. Path parser shared
+# with `->` (zeta #1064).
 SELECT JSON_EXTRACT(j, '$.a') AS a FROM t1 WHERE i = 1;
-ERROR 1105: execution error: unknown function: JSON_EXTRACT
+a
+1
+SELECT JSON_EXTRACT(j, '$.a', '$.b') AS ab FROM t1 WHERE i = 1;
+ab
+[1,"two"]
 # ---- `->` operator with MySQL `$.<key>` path syntax ----   zeta #1064 FIXED
 # MySQL / zeta: shorthand for JSON_EXTRACT → 1
 SELECT j->'$.a' AS a FROM t1 WHERE i = 1;
