@@ -38,13 +38,10 @@
 #     diverge from zeta even after aliases land (see zeta #1062);
 #     when divergence surfaces in JSON_OBJECTAGG, `--sorted_result`
 #     can keep the .result stable.
-#   # zeta-adapt: JSON_ARRAYAGG / JSON_OBJECTAGG slices of zeta #1063
-#     are now FIXED (#1063 alias landed, #1068 iter_exec dispatch
-#     landed); the two aggregate probes pin to actual values.
-#     JSON_QUOTE / JSON_UNQUOTE are still ERROR 1105 — bundled under
-#     #1063 and the next slice to land.
-#   # zeta-adapt: .result is pinned to zeta's *observed* output —
-#     aggregates show actual JSON; QUOTE/UNQUOTE still show errors.
+#   # zeta-adapt: All four slices of zeta #1063 covered here are now
+#     FIXED — JSON_ARRAYAGG / JSON_OBJECTAGG via the alias work,
+#     JSON_QUOTE / JSON_UNQUOTE via the text-escaping slice. The
+#     .result pins actual values for all four.
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
@@ -72,14 +69,12 @@ SELECT grp, JSON_ARRAYAGG(val ORDER BY i) AS arr FROM t1 GROUP BY grp ORDER BY g
 --echo # of #1062 landing).
 SELECT JSON_OBJECTAGG(i, val) AS obj FROM t1;
 
---echo # ---- JSON_QUOTE — escape a string for JSON ----   zeta #1063
---echo # MySQL: returns "hello \"world\"" (with surrounding double quotes)
---error 1105
+--echo # ---- JSON_QUOTE — escape a string for JSON ----   zeta #1063 FIXED
+--echo # MySQL / zeta: returns "hello \"world\"" (with surrounding double quotes)
 SELECT JSON_QUOTE('hello "world"') AS q;
 
---echo # ---- JSON_UNQUOTE — strip the surrounding quotes from a JSON string ----   zeta #1063
---echo # MySQL: returns "hello" (without surrounding quotes)
---error 1105
+--echo # ---- JSON_UNQUOTE — strip the surrounding quotes from a JSON string ----   zeta #1063 FIXED
+--echo # MySQL / zeta: returns "hello" (without surrounding quotes)
 SELECT JSON_UNQUOTE('"hello"') AS u;
 
 DROP TABLE t1;
