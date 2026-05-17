@@ -57,13 +57,21 @@ INSERT INTO t1 VALUES
   (2, '[10, 20, 30]'),
   (3, '"hello"'),
   (4, 'null'),
-  (5, 'true');
+  (5, 'true'),
+  (6, '42'),
+  (7, '3.14');
 
 --echo # ---- JSON_TYPE ----   zeta #1063 FIXED
 --echo # MySQL: uppercase scalar tag. zeta covers the seven types its
 --echo # JsonbType carries (OBJECT/ARRAY/STRING/NULL/BOOLEAN/INTEGER/
 --echo # DOUBLE). MySQL's binary-format-only tags (BLOB/DATE/TIME/
 --echo # DATETIME/TIMESTAMP/DECIMAL/OPAQUE) are out of scope.
+--echo #
+--echo # Known divergence (pinned in zeta integration tests, not here):
+--echo # values like `1.0` / `1e0` / `0.0` are stored as Integer by
+--echo # JsonbValue::from_decimal, so JSON_TYPE returns INTEGER for
+--echo # them rather than DOUBLE. Driven by the storage encoder, not
+--echo # the alias.
 SELECT i, JSON_TYPE(j) AS t FROM t1 ORDER BY i;
 
 --echo # ---- JSON_OBJECT(k,v[,k,v]...) ----   zeta #1063 FIXED
