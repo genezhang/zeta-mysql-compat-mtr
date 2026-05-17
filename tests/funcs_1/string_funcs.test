@@ -39,8 +39,13 @@
 #       - zeta #1076 — MySQL string-function aliases & missing
 #         functions. All 13 (LCASE, UCASE, MID, FIELD, FIND_IN_SET,
 #         ELT, INSERT, HEX, UNHEX, CHAR, SPACE, QUOTE, SOUNDEX)
-#         are now FIXED. Only the LENGTH bytes-vs-chars semantic
-#         divergence remains as a separate follow-up.
+#         are now FIXED.
+#       - zeta #1083 — LENGTH bytes-vs-chars semantic divergence.
+#         MySQL counts bytes (5 for 'café'); zeta counts chars
+#         (4, PG-style). Tracked as a separate design issue —
+#         likely fix is adding OCTET_LENGTH (PG name) / LENGTHB
+#         (MySQL convention) / BIT_LENGTH rather than changing
+#         LENGTH itself.
 # ----------------------------------------------------------------------
 
 --echo === Functions zeta supports (PG-flavored, MySQL-compatible) ===
@@ -58,9 +63,11 @@ SELECT TRIM('  spaced  ') AS v;
 SELECT LTRIM('  left') AS v;
 SELECT RTRIM('right  ') AS v;
 
---echo === LENGTH semantics divergence ===
+--echo === LENGTH semantics divergence ===   zeta #1083
 --echo # MySQL: byte count → 5 for 'café' (c+a+f+0xC3+0xA9)
 --echo # zeta:  char count → 4 (PG-style; LENGTH behaves like CHAR_LENGTH)
+--echo # Tracked in #1083 — likely fix is adding OCTET_LENGTH /
+--echo # LENGTHB / BIT_LENGTH rather than changing LENGTH itself.
 SELECT LENGTH('café') AS v;
 
 --echo === Character-length aliases (work) ===
