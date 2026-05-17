@@ -57,11 +57,19 @@ INSERT INTO t1 VALUES
 
 --echo # ---- JSON_ARRAYAGG — roll rows of a group into a JSON array ----   zeta #1063 FIXED
 --echo # MySQL / zeta: per-group ["apple","banana"] / ["cherry","date"]
---sorted_result
-SELECT grp, JSON_ARRAYAGG(val) AS arr FROM t1 GROUP BY grp ORDER BY grp;
+--echo # Use `ORDER BY i` inside the aggregate so element order is
+--echo # deterministic regardless of row-read order. (`--sorted_result`
+--echo # only sorts result *rows*, not array contents — Copilot caught
+--echo # the bug in the original revision of this test.)
+SELECT grp, JSON_ARRAYAGG(val ORDER BY i) AS arr FROM t1 GROUP BY grp ORDER BY grp;
 
 --echo # ---- JSON_OBJECTAGG — roll k,v rows into a JSON object ----   zeta #1063 + #1068 FIXED
---echo # MySQL / zeta: {"1":"apple","2":"banana", ...} (single grouped object)
+--echo # MySQL / zeta: {"1":"apple","2":"banana","3":"cherry","4":"date"}
+--echo # zeta canonicalizes JSON object keys deterministically — see
+--echo # #1062 (alphabetical now, not MySQL's length-then-alpha; the
+--echo # all-1-char-keys case here happens to produce the same order
+--echo # for both schemes, so this assertion is stable on either side
+--echo # of #1062 landing).
 SELECT JSON_OBJECTAGG(i, val) AS obj FROM t1;
 
 --echo # ---- JSON_QUOTE — escape a string for JSON ----   zeta #1063
