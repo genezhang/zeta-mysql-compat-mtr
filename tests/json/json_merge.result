@@ -5,7 +5,7 @@ ERROR 1105: execution error: unknown function: JSON_MERGE_PRESERVE
 # MySQL: [1, 2, 3, 4]  (array + array → concat)
 SELECT JSON_MERGE_PRESERVE('[1, 2]', '[3, 4]') AS arr;
 ERROR 1105: execution error: unknown function: JSON_MERGE_PRESERVE
-# ---- JSON_MERGE_PATCH — RFC 7396, right-hand wins ----   zeta #1063
+# ---- JSON_MERGE_PATCH — RFC 7396 recursive patch, right-hand wins ----   zeta #1063
 # MySQL: {"a": 2, "b": 3}  (b wins for a)
 SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
 ERROR 1105: execution error: unknown function: JSON_MERGE_PATCH

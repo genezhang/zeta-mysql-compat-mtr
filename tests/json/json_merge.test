@@ -28,8 +28,9 @@
 #     Useful when you don't want to lose either side.
 #
 #   JSON_MERGE_PATCH(a, b, ...)
-#     RFC 7396 — recursive shallow patch, right-hand wins on collision,
-#     NULL value means "delete the key":
+#     RFC 7396 — recursive merge patch, right-hand wins on collision,
+#     NULL value means "delete the key". Recurses into nested objects;
+#     arrays are replaced wholesale (not merged element-wise):
 #         {"a":1}  +  {"a":2}     ->  {"a":2}      (b wins)
 #         {"a":1}  +  {"a":null}  ->  {}           (delete)
 #         [1,2]    +  [3,4]       ->  [3,4]        (replace entirely)
@@ -65,7 +66,7 @@ SELECT JSON_MERGE_PRESERVE('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
 --error 1105
 SELECT JSON_MERGE_PRESERVE('[1, 2]', '[3, 4]') AS arr;
 
---echo # ---- JSON_MERGE_PATCH — RFC 7396, right-hand wins ----   zeta #1063
+--echo # ---- JSON_MERGE_PATCH — RFC 7396 recursive patch, right-hand wins ----   zeta #1063
 --echo # MySQL: {"a": 2, "b": 3}  (b wins for a)
 --error 1105
 SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
