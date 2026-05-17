@@ -114,12 +114,19 @@ SELECT QUARTER('2024-03-15') AS v;
 
 --echo === MySQL-only formatting / conversion ===
 
---echo # DATE_FORMAT / STR_TO_DATE — MySQL %-format DSL. No PG
---echo # equivalent (PG uses TO_CHAR / TO_DATE with different syntax).
---error 1105
+--echo # DATE_FORMAT / STR_TO_DATE — MySQL %-format DSL. zeta
+--echo # #1093 Phase 1 — FIXED with 13 common directives covering
+--echo # ~80% of usage (%Y %y %m %d %H %i %S %T %a %b %W %M %%).
+--echo # Phase 2 (remaining 19 directives + lc_time_names) is
+--echo # tracked as a follow-up in #1093.
 SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
---error 1105
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%Y-%m-%d %T') AS v;
+SELECT DATE_FORMAT('2024-03-15', '%W, %M %d, %Y') AS v;
+--echo # STR_TO_DATE always returns Timestamp (midnight for date-only
+--echo # formats) so the runtime value matches the advertised column
+--echo # type. See #1094 review.
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
+SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %T') AS v;
 
 --echo # Epoch conversions. Slice 3c of zeta #1086 — FIXED.
 --echo # UNIX_TIMESTAMP() is wall-clock; pin exact 10-digit shape
