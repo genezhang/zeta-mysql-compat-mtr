@@ -24,9 +24,16 @@ recorded here; individual test files retain their original GPL v2 headers.
 
 ## tests/json/
 
-- Source: https://github.com/mysql/mysql-server (`mysql-test/t/json*.test`)
-- Tracking version: TBD
-- Last sync: TBD
+- Source: https://github.com/mysql/mysql-server (`mysql-test/suite/json/inc/`
+  and `mysql-test/suite/json/t/`; pure `mysql-test/t/json*.test` are
+  EXPLAIN-focused and not relevant to function/storage coverage)
+- Tracking version: mysql-8.0.46 (tag, commit `0a7df2e4693d8f10901a26034ae6257699356e30`)
+- Last sync: 2026-05-16
+- Notes: First seed is `json_basic.test`, a hand-trimmed subset of
+  `inc/json_insert.inc` covering CREATE/INSERT/SELECT on a JSON column.
+  Prepared-statement, charset, and `--error ER_INVALID_JSON_TEXT` slices
+  are deferred. The `.result` is pinned to zeta's observed output; see
+  the file's header for the list of MySQL divergences with issue links.
 
 ## tests/binlog/
 
