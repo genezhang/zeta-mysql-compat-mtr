@@ -83,14 +83,18 @@ v
 bcd
 === MySQL functions with no PG equivalent ===
 # FIELD(x, v1, v2, ...) — 1-based index of x in v-list, 0 if absent
+# Slice 2 of zeta #1076 — FIXED.
 SELECT FIELD('b', 'a', 'b', 'c') AS v;
-ERROR 1105: execution error: unknown function: FIELD
+v
+2
 # FIND_IN_SET(needle, csv) — 1-based index of needle in CSV
 SELECT FIND_IN_SET('two', 'one,two,three') AS v;
-ERROR 1105: execution error: unknown function: FIND_IN_SET
+v
+2
 # ELT(N, str1, str2, ...) — pick the N-th argument (1-based)
 SELECT ELT(2, 'a', 'b', 'c') AS v;
-ERROR 1105: execution error: unknown function: ELT
+v
+b
 # INSERT(str, pos, len, newstr) — splice newstr into str
 SELECT INSERT('abcdef', 2, 3, 'XYZ') AS v;
 ERROR 1105: execution error: unknown function: INSERT
