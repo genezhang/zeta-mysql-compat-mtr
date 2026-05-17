@@ -92,6 +92,12 @@ SELECT SUBSTRING(CAST(SYSDATE() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
 --echo # 2024-03-15 is a Friday.
 --echo # MySQL DAYOFWEEK: Sunday=1..Sat=7 → Friday=6
 --echo # MySQL WEEKDAY:   Monday=0..Sun=6 → Friday=4
+--echo # KNOWN DIVERGENCE: WEEK(d) uses ISO/PG week numbering
+--echo # (Mon-start, week 1 contains Jan 4). MySQL default mode 0
+--echo # is Sun-start with different boundary rules — for
+--echo # 2024-03-15 MySQL mode 0 returns 10, zeta/PG returns 11.
+--echo # Pinning the zeta-side value to surface the divergence;
+--echo # add a `mode` arg + mode 0 algorithm in a follow-up.
 
 SELECT YEAR('2024-03-15') AS v;
 SELECT MONTH('2024-03-15') AS v;

@@ -68,6 +68,12 @@ shape_ok
 # 2024-03-15 is a Friday.
 # MySQL DAYOFWEEK: Sunday=1..Sat=7 → Friday=6
 # MySQL WEEKDAY:   Monday=0..Sun=6 → Friday=4
+# KNOWN DIVERGENCE: WEEK(d) uses ISO/PG week numbering
+# (Mon-start, week 1 contains Jan 4). MySQL default mode 0
+# is Sun-start with different boundary rules — for
+# 2024-03-15 MySQL mode 0 returns 10, zeta/PG returns 11.
+# Pinning the zeta-side value to surface the divergence;
+# add a `mode` arg + mode 0 algorithm in a follow-up.
 SELECT YEAR('2024-03-15') AS v;
 v
 2024
