@@ -86,33 +86,24 @@ SELECT SUBSTRING(CAST(CURTIME() AS TEXT), 1, 6) LIKE '__:__:' AS shape_ok;
 SELECT SUBSTRING(CAST(SYSDATE() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
 
 --echo === MySQL-only direct accessor functions ===
---echo # These map onto EXTRACT(<unit> FROM d) but are the names
---echo # MySQL apps use heavily. PG calls these `extract` only;
---echo # MySQL apps would need a code rewrite without them.
+--echo # Slice 2 of zeta #1086 — FIXED. These delegate through
+--echo # the existing EXTRACT path with string-literal auto-
+--echo # coercion (MySQL apps don't write `::date` casts).
+--echo # 2024-03-15 is a Friday.
+--echo # MySQL DAYOFWEEK: Sunday=1..Sat=7 → Friday=6
+--echo # MySQL WEEKDAY:   Monday=0..Sun=6 → Friday=4
 
---error 1105
 SELECT YEAR('2024-03-15') AS v;
---error 1105
 SELECT MONTH('2024-03-15') AS v;
---error 1105
 SELECT DAY('2024-03-15') AS v;
---error 1105
 SELECT HOUR('14:30:45') AS v;
---error 1105
 SELECT MINUTE('14:30:45') AS v;
---error 1105
 SELECT SECOND('14:30:45') AS v;
---error 1105
 SELECT DAYOFWEEK('2024-03-15') AS v;
---error 1105
 SELECT DAYOFMONTH('2024-03-15') AS v;
---error 1105
 SELECT DAYOFYEAR('2024-03-15') AS v;
---error 1105
 SELECT WEEKDAY('2024-03-15') AS v;
---error 1105
 SELECT WEEK('2024-03-15') AS v;
---error 1105
 SELECT QUARTER('2024-03-15') AS v;
 
 --echo === MySQL-only formatting / conversion ===
