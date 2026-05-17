@@ -36,12 +36,10 @@
 #     not 1305 (ER_SP_DOES_NOT_EXIST) — same pattern as
 #     tests/json/json_funcs.test.
 #   # zeta-adapt: filed gaps:
-#       - zeta #TBD — MySQL string-function aliases & missing functions
-#         (LCASE, UCASE, MID, FIELD, FIND_IN_SET, ELT, INSERT, HEX,
-#         UNHEX, CHAR, SPACE, QUOTE, SOUNDEX).
-#       - LENGTH semantics: zeta's LENGTH counts characters, MySQL
-#         counts bytes. Separate gap (filed alongside the alias
-#         work). zeta exposes the byte count via no current built-in.
+#       - zeta #1076 — MySQL string-function aliases & missing
+#         functions (LCASE, UCASE, MID, FIELD, FIND_IN_SET, ELT,
+#         INSERT, HEX, UNHEX, CHAR, SPACE, QUOTE, SOUNDEX), plus
+#         the LENGTH bytes-vs-chars semantic divergence.
 # ----------------------------------------------------------------------
 
 --echo === Functions zeta supports (PG-flavored, MySQL-compatible) ===
