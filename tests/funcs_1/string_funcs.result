@@ -70,13 +70,17 @@ v
 1,234,567.89
 === MySQL-flavored aliases for already-supported functions ===
 # These are pure renames — fix is one match arm each.
+# Slice 1 of zeta #1076 — FIXED.
 SELECT LCASE('WORLD') AS v;
-ERROR 1105: execution error: unknown function: LCASE
+v
+world
 SELECT UCASE('hello') AS v;
-ERROR 1105: execution error: unknown function: UCASE
+v
+HELLO
 # MID — alias for SUBSTRING (same arg order)
 SELECT MID('abcdef', 2, 3) AS v;
-ERROR 1105: execution error: unknown function: MID
+v
+bcd
 === MySQL functions with no PG equivalent ===
 # FIELD(x, v1, v2, ...) — 1-based index of x in v-list, 0 if absent
 SELECT FIELD('b', 'a', 'b', 'c') AS v;

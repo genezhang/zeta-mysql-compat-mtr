@@ -83,13 +83,11 @@ SELECT FORMAT(1234567.891, 2) AS v;
 
 --echo === MySQL-flavored aliases for already-supported functions ===
 --echo # These are pure renames — fix is one match arm each.
+--echo # Slice 1 of zeta #1076 — FIXED.
 
---error 1105
 SELECT LCASE('WORLD') AS v;
---error 1105
 SELECT UCASE('hello') AS v;
 --echo # MID — alias for SUBSTRING (same arg order)
---error 1105
 SELECT MID('abcdef', 2, 3) AS v;
 
 --echo === MySQL functions with no PG equivalent ===
