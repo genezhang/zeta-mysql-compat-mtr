@@ -1,0 +1,78 @@
+# Copyright (c) 2015, 2024, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License, version 2.0,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License, version 2.0, for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+# ----------------------------------------------------------------------
+# Inspired by MySQL 8.0 source:
+#   mysql-test/suite/json/inc/json_table.test
+#   https://github.com/mysql/mysql-server/blob/mysql-8.0.46/mysql-test/suite/json/t/json_table.test
+#
+# Probes the SIMPLE shape of JSON_TABLE — the lateral-expansion
+# function that turns a JSON document into a relational result set.
+# Apps reach for it when they need to FROM-join against the elements
+# of a stored JSON array, the most common use:
+#
+#   SELECT jt.* FROM t1, JSON_TABLE(j, '$[*]' COLUMNS (...)) AS jt
+#
+# This probe deliberately stays away from the heavier features —
+# NESTED PATH (recursive joins), FOR ORDINALITY (row numbering),
+# DEFAULT ... ON EMPTY / ERROR clauses, EXISTS PATH columns — which
+# each warrant their own probe once base support lands.
+#
+# JSON_TABLE has its own SQL grammar (it's not a regular function
+# call), so absent support typically shows up as a parser-level
+# error (1064 / SQLSTATE 42000) rather than the runtime
+# "unknown function 1105" we see elsewhere. The probe pins whichever
+# zeta emits.
+#
+# Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
+#   # zeta-adapt: not a line-for-line copy; surface probe written to
+#     fit the M0 runner. Upstream coverage is 50k+ of feature-by-
+#     feature coverage that the M0 runner can't drive.
+#   # zeta-adapt: scoped to the simple column-extraction case only.
+#     NESTED PATH / FOR ORDINALITY / DEFAULT / EXISTS PATH variants
+#     deferred to follow-up probes once the base parser support
+#     lands.
+#   # zeta-adapt: zeta rejects JSON_TABLE at parse time with error
+#     1064 (HY000) — the parser's FROM-clause grammar doesn't accept
+#     JSON_TABLE's COLUMNS subclause syntax. Tracked as zeta #1065,
+#     filed separately from #1063 (which is about runtime function
+#     aliases). When parser support lands, drop the `--error 1064`
+#     line so the .result captures actual rows.
+# ----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
+INSERT INTO t1 VALUES
+  (1, '[{"name": "apple", "qty": 3}, {"name": "banana", "qty": 7}]'),
+  (2, '[{"name": "cherry", "qty": 5}]');
+
+--echo # ---- JSON_TABLE simple shape ----   zeta #1065
+--echo # MySQL: rows (1,"apple",3) (1,"banana",7) (2,"cherry",5)
+--echo # zeta: parser-level rejection (1064) — JSON_TABLE has its own
+--echo # FROM-clause grammar, not a regular function call, so this is
+--echo # tracked separately from the #1063 function-alias family.
+--error 1064
+SELECT t1.i, jt.name, jt.qty
+FROM t1,
+     JSON_TABLE(
+       t1.j,
+       '$[*]' COLUMNS (
+         name VARCHAR(20) PATH '$.name',
+         qty  INT         PATH '$.qty'
+       )
+     ) AS jt
+ORDER BY t1.i, jt.name;
+
+DROP TABLE t1;
