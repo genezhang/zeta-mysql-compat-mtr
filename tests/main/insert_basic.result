@@ -1,0 +1,62 @@
+=== Setup ===
+DROP TABLE IF EXISTS t1;
+CREATE TABLE t1 (id INT PRIMARY KEY, name VARCHAR(20), grade INT DEFAULT 50);
+=== Single-row INSERT with explicit values ===
+INSERT INTO t1 (id, name, grade) VALUES (1, 'alice', 90);
+SELECT id, name, grade FROM t1 WHERE id = 1;
+id	name	grade
+1	alice	90
+=== Multi-row INSERT ===
+INSERT INTO t1 (id, name, grade) VALUES (2, 'bob', 80), (3, 'carol', 70);
+SELECT id, name, grade FROM t1 WHERE id IN (2, 3);
+id	name	grade
+2	bob	80
+3	carol	70
+=== Omitted column takes DEFAULT ===
+INSERT INTO t1 (id, name) VALUES (4, 'dave');
+SELECT id, name, grade FROM t1 WHERE id = 4;
+id	name	grade
+4	dave	50
+=== ON DUPLICATE KEY UPDATE — applies on PK conflict ===
+# VALUES(col) refers to the rejected new value.
+INSERT INTO t1 (id, name, grade) VALUES (1, 'alice2', 100)
+  ON DUPLICATE KEY UPDATE name = VALUES(name), grade = VALUES(grade);
+SELECT id, name, grade FROM t1 WHERE id = 1;
+id	name	grade
+1	alice2	100
+=== ON DUPLICATE KEY UPDATE — applies even with non-VALUES expression ===
+INSERT INTO t1 (id, name, grade) VALUES (1, 'ignored', 0)
+  ON DUPLICATE KEY UPDATE grade = grade + 1;
+SELECT id, name, grade FROM t1 WHERE id = 1;
+id	name	grade
+1	alice2	101
+=== INSERT IGNORE — KNOWN DIVERGENCE (zeta parser gap) ===
+# MySQL accepts INSERT IGNORE INTO ... to silently skip rows
+# that would violate a constraint. zeta's parser does not yet
+# recognize the IGNORE keyword in INSERT position — errno
+# 1064 (parse error). Tracked as a follow-up.
+INSERT IGNORE INTO t1 (id, name, grade) VALUES (1, 'alice-ignored', 0);
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: INTO at Line: 1, Column: 15
+=== INSERT ... SET form — KNOWN DIVERGENCE (zeta parser gap) ===
+# MySQL accepts INSERT INTO ... SET col=val, ... as syntactic
+# sugar for INSERT ... (col, ...) VALUES (val, ...). zeta's
+# parser does not yet recognize the SET form — errno 1064.
+# The (col) VALUES (val) form below is the equivalent.
+INSERT INTO t1 SET id = 10, name = 'frank', grade = 88;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: SET at Line: 1, Column: 16
+INSERT INTO t1 (id, name, grade) VALUES (10, 'frank', 88);
+SELECT id, name, grade FROM t1 WHERE id = 10;
+id	name	grade
+10	frank	88
+=== INSERT ... SELECT (copy from another table) ===
+DROP TABLE IF EXISTS t2;
+CREATE TABLE t2 (id INT PRIMARY KEY, name VARCHAR(20), grade INT DEFAULT 50);
+INSERT INTO t2 (id, name, grade) SELECT id, name, grade FROM t1 WHERE id <= 3;
+SELECT id, name, grade FROM t2;
+id	name	grade
+1	alice2	101
+2	bob	80
+3	carol	70
+=== Cleanup ===
+DROP TABLE t1;
+DROP TABLE t2;
