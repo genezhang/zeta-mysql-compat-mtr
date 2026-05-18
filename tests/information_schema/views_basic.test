@@ -119,22 +119,33 @@ CREATE VIEW customer_emails AS SELECT id, email FROM customers;
 
 SELECT table_name, view_definition, check_option, is_updatable FROM information_schema.views WHERE table_schema='test';
 
---echo === Unsupported: information_schema.character_sets ===
---echo # Connection-time probe by many MySQL drivers. KNOWN
---echo # DIVERGENCE — character_set is hardcoded to utf8mb4 in
---echo # the wire shim but the directory isn't exposed.
---echo # Tracked as zeta #1100 Phase 2.
+--echo === Supported: information_schema.character_sets (#1100 Phase 2) ===
+--echo # Connection-time probe by many MySQL drivers. zeta advertises
+--echo # utf8mb4 via lookup_system_variable; the directory now exposes
+--echo # the same single row.
+--echo # KNOWN DIVERGENCE: only utf8mb4 is exposed; latin1 / ascii /
+--echo # binary etc. are not — zeta runs utf8mb4-only.
 
 SELECT * FROM information_schema.character_sets WHERE character_set_name='utf8mb4';
 
---echo === Unsupported: information_schema.collations ===
---echo # Common ORM probe. KNOWN DIVERGENCE. Tracked as #1100 Phase 2.
+--echo # Probe a non-existent charset — empty result confirms the
+--echo # filter works (the row above isn't always returned).
+SELECT * FROM information_schema.character_sets WHERE character_set_name='latin1';
+
+--echo === Supported: information_schema.collations (#1100 Phase 2) ===
+--echo # Common ORM probe. zeta exposes a single utf8mb4_general_ci
+--echo # collation (id=45, matches MySQL's well-known assignment).
+--echo # KNOWN DIVERGENCE: only utf8mb4_general_ci is exposed; the
+--echo # other utf8mb4 collations (utf8mb4_unicode_ci, utf8mb4_bin)
+--echo # are not.
 
 SELECT * FROM information_schema.collations WHERE collation_name='utf8mb4_general_ci';
 
---echo === Unsupported: information_schema.engines ===
---echo # MySQL `SHOW ENGINES` / engine-introspection tooling.
---echo # KNOWN DIVERGENCE. Tracked as #1100 Phase 2.
+--echo === Supported: information_schema.engines (#1100 Phase 2) ===
+--echo # MySQL `SHOW ENGINES` / engine-introspection tooling. zeta
+--echo # presents itself as InnoDB-compatible (matches the
+--echo # default_storage_engine sysvar). Transactions / XA /
+--echo # savepoints all advertised as supported.
 
 SELECT * FROM information_schema.engines;
 
