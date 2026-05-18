@@ -1,0 +1,62 @@
+# Independently authored UPDATE smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/update.test;
+# pins zeta's behavior across common MySQL UPDATE forms.
+#
+# Adaptation notes:
+#   # zeta-adapt: UPDATE ... LIMIT N — MySQL caps the number of rows
+#     touched. zeta silently IGNORES the LIMIT clause (no error,
+#     all matching rows are updated). Tracked as a divergence; not
+#     pinned here because pinning would obscure the data-loss risk.
+#   # zeta-adapt: UPDATE ... ORDER BY ... LIMIT — MySQL extension
+#     for deterministic partial updates. zeta's parser rejects with
+#     errno 1064. Not pinned here (the LIMIT-without-ORDER-BY case
+#     above is the more dangerous one).
+#   # zeta-adapt: UPDATE t1 JOIN t2 ON ... SET ... — MySQL multi-
+#     table UPDATE; zeta's mysqlwire parses these via the implicit
+#     FROM-rewrite (treats the JOIN like a PG `UPDATE t SET ... FROM`).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS u1;
+CREATE TABLE u1 (id INT PRIMARY KEY, name VARCHAR(20), grade INT);
+INSERT INTO u1 (id, name, grade) VALUES
+  (1, 'alice', 90),
+  (2, 'bob', 80),
+  (3, 'carol', 70),
+  (4, 'dave', 60);
+
+--echo === Single-row UPDATE with WHERE ===
+
+UPDATE u1 SET grade = 100 WHERE id = 1;
+SELECT id, name, grade FROM u1 WHERE id = 1;
+
+--echo === Multi-row UPDATE with WHERE IN ===
+
+UPDATE u1 SET grade = 0 WHERE id IN (3, 4);
+--sorted_result
+SELECT id, name, grade FROM u1 WHERE id IN (3, 4);
+
+--echo === UPDATE with expression (col = col + N) ===
+
+UPDATE u1 SET grade = grade + 5 WHERE id = 2;
+SELECT id, name, grade FROM u1 WHERE id = 2;
+
+--echo === UPDATE multiple columns in one statement ===
+
+UPDATE u1 SET name = 'alice2', grade = grade - 50 WHERE id = 1;
+SELECT id, name, grade FROM u1 WHERE id = 1;
+
+--echo === UPDATE ... JOIN (MySQL multi-table form) ===
+
+DROP TABLE IF EXISTS u2;
+CREATE TABLE u2 (id INT PRIMARY KEY, source VARCHAR(20));
+INSERT INTO u2 (id, source) VALUES (1, 'src-1'), (2, 'src-2');
+
+UPDATE u1 JOIN u2 ON u1.id = u2.id SET u1.name = u2.source;
+--sorted_result
+SELECT id, name, grade FROM u1 WHERE id IN (1, 2);
+
+--echo === Cleanup ===
+
+DROP TABLE u1;
+DROP TABLE u2;

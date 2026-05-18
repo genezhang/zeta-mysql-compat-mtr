@@ -1,0 +1,69 @@
+# Independently authored DELETE smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/delete.test;
+# pins zeta's behavior across common MySQL DELETE forms and surfaces
+# one known divergence.
+#
+# Adaptation notes:
+#   # zeta-adapt: DELETE ... LIMIT N — MySQL caps the number of rows
+#     deleted. zeta silently IGNORES the LIMIT clause: every row
+#     matching the WHERE is deleted. This is a data-loss-risk
+#     divergence; not pinned here because pinning would obscure the
+#     issue. Tracked as a follow-up.
+#   # zeta-adapt: DELETE FROM t WHERE col IN (SELECT ...) —
+#     correlated/subquery DELETE. zeta's executor does not support
+#     `InSubquery` in WHERE for DELETE — errno 1105. Pinned below.
+#   # zeta-adapt: DELETE t1 FROM t1 JOIN t2 ON ... — MySQL multi-
+#     table DELETE works in zeta (parsed via PG-style multi-table
+#     DELETE shape).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS d1;
+CREATE TABLE d1 (id INT PRIMARY KEY, name VARCHAR(20), grade INT);
+INSERT INTO d1 (id, name, grade) VALUES
+  (1, 'alice', 90),
+  (2, 'bob', 80),
+  (3, 'carol', 70),
+  (4, 'dave', 60),
+  (5, 'erin', 50);
+
+--echo === DELETE with WHERE — single row ===
+
+DELETE FROM d1 WHERE id = 2;
+--sorted_result
+SELECT id, name, grade FROM d1;
+
+--echo === DELETE with WHERE IN — multi-row ===
+
+DELETE FROM d1 WHERE id IN (3, 4);
+--sorted_result
+SELECT id, name, grade FROM d1;
+
+--echo === DELETE with subquery — KNOWN DIVERGENCE (zeta executor gap) ===
+--echo # MySQL accepts WHERE col IN (SELECT ...) for DELETE.
+--echo # zeta's executor does not support InSubquery for DELETE
+--echo # (errno 1105). Tracked as a follow-up; the equivalent
+--echo # JOIN-form DELETE below works.
+
+DROP TABLE IF EXISTS d_filter;
+CREATE TABLE d_filter (fid INT PRIMARY KEY);
+INSERT INTO d_filter (fid) VALUES (1);
+
+--error 1105
+DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter);
+
+--echo === DELETE t1 FROM t1 JOIN t2 ... (MySQL multi-table form) ===
+
+DELETE d1 FROM d1 JOIN d_filter ON d1.id = d_filter.fid;
+--sorted_result
+SELECT id, name, grade FROM d1;
+
+--echo === DELETE all rows (no WHERE) ===
+
+DELETE FROM d1;
+SELECT COUNT(*) AS remaining FROM d1;
+
+--echo === Cleanup ===
+
+DROP TABLE d1;
+DROP TABLE d_filter;
