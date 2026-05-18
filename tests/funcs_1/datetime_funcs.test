@@ -35,7 +35,9 @@
 #     aliases & missing functions. Spec lays out 4 fix slices:
 #     (1) CURDATE/CURTIME/SYSDATE renames, (2) direct accessor
 #     functions (YEAR/MONTH/DAY/...) delegating to EXTRACT,
-#     (3) DATE_FORMAT/STR_TO_DATE %-format DSL plus DAY/MONTHNAME,
+#     (3) DATE_FORMAT/STR_TO_DATE %-format DSL plus DAY/MONTHNAME
+#     — Phase 1 (13 directives) shipped in #1093; Phase 2 (all
+#     remaining MySQL directives + lc_time_names) shipped in #1119,
 #     (4) epoch + TIMESTAMPDIFF. TIMESTAMPDIFF needed parser work
 #     for bare-identifier unit args; FIXED in zeta #1108.
 # ----------------------------------------------------------------------
@@ -125,18 +127,30 @@ SELECT QUARTER('2024-03-15') AS v;
 --echo === MySQL-only formatting / conversion ===
 
 --echo # DATE_FORMAT / STR_TO_DATE — MySQL %-format DSL. zeta
---echo # #1093 Phase 1 — FIXED with 13 common directives covering
---echo # ~80% of usage (%Y %y %m %d %H %i %S %T %a %b %W %M %%).
---echo # Phase 2 (remaining 19 directives + lc_time_names) is
---echo # tracked as a follow-up in #1093.
+--echo # #1093 Phases 1+2 both FIXED: all 32 documented MySQL
+--echo # directives plus lc_time_names sysvar (en_US only).
 SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
 SELECT DATE_FORMAT('2024-03-15 14:30:45', '%Y-%m-%d %T') AS v;
 SELECT DATE_FORMAT('2024-03-15', '%W, %M %d, %Y') AS v;
+--echo # Phase 2 directives — unpadded forms.
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%c-%e') AS v;
+--echo # Phase 2 directives — 12-hour clock + AM/PM.
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%h:%i:%S %p') AS v;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%r') AS v;
+--echo # Phase 2 directives — microseconds + day-of-year + ordinal.
+SELECT DATE_FORMAT(STR_TO_DATE('2024-03-15 14:30:45.123456', '%Y-%m-%d %H:%i:%S.%f'), '%f') AS v;
+SELECT DATE_FORMAT('2024-03-15', '%j') AS v;
+SELECT DATE_FORMAT('2024-03-15', '%D %M %Y') AS v;
+--echo # Phase 2 directives — ISO and Sun-anchored week numbering.
+SELECT DATE_FORMAT('2024-01-01', '%v') AS v;
+SELECT DATE_FORMAT('2024-01-01', '%u') AS v;
 --echo # STR_TO_DATE always returns Timestamp (midnight for date-only
 --echo # formats) so the runtime value matches the advertised column
 --echo # type. See #1094 review.
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
 SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %T') AS v;
+--echo # STR_TO_DATE Phase 2 — %r round-trip (12h time form).
+SELECT STR_TO_DATE('2024-03-15 02:30:45 PM', '%Y-%m-%d %r') AS v;
 
 --echo # Epoch conversions. Slice 3c of zeta #1086 — FIXED.
 --echo # UNIX_TIMESTAMP() is wall-clock; pin exact 10-digit shape
