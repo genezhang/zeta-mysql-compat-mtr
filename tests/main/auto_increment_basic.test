@@ -16,9 +16,11 @@
 #     auto-assign in both MySQL and zeta — pinned below.
 #   # zeta-adapt: LAST_INSERT_ID() after a multi-row INSERT —
 #     MySQL returns the FIRST generated value (so after inserting
-#     ('alice'), ('bob') it returns 1). zeta returns the LAST
-#     generated value (2). Pinned to zeta's behavior below as a
-#     KNOWN DIVERGENCE; tracked as a follow-up.
+#     ('alice'), ('bob') it returns 1). zeta #1121 FIXED: the
+#     SERIAL/BIGSERIAL nextval path now captures the first value
+#     it generates during an INSERT, so LAST_INSERT_ID() matches
+#     MySQL. Explicit-id INSERTs that don't trigger auto-generation
+#     correctly leave LAST_INSERT_ID unchanged.
 
 --echo === Setup ===
 
@@ -26,9 +28,8 @@ DROP TABLE IF EXISTS ai1;
 CREATE TABLE ai1 (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));
 
 --echo === Implicit AUTO_INCREMENT — sequential 1, 2 ===
---echo # KNOWN DIVERGENCE: LAST_INSERT_ID() after a multi-row INSERT.
---echo # MySQL returns the FIRST generated value (1). zeta returns
---echo # the LAST generated value (2). Pinning zeta's behavior here.
+--echo # LAST_INSERT_ID() after a multi-row INSERT returns the FIRST
+--echo # generated value (1) — zeta #1121 FIXED. Matches MySQL.
 
 INSERT INTO ai1 (name) VALUES ('alice'), ('bob');
 SELECT LAST_INSERT_ID();
