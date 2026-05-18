@@ -67,6 +67,7 @@ SELECT DATE_ADD('2024-03-15', INTERVAL '7' DAY) AS v;
 SELECT DATE_SUB('2024-03-15', INTERVAL '7' DAY) AS v;
 SELECT ADDDATE('2024-03-15', 7) AS v;
 SELECT SUBDATE('2024-03-15', INTERVAL '7' DAY) AS v;
+SELECT SUBDATE('2024-03-15', 7) AS v;
 
 --echo # Datetime literal: parser detects time component and casts
 --echo # to TIMESTAMP instead of DATE so parse_date doesn't reject

@@ -34,6 +34,9 @@ v
 SELECT SUBDATE('2024-03-15', INTERVAL '7' DAY) AS v;
 v
 2024-03-08 00:00:00
+SELECT SUBDATE('2024-03-15', 7) AS v;
+v
+2024-03-08
 # Datetime literal: parser detects time component and casts
 # to TIMESTAMP instead of DATE so parse_date doesn't reject
 # the time portion.
