@@ -15,19 +15,31 @@ shape_ok
 SELECT SUBSTRING(CAST(NOW() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
 shape_ok
 1
-=== Date arithmetic (works, requires explicit cast) ===
-# DATE_ADD — implementation present but parser doesn't auto-
-# coerce string-literal dates. With `::date` it works.
-# MySQL would accept DATE_ADD('2024-03-15', INTERVAL 7 DAY).
-SELECT DATE_ADD('2024-03-15'::date, INTERVAL '7' DAY) AS v;
+=== Date arithmetic ===
+# DATE_ADD / DATE_SUB / ADDDATE / SUBDATE — zeta #1105 FIXED.
+# Parser auto-wraps string literals in CAST(... AS DATE) so
+# MySQL apps can write DATE_ADD('2024-03-15', INTERVAL 7 DAY)
+# without an explicit ::date cast. Result is Timestamp
+# (Date+Interval) for the INTERVAL form and Date for the
+# ADDDATE/SUBDATE Int form.
+SELECT DATE_ADD('2024-03-15', INTERVAL '7' DAY) AS v;
 v
 2024-03-22 00:00:00
-SELECT DATE_SUB('2024-03-15'::date, INTERVAL '7' DAY) AS v;
+SELECT DATE_SUB('2024-03-15', INTERVAL '7' DAY) AS v;
 v
 2024-03-08 00:00:00
-SELECT ADDDATE('2024-03-15'::date, 7) AS v;
+SELECT ADDDATE('2024-03-15', 7) AS v;
 v
 2024-03-22
+SELECT SUBDATE('2024-03-15', INTERVAL '7' DAY) AS v;
+v
+2024-03-08 00:00:00
+# Datetime literal: parser detects time component and casts
+# to TIMESTAMP instead of DATE so parse_date doesn't reject
+# the time portion.
+SELECT DATE_ADD('2024-03-15 12:00:00', INTERVAL '1' HOUR) AS v;
+v
+2024-03-15 13:00:00
 # DATEDIFF — works directly on string dates (no cast needed).
 SELECT DATEDIFF('2024-03-15','2024-03-01') AS v;
 v
