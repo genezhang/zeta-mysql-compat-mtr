@@ -127,10 +127,8 @@ v
 1
 === MySQL-only formatting / conversion ===
 # DATE_FORMAT / STR_TO_DATE — MySQL %-format DSL. zeta
-# #1093 Phase 1 — FIXED with 13 common directives covering
-# ~80% of usage (%Y %y %m %d %H %i %S %T %a %b %W %M %%).
-# Phase 2 (remaining 19 directives + lc_time_names) is
-# tracked as a follow-up in #1093.
+# #1093 Phases 1+2 both FIXED: all 32 documented MySQL
+# directives plus lc_time_names sysvar (en_US only).
 SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d') AS v;
 v
 2024-03-15
@@ -140,6 +138,46 @@ v
 SELECT DATE_FORMAT('2024-03-15', '%W, %M %d, %Y') AS v;
 v
 Friday, March 15, 2024
+# Phase 2 directives — unpadded forms.
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%c-%e') AS v;
+v
+3-15
+# Phase 2 directives — 12-hour clock + AM/PM.
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%h:%i:%S %p') AS v;
+v
+02:30:45 PM
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%r') AS v;
+v
+02:30:45 PM
+# Phase 2 directives — microseconds + day-of-year + ordinal.
+SELECT DATE_FORMAT(STR_TO_DATE('2024-03-15 14:30:45.123456', '%Y-%m-%d %H:%i:%S.%f'), '%f') AS v;
+v
+123456
+SELECT DATE_FORMAT('2024-03-15', '%j') AS v;
+v
+075
+SELECT DATE_FORMAT('2024-03-15', '%D %M %Y') AS v;
+v
+15th March 2024
+# Phase 2 directives — week numbering, both anchors.
+# 2024-01-01 is a Monday: %u (Mon-first, no rollover) starts
+# week 1 here; %v (ISO, Mon-first, ≥4 days) also week 1;
+# %U (Sun-first, no rollover) is still week 0 (waiting for
+# the first Sunday on Jan 7); %V (Sun-first, ≥4 days) sees
+# the Sun-Sat week containing Mon Jan 1 as having 6 days in
+# 2024 → week 1.
+SELECT DATE_FORMAT('2024-01-01', '%u') AS v;
+v
+01
+SELECT DATE_FORMAT('2024-01-01', '%v') AS v;
+v
+01
+SELECT DATE_FORMAT('2024-01-01', '%U') AS v;
+v
+00
+SELECT DATE_FORMAT('2024-01-01', '%V') AS v;
+v
+01
 # STR_TO_DATE always returns Timestamp (midnight for date-only
 # formats) so the runtime value matches the advertised column
 # type. See #1094 review.
@@ -147,6 +185,10 @@ SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d') AS v;
 v
 2024-03-15 00:00:00
 SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %T') AS v;
+v
+2024-03-15 14:30:45
+# STR_TO_DATE Phase 2 — %r round-trip (12h time form).
+SELECT STR_TO_DATE('2024-03-15 02:30:45 PM', '%Y-%m-%d %r') AS v;
 v
 2024-03-15 14:30:45
 # Epoch conversions. Slice 3c of zeta #1086 — FIXED.
