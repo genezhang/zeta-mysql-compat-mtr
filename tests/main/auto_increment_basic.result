@@ -2,13 +2,12 @@
 DROP TABLE IF EXISTS ai1;
 CREATE TABLE ai1 (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));
 === Implicit AUTO_INCREMENT — sequential 1, 2 ===
-# KNOWN DIVERGENCE: LAST_INSERT_ID() after a multi-row INSERT.
-# MySQL returns the FIRST generated value (1). zeta returns
-# the LAST generated value (2). Pinning zeta's behavior here.
+# LAST_INSERT_ID() after a multi-row INSERT returns the FIRST
+# generated value (1) — zeta #1121 FIXED. Matches MySQL.
 INSERT INTO ai1 (name) VALUES ('alice'), ('bob');
 SELECT LAST_INSERT_ID();
 LAST_INSERT_ID()
-2
+1
 SELECT id, name FROM ai1;
 id	name
 1	alice
