@@ -13,8 +13,12 @@
 #   # zeta-adapt: ON DUPLICATE KEY UPDATE — VALUES(col) in the update
 #     clause refers to the value that was rejected, not the
 #     existing row. zeta matches MySQL here.
-#   # zeta-adapt: INSERT IGNORE — silently skips rows that would
-#     violate a constraint, keeps the existing row.
+#   # zeta-adapt: INSERT IGNORE — MySQL silently skips rows that
+#     would violate a constraint and keeps the existing row.
+#     zeta DIVERGES: parser does not recognize the IGNORE keyword
+#     in INSERT position yet, so the statement errors with 1064.
+#     Pinned as KNOWN DIVERGENCE below; close the gap to remove
+#     the --error pin.
 #   # zeta-adapt: CREATE TABLE ... LIKE is not supported by zeta's
 #     MySQL wire (parsed as PG dialect which doesn't recognize the
 #     form); use explicit re-CREATE for INSERT...SELECT setup.
