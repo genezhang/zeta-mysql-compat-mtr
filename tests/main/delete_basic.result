@@ -21,22 +21,24 @@ SELECT id, name, grade FROM d1;
 id	name	grade
 1	alice	90
 5	erin	50
-=== Setup helper table for JOIN-DELETE ===
-# Documented divergence (NOT actively probed): MySQL accepts
-# `DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter)`,
-# zeta's executor does not support InSubquery for DELETE and
-# errors with 1105. The exact message wraps a Rust Debug dump
-# of the AST, which is unstable — pinning it here would break
-# on harmless AST changes. The equivalent JOIN-form DELETE
-# below works in both engines and is what's pinned instead.
+=== Setup helper table for subquery / JOIN DELETE ===
 DROP TABLE IF EXISTS d_filter;
 CREATE TABLE d_filter (fid INT PRIMARY KEY);
 INSERT INTO d_filter (fid) VALUES (1);
-=== DELETE t1 FROM t1 JOIN t2 ... (MySQL multi-table form) ===
-DELETE d1 FROM d1 JOIN d_filter ON d1.id = d_filter.fid;
+=== DELETE WHERE col IN (SELECT ...) (zeta #1125 FIXED) ===
+# MySQL semantics: the inner SELECT returns {1}; rows with
+# matching id are deleted, leaving id=5 in d1.
+DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter);
 SELECT id, name, grade FROM d1;
 id	name	grade
 5	erin	50
+=== DELETE t1 FROM t1 JOIN t2 ... (MySQL multi-table form) ===
+# Repopulate d_filter with the surviving id so the JOIN-form
+# DELETE has something to match against; subquery DELETE above
+# already drained the (id=1) entry.
+INSERT INTO d_filter (fid) VALUES (5);
+DELETE d1 FROM d1 JOIN d_filter ON d1.id = d_filter.fid;
+SELECT id, name, grade FROM d1;
 === DELETE ... LIMIT — rejected (zeta #1124 FIXED) ===
 # MySQL caps DELETE to N rows. zeta does not honor LIMIT;
 # the parser rejects with errno 1064 instead of silently
