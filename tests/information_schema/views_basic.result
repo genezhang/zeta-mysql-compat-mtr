@@ -113,10 +113,24 @@ utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
 SELECT * FROM information_schema.engines;
 ENGINE	SUPPORT	COMMENT	TRANSACTIONS	XA	SAVEPOINTS
 InnoDB	DEFAULT	Supports transactions, row-level locking, and foreign keys	YES	YES	YES
-=== Unsupported: information_schema.routines ===
-# PROCEDURE / FUNCTION metadata. KNOWN DIVERGENCE.
-# Tracked as #1100 Phase 3.
-SELECT * FROM information_schema.routines WHERE routine_schema='test';
+=== Supported: information_schema.routines (#1100 Phase 3) ===
+# PROCEDURE / FUNCTION metadata. zeta only has trigger functions
+# (no stored procedures / general user functions with typed
+# parameters), so they surface as ROUTINE_TYPE='FUNCTION' with
+# DATA_TYPE='trigger'. The shim scopes them to the connection's
+# current database so `WHERE routine_schema = DATABASE()` works.
+CREATE FUNCTION audit_fn() RETURNS trigger AS 'BEGIN RETURN NEW; END' LANGUAGE plpgsql;
+SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DATA_TYPE,
+       ROUTINE_BODY, EXTERNAL_LANGUAGE, SECURITY_TYPE
+  FROM information_schema.routines WHERE routine_schema='test';
+ROUTINE_SCHEMA	ROUTINE_NAME	ROUTINE_TYPE	DATA_TYPE	ROUTINE_BODY	EXTERNAL_LANGUAGE	SECURITY_TYPE
+test	audit_fn	FUNCTION	trigger	SQL	SQL	DEFINER
+=== Supported: information_schema.parameters (#1100 Phase 3) ===
+# zeta has no stored procedures or general user functions with
+# typed parameters, so PARAMETERS is always empty — but the
+# documented 8-column header is emitted so introspection tools
+# see "view exists, no rows" instead of "view missing".
+SELECT * FROM information_schema.parameters WHERE specific_schema='test';
 === Function-call projection gap ===
 # zeta's info_schema query parser does not accept COUNT(*)
 # (or any function-call / expression projection) in any

@@ -29,10 +29,12 @@
 #   # zeta-adapt: pinned to zeta's *current* behavior. Supported
 #     views get the actual returned rows; unsupported views still
 #     get a "returns 0 rows / 0 cols" pin so the divergence is visible.
-#   # zeta-adapt: zeta #1100 Phase 1 — FIXED: KEY_COLUMN_USAGE /
-#     TABLE_CONSTRAINTS / REFERENTIAL_CONSTRAINTS / VIEWS now return
-#     real rows. Phase 2 (character_sets / collations / engines)
-#     and Phase 3 (routines) tracked as follow-ups in #1100.
+#   # zeta-adapt: zeta #1100 Phases 1+2+3 all FIXED: KEY_COLUMN_USAGE
+#     / TABLE_CONSTRAINTS / REFERENTIAL_CONSTRAINTS / VIEWS,
+#     CHARACTER_SETS / COLLATIONS / ENGINES, and ROUTINES / PARAMETERS
+#     all return the documented column schema with real rows
+#     (or empty rows + header for PARAMETERS — zeta has no stored
+#     procedures or general user functions with typed parameters).
 #   # zeta-adapt: KNOWN DIVERGENCE — FK constraint names are stored
 #     with the fully-qualified internal prefix (`test.public.<name>`).
 #     MySQL stores them bare. The output is pinned to zeta's current
@@ -149,11 +151,26 @@ SELECT * FROM information_schema.collations WHERE collation_name='utf8mb4_genera
 
 SELECT * FROM information_schema.engines;
 
---echo === Unsupported: information_schema.routines ===
---echo # PROCEDURE / FUNCTION metadata. KNOWN DIVERGENCE.
---echo # Tracked as #1100 Phase 3.
+--echo === Supported: information_schema.routines (#1100 Phase 3) ===
+--echo # PROCEDURE / FUNCTION metadata. zeta only has trigger functions
+--echo # (no stored procedures / general user functions with typed
+--echo # parameters), so they surface as ROUTINE_TYPE='FUNCTION' with
+--echo # DATA_TYPE='trigger'. The shim scopes them to the connection's
+--echo # current database so `WHERE routine_schema = DATABASE()` works.
 
-SELECT * FROM information_schema.routines WHERE routine_schema='test';
+CREATE FUNCTION audit_fn() RETURNS trigger AS 'BEGIN RETURN NEW; END' LANGUAGE plpgsql;
+
+SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DATA_TYPE,
+       ROUTINE_BODY, EXTERNAL_LANGUAGE, SECURITY_TYPE
+  FROM information_schema.routines WHERE routine_schema='test';
+
+--echo === Supported: information_schema.parameters (#1100 Phase 3) ===
+--echo # zeta has no stored procedures or general user functions with
+--echo # typed parameters, so PARAMETERS is always empty — but the
+--echo # documented 8-column header is emitted so introspection tools
+--echo # see "view exists, no rows" instead of "view missing".
+
+SELECT * FROM information_schema.parameters WHERE specific_schema='test';
 
 --echo === Function-call projection gap ===
 --echo # zeta's info_schema query parser does not accept COUNT(*)
