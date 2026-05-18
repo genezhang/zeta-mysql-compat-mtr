@@ -1,7 +1,6 @@
 # Independently authored DELETE smoke test for the GPL MTR-format
 # runner. NOT copied or adapted from MySQL's mysql-test/t/delete.test;
-# pins zeta's behavior across common MySQL DELETE forms and surfaces
-# one known divergence.
+# pins zeta's behavior across common MySQL DELETE forms.
 #
 # Adaptation notes:
 #   # zeta-adapt: DELETE ... LIMIT N and DELETE ... ORDER BY —
@@ -13,11 +12,12 @@
 #     silently ignoring the clauses. Pinned below; remove the
 #     --error pins once proper support lands.
 #   # zeta-adapt: DELETE FROM t WHERE col IN (SELECT ...) —
-#     correlated/subquery DELETE. zeta's executor does not support
-#     `InSubquery` in WHERE for DELETE — errno 1105. NOT pinned
-#     here because the error message wraps an unstable Rust Debug
-#     dump of the AST; pinning it would break on harmless changes.
-#     Documented in-section; the JOIN-form DELETE is what's pinned.
+#     subquery DELETE. zeta #1125 FIXED: exec_dml_in_txn now
+#     materializes non-correlated subqueries in the WHERE filter
+#     before dispatching, and qualify_statement walks the DELETE
+#     WHERE clause so unqualified subquery FROM tables resolve
+#     against the connection's search_path. Pinned with an active
+#     row-pin probe below.
 #   # zeta-adapt: DELETE t1 FROM t1 JOIN t2 ON ... — MySQL multi-
 #     table DELETE works in zeta (parsed via PG-style multi-table
 #     DELETE shape).
@@ -45,21 +45,26 @@ DELETE FROM d1 WHERE id IN (3, 4);
 --sorted_result
 SELECT id, name, grade FROM d1;
 
---echo === Setup helper table for JOIN-DELETE ===
---echo # Documented divergence (NOT actively probed): MySQL accepts
---echo # `DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter)`,
---echo # zeta's executor does not support InSubquery for DELETE and
---echo # errors with 1105. The exact message wraps a Rust Debug dump
---echo # of the AST, which is unstable — pinning it here would break
---echo # on harmless AST changes. The equivalent JOIN-form DELETE
---echo # below works in both engines and is what's pinned instead.
+--echo === Setup helper table for subquery / JOIN DELETE ===
 
 DROP TABLE IF EXISTS d_filter;
 CREATE TABLE d_filter (fid INT PRIMARY KEY);
 INSERT INTO d_filter (fid) VALUES (1);
 
---echo === DELETE t1 FROM t1 JOIN t2 ... (MySQL multi-table form) ===
+--echo === DELETE WHERE col IN (SELECT ...) (zeta #1125 FIXED) ===
+--echo # MySQL semantics: the inner SELECT returns {1}; rows with
+--echo # matching id are deleted, leaving id=5 in d1.
 
+DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter);
+--sorted_result
+SELECT id, name, grade FROM d1;
+
+--echo === DELETE t1 FROM t1 JOIN t2 ... (MySQL multi-table form) ===
+--echo # Repopulate d_filter with the surviving id so the JOIN-form
+--echo # DELETE has something to match against; subquery DELETE above
+--echo # already drained the (id=1) entry.
+
+INSERT INTO d_filter (fid) VALUES (5);
 DELETE d1 FROM d1 JOIN d_filter ON d1.id = d_filter.fid;
 --sorted_result
 SELECT id, name, grade FROM d1;
