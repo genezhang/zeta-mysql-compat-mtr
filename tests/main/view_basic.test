@@ -1,0 +1,86 @@
+# Independently authored VIEW smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/view.test;
+# pins zeta's behavior across the common MySQL view shapes ORMs
+# and admin tools depend on.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE VIEW … AS SELECT … — supported (filter,
+#     projection, multi-table JOIN). Views are scoped to the
+#     connection's current database (TABLE_SCHEMA reports it).
+#   # zeta-adapt: CREATE OR REPLACE VIEW — supported (atomic
+#     definition swap).
+#   # zeta-adapt: DROP VIEW … — supported.
+#   # zeta-adapt: DROP VIEW IF EXISTS … — supported (silent
+#     no-op when the view doesn't exist).
+#   # zeta-adapt: information_schema.VIEWS — supported. TABLE_SCHEMA
+#     reflects the connection's current database, TABLE_NAME the
+#     view name, VIEW_DEFINITION the original SELECT text.
+#   # zeta-adapt: DROP VIEW <missing> (no IF EXISTS) — KNOWN
+#     DIVERGENCE. zeta errors with 1105 (generic execution error);
+#     MySQL uses 1051 (Unknown table). Pinned below.
+#   # zeta-adapt: SHOW CREATE VIEW — not pinned here (zeta does
+#     not currently emit the MySQL-style row shape; tracked
+#     separately).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS emp;
+CREATE TABLE emp (id INT PRIMARY KEY, name VARCHAR(20), dept VARCHAR(10), salary INT);
+INSERT INTO emp VALUES
+  (1, 'alice', 'eng', 100),
+  (2, 'bob', 'eng', 90),
+  (3, 'carol', 'sales', 80);
+
+DROP TABLE IF EXISTS dept;
+CREATE TABLE dept (name VARCHAR(10) PRIMARY KEY, location VARCHAR(10));
+INSERT INTO dept VALUES ('eng', 'sf'), ('sales', 'ny');
+
+--echo === Basic CREATE VIEW + SELECT ===
+
+CREATE VIEW eng_emps AS
+  SELECT id, name, salary FROM emp WHERE dept = 'eng';
+--sorted_result
+SELECT id, name, salary FROM eng_emps;
+
+--echo === CREATE OR REPLACE VIEW — atomic redefinition ===
+
+CREATE OR REPLACE VIEW eng_emps AS
+  SELECT id, name FROM emp WHERE dept = 'eng';
+--sorted_result
+SELECT id, name FROM eng_emps;
+
+--echo === View over a JOIN ===
+
+CREATE VIEW emp_dept AS
+  SELECT e.id, e.name, d.location
+  FROM emp e JOIN dept d ON e.dept = d.name;
+--sorted_result
+SELECT id, name, location FROM emp_dept;
+
+--echo === information_schema.VIEWS metadata ===
+--echo # TABLE_SCHEMA reflects the connection's current database
+--echo # (the runner connects with `/test`), TABLE_NAME the view.
+
+SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.VIEWS
+  WHERE TABLE_NAME IN ('eng_emps', 'emp_dept')
+  ORDER BY TABLE_NAME;
+
+--echo === DROP VIEW + DROP VIEW IF EXISTS (no-op when absent) ===
+
+DROP VIEW eng_emps;
+DROP VIEW emp_dept;
+# Second drop is a no-op because of IF EXISTS — must NOT error.
+DROP VIEW IF EXISTS eng_emps;
+DROP VIEW IF EXISTS emp_dept;
+
+--echo === DROP VIEW <missing> — KNOWN DIVERGENCE (errno 1105) ===
+--echo # MySQL errno 1051 (Unknown table 'X'). zeta errors with
+--echo # 1105 (generic execution error). Tracked as a follow-up.
+
+--error 1105
+DROP VIEW does_not_exist;
+
+--echo === Cleanup ===
+
+DROP TABLE emp;
+DROP TABLE dept;

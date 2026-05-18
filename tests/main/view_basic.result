@@ -1,0 +1,55 @@
+=== Setup ===
+DROP TABLE IF EXISTS emp;
+CREATE TABLE emp (id INT PRIMARY KEY, name VARCHAR(20), dept VARCHAR(10), salary INT);
+INSERT INTO emp VALUES
+  (1, 'alice', 'eng', 100),
+  (2, 'bob', 'eng', 90),
+  (3, 'carol', 'sales', 80);
+DROP TABLE IF EXISTS dept;
+CREATE TABLE dept (name VARCHAR(10) PRIMARY KEY, location VARCHAR(10));
+INSERT INTO dept VALUES ('eng', 'sf'), ('sales', 'ny');
+=== Basic CREATE VIEW + SELECT ===
+CREATE VIEW eng_emps AS
+  SELECT id, name, salary FROM emp WHERE dept = 'eng';
+SELECT id, name, salary FROM eng_emps;
+id	name	salary
+1	alice	100
+2	bob	90
+=== CREATE OR REPLACE VIEW — atomic redefinition ===
+CREATE OR REPLACE VIEW eng_emps AS
+  SELECT id, name FROM emp WHERE dept = 'eng';
+SELECT id, name FROM eng_emps;
+id	name
+1	alice
+2	bob
+=== View over a JOIN ===
+CREATE VIEW emp_dept AS
+  SELECT e.id, e.name, d.location
+  FROM emp e JOIN dept d ON e.dept = d.name;
+SELECT id, name, location FROM emp_dept;
+id	name	location
+1	alice	sf
+2	bob	sf
+3	carol	ny
+=== information_schema.VIEWS metadata ===
+# TABLE_SCHEMA reflects the connection's current database
+# (the runner connects with `/test`), TABLE_NAME the view.
+SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.VIEWS
+  WHERE TABLE_NAME IN ('eng_emps', 'emp_dept')
+  ORDER BY TABLE_NAME;
+TABLE_SCHEMA	TABLE_NAME
+test	emp_dept
+test	eng_emps
+=== DROP VIEW + DROP VIEW IF EXISTS (no-op when absent) ===
+DROP VIEW eng_emps;
+DROP VIEW emp_dept;
+DROP VIEW IF EXISTS eng_emps;
+DROP VIEW IF EXISTS emp_dept;
+=== DROP VIEW <missing> — KNOWN DIVERGENCE (errno 1105) ===
+# MySQL errno 1051 (Unknown table 'X'). zeta errors with
+# 1105 (generic execution error). Tracked as a follow-up.
+DROP VIEW does_not_exist;
+ERROR 1105: execution error: view 'test.public.does_not_exist' does not exist
+=== Cleanup ===
+DROP TABLE emp;
+DROP TABLE dept;
