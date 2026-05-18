@@ -169,8 +169,14 @@ SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DATA_TYPE,
 --echo # typed parameters, so PARAMETERS is always empty — but the
 --echo # documented 8-column header is emitted so introspection tools
 --echo # see "view exists, no rows" instead of "view missing".
+--echo #
+--echo # Load-bearing probe: project ORDINAL_POSITION + PARAMETER_NAME.
+--echo # Both are Phase 3-only columns (not in the pre-Phase-3 catch-all
+--echo # stub's 4-col TABLE_CATALOG/TABLE_SCHEMA/TABLE_NAME/CONSTRAINT_NAME
+--echo # header), so the old stub would error 1054 here. Empty rowset
+--echo # plus successful projection is the actual assertion.
 
-SELECT * FROM information_schema.parameters WHERE specific_schema='test';
+SELECT ORDINAL_POSITION, PARAMETER_NAME FROM information_schema.parameters WHERE specific_schema='test';
 
 --echo === Function-call projection gap ===
 --echo # zeta's info_schema query parser does not accept COUNT(*)

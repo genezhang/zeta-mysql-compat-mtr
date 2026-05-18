@@ -130,7 +130,13 @@ test	audit_fn	FUNCTION	trigger	SQL	SQL	DEFINER
 # typed parameters, so PARAMETERS is always empty — but the
 # documented 8-column header is emitted so introspection tools
 # see "view exists, no rows" instead of "view missing".
-SELECT * FROM information_schema.parameters WHERE specific_schema='test';
+#
+# Load-bearing probe: project ORDINAL_POSITION + PARAMETER_NAME.
+# Both are Phase 3-only columns (not in the pre-Phase-3 catch-all
+# stub's 4-col TABLE_CATALOG/TABLE_SCHEMA/TABLE_NAME/CONSTRAINT_NAME
+# header), so the old stub would error 1054 here. Empty rowset
+# plus successful projection is the actual assertion.
+SELECT ORDINAL_POSITION, PARAMETER_NAME FROM information_schema.parameters WHERE specific_schema='test';
 === Function-call projection gap ===
 # zeta's info_schema query parser does not accept COUNT(*)
 # (or any function-call / expression projection) in any
