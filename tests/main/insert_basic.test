@@ -14,11 +14,16 @@
 #     clause refers to the value that was rejected, not the
 #     existing row. zeta matches MySQL here.
 #   # zeta-adapt: INSERT IGNORE — MySQL silently skips rows that
-#     would violate a constraint and keeps the existing row.
-#     zeta DIVERGES: parser does not recognize the IGNORE keyword
-#     in INSERT position yet, so the statement errors with 1064.
-#     Pinned as KNOWN DIVERGENCE below; close the gap to remove
-#     the --error pin.
+#     would violate a unique constraint and keeps the existing row.
+#     zeta now handles this via a wire-level rewrite (#1120):
+#     `INSERT IGNORE INTO ...` is translated into
+#     `INSERT INTO ... ON CONFLICT DO NOTHING`. Pinned below.
+#     (Non-conflict constraint violations under IGNORE — NOT NULL,
+#     FK — still raise; that's a separate divergence.)
+#   # zeta-adapt: INSERT INTO ... SET col = val, ... — MySQL
+#     syntactic sugar. zeta now handles this via a wire-level
+#     rewrite (#1120): rewritten into the standard column-list /
+#     VALUES form before parsing.
 #   # zeta-adapt: CREATE TABLE ... LIKE is not supported by zeta's
 #     MySQL wire (parsed as PG dialect which doesn't recognize the
 #     form); use explicit re-CREATE for INSERT...SELECT setup.
@@ -57,25 +62,34 @@ INSERT INTO t1 (id, name, grade) VALUES (1, 'ignored', 0)
   ON DUPLICATE KEY UPDATE grade = grade + 1;
 SELECT id, name, grade FROM t1 WHERE id = 1;
 
---echo === INSERT IGNORE — KNOWN DIVERGENCE (zeta parser gap) ===
+--echo === INSERT IGNORE — silently skips PK conflict (zeta #1120 FIXED) ===
 --echo # MySQL accepts INSERT IGNORE INTO ... to silently skip rows
---echo # that would violate a constraint. zeta's parser does not yet
---echo # recognize the IGNORE keyword in INSERT position — errno
---echo # 1064 (parse error). Tracked as a follow-up.
+--echo # that would violate a unique constraint. zeta now translates
+--echo # this at the wire layer to ON CONFLICT DO NOTHING so the row
+--echo # is preserved verbatim.
 
---error 1064
 INSERT IGNORE INTO t1 (id, name, grade) VALUES (1, 'alice-ignored', 0);
+# Row id=1 was previously updated to (alice2, 101) by ODKU above; the
+# IGNORE above should NOT have overwritten it.
+SELECT id, name, grade FROM t1 WHERE id = 1;
 
---echo === INSERT ... SET form — KNOWN DIVERGENCE (zeta parser gap) ===
+# INSERT IGNORE on a non-conflicting row inserts normally.
+INSERT IGNORE INTO t1 (id, name, grade) VALUES (5, 'erin', 75);
+SELECT id, name, grade FROM t1 WHERE id = 5;
+
+--echo === INSERT ... SET form (zeta #1120 FIXED) ===
 --echo # MySQL accepts INSERT INTO ... SET col=val, ... as syntactic
---echo # sugar for INSERT ... (col, ...) VALUES (val, ...). zeta's
---echo # parser does not yet recognize the SET form — errno 1064.
---echo # The (col) VALUES (val) form below is the equivalent.
+--echo # sugar for INSERT ... (col, ...) VALUES (val, ...). zeta now
+--echo # rewrites this at the wire layer into the standard form.
 
---error 1064
 INSERT INTO t1 SET id = 10, name = 'frank', grade = 88;
+SELECT id, name, grade FROM t1 WHERE id = 10;
 
-INSERT INTO t1 (id, name, grade) VALUES (10, 'frank', 88);
+# INSERT ... SET combined with ON DUPLICATE KEY UPDATE — the suffix
+# is preserved through the SET-form rewrite and then translated to
+# ON CONFLICT via the existing ODKU rewrite.
+INSERT INTO t1 SET id = 10, name = 'ignored', grade = 0
+  ON DUPLICATE KEY UPDATE grade = VALUES(grade) + 5;
 SELECT id, name, grade FROM t1 WHERE id = 10;
 
 --echo === INSERT ... SELECT (copy from another table) ===

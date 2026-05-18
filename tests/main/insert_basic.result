@@ -30,24 +30,32 @@ INSERT INTO t1 (id, name, grade) VALUES (1, 'ignored', 0)
 SELECT id, name, grade FROM t1 WHERE id = 1;
 id	name	grade
 1	alice2	101
-=== INSERT IGNORE — KNOWN DIVERGENCE (zeta parser gap) ===
+=== INSERT IGNORE — silently skips PK conflict (zeta #1120 FIXED) ===
 # MySQL accepts INSERT IGNORE INTO ... to silently skip rows
-# that would violate a constraint. zeta's parser does not yet
-# recognize the IGNORE keyword in INSERT position — errno
-# 1064 (parse error). Tracked as a follow-up.
+# that would violate a unique constraint. zeta now translates
+# this at the wire layer to ON CONFLICT DO NOTHING so the row
+# is preserved verbatim.
 INSERT IGNORE INTO t1 (id, name, grade) VALUES (1, 'alice-ignored', 0);
-ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: INTO at Line: 1, Column: 15
-=== INSERT ... SET form — KNOWN DIVERGENCE (zeta parser gap) ===
+SELECT id, name, grade FROM t1 WHERE id = 1;
+id	name	grade
+1	alice2	101
+INSERT IGNORE INTO t1 (id, name, grade) VALUES (5, 'erin', 75);
+SELECT id, name, grade FROM t1 WHERE id = 5;
+id	name	grade
+5	erin	75
+=== INSERT ... SET form (zeta #1120 FIXED) ===
 # MySQL accepts INSERT INTO ... SET col=val, ... as syntactic
-# sugar for INSERT ... (col, ...) VALUES (val, ...). zeta's
-# parser does not yet recognize the SET form — errno 1064.
-# The (col) VALUES (val) form below is the equivalent.
+# sugar for INSERT ... (col, ...) VALUES (val, ...). zeta now
+# rewrites this at the wire layer into the standard form.
 INSERT INTO t1 SET id = 10, name = 'frank', grade = 88;
-ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: SET at Line: 1, Column: 16
-INSERT INTO t1 (id, name, grade) VALUES (10, 'frank', 88);
 SELECT id, name, grade FROM t1 WHERE id = 10;
 id	name	grade
 10	frank	88
+INSERT INTO t1 SET id = 10, name = 'ignored', grade = 0
+  ON DUPLICATE KEY UPDATE grade = VALUES(grade) + 5;
+SELECT id, name, grade FROM t1 WHERE id = 10;
+id	name	grade
+10	frank	5
 === INSERT ... SELECT (copy from another table) ===
 DROP TABLE IF EXISTS t2;
 CREATE TABLE t2 (id INT PRIMARY KEY, name VARCHAR(20), grade INT DEFAULT 50);
