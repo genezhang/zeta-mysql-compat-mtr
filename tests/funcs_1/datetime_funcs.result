@@ -159,11 +159,23 @@ v
 SELECT DATE_FORMAT('2024-03-15', '%D %M %Y') AS v;
 v
 15th March 2024
-# Phase 2 directives — ISO and Sun-anchored week numbering.
+# Phase 2 directives — week numbering, both anchors.
+# 2024-01-01 is a Monday: %u (Mon-first, no rollover) starts
+# week 1 here; %v (ISO, Mon-first, ≥4 days) also week 1;
+# %U (Sun-first, no rollover) is still week 0 (waiting for
+# the first Sunday on Jan 7); %V (Sun-first, ≥4 days) sees
+# the Sun-Sat week containing Mon Jan 1 as having 6 days in
+# 2024 → week 1.
+SELECT DATE_FORMAT('2024-01-01', '%u') AS v;
+v
+01
 SELECT DATE_FORMAT('2024-01-01', '%v') AS v;
 v
 01
-SELECT DATE_FORMAT('2024-01-01', '%u') AS v;
+SELECT DATE_FORMAT('2024-01-01', '%U') AS v;
+v
+00
+SELECT DATE_FORMAT('2024-01-01', '%V') AS v;
 v
 01
 # STR_TO_DATE always returns Timestamp (midnight for date-only

@@ -141,9 +141,17 @@ SELECT DATE_FORMAT('2024-03-15 14:30:45', '%r') AS v;
 SELECT DATE_FORMAT(STR_TO_DATE('2024-03-15 14:30:45.123456', '%Y-%m-%d %H:%i:%S.%f'), '%f') AS v;
 SELECT DATE_FORMAT('2024-03-15', '%j') AS v;
 SELECT DATE_FORMAT('2024-03-15', '%D %M %Y') AS v;
---echo # Phase 2 directives — ISO and Sun-anchored week numbering.
-SELECT DATE_FORMAT('2024-01-01', '%v') AS v;
+--echo # Phase 2 directives — week numbering, both anchors.
+--echo # 2024-01-01 is a Monday: %u (Mon-first, no rollover) starts
+--echo # week 1 here; %v (ISO, Mon-first, ≥4 days) also week 1;
+--echo # %U (Sun-first, no rollover) is still week 0 (waiting for
+--echo # the first Sunday on Jan 7); %V (Sun-first, ≥4 days) sees
+--echo # the Sun-Sat week containing Mon Jan 1 as having 6 days in
+--echo # 2024 → week 1.
 SELECT DATE_FORMAT('2024-01-01', '%u') AS v;
+SELECT DATE_FORMAT('2024-01-01', '%v') AS v;
+SELECT DATE_FORMAT('2024-01-01', '%U') AS v;
+SELECT DATE_FORMAT('2024-01-01', '%V') AS v;
 --echo # STR_TO_DATE always returns Timestamp (midnight for date-only
 --echo # formats) so the runtime value matches the advertised column
 --echo # type. See #1094 review.
