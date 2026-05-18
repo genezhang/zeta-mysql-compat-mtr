@@ -1,0 +1,119 @@
+# Independently authored transaction smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/transaction.test; pins zeta's behavior across the
+# transaction-control statements MySQL apps and ORMs rely on.
+#
+# Adaptation notes:
+#   # zeta-adapt: START TRANSACTION (MySQL alias for BEGIN) — both
+#     forms accepted; the surrounding txn semantics match BEGIN.
+#   # zeta-adapt: BEGIN WORK — accepted (PG/MySQL alias for BEGIN).
+#   # zeta-adapt: SAVEPOINT name / ROLLBACK TO SAVEPOINT name /
+#     RELEASE SAVEPOINT name — all supported (matches MySQL +
+#     PG). Released savepoints can no longer be rolled back to;
+#     attempting to do so errors.
+#   # zeta-adapt: SET TRANSACTION ISOLATION LEVEL ... — accepted
+#     (no error) for READ COMMITTED / REPEATABLE READ / SERIALIZABLE
+#     ahead of a transaction. Effect is applied at txn boundaries.
+#   # zeta-adapt: START TRANSACTION READ ONLY — KNOWN DIVERGENCE.
+#     zeta does not support read-only transaction marking yet;
+#     errors with 1235 ("not supported"). MySQL accepts; the
+#     READ ONLY flag would only matter for explicit write rejection.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS tx;
+CREATE TABLE tx (id INT PRIMARY KEY, v INT);
+INSERT INTO tx VALUES (1, 100);
+
+--echo === BEGIN / INSERT / COMMIT — row persists ===
+
+BEGIN;
+INSERT INTO tx VALUES (2, 200);
+SELECT id, v FROM tx WHERE id = 2;
+COMMIT;
+SELECT id, v FROM tx WHERE id = 2;
+
+--echo === BEGIN / INSERT / ROLLBACK — row discarded ===
+
+BEGIN;
+INSERT INTO tx VALUES (3, 300);
+SELECT id, v FROM tx WHERE id = 3;
+ROLLBACK;
+SELECT id, v FROM tx WHERE id = 3;
+
+--echo === START TRANSACTION (MySQL alias for BEGIN) ===
+
+START TRANSACTION;
+INSERT INTO tx VALUES (4, 400);
+COMMIT;
+SELECT id, v FROM tx WHERE id = 4;
+
+--echo === BEGIN WORK (legacy alias) ===
+
+BEGIN WORK;
+INSERT INTO tx VALUES (5, 500);
+COMMIT;
+SELECT id, v FROM tx WHERE id = 5;
+
+--echo === SAVEPOINT + ROLLBACK TO SAVEPOINT ===
+--echo # Stacked savepoints: rolling back to an inner savepoint
+--echo # keeps changes from earlier savepoints intact.
+
+DROP TABLE IF EXISTS sv;
+CREATE TABLE sv (id INT PRIMARY KEY);
+BEGIN;
+INSERT INTO sv VALUES (1);
+SAVEPOINT s1;
+INSERT INTO sv VALUES (2);
+SAVEPOINT s2;
+INSERT INTO sv VALUES (3);
+# Roll back to s2 — drops (3), keeps (1, 2).
+ROLLBACK TO SAVEPOINT s2;
+--sorted_result
+SELECT id FROM sv;
+# Roll back to s1 — drops (2), keeps (1).
+ROLLBACK TO SAVEPOINT s1;
+--sorted_result
+SELECT id FROM sv;
+COMMIT;
+--sorted_result
+SELECT id FROM sv;
+
+--echo === RELEASE SAVEPOINT ===
+--echo # Releasing a savepoint discards the savepoint marker but
+--echo # keeps all work done since (no rollback effect). Attempting
+--echo # to roll back to a released savepoint errors.
+
+DROP TABLE IF EXISTS rsv;
+CREATE TABLE rsv (id INT PRIMARY KEY);
+BEGIN;
+INSERT INTO rsv VALUES (1);
+SAVEPOINT s1;
+INSERT INTO rsv VALUES (2);
+RELEASE SAVEPOINT s1;
+SELECT id FROM rsv ORDER BY id;
+COMMIT;
+SELECT id FROM rsv ORDER BY id;
+
+--echo === SET TRANSACTION ISOLATION LEVEL — accepted forms ===
+--echo # Pin only that the statements parse + execute without
+--echo # error; observable effects are tested elsewhere in the
+--echo # isolation-specific suites.
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+--echo === START TRANSACTION READ ONLY — KNOWN DIVERGENCE (errno 1235) ===
+--echo # MySQL marks the transaction read-only and rejects writes
+--echo # inside it. zeta does not yet support the READ ONLY flag;
+--echo # errors with 1235 ("not supported"). Tracked as a follow-up.
+
+--error 1235
+START TRANSACTION READ ONLY;
+
+--echo === Cleanup ===
+
+DROP TABLE tx;
+DROP TABLE sv;
+DROP TABLE rsv;

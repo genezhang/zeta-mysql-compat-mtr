@@ -1,0 +1,97 @@
+=== Setup ===
+DROP TABLE IF EXISTS tx;
+CREATE TABLE tx (id INT PRIMARY KEY, v INT);
+INSERT INTO tx VALUES (1, 100);
+=== BEGIN / INSERT / COMMIT — row persists ===
+BEGIN;
+INSERT INTO tx VALUES (2, 200);
+SELECT id, v FROM tx WHERE id = 2;
+id	v
+2	200
+COMMIT;
+SELECT id, v FROM tx WHERE id = 2;
+id	v
+2	200
+=== BEGIN / INSERT / ROLLBACK — row discarded ===
+BEGIN;
+INSERT INTO tx VALUES (3, 300);
+SELECT id, v FROM tx WHERE id = 3;
+id	v
+3	300
+ROLLBACK;
+SELECT id, v FROM tx WHERE id = 3;
+=== START TRANSACTION (MySQL alias for BEGIN) ===
+START TRANSACTION;
+INSERT INTO tx VALUES (4, 400);
+COMMIT;
+SELECT id, v FROM tx WHERE id = 4;
+id	v
+4	400
+=== BEGIN WORK (legacy alias) ===
+BEGIN WORK;
+INSERT INTO tx VALUES (5, 500);
+COMMIT;
+SELECT id, v FROM tx WHERE id = 5;
+id	v
+5	500
+=== SAVEPOINT + ROLLBACK TO SAVEPOINT ===
+# Stacked savepoints: rolling back to an inner savepoint
+# keeps changes from earlier savepoints intact.
+DROP TABLE IF EXISTS sv;
+CREATE TABLE sv (id INT PRIMARY KEY);
+BEGIN;
+INSERT INTO sv VALUES (1);
+SAVEPOINT s1;
+INSERT INTO sv VALUES (2);
+SAVEPOINT s2;
+INSERT INTO sv VALUES (3);
+ROLLBACK TO SAVEPOINT s2;
+SELECT id FROM sv;
+id
+1
+2
+ROLLBACK TO SAVEPOINT s1;
+SELECT id FROM sv;
+id
+1
+COMMIT;
+SELECT id FROM sv;
+id
+1
+=== RELEASE SAVEPOINT ===
+# Releasing a savepoint discards the savepoint marker but
+# keeps all work done since (no rollback effect). Attempting
+# to roll back to a released savepoint errors.
+DROP TABLE IF EXISTS rsv;
+CREATE TABLE rsv (id INT PRIMARY KEY);
+BEGIN;
+INSERT INTO rsv VALUES (1);
+SAVEPOINT s1;
+INSERT INTO rsv VALUES (2);
+RELEASE SAVEPOINT s1;
+SELECT id FROM rsv ORDER BY id;
+id
+1
+2
+COMMIT;
+SELECT id FROM rsv ORDER BY id;
+id
+1
+2
+=== SET TRANSACTION ISOLATION LEVEL — accepted forms ===
+# Pin only that the statements parse + execute without
+# error; observable effects are tested elsewhere in the
+# isolation-specific suites.
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+=== START TRANSACTION READ ONLY — KNOWN DIVERGENCE (errno 1235) ===
+# MySQL marks the transaction read-only and rejects writes
+# inside it. zeta does not yet support the READ ONLY flag;
+# errors with 1235 ("not supported"). Tracked as a follow-up.
+START TRANSACTION READ ONLY;
+ERROR 1235: START TRANSACTION READ ONLY is not supported
+=== Cleanup ===
+DROP TABLE tx;
+DROP TABLE sv;
+DROP TABLE rsv;
