@@ -4,13 +4,13 @@
 #
 # Adaptation notes:
 #   # zeta-adapt: UPDATE ... LIMIT N — MySQL caps the number of rows
-#     touched. zeta silently IGNORES the LIMIT clause (no error,
-#     all matching rows are updated). Tracked as a divergence; not
-#     pinned here because pinning would obscure the data-loss risk.
-#   # zeta-adapt: UPDATE ... ORDER BY ... LIMIT — MySQL extension
-#     for deterministic partial updates. zeta's parser rejects with
-#     errno 1064. Not pinned here (the LIMIT-without-ORDER-BY case
-#     above is the more dangerous one).
+#     touched. zeta does not yet honor LIMIT in UPDATE/DELETE
+#     (planner/executor work). zeta #1124 FIXED: rejects with
+#     errno 1064 (clear "would silently update all matching rows"
+#     message) instead of silently ignoring the clause. Pinned
+#     below; remove the --error pin once proper LIMIT support
+#     lands. The ORDER BY ... LIMIT shape is also rejected at the
+#     parser level (sqlparser fails it before our convert).
 #   # zeta-adapt: UPDATE t1 JOIN t2 ON ... SET ... — MySQL multi-
 #     table UPDATE; zeta's mysqlwire parses these via the implicit
 #     FROM-rewrite (treats the JOIN like a PG `UPDATE t SET ... FROM`).
@@ -45,6 +45,14 @@ SELECT id, name, grade FROM u1 WHERE id = 2;
 
 UPDATE u1 SET name = 'alice2', grade = grade - 50 WHERE id = 1;
 SELECT id, name, grade FROM u1 WHERE id = 1;
+
+--echo === UPDATE ... LIMIT — rejected (zeta #1124 FIXED) ===
+--echo # MySQL caps UPDATE to N rows. zeta does not honor LIMIT in
+--echo # UPDATE; the parser rejects with errno 1064 instead of
+--echo # silently updating every matching row.
+
+--error 1064
+UPDATE u1 SET grade = 0 WHERE id > 1 LIMIT 1;
 
 --echo === UPDATE ... JOIN (MySQL multi-table form) ===
 

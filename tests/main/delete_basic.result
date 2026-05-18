@@ -37,6 +37,18 @@ DELETE d1 FROM d1 JOIN d_filter ON d1.id = d_filter.fid;
 SELECT id, name, grade FROM d1;
 id	name	grade
 5	erin	50
+=== DELETE ... LIMIT — rejected (zeta #1124 FIXED) ===
+# MySQL caps DELETE to N rows. zeta does not honor LIMIT;
+# the parser rejects with errno 1064 instead of silently
+# deleting every matching row.
+DELETE FROM d1 WHERE id > 0 LIMIT 1;
+ERROR 1064: SQL parse error: DELETE ... LIMIT is not supported (would silently delete all matching rows; remove the LIMIT clause)
+=== DELETE ... ORDER BY — rejected (zeta #1124 FIXED) ===
+# MySQL uses ORDER BY with LIMIT to pick which rows survive.
+# zeta does not honor ORDER BY in DELETE; rejected at the
+# parser with errno 1064 (ordering would be silently dropped).
+DELETE FROM d1 ORDER BY id DESC;
+ERROR 1064: SQL parse error: DELETE ... ORDER BY is not supported (the ordering is dropped without LIMIT; remove the ORDER BY clause)
 === DELETE all rows (no WHERE) ===
 DELETE FROM d1;
 SELECT COUNT(*) AS remaining FROM d1;

@@ -4,11 +4,14 @@
 # one known divergence.
 #
 # Adaptation notes:
-#   # zeta-adapt: DELETE ... LIMIT N — MySQL caps the number of rows
-#     deleted. zeta silently IGNORES the LIMIT clause: every row
-#     matching the WHERE is deleted. This is a data-loss-risk
-#     divergence; not pinned here because pinning would obscure the
-#     issue. Tracked as a follow-up.
+#   # zeta-adapt: DELETE ... LIMIT N and DELETE ... ORDER BY —
+#     MySQL caps DELETE to N rows and lets ORDER BY drive which
+#     rows survive. zeta does not yet honor either (planner/
+#     executor work). zeta #1124 FIXED: both are rejected with
+#     errno 1064 (clear "would silently delete all matching rows"
+#     / "ordering is dropped without LIMIT" messages) instead of
+#     silently ignoring the clauses. Pinned below; remove the
+#     --error pins once proper support lands.
 #   # zeta-adapt: DELETE FROM t WHERE col IN (SELECT ...) —
 #     correlated/subquery DELETE. zeta's executor does not support
 #     `InSubquery` in WHERE for DELETE — errno 1105. NOT pinned
@@ -60,6 +63,22 @@ INSERT INTO d_filter (fid) VALUES (1);
 DELETE d1 FROM d1 JOIN d_filter ON d1.id = d_filter.fid;
 --sorted_result
 SELECT id, name, grade FROM d1;
+
+--echo === DELETE ... LIMIT — rejected (zeta #1124 FIXED) ===
+--echo # MySQL caps DELETE to N rows. zeta does not honor LIMIT;
+--echo # the parser rejects with errno 1064 instead of silently
+--echo # deleting every matching row.
+
+--error 1064
+DELETE FROM d1 WHERE id > 0 LIMIT 1;
+
+--echo === DELETE ... ORDER BY — rejected (zeta #1124 FIXED) ===
+--echo # MySQL uses ORDER BY with LIMIT to pick which rows survive.
+--echo # zeta does not honor ORDER BY in DELETE; rejected at the
+--echo # parser with errno 1064 (ordering would be silently dropped).
+
+--error 1064
+DELETE FROM d1 ORDER BY id DESC;
 
 --echo === DELETE all rows (no WHERE) ===
 
