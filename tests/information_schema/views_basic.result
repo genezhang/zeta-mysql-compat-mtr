@@ -84,19 +84,35 @@ CREATE VIEW customer_emails AS SELECT id, email FROM customers;
 SELECT table_name, view_definition, check_option, is_updatable FROM information_schema.views WHERE table_schema='test';
 TABLE_NAME	VIEW_DEFINITION	CHECK_OPTION	IS_UPDATABLE
 customer_emails	SELECT id, email FROM customers	NONE	NO
-=== Unsupported: information_schema.character_sets ===
-# Connection-time probe by many MySQL drivers. KNOWN
-# DIVERGENCE — character_set is hardcoded to utf8mb4 in
-# the wire shim but the directory isn't exposed.
-# Tracked as zeta #1100 Phase 2.
+=== Supported: information_schema.character_sets (#1100 Phase 2) ===
+# Connection-time probe by many MySQL drivers. zeta advertises
+# utf8mb4 via lookup_system_variable; the directory now exposes
+# the same single row.
+# KNOWN DIVERGENCE: only utf8mb4 is exposed; latin1 / ascii /
+# binary etc. are not — zeta runs utf8mb4-only.
 SELECT * FROM information_schema.character_sets WHERE character_set_name='utf8mb4';
-=== Unsupported: information_schema.collations ===
-# Common ORM probe. KNOWN DIVERGENCE. Tracked as #1100 Phase 2.
+CHARACTER_SET_NAME	DEFAULT_COLLATE_NAME	DESCRIPTION	MAXLEN
+utf8mb4	utf8mb4_general_ci	UTF-8 Unicode	4
+# Probe a non-existent charset — empty result confirms the
+# filter works (the row above isn't always returned).
+SELECT * FROM information_schema.character_sets WHERE character_set_name='latin1';
+=== Supported: information_schema.collations (#1100 Phase 2) ===
+# Common ORM probe. zeta exposes a single utf8mb4_general_ci
+# collation (id=45, matches MySQL's well-known assignment).
+# KNOWN DIVERGENCE: only utf8mb4_general_ci is exposed; the
+# other utf8mb4 collations (utf8mb4_unicode_ci, utf8mb4_bin)
+# are not.
 SELECT * FROM information_schema.collations WHERE collation_name='utf8mb4_general_ci';
-=== Unsupported: information_schema.engines ===
-# MySQL `SHOW ENGINES` / engine-introspection tooling.
-# KNOWN DIVERGENCE. Tracked as #1100 Phase 2.
+COLLATION_NAME	CHARACTER_SET_NAME	ID	IS_DEFAULT	IS_COMPILED	SORTLEN
+utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
+=== Supported: information_schema.engines (#1100 Phase 2) ===
+# MySQL `SHOW ENGINES` / engine-introspection tooling. zeta
+# presents itself as InnoDB-compatible (matches the
+# default_storage_engine sysvar). Transactions / XA /
+# savepoints all advertised as supported.
 SELECT * FROM information_schema.engines;
+ENGINE	SUPPORT	COMMENT	TRANSACTIONS	XA	SAVEPOINTS
+InnoDB	DEFAULT	Supports transactions, row-level locking, and foreign keys	YES	YES	YES
 === Unsupported: information_schema.routines ===
 # PROCEDURE / FUNCTION metadata. KNOWN DIVERGENCE.
 # Tracked as #1100 Phase 3.
