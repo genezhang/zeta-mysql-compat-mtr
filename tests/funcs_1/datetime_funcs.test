@@ -55,14 +55,24 @@ SELECT SUBSTRING(CAST(CURRENT_TIME() AS TEXT), 1, 6) LIKE '__:__:' AS shape_ok;
 --echo # NOW — same microsecond divergence as CURRENT_TIME.
 SELECT SUBSTRING(CAST(NOW() AS TEXT), 1, 10) LIKE '____-__-__' AS shape_ok;
 
---echo === Date arithmetic (works, requires explicit cast) ===
+--echo === Date arithmetic ===
 
---echo # DATE_ADD — implementation present but parser doesn't auto-
---echo # coerce string-literal dates. With `::date` it works.
---echo # MySQL would accept DATE_ADD('2024-03-15', INTERVAL 7 DAY).
-SELECT DATE_ADD('2024-03-15'::date, INTERVAL '7' DAY) AS v;
-SELECT DATE_SUB('2024-03-15'::date, INTERVAL '7' DAY) AS v;
-SELECT ADDDATE('2024-03-15'::date, 7) AS v;
+--echo # DATE_ADD / DATE_SUB / ADDDATE / SUBDATE — zeta #1105 FIXED.
+--echo # Parser auto-wraps string literals in CAST(... AS DATE) so
+--echo # MySQL apps can write DATE_ADD('2024-03-15', INTERVAL 7 DAY)
+--echo # without an explicit ::date cast. Result is Timestamp
+--echo # (Date+Interval) for the INTERVAL form and Date for the
+--echo # ADDDATE/SUBDATE Int form.
+SELECT DATE_ADD('2024-03-15', INTERVAL '7' DAY) AS v;
+SELECT DATE_SUB('2024-03-15', INTERVAL '7' DAY) AS v;
+SELECT ADDDATE('2024-03-15', 7) AS v;
+SELECT SUBDATE('2024-03-15', INTERVAL '7' DAY) AS v;
+SELECT SUBDATE('2024-03-15', 7) AS v;
+
+--echo # Datetime literal: parser detects time component and casts
+--echo # to TIMESTAMP instead of DATE so parse_date doesn't reject
+--echo # the time portion.
+SELECT DATE_ADD('2024-03-15 12:00:00', INTERVAL '1' HOUR) AS v;
 
 --echo # DATEDIFF — works directly on string dates (no cast needed).
 SELECT DATEDIFF('2024-03-15','2024-03-01') AS v;
