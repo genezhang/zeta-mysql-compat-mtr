@@ -28,12 +28,9 @@ SELECT id, name FROM ai2;
 id	name
 1	null-id
 2	zero-id
-=== Explicit jump value + subsequent implicit — KNOWN DIVERGENCE ===
-# MySQL: explicit id=100 advances the counter, so the next
-# implicit insert gets id=101.
-# zeta: the counter is NOT advanced, so the next implicit
-# insert gets id=3 (continuing from the local sequence).
-# Both inserts succeed, but the resulting row IDs differ.
+=== Explicit jump value + subsequent implicit (zeta #1123 FIXED) ===
+# Explicit id=100 advances the sequence past 100; the next
+# implicit insert correctly gets id=101 (matches MySQL).
 INSERT INTO ai1 (id, name) VALUES (100, 'jump');
 SELECT LAST_INSERT_ID();
 LAST_INSERT_ID()
@@ -41,13 +38,13 @@ LAST_INSERT_ID()
 INSERT INTO ai1 (name) VALUES ('next');
 SELECT LAST_INSERT_ID();
 LAST_INSERT_ID()
-3
+101
 SELECT id, name FROM ai1 ORDER BY id;
 id	name
 1	alice
 2	bob
-3	next
 100	jump
+101	next
 === Cleanup ===
 DROP TABLE ai1;
 DROP TABLE ai2;

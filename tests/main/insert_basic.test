@@ -6,10 +6,9 @@
 # Adaptation notes:
 #   # zeta-adapt: AUTO_INCREMENT counter — when an explicit value is
 #     inserted that exceeds the current counter, MySQL advances the
-#     counter past it; zeta does NOT. This is a known divergence
-#     pinned via an explicit-value-only path here; a follow-up
-#     `auto_increment_basic.test` would probe the implicit-only
-#     path where zeta and MySQL agree.
+#     counter past it. zeta #1123 FIXED: the MySQL wire path now
+#     bumps the SERIAL sequence accordingly. See
+#     `auto_increment_basic.test` for the dedicated pin.
 #   # zeta-adapt: ON DUPLICATE KEY UPDATE — VALUES(col) in the update
 #     clause refers to the value that was rejected, not the
 #     existing row. zeta matches MySQL here.

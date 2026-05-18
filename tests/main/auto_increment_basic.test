@@ -1,17 +1,16 @@
 # Independently authored AUTO_INCREMENT smoke test for the GPL
 # MTR-format runner. NOT copied or adapted from MySQL's
 # mysql-test/t/auto_increment.test; pins zeta's behavior across
-# common MySQL AUTO_INCREMENT idioms and surfaces one divergence.
+# common MySQL AUTO_INCREMENT idioms.
 #
 # Adaptation notes:
 #   # zeta-adapt: AUTO_INCREMENT counter advance — when an explicit
 #     value is inserted that exceeds the current counter, MySQL
 #     advances the counter past it (so the next implicit insert
-#     gets max+1). zeta does NOT advance: the next implicit insert
-#     reuses the next value from the local sequence, which may
-#     collide with the explicit value later. Pinned below as a
-#     KNOWN DIVERGENCE (different row IDs); not surfaced as an
-#     errno because the inserts themselves succeed.
+#     gets max+1). zeta #1123 FIXED: the MySQL wire path now bumps
+#     the SERIAL sequence past explicit values greater than its
+#     current value (post BEFORE-trigger evaluation), so subsequent
+#     implicit inserts never reuse explicit ids.
 #   # zeta-adapt: NULL / 0 explicit AUTO_INCREMENT values trigger
 #     auto-assign in both MySQL and zeta — pinned below.
 #   # zeta-adapt: LAST_INSERT_ID() after a multi-row INSERT —
@@ -50,12 +49,9 @@ INSERT INTO ai2 (id, name) VALUES (0, 'zero-id');
 --sorted_result
 SELECT id, name FROM ai2;
 
---echo === Explicit jump value + subsequent implicit — KNOWN DIVERGENCE ===
---echo # MySQL: explicit id=100 advances the counter, so the next
---echo # implicit insert gets id=101.
---echo # zeta: the counter is NOT advanced, so the next implicit
---echo # insert gets id=3 (continuing from the local sequence).
---echo # Both inserts succeed, but the resulting row IDs differ.
+--echo === Explicit jump value + subsequent implicit (zeta #1123 FIXED) ===
+--echo # Explicit id=100 advances the sequence past 100; the next
+--echo # implicit insert correctly gets id=101 (matches MySQL).
 
 INSERT INTO ai1 (id, name) VALUES (100, 'jump');
 SELECT LAST_INSERT_ID();
