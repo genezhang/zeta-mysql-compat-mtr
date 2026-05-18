@@ -14,6 +14,11 @@
 #     errno because the inserts themselves succeed.
 #   # zeta-adapt: NULL / 0 explicit AUTO_INCREMENT values trigger
 #     auto-assign in both MySQL and zeta — pinned below.
+#   # zeta-adapt: LAST_INSERT_ID() after a multi-row INSERT —
+#     MySQL returns the FIRST generated value (so after inserting
+#     ('alice'), ('bob') it returns 1). zeta returns the LAST
+#     generated value (2). Pinned to zeta's behavior below as a
+#     KNOWN DIVERGENCE; tracked as a follow-up.
 
 --echo === Setup ===
 
@@ -21,6 +26,9 @@ DROP TABLE IF EXISTS ai1;
 CREATE TABLE ai1 (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));
 
 --echo === Implicit AUTO_INCREMENT — sequential 1, 2 ===
+--echo # KNOWN DIVERGENCE: LAST_INSERT_ID() after a multi-row INSERT.
+--echo # MySQL returns the FIRST generated value (1). zeta returns
+--echo # the LAST generated value (2). Pinning zeta's behavior here.
 
 INSERT INTO ai1 (name) VALUES ('alice'), ('bob');
 SELECT LAST_INSERT_ID();

@@ -21,16 +21,17 @@ SELECT id, name, grade FROM d1;
 id	name	grade
 1	alice	90
 5	erin	50
-=== DELETE with subquery — KNOWN DIVERGENCE (zeta executor gap) ===
-# MySQL accepts WHERE col IN (SELECT ...) for DELETE.
-# zeta's executor does not support InSubquery for DELETE
-# (errno 1105). Tracked as a follow-up; the equivalent
-# JOIN-form DELETE below works.
+=== Setup helper table for JOIN-DELETE ===
+# Documented divergence (NOT actively probed): MySQL accepts
+# `DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter)`,
+# zeta's executor does not support InSubquery for DELETE and
+# errors with 1105. The exact message wraps a Rust Debug dump
+# of the AST, which is unstable — pinning it here would break
+# on harmless AST changes. The equivalent JOIN-form DELETE
+# below works in both engines and is what's pinned instead.
 DROP TABLE IF EXISTS d_filter;
 CREATE TABLE d_filter (fid INT PRIMARY KEY);
 INSERT INTO d_filter (fid) VALUES (1);
-DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter);
-ERROR 1105: execution error: unsupported expression: InSubquery { expr: Column("id"), subquery: SelectStmt { distinct: false, distinct_on: [], projections: [SelectItem { expr: Column("fid"), alias: None }], from: [Table { name: "d_filter", alias: None }], where_clause: None, group_by: [], grouping_sets: [], having: None, order_by: [], limit: None, offset: None, limit_with_ties: false, ctes: [], for_update: false }, negated: false }
 === DELETE t1 FROM t1 JOIN t2 ... (MySQL multi-table form) ===
 DELETE d1 FROM d1 JOIN d_filter ON d1.id = d_filter.fid;
 SELECT id, name, grade FROM d1;

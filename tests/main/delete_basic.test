@@ -11,7 +11,10 @@
 #     issue. Tracked as a follow-up.
 #   # zeta-adapt: DELETE FROM t WHERE col IN (SELECT ...) —
 #     correlated/subquery DELETE. zeta's executor does not support
-#     `InSubquery` in WHERE for DELETE — errno 1105. Pinned below.
+#     `InSubquery` in WHERE for DELETE — errno 1105. NOT pinned
+#     here because the error message wraps an unstable Rust Debug
+#     dump of the AST; pinning it would break on harmless changes.
+#     Documented in-section; the JOIN-form DELETE is what's pinned.
 #   # zeta-adapt: DELETE t1 FROM t1 JOIN t2 ON ... — MySQL multi-
 #     table DELETE works in zeta (parsed via PG-style multi-table
 #     DELETE shape).
@@ -39,18 +42,18 @@ DELETE FROM d1 WHERE id IN (3, 4);
 --sorted_result
 SELECT id, name, grade FROM d1;
 
---echo === DELETE with subquery — KNOWN DIVERGENCE (zeta executor gap) ===
---echo # MySQL accepts WHERE col IN (SELECT ...) for DELETE.
---echo # zeta's executor does not support InSubquery for DELETE
---echo # (errno 1105). Tracked as a follow-up; the equivalent
---echo # JOIN-form DELETE below works.
+--echo === Setup helper table for JOIN-DELETE ===
+--echo # Documented divergence (NOT actively probed): MySQL accepts
+--echo # `DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter)`,
+--echo # zeta's executor does not support InSubquery for DELETE and
+--echo # errors with 1105. The exact message wraps a Rust Debug dump
+--echo # of the AST, which is unstable — pinning it here would break
+--echo # on harmless AST changes. The equivalent JOIN-form DELETE
+--echo # below works in both engines and is what's pinned instead.
 
 DROP TABLE IF EXISTS d_filter;
 CREATE TABLE d_filter (fid INT PRIMARY KEY);
 INSERT INTO d_filter (fid) VALUES (1);
-
---error 1105
-DELETE FROM d1 WHERE id IN (SELECT fid FROM d_filter);
 
 --echo === DELETE t1 FROM t1 JOIN t2 ... (MySQL multi-table form) ===
 
