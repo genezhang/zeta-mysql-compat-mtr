@@ -177,13 +177,25 @@ March
 SELECT LAST_DAY('2024-02-15') AS v;
 v
 2024-02-29
-# TIMESTAMPDIFF — configurable-unit diff. The unit is a bare
-# identifier, not a string — zeta's parser reads it as a
-# column reference (errno 1054), so this is BOTH a missing
-# function and a parser-grammar gap. MySQL apps would need
-# parser support before the function arm helps.
+# TIMESTAMPDIFF — configurable-unit diff with bare-identifier
+# unit (DAY/HOUR/MONTH/etc., not a string). FIXED in zeta #1108:
+# parser now rewrites the unit identifier into a string literal,
+# and the function arm computes calendar-boundary counts that
+# match MySQL semantics (sign-aware for MONTH/QUARTER/YEAR).
 SELECT TIMESTAMPDIFF(DAY, '2024-03-01', '2024-03-15') AS v;
-ERROR 1054: column not found: DAY
+v
+14
+SELECT TIMESTAMPDIFF(HOUR, '2024-03-15 08:00:00', '2024-03-15 14:30:00') AS v;
+v
+6
+# MONTH boundary counting — calendar diff, not day-count/30.
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-15', '2024-04-15') AS v;
+v
+3
+# Reverse direction is negative.
+SELECT TIMESTAMPDIFF(MONTH, '2024-03-01', '2024-01-31') AS v;
+v
+-1
 # TIMEDIFF — signed duration. Slice 3c of #1086 + the
 # Interval→TIME MySQL wire encoder from zeta #1096. The
 # earlier KNOWN DIVERGENCE (debug-rendered Interval wire

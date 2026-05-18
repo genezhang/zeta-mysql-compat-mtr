@@ -36,8 +36,8 @@
 #     (1) CURDATE/CURTIME/SYSDATE renames, (2) direct accessor
 #     functions (YEAR/MONTH/DAY/...) delegating to EXTRACT,
 #     (3) DATE_FORMAT/STR_TO_DATE %-format DSL plus DAY/MONTHNAME,
-#     (4) epoch + TIMESTAMPDIFF (the last needs parser work for
-#     bare-identifier unit args).
+#     (4) epoch + TIMESTAMPDIFF. TIMESTAMPDIFF needed parser work
+#     for bare-identifier unit args; FIXED in zeta #1108.
 # ----------------------------------------------------------------------
 
 --echo === Functions zeta already supports ===
@@ -157,13 +157,17 @@ SELECT MONTHNAME('2024-03-15') AS v;
 --echo # LAST_DAY — end-of-month accessor. Slice 3c of #1086 — FIXED.
 SELECT LAST_DAY('2024-02-15') AS v;
 
---echo # TIMESTAMPDIFF — configurable-unit diff. The unit is a bare
---echo # identifier, not a string — zeta's parser reads it as a
---echo # column reference (errno 1054), so this is BOTH a missing
---echo # function and a parser-grammar gap. MySQL apps would need
---echo # parser support before the function arm helps.
---error 1054
+--echo # TIMESTAMPDIFF — configurable-unit diff with bare-identifier
+--echo # unit (DAY/HOUR/MONTH/etc., not a string). FIXED in zeta #1108:
+--echo # parser now rewrites the unit identifier into a string literal,
+--echo # and the function arm computes calendar-boundary counts that
+--echo # match MySQL semantics (sign-aware for MONTH/QUARTER/YEAR).
 SELECT TIMESTAMPDIFF(DAY, '2024-03-01', '2024-03-15') AS v;
+SELECT TIMESTAMPDIFF(HOUR, '2024-03-15 08:00:00', '2024-03-15 14:30:00') AS v;
+--echo # MONTH boundary counting — calendar diff, not day-count/30.
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-15', '2024-04-15') AS v;
+--echo # Reverse direction is negative.
+SELECT TIMESTAMPDIFF(MONTH, '2024-03-01', '2024-01-31') AS v;
 
 --echo # TIMEDIFF — signed duration. Slice 3c of #1086 + the
 --echo # Interval→TIME MySQL wire encoder from zeta #1096. The
