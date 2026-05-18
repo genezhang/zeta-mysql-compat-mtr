@@ -1,0 +1,68 @@
+# Independently authored AUTO_INCREMENT smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/auto_increment.test; pins zeta's behavior across
+# common MySQL AUTO_INCREMENT idioms and surfaces one divergence.
+#
+# Adaptation notes:
+#   # zeta-adapt: AUTO_INCREMENT counter advance — when an explicit
+#     value is inserted that exceeds the current counter, MySQL
+#     advances the counter past it (so the next implicit insert
+#     gets max+1). zeta does NOT advance: the next implicit insert
+#     reuses the next value from the local sequence, which may
+#     collide with the explicit value later. Pinned below as a
+#     KNOWN DIVERGENCE (different row IDs); not surfaced as an
+#     errno because the inserts themselves succeed.
+#   # zeta-adapt: NULL / 0 explicit AUTO_INCREMENT values trigger
+#     auto-assign in both MySQL and zeta — pinned below.
+#   # zeta-adapt: LAST_INSERT_ID() after a multi-row INSERT —
+#     MySQL returns the FIRST generated value (so after inserting
+#     ('alice'), ('bob') it returns 1). zeta returns the LAST
+#     generated value (2). Pinned to zeta's behavior below as a
+#     KNOWN DIVERGENCE; tracked as a follow-up.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ai1;
+CREATE TABLE ai1 (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));
+
+--echo === Implicit AUTO_INCREMENT — sequential 1, 2 ===
+--echo # KNOWN DIVERGENCE: LAST_INSERT_ID() after a multi-row INSERT.
+--echo # MySQL returns the FIRST generated value (1). zeta returns
+--echo # the LAST generated value (2). Pinning zeta's behavior here.
+
+INSERT INTO ai1 (name) VALUES ('alice'), ('bob');
+SELECT LAST_INSERT_ID();
+--sorted_result
+SELECT id, name FROM ai1;
+
+--echo === NULL explicit value — triggers auto-assign ===
+
+DROP TABLE IF EXISTS ai2;
+CREATE TABLE ai2 (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));
+INSERT INTO ai2 (id, name) VALUES (NULL, 'null-id');
+SELECT LAST_INSERT_ID();
+SELECT id, name FROM ai2;
+
+--echo === 0 explicit value — triggers auto-assign ===
+
+INSERT INTO ai2 (id, name) VALUES (0, 'zero-id');
+--sorted_result
+SELECT id, name FROM ai2;
+
+--echo === Explicit jump value + subsequent implicit — KNOWN DIVERGENCE ===
+--echo # MySQL: explicit id=100 advances the counter, so the next
+--echo # implicit insert gets id=101.
+--echo # zeta: the counter is NOT advanced, so the next implicit
+--echo # insert gets id=3 (continuing from the local sequence).
+--echo # Both inserts succeed, but the resulting row IDs differ.
+
+INSERT INTO ai1 (id, name) VALUES (100, 'jump');
+SELECT LAST_INSERT_ID();
+INSERT INTO ai1 (name) VALUES ('next');
+SELECT LAST_INSERT_ID();
+SELECT id, name FROM ai1 ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE ai1;
+DROP TABLE ai2;

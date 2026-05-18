@@ -1,0 +1,54 @@
+=== Setup ===
+DROP TABLE IF EXISTS ai1;
+CREATE TABLE ai1 (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));
+=== Implicit AUTO_INCREMENT — sequential 1, 2 ===
+# KNOWN DIVERGENCE: LAST_INSERT_ID() after a multi-row INSERT.
+# MySQL returns the FIRST generated value (1). zeta returns
+# the LAST generated value (2). Pinning zeta's behavior here.
+INSERT INTO ai1 (name) VALUES ('alice'), ('bob');
+SELECT LAST_INSERT_ID();
+LAST_INSERT_ID()
+2
+SELECT id, name FROM ai1;
+id	name
+1	alice
+2	bob
+=== NULL explicit value — triggers auto-assign ===
+DROP TABLE IF EXISTS ai2;
+CREATE TABLE ai2 (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));
+INSERT INTO ai2 (id, name) VALUES (NULL, 'null-id');
+SELECT LAST_INSERT_ID();
+LAST_INSERT_ID()
+1
+SELECT id, name FROM ai2;
+id	name
+1	null-id
+=== 0 explicit value — triggers auto-assign ===
+INSERT INTO ai2 (id, name) VALUES (0, 'zero-id');
+SELECT id, name FROM ai2;
+id	name
+1	null-id
+2	zero-id
+=== Explicit jump value + subsequent implicit — KNOWN DIVERGENCE ===
+# MySQL: explicit id=100 advances the counter, so the next
+# implicit insert gets id=101.
+# zeta: the counter is NOT advanced, so the next implicit
+# insert gets id=3 (continuing from the local sequence).
+# Both inserts succeed, but the resulting row IDs differ.
+INSERT INTO ai1 (id, name) VALUES (100, 'jump');
+SELECT LAST_INSERT_ID();
+LAST_INSERT_ID()
+2
+INSERT INTO ai1 (name) VALUES ('next');
+SELECT LAST_INSERT_ID();
+LAST_INSERT_ID()
+3
+SELECT id, name FROM ai1 ORDER BY id;
+id	name
+1	alice
+2	bob
+3	next
+100	jump
+=== Cleanup ===
+DROP TABLE ai1;
+DROP TABLE ai2;
