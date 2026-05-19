@@ -1,0 +1,88 @@
+# Independently authored set-operation smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/union*.test
+# or mysql-test/t/intersect.test; pins zeta's behavior across the
+# UNION / INTERSECT / EXCEPT shapes ORMs and analytics tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: UNION (dedup) — supported.
+#   # zeta-adapt: UNION ALL (preserve dupes) — supported.
+#   # zeta-adapt: INTERSECT — supported.
+#   # zeta-adapt: INTERSECT ALL — supported.
+#   # zeta-adapt: EXCEPT — supported.
+#   # zeta-adapt: EXCEPT ALL — supported.
+#   # zeta-adapt: MINUS (Oracle/MySQL alias for EXCEPT) — supported.
+#   # zeta-adapt: Multi-way (>2 branch) UNION — supported.
+#   # zeta-adapt: Set-op inside FROM (`SELECT … FROM (… UNION …) sub`)
+#     — supported.
+#   # zeta-adapt: Mixed scalar types (INT + DOUBLE) coerce on UNION —
+#     supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — column-count mismatch raises
+#     errno 1105 in zeta; MySQL emits 1222
+#     ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT. Pinned below with the
+#     wider --error so we still trip on changes.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS s1;
+DROP TABLE IF EXISTS s2;
+CREATE TABLE s1 (id INT PRIMARY KEY, name VARCHAR(10));
+CREATE TABLE s2 (id INT PRIMARY KEY, name VARCHAR(10));
+INSERT INTO s1 VALUES (1, 'a'), (2, 'b'), (3, 'c');
+INSERT INTO s2 VALUES (2, 'b'), (3, 'c'), (4, 'd');
+
+--echo === UNION (dedup) ===
+
+SELECT id FROM s1 UNION SELECT id FROM s2 ORDER BY id;
+
+--echo === UNION ALL (preserve duplicates) ===
+
+SELECT id FROM s1 UNION ALL SELECT id FROM s2 ORDER BY id;
+
+--echo === INTERSECT ===
+
+SELECT id FROM s1 INTERSECT SELECT id FROM s2 ORDER BY id;
+
+--echo === INTERSECT ALL ===
+
+SELECT id FROM s1 INTERSECT ALL SELECT id FROM s2 ORDER BY id;
+
+--echo === EXCEPT ===
+
+SELECT id FROM s1 EXCEPT SELECT id FROM s2 ORDER BY id;
+
+--echo === EXCEPT ALL ===
+
+SELECT id FROM s1 EXCEPT ALL SELECT id FROM s2 ORDER BY id;
+
+--echo === MINUS (alias for EXCEPT) ===
+
+SELECT id FROM s1 MINUS SELECT id FROM s2 ORDER BY id;
+
+--echo === Multi-way UNION (>2 branches) ===
+
+SELECT 1 AS v UNION SELECT 2 UNION SELECT 3 ORDER BY v;
+
+--echo === Multi-column UNION with ORDER BY at tail ===
+
+SELECT id, name FROM s1 UNION SELECT id, name FROM s2 ORDER BY id, name;
+
+--echo === Set-op inside FROM (subquery) ===
+
+SELECT MAX(id) AS mx FROM (SELECT id FROM s1 UNION SELECT id FROM s2) u;
+
+--echo === Mixed-type coercion (INT + DOUBLE) ===
+
+SELECT 1 AS v UNION SELECT 2.5 ORDER BY v;
+
+--echo === KNOWN DIVERGENCE: column-count mismatch — errno 1105 ===
+--echo # MySQL emits 1222 (ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT); zeta
+--echo # emits 1105 (generic execution error). Pinned to the wider
+--echo # errno so we still trip if the behavior changes.
+
+--error 1105
+SELECT id, name FROM s1 UNION SELECT id FROM s2;
+
+--echo === Cleanup ===
+
+DROP TABLE s1;
+DROP TABLE s2;
