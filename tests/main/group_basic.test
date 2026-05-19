@@ -1,0 +1,169 @@
+# Independently authored GROUP BY + aggregate smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/group_by*.test; pins zeta's behavior across the
+# aggregate-and-group shapes ORMs and analytics tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: COUNT(*), COUNT(col), COUNT(DISTINCT col) — supported.
+#     COUNT(*) returns BIGINT-shaped result.
+#   # zeta-adapt: SUM / AVG / MIN / MAX on INT and DECIMAL — supported.
+#     AVG on INT returns a high-precision float (zeta's avg widens to
+#     f64; MySQL would coerce to a DECIMAL). Result value matches; only
+#     the display precision differs.
+#   # zeta-adapt: GROUP BY <col>, GROUP BY <col1>, <col2>, GROUP BY <N>
+#     (ordinal position) — all supported.
+#   # zeta-adapt: HAVING with a raw aggregate (`HAVING COUNT(*) > 1`)
+#     — supported. KNOWN DIVERGENCE — HAVING with a SELECT-list alias
+#     (`SELECT COUNT(*) AS c ... HAVING c > 1`) silently returns 0
+#     rows (the alias does not resolve in HAVING; the predicate
+#     evaluates to NULL, which filters out every group). MySQL accepts
+#     alias-in-HAVING. Substitute the raw aggregate expression.
+#     Asserted below.
+#   # zeta-adapt: DISTINCT (single + multi-column) — supported.
+#   # zeta-adapt: ONLY_FULL_GROUP_BY-style enforcement — supported.
+#     A SELECT-list reference to a non-grouped, non-aggregated column
+#     is REJECTED. Errno is 1054 (ER_BAD_FIELD_ERROR "column not
+#     found") vs MySQL's 1055 (ER_WRONG_FIELD_WITH_GROUP), but the
+#     rejection behavior matches. Asserted below.
+#   # zeta-adapt: Empty-table aggregate — COUNT returns 0,
+#     MIN/MAX/SUM/AVG return NULL. Matches MySQL + SQL standard.
+#   # zeta-adapt: STRING_AGG(col, sep [ORDER BY ...]) — supported (PG
+#     spelling). Used here as the substitute for GROUP_CONCAT.
+#   # zeta-adapt: KNOWN DIVERGENCE — GROUP_CONCAT (MySQL spelling) is
+#     NOT supported (errno 1105 "unknown function: GROUP_CONCAT").
+#     Substitute STRING_AGG.
+#   # zeta-adapt: KNOWN DIVERGENCE — ANY_VALUE (MySQL) is NOT
+#     supported (errno 1105 "unknown function: ANY_VALUE"). No PG
+#     substitute; typically the wrapped column needs to be added to
+#     GROUP BY or wrapped in MIN/MAX.
+#   # zeta-adapt: KNOWN DIVERGENCE — `GROUP BY ... WITH ROLLUP` is
+#     REJECTED at parse (errno 1064). MySQL extension; no zeta
+#     equivalent yet. NOT pinned with --error because the parser's
+#     error message contains line/column offsets that vary with .test
+#     formatting; documented in header only.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sales;
+CREATE TABLE sales (
+  id INT PRIMARY KEY,
+  region VARCHAR(10),
+  product VARCHAR(10),
+  qty INT,
+  amt DECIMAL(10, 2)
+);
+INSERT INTO sales VALUES
+  (1, 'NA', 'widget', 5, 50.00),
+  (2, 'NA', 'widget', 3, 30.00),
+  (3, 'EU', 'widget', 7, 70.00),
+  (4, 'NA', 'gadget', 2, 200.00),
+  (5, 'EU', 'gadget', 1, 100.00),
+  (6, 'AP', 'widget', 4, 40.00);
+
+--echo === COUNT family — COUNT(*) / COUNT(col) / COUNT(DISTINCT col) ===
+
+SELECT COUNT(*) AS c_all, COUNT(region) AS c_region, COUNT(DISTINCT region) AS c_distinct
+  FROM sales;
+
+--echo === SUM / MIN / MAX on INT and DECIMAL ===
+
+SELECT SUM(qty) AS sum_q, MIN(qty) AS min_q, MAX(qty) AS max_q FROM sales;
+SELECT SUM(amt) AS sum_a, MIN(amt) AS min_a, MAX(amt) AS max_a FROM sales;
+
+--echo === GROUP BY single column ===
+
+SELECT region, COUNT(*) AS c FROM sales GROUP BY region ORDER BY region;
+
+--echo === GROUP BY multi column ===
+
+SELECT region, product, SUM(qty) AS sum_q
+  FROM sales
+  GROUP BY region, product
+  ORDER BY region, product;
+
+--echo === GROUP BY ordinal position ===
+
+SELECT region, SUM(qty) AS sum_q FROM sales GROUP BY 1 ORDER BY 1;
+
+--echo === HAVING with raw aggregate predicate ===
+
+SELECT region, COUNT(*) AS c
+  FROM sales
+  GROUP BY region
+  HAVING COUNT(*) > 1
+  ORDER BY region;
+
+--echo === HAVING + WHERE composed ===
+
+SELECT region, COUNT(*) AS c
+  FROM sales
+  WHERE qty >= 3
+  GROUP BY region
+  HAVING COUNT(*) >= 1
+  ORDER BY region;
+
+--echo === DISTINCT — single column ===
+
+SELECT DISTINCT region FROM sales ORDER BY region;
+
+--echo === DISTINCT — multi column ===
+
+SELECT DISTINCT region, product FROM sales ORDER BY region, product;
+
+--echo === STRING_AGG (PG; substitute for GROUP_CONCAT) ===
+
+SELECT region, STRING_AGG(product, ',') AS products
+  FROM sales
+  GROUP BY region
+  ORDER BY region;
+
+--echo === STRING_AGG with internal ORDER BY ===
+
+SELECT region, STRING_AGG(product, ',' ORDER BY product) AS products
+  FROM sales
+  GROUP BY region
+  ORDER BY region;
+
+--echo === Empty-table aggregate — COUNT 0; MIN/MAX/SUM/AVG NULL ===
+
+DROP TABLE IF EXISTS empty_t;
+CREATE TABLE empty_t (x INT);
+SELECT COUNT(*) AS c, MIN(x) AS mn, MAX(x) AS mx, SUM(x) AS s FROM empty_t;
+
+--echo === KNOWN DIVERGENCE: HAVING with SELECT-list alias ===
+--echo # MySQL resolves the alias; zeta silently returns 0 rows
+--echo # (the alias doesn't resolve in HAVING; the predicate
+--echo # evaluates to NULL, which filters every group).
+--echo # Use the raw aggregate expression in HAVING instead.
+
+SELECT region, COUNT(*) AS c
+  FROM sales
+  GROUP BY region
+  HAVING c > 1
+  ORDER BY region;
+
+--echo === KNOWN DIVERGENCE: GROUP_CONCAT — unknown function (errno 1105) ===
+--echo # MySQL standard. Substitute STRING_AGG.
+
+--error 1105
+SELECT region, GROUP_CONCAT(product) FROM sales GROUP BY region;
+
+--echo === KNOWN DIVERGENCE: ANY_VALUE — unknown function (errno 1105) ===
+
+--error 1105
+SELECT region, ANY_VALUE(product) FROM sales GROUP BY region;
+
+--echo === KNOWN DIVERGENCE: ONLY_FULL_GROUP_BY violation — errno 1054 ===
+--echo # zeta rejects a SELECT-list reference to a non-grouped,
+--echo # non-aggregated column with errno 1054 (column not found);
+--echo # MySQL emits errno 1055 (ER_WRONG_FIELD_WITH_GROUP) by
+--echo # default. The rejection behavior matches; only the errno
+--echo # differs.
+
+--error 1054
+SELECT region, product FROM sales GROUP BY region;
+
+--echo === Cleanup ===
+
+DROP TABLE sales;
+DROP TABLE empty_t;
