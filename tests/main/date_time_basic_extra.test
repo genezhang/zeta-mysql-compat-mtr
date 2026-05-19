@@ -40,17 +40,20 @@
 #     SILENT PASS-THROUGH: returns the input timestamp unchanged
 #     (no actual TZ conversion). Documented divergence; pinned
 #     positively for the no-op stability.
-#   # zeta-adapt: KNOWN GAP — WEEKOFYEAR(date) errors 1105
-#     "unknown function: WEEKOFYEAR". Portable substitute: WEEK
-#     (covered in datetime_format_basic) which returns the same
-#     ISO week number for most inputs.
+#   # zeta-adapt: WEEKOFYEAR(date) — FIXED via zeta #1182.
+#     Alias for WEEK with the same iso_week_number impl.
+#     Returns the ISO week number (Int32).
 #   # zeta-adapt: KNOWN GAP — ADDTIME(t, n), SUBTIME(t, n)
 #     error 1105 "unknown function". Portable substitute: cast
 #     TIME to TIMESTAMP and add/subtract an INTERVAL.
-#   # zeta-adapt: KNOWN GAP — MAKEDATE(year, dayofyear),
-#     MAKETIME(h, m, s) error 1105 "unknown function". Portable
-#     substitute: MAKE_DATE / MAKE_TIME (PG-style) — pinned
-#     positively below for the substitute path.
+#   # zeta-adapt: MAKETIME(h, m, s) — FIXED via zeta #1182.
+#     Alias for MAKE_TIME with the same 3-arg signature.
+#   # zeta-adapt: KNOWN GAP — MAKEDATE(year, dayofyear)
+#     errors 1105 "unknown function". NOT aliased: MySQL's
+#     MAKEDATE takes (year, dayofyear) while zeta's MAKE_DATE
+#     takes (year, month, day) — different signatures, not
+#     interchangeable. Portable substitute: MAKE_DATE plus
+#     manual day-of-year arithmetic.
 
 --echo === DATE / TIME / TIMESTAMP typed literals ===
 
@@ -129,10 +132,13 @@ SELECT TIMESTAMP '2024-01-01 14:30:00' AT TIME ZONE 'UTC' AS ts_utc;
 SELECT MAKE_DATE(2024, 5, 19) AS md;
 SELECT MAKE_TIME(14, 30, 45)  AS mt;
 
---echo === KNOWN GAP: WEEKOFYEAR — errno 1105 ===
+--echo === WEEKOFYEAR — FIXED via zeta #1182 (alias for WEEK) ===
 
---error 1105
-SELECT WEEKOFYEAR('2024-05-19');
+SELECT WEEKOFYEAR('2024-05-19') AS w;
+
+--echo === MAKETIME — FIXED via zeta #1182 (alias for MAKE_TIME) ===
+
+SELECT MAKETIME(14, 30, 45) AS mt;
 
 --echo === KNOWN GAP: ADDTIME / SUBTIME — errno 1105 ===
 
@@ -142,13 +148,10 @@ SELECT ADDTIME('14:30:00', '1:30:00');
 --error 1105
 SELECT SUBTIME('14:30:00', '1:30:00');
 
---echo === KNOWN GAP: MAKEDATE / MAKETIME (MySQL spellings) — errno 1105 ===
+--echo === KNOWN GAP: MAKEDATE (different signature than MAKE_DATE) — errno 1105 ===
 
 --error 1105
 SELECT MAKEDATE(2024, 140);
-
---error 1105
-SELECT MAKETIME(14, 30, 45);
 
 --echo === Cleanup ===
 

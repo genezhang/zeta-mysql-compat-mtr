@@ -109,18 +109,21 @@ md
 SELECT MAKE_TIME(14, 30, 45)  AS mt;
 mt
 14:30:45
-=== KNOWN GAP: WEEKOFYEAR — errno 1105 ===
-SELECT WEEKOFYEAR('2024-05-19');
-ERROR 1105: execution error: unknown function: WEEKOFYEAR
+=== WEEKOFYEAR — FIXED via zeta #1182 (alias for WEEK) ===
+SELECT WEEKOFYEAR('2024-05-19') AS w;
+w
+20
+=== MAKETIME — FIXED via zeta #1182 (alias for MAKE_TIME) ===
+SELECT MAKETIME(14, 30, 45) AS mt;
+mt
+14:30:45
 === KNOWN GAP: ADDTIME / SUBTIME — errno 1105 ===
 SELECT ADDTIME('14:30:00', '1:30:00');
 ERROR 1105: execution error: unknown function: ADDTIME
 SELECT SUBTIME('14:30:00', '1:30:00');
 ERROR 1105: execution error: unknown function: SUBTIME
-=== KNOWN GAP: MAKEDATE / MAKETIME (MySQL spellings) — errno 1105 ===
+=== KNOWN GAP: MAKEDATE (different signature than MAKE_DATE) — errno 1105 ===
 SELECT MAKEDATE(2024, 140);
 ERROR 1105: execution error: unknown function: MAKEDATE
-SELECT MAKETIME(14, 30, 45);
-ERROR 1105: execution error: unknown function: MAKETIME
 === Cleanup ===
 DROP TABLE dts;
