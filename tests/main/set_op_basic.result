@@ -1,0 +1,76 @@
+=== Setup ===
+DROP TABLE IF EXISTS s1;
+DROP TABLE IF EXISTS s2;
+CREATE TABLE s1 (id INT PRIMARY KEY, name VARCHAR(10));
+CREATE TABLE s2 (id INT PRIMARY KEY, name VARCHAR(10));
+INSERT INTO s1 VALUES (1, 'a'), (2, 'b'), (3, 'c');
+INSERT INTO s2 VALUES (2, 'b'), (3, 'c'), (4, 'd');
+=== UNION (dedup) ===
+SELECT id FROM s1 UNION SELECT id FROM s2 ORDER BY id;
+id
+1
+2
+3
+4
+=== UNION ALL (preserve duplicates) ===
+SELECT id FROM s1 UNION ALL SELECT id FROM s2 ORDER BY id;
+id
+1
+2
+2
+3
+3
+4
+=== INTERSECT ===
+SELECT id FROM s1 INTERSECT SELECT id FROM s2 ORDER BY id;
+id
+2
+3
+=== INTERSECT ALL ===
+SELECT id FROM s1 INTERSECT ALL SELECT id FROM s2 ORDER BY id;
+id
+2
+3
+=== EXCEPT ===
+SELECT id FROM s1 EXCEPT SELECT id FROM s2 ORDER BY id;
+id
+1
+=== EXCEPT ALL ===
+SELECT id FROM s1 EXCEPT ALL SELECT id FROM s2 ORDER BY id;
+id
+1
+=== MINUS (alias for EXCEPT) ===
+SELECT id FROM s1 MINUS SELECT id FROM s2 ORDER BY id;
+id
+1
+=== Multi-way UNION (>2 branches) ===
+SELECT 1 AS v UNION SELECT 2 UNION SELECT 3 ORDER BY v;
+v
+1
+2
+3
+=== Multi-column UNION with ORDER BY at tail ===
+SELECT id, name FROM s1 UNION SELECT id, name FROM s2 ORDER BY id, name;
+id	name
+1	a
+2	b
+3	c
+4	d
+=== Set-op inside FROM (subquery) ===
+SELECT MAX(id) AS mx FROM (SELECT id FROM s1 UNION SELECT id FROM s2) u;
+mx
+4
+=== Mixed-type coercion (INT + DOUBLE) ===
+SELECT 1 AS v UNION SELECT 2.5 ORDER BY v;
+v
+1
+2.5
+=== KNOWN DIVERGENCE: column-count mismatch — errno 1105 ===
+# MySQL emits 1222 (ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT); zeta
+# emits 1105 (generic execution error). Pinned to the wider
+# errno so we still trip if the behavior changes.
+SELECT id, name FROM s1 UNION SELECT id FROM s2;
+ERROR 1105: execution error: set operation column count mismatch: left has 2, right has 1
+=== Cleanup ===
+DROP TABLE s1;
+DROP TABLE s2;
