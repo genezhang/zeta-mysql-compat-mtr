@@ -110,12 +110,10 @@ ERROR 1064: SQL parse error: unsupported operator '>' for ANY(subquery)
 # AND-joined equalities.
 SELECT id FROM emp WHERE (dept_id, name) IN ((10, 'alice'), (30, 'eve'));
 ERROR 1064: SQL parse error: unsupported expression: (dept_id, name)
-=== KNOWN DIVERGENCE: scalar subquery >1 row — errno 1105 ===
-# MySQL emits 1242 (ER_SUBQUERY_NO_1_ROW); zeta emits the
-# generic 1105. Behavior (rejection) matches; only the errno
-# differs.
+=== Scalar subquery >1 row — errno 1242 (FIXED via zeta #1143) ===
+# zeta now emits MySQL-standard 1242 (ER_SUBQUERY_NO_1_ROW).
 SELECT (SELECT id FROM emp) AS x FROM emp LIMIT 1;
-ERROR 1105: execution error: scalar subquery returned more than one row
+ERROR 1242: execution error: scalar subquery returned more than one row
 === KNOWN DIVERGENCE: LATERAL with correlated subquery ===
 # Returns 0 rows instead of the expected row-per-outer. The
 # correlation binding doesn't fire through the LATERAL boundary.
