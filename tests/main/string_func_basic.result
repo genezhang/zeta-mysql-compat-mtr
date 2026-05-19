@@ -93,15 +93,16 @@ ea09ae9cc6768c50fcee903ed054556e5bfc8347907f12598aa24193
 SELECT SHA2('hello', 999) AS bad;
 bad
 NULL
-=== KNOWN DIVERGENCE: BIN — unknown function (errno 1105) ===
-SELECT BIN(10);
-ERROR 1105: execution error: unknown function: BIN
-=== KNOWN DIVERGENCE: OCT — unknown function (errno 1105) ===
-SELECT OCT(10);
-ERROR 1105: execution error: unknown function: OCT
-=== KNOWN DIVERGENCE: ORD — unknown function (errno 1105) ===
-SELECT ORD('A');
-ERROR 1105: execution error: unknown function: ORD
+=== BIN / OCT / ORD — FIXED via zeta #1154 ===
+SELECT BIN(10) AS b, BIN(255) AS b255, BIN(0) AS b0;
+b	b255	b0
+1010	11111111	0
+SELECT OCT(10) AS o, OCT(64) AS o64;
+o	o64
+12	100
+SELECT ORD('A') AS a, ORD('') AS empty;
+a	empty
+65	0
 === KNOWN DIVERGENCE: CHARSET — unknown function (errno 1105) ===
 SELECT CHARSET('hi');
 ERROR 1105: execution error: unknown function: CHARSET

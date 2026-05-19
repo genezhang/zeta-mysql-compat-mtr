@@ -38,8 +38,10 @@
 #     SHA1 / SHA (alias) return 40-char lowercase hex. SHA2 takes
 #     bits ∈ {0 (=256), 224, 256, 384, 512}; invalid bits → NULL
 #     (matches MySQL).
-#   # zeta-adapt: KNOWN DIVERGENCE — BIN, OCT, ORD — errno 1105.
-#     Substitute LPAD + ROUND on bit math, or just CAST.
+#   # zeta-adapt: BIN, OCT, ORD — supported (FIXED via zeta #1154).
+#     BIN/OCT return string representations; negatives wrap to
+#     two's-complement 64-bit (matches MySQL). ORD returns the
+#     multibyte code of the first character.
 #   # zeta-adapt: KNOWN DIVERGENCE — CHARSET, COLLATION — errno 1105.
 #     MySQL-only introspection; no PG equivalent.
 #   # zeta-adapt: KNOWN DIVERGENCE — TO_BASE64, FROM_BASE64 —
@@ -128,20 +130,11 @@ SELECT SHA2('hello', 224) AS h224;
 # Invalid bits → NULL (matches MySQL).
 SELECT SHA2('hello', 999) AS bad;
 
---echo === KNOWN DIVERGENCE: BIN — unknown function (errno 1105) ===
+--echo === BIN / OCT / ORD — FIXED via zeta #1154 ===
 
---error 1105
-SELECT BIN(10);
-
---echo === KNOWN DIVERGENCE: OCT — unknown function (errno 1105) ===
-
---error 1105
-SELECT OCT(10);
-
---echo === KNOWN DIVERGENCE: ORD — unknown function (errno 1105) ===
-
---error 1105
-SELECT ORD('A');
+SELECT BIN(10) AS b, BIN(255) AS b255, BIN(0) AS b0;
+SELECT OCT(10) AS o, OCT(64) AS o64;
+SELECT ORD('A') AS a, ORD('') AS empty;
 
 --echo === KNOWN DIVERGENCE: CHARSET — unknown function (errno 1105) ===
 
