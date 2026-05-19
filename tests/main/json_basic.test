@@ -53,10 +53,15 @@
 #     and adds new ones; variadic (path, value) pairs. NULL on
 #     NULL. Array-index paths (`$[0]`) still return NULL —
 #     covered when zeta-jsonb::set_path is extended for arrays.
-#   # zeta-adapt: KNOWN GAPS — the following MySQL JSON_xxx
-#     functions are NOT yet implemented and raise errno 1105
-#     "unknown function":
-#       JSON_INSERT, JSON_REPLACE.
+#   # zeta-adapt: JSON_INSERT / JSON_REPLACE — supported
+#     (FIXED via zeta #1173). Same first-pass scope as JSON_SET.
+#     INSERT only adds (skip if path exists); REPLACE only
+#     replaces (skip if path missing). Variadic; NULL on NULL.
+#
+#   All 7 originally-audited MySQL JSON_xxx gaps are now
+#   supported via zeta #1162 (JSON_LENGTH), #1163 (JSON_KEYS),
+#   #1164 (JSON_DEPTH), #1165 (JSON_CONTAINS), #1171 (JSON_SET),
+#   #1173 (JSON_INSERT + JSON_REPLACE).
 #     Pinned below — a future implementation that wires any of
 #     these to jsonb_* implementations will need to retighten.
 #   # zeta-adapt: JSON object keys are returned in sorted order
@@ -153,11 +158,15 @@ SELECT JSON_SET('{"a":1}', '$.a', 99) AS s;
 SELECT JSON_SET('{"a":1}', '$.b', 2) AS s;
 SELECT JSON_SET('{"a":1}', '$.a', 2, '$.b', 3) AS s;
 
---error 1105
-SELECT JSON_INSERT(data, '$.new', 'x') FROM j WHERE id = 1;
+--echo === JSON_INSERT — FIXED via zeta #1173 (skip if path exists) ===
 
---error 1105
-SELECT JSON_REPLACE(data, '$.name', 'carol') FROM j WHERE id = 1;
+SELECT JSON_INSERT('{"a":1}', '$.b', 2) AS s;
+SELECT JSON_INSERT('{"a":1}', '$.a', 99) AS s;
+
+--echo === JSON_REPLACE — FIXED via zeta #1173 (skip if path missing) ===
+
+SELECT JSON_REPLACE('{"a":1}', '$.a', 99) AS s;
+SELECT JSON_REPLACE('{"a":1}', '$.b', 2) AS s;
 
 --echo === JSON_DEPTH — FIXED via zeta #1164 ===
 --echo # Recursive max depth. Scalar / empty container → 1;
