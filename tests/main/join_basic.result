@@ -1,0 +1,140 @@
+=== Setup ===
+DROP TABLE IF EXISTS emp;
+CREATE TABLE emp (id INT PRIMARY KEY, name VARCHAR(10), dept_id INT);
+INSERT INTO emp VALUES (1, 'alice', 10), (2, 'bob', 10), (3, 'carol', 20), (4, 'dan', NULL);
+DROP TABLE IF EXISTS dept;
+CREATE TABLE dept (id INT PRIMARY KEY, name VARCHAR(10));
+INSERT INTO dept VALUES (10, 'eng'), (20, 'sales'), (30, 'ops');
+DROP TABLE IF EXISTS sales;
+CREATE TABLE sales (id INT PRIMARY KEY, emp_id INT, amt INT);
+INSERT INTO sales VALUES (1, 1, 500), (2, 2, 300), (3, 3, 200);
+=== INNER JOIN — matched rows only ===
+SELECT e.name AS emp, d.name AS dept
+  FROM emp e INNER JOIN dept d ON e.dept_id = d.id
+  ORDER BY emp;
+emp	dept
+alice	eng
+bob	eng
+carol	sales
+=== LEFT JOIN — preserves left side (NULL right when unmatched) ===
+SELECT e.name AS emp, d.name AS dept
+  FROM emp e LEFT JOIN dept d ON e.dept_id = d.id
+  ORDER BY emp;
+emp	dept
+alice	eng
+bob	eng
+carol	sales
+dan	NULL
+=== RIGHT JOIN — preserves right side ===
+SELECT e.name AS emp, d.name AS dept
+  FROM emp e RIGHT JOIN dept d ON e.dept_id = d.id
+  ORDER BY dept, emp;
+emp	dept
+alice	eng
+bob	eng
+NULL	ops
+carol	sales
+=== FULL OUTER JOIN — preserves both sides ===
+SELECT e.name AS emp, d.name AS dept
+  FROM emp e FULL OUTER JOIN dept d ON e.dept_id = d.id;
+emp	dept
+NULL	ops
+alice	eng
+bob	eng
+carol	sales
+dan	NULL
+=== CROSS JOIN — cartesian product, no ON ===
+SELECT e.name AS emp, d.name AS dept
+  FROM emp e CROSS JOIN dept d;
+emp	dept
+alice	eng
+alice	ops
+alice	sales
+bob	eng
+bob	ops
+bob	sales
+carol	eng
+carol	ops
+carol	sales
+dan	eng
+dan	ops
+dan	sales
+=== Comma-join (legacy MySQL syntax) — predicate in WHERE ===
+SELECT e.name AS emp, d.name AS dept
+  FROM emp e, dept d
+  WHERE e.dept_id = d.id
+  ORDER BY emp;
+emp	dept
+alice	eng
+bob	eng
+carol	sales
+=== USING (col) — collapses common column ===
+# KNOWN DIVERGENCE: zeta column-names the merged column with
+# table prefixes (e1.cid etc.); MySQL emits plain names.
+DROP TABLE IF EXISTS e1;
+DROP TABLE IF EXISTS e2;
+CREATE TABLE e1 (cid INT, x INT);
+INSERT INTO e1 VALUES (1, 100), (2, 200);
+CREATE TABLE e2 (cid INT, y VARCHAR(5));
+INSERT INTO e2 VALUES (1, 'a'), (2, 'b');
+SELECT * FROM e1 JOIN e2 USING (cid) ORDER BY cid;
+e1.cid	e1.x	e2.y
+1	100	a
+2	200	b
+=== NATURAL JOIN — KNOWN DIVERGENCE (no projection dedup) ===
+# MySQL collapses the common column; zeta returns it from
+# both sides. Predicate inference still matches on `cid`,
+# so the row count is correct (one per matching pair).
+SELECT * FROM e1 NATURAL JOIN e2 ORDER BY e1.cid;
+e1.cid	e1.x	e2.cid	e2.y
+1	100	1	a
+2	200	2	b
+=== Multi-table JOIN chain — A JOIN B JOIN C ===
+SELECT e.name AS emp, d.name AS dept, s.amt
+  FROM emp e
+  JOIN dept d ON e.dept_id = d.id
+  JOIN sales s ON s.emp_id = e.id
+  ORDER BY emp;
+emp	dept	amt
+alice	eng	500
+bob	eng	300
+carol	sales	200
+=== Anti-join via LEFT JOIN + IS NULL ===
+# Returns employees with no matching dept (classic outer-anti pattern).
+SELECT e.name AS emp
+  FROM emp e LEFT JOIN dept d ON e.dept_id = d.id
+  WHERE d.id IS NULL
+  ORDER BY emp;
+emp
+dan
+=== Self-join — same table aliased twice ===
+DROP TABLE IF EXISTS mgr;
+CREATE TABLE mgr (id INT PRIMARY KEY, name VARCHAR(10), boss_id INT);
+INSERT INTO mgr VALUES (1, 'alice', NULL), (2, 'bob', 1), (3, 'carol', 1), (4, 'dan', 2);
+SELECT m.name AS emp, b.name AS boss
+  FROM mgr m LEFT JOIN mgr b ON m.boss_id = b.id
+  ORDER BY emp;
+emp	boss
+alice	NULL
+bob	alice
+carol	alice
+dan	bob
+=== ON with composite predicate (AND) ===
+SELECT e.name AS emp, s.amt
+  FROM emp e JOIN sales s ON s.emp_id = e.id AND s.amt > 250
+  ORDER BY emp;
+emp	amt
+alice	500
+bob	300
+=== KNOWN DIVERGENCE: INNER JOIN without ON — errno 1064 ===
+# MySQL treats this as CROSS JOIN; zeta requires ON.
+# Substitute CROSS JOIN or `ON 1=1`.
+SELECT e.name FROM emp e INNER JOIN dept d;
+ERROR 1064: SQL parse error: INNER JOIN requires an ON clause
+=== Cleanup ===
+DROP TABLE mgr;
+DROP TABLE sales;
+DROP TABLE dept;
+DROP TABLE emp;
+DROP TABLE e1;
+DROP TABLE e2;
