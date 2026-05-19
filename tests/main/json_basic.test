@@ -39,11 +39,15 @@
 #     scalar (incl. JSON null) and empty container → 1; non-empty
 #     container → 1 + max(depth of children); SQL NULL → SQL NULL.
 #     Single-arg form only.
+#   # zeta-adapt: JSON_CONTAINS — supported (FIXED via zeta #1165).
+#     Two-arg form: returns 1 if candidate contained in target,
+#     0 otherwise; NULL on NULL. Routes through zeta-jsonb's PG
+#     `@>` semantics. Three-arg path form is a separate slice.
 #   # zeta-adapt: KNOWN GAPS — the following MySQL JSON_xxx
 #     functions are NOT yet implemented and raise errno 1105
 #     "unknown function":
 #       JSON_SET, JSON_INSERT, JSON_REPLACE,
-#       JSON_CONTAINS, JSON_OBJECTAGG.
+#       JSON_OBJECTAGG.
 #     Pinned below — a future implementation that wires any of
 #     these to jsonb_* implementations will need to retighten.
 #   # zeta-adapt: JSON object keys are returned in sorted order
@@ -152,8 +156,17 @@ SELECT JSON_DEPTH('{"a": 1}') AS d;
 SELECT JSON_DEPTH('{"a":{"b":1}}') AS d;
 SELECT JSON_DEPTH('[[[1]]]') AS d;
 
---error 1105
-SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}');
+--echo === JSON_CONTAINS — FIXED via zeta #1165 ===
+--echo # Two-arg form: 1 if candidate contained in target, else 0;
+--echo # NULL on NULL. Routes through zeta-jsonb's PG `@>`
+--echo # containment semantics.
+
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}') AS r;
+SELECT JSON_CONTAINS('{"a":1}', '{"z":1}') AS r;
+SELECT JSON_CONTAINS('[1,2,3]', '2') AS r;
+SELECT JSON_CONTAINS('[1,2,3]', '4') AS r;
+SELECT JSON_CONTAINS('[1,2,3]', '[2,3]') AS r;
+SELECT JSON_CONTAINS(CAST(NULL AS JSON), '1') AS r;
 
 --echo === Cleanup ===
 

@@ -122,7 +122,27 @@ d
 SELECT JSON_DEPTH('[[[1]]]') AS d;
 d
 4
-SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}');
-ERROR 1105: execution error: unknown function: JSON_CONTAINS
+=== JSON_CONTAINS — FIXED via zeta #1165 ===
+# Two-arg form: 1 if candidate contained in target, else 0;
+# NULL on NULL. Routes through zeta-jsonb's PG `@>`
+# containment semantics.
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}') AS r;
+r
+1
+SELECT JSON_CONTAINS('{"a":1}', '{"z":1}') AS r;
+r
+0
+SELECT JSON_CONTAINS('[1,2,3]', '2') AS r;
+r
+1
+SELECT JSON_CONTAINS('[1,2,3]', '4') AS r;
+r
+0
+SELECT JSON_CONTAINS('[1,2,3]', '[2,3]') AS r;
+r
+1
+SELECT JSON_CONTAINS(CAST(NULL AS JSON), '1') AS r;
+r
+NULL
 === Cleanup ===
 DROP TABLE j;
