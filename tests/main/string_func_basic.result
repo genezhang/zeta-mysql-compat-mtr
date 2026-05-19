@@ -115,12 +115,19 @@ ERROR 1105: execution error: unknown function: TO_BASE64
 === KNOWN DIVERGENCE: FROM_BASE64 — unknown function (errno 1105) ===
 SELECT FROM_BASE64('aGVsbG8=');
 ERROR 1105: execution error: unknown function: FROM_BASE64
-=== KNOWN DIVERGENCE: REGEXP_LIKE — unknown function (errno 1105) ===
-SELECT REGEXP_LIKE('hello', '^h');
-ERROR 1105: execution error: unknown function: REGEXP_LIKE
-=== KNOWN DIVERGENCE: REGEXP_INSTR — unknown function (errno 1105) ===
-SELECT REGEXP_INSTR('abcdef', 'cd');
-ERROR 1105: execution error: unknown function: REGEXP_INSTR
+=== REGEXP_LIKE / REGEXP_INSTR — FIXED via zeta #1157 ===
+SELECT REGEXP_LIKE('hello', '^h') AS l_yes, REGEXP_LIKE('hello', '^x') AS l_no;
+l_yes	l_no
+1	0
+SELECT REGEXP_LIKE('HELLO', '^h', 'i') AS l_ci;
+l_ci
+1
+SELECT REGEXP_INSTR('abcdef', 'cd') AS p_match, REGEXP_INSTR('abcdef', 'xy') AS p_miss;
+p_match	p_miss
+3	0
+SELECT REGEXP_INSTR('abcabc', 'a', 2) AS pos2;
+pos2
+4
 === STRCMP — FIXED via zeta #1155 ===
 SELECT STRCMP('a', 'b') AS less, STRCMP('a', 'a') AS eq, STRCMP('b', 'a') AS greater;
 less	eq	greater
