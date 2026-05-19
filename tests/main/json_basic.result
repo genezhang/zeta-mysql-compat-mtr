@@ -144,5 +144,15 @@ r
 SELECT JSON_CONTAINS(CAST(NULL AS JSON), '1') AS r;
 r
 NULL
+=== JSON_OBJECTAGG — supported (alias for jsonb_object_agg) ===
+# Builds a JSON object from a (key, value) pair across the
+# group. Keys are sorted (JSONB semantics).
+DROP TABLE IF EXISTS kv;
+CREATE TABLE kv (k VARCHAR(10), v INT);
+INSERT INTO kv VALUES ('a', 1), ('b', 2), ('c', 3);
+SELECT JSON_OBJECTAGG(k, v) AS o FROM kv;
+o
+{"a":1,"b":2,"c":3}
+DROP TABLE kv;
 === Cleanup ===
 DROP TABLE j;
