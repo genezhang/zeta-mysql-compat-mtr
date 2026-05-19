@@ -1,0 +1,213 @@
+# Independently authored ALTER-TABLE-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/alter_table*.test files; pins zeta's behavior
+# across the ALTER TABLE shapes NOT held by alter_table_basic
+# (which covers ADD/DROP/RENAME COLUMN, MODIFY/CHANGE COLUMN,
+# RENAME TO, ADD CONSTRAINT PK/FK/UNIQUE, the CHECK/ADD INDEX
+# gap pins, and the DROP INDEX MySQL form).
+#
+# Adaptation notes:
+#   # zeta-adapt: ALTER COLUMN SET DEFAULT (PG syntax) — supported.
+#     Subsequent INSERTs that omit the column receive the new
+#     default.
+#   # zeta-adapt: ALTER COLUMN DROP DEFAULT (PG syntax) — supported.
+#     Subsequent INSERTs that omit the column receive NULL.
+#   # zeta-adapt: ALTER COLUMN SET NOT NULL — supported when no
+#     existing rows hold NULL. Subsequent INSERT of NULL into the
+#     column errors 1105 (PG-style "violates not-null constraint";
+#     MySQL errno-alignment would be 1048 ER_BAD_NULL_ERROR — not
+#     pinned here, separate slice).
+#   # zeta-adapt: ALTER COLUMN DROP NOT NULL — supported.
+#   # zeta-adapt: ALTER COLUMN TYPE / SET DATA TYPE — both forms
+#     supported.
+#   # zeta-adapt: ADD COLUMN with `COMMENT '...'` clause —
+#     accepted at parse, comment is stored.
+#   # zeta-adapt: ADD COLUMN with `GENERATED ALWAYS AS (<expr>)
+#     STORED` — supported. The stored generated value is
+#     computed at insert time.
+#   # zeta-adapt: DROP CONSTRAINT IF EXISTS — silent no-op on
+#     missing constraint name.
+#   # zeta-adapt: DROP CONSTRAINT <fk_name> — supported for
+#     FOREIGN KEY constraints (drops the FK reference).
+#   # zeta-adapt: KNOWN DIVERGENCE — ALTER COLUMN SET NOT NULL
+#     against a column that already contains NULL errors 1105
+#     "column contains null values" instead of accepting and
+#     leaving the rows null-bearing. Matches PG semantics
+#     (correct invariant), but the errno is zeta-generic — MySQL
+#     would surface 1138.
+#   # zeta-adapt: KNOWN GAP — multi-clause ALTER TABLE (e.g.
+#     `ALTER TABLE t ADD COLUMN a INT, ADD COLUMN b VARCHAR(10)`)
+#     errors 1064 "ALTER TABLE supports exactly one operation
+#     per statement". Portable substitute: split into separate
+#     ALTER TABLE statements (still atomic to the user when
+#     wrapped in a single transaction).
+#   # zeta-adapt: KNOWN GAP — `DROP CONSTRAINT <uniq_name>` where
+#     the named constraint was added as a UNIQUE constraint (via
+#     `ADD CONSTRAINT u UNIQUE (col)`) errors 1105 "constraint
+#     does not exist". UNIQUE constraints internally route
+#     through CREATE UNIQUE INDEX, so DROP INDEX is the
+#     symmetric path. Asymmetric with FK/CHECK drop.
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE ENGINE = <name> errors
+#     1064 at parse. MySQL-only storage-engine selector, no PG
+#     equivalent. Portable substitute: zeta has a single backend
+#     (LSM or B+tree) selected per-cluster at start.
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE AUTO_INCREMENT = N
+#     errors 1064 "unsupported ALTER TABLE operation". Portable
+#     substitute: alter the SEQUENCE backing the SERIAL column
+#     (SETVAL).
+#   # zeta-adapt: KNOWN GAP — RENAME CONSTRAINT errors 1064
+#     "unsupported ALTER TABLE operation". Portable substitute:
+#     DROP + ADD under the new name.
+#   # zeta-adapt: KNOWN DIVERGENCE — ADD COLUMN with `GENERATED
+#     ALWAYS AS IDENTITY` (no expression) is accepted at parse
+#     but the IDENTITY counter is NOT wired — INSERT leaves the
+#     column NULL. Portable substitute: a SEQUENCE + DEFAULT
+#     NEXTVAL declaration at CREATE TABLE time.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ae;
+CREATE TABLE ae (id INT PRIMARY KEY, name VARCHAR(20), age INT);
+INSERT INTO ae VALUES (1, 'a', 10);
+
+--echo === ALTER COLUMN SET DEFAULT ===
+
+ALTER TABLE ae ALTER COLUMN age SET DEFAULT 99;
+INSERT INTO ae (id, name) VALUES (2, 'b');
+SELECT id, age FROM ae ORDER BY id;
+
+--echo === ALTER COLUMN DROP DEFAULT ===
+
+ALTER TABLE ae ALTER COLUMN age DROP DEFAULT;
+INSERT INTO ae (id, name) VALUES (3, 'c');
+SELECT id, age FROM ae ORDER BY id;
+
+--echo === ALTER COLUMN DROP NOT NULL ===
+--echo # Backfill the column first so SET NOT NULL is meaningful.
+
+DROP TABLE IF EXISTS aen;
+CREATE TABLE aen (id INT PRIMARY KEY, x INT NOT NULL);
+INSERT INTO aen VALUES (1, 10), (2, 20);
+ALTER TABLE aen ALTER COLUMN x DROP NOT NULL;
+INSERT INTO aen (id, x) VALUES (3, NULL);
+--sorted_result
+SELECT id, x FROM aen;
+
+--echo === ALTER COLUMN SET NOT NULL — only when no existing NULL ===
+
+DROP TABLE IF EXISTS aen2;
+CREATE TABLE aen2 (id INT PRIMARY KEY, x INT);
+INSERT INTO aen2 VALUES (1, 10), (2, 20);
+ALTER TABLE aen2 ALTER COLUMN x SET NOT NULL;
+
+--echo # Now NULL insert is rejected.
+--error 1105
+INSERT INTO aen2 (id, x) VALUES (3, NULL);
+
+--echo === KNOWN DIVERGENCE: SET NOT NULL with existing NULL — errno 1105 ===
+
+DROP TABLE IF EXISTS aen3;
+CREATE TABLE aen3 (id INT PRIMARY KEY, x INT);
+INSERT INTO aen3 (id) VALUES (1);
+--error 1105
+ALTER TABLE aen3 ALTER COLUMN x SET NOT NULL;
+
+--echo === ALTER COLUMN TYPE — widen INT → BIGINT ===
+
+DROP TABLE IF EXISTS atp;
+CREATE TABLE atp (id INT PRIMARY KEY, n INT);
+INSERT INTO atp VALUES (1, 100);
+ALTER TABLE atp ALTER COLUMN n TYPE BIGINT;
+INSERT INTO atp VALUES (2, 4294967296);
+SELECT id, n FROM atp ORDER BY id;
+
+--echo === ALTER COLUMN SET DATA TYPE (alt syntax) ===
+
+ALTER TABLE atp ALTER COLUMN n SET DATA TYPE BIGINT;
+
+--echo === ADD COLUMN with COMMENT clause ===
+
+ALTER TABLE atp ADD COLUMN note VARCHAR(50) COMMENT 'free-form annotation';
+
+--echo === ADD COLUMN GENERATED ALWAYS AS (expr) STORED ===
+
+DROP TABLE IF EXISTS ag;
+CREATE TABLE ag (id INT PRIMARY KEY, x INT, y INT);
+ALTER TABLE ag ADD COLUMN z INT GENERATED ALWAYS AS (x + y) STORED;
+INSERT INTO ag (id, x, y) VALUES (1, 5, 10);
+SELECT id, x, y, z FROM ag;
+
+--echo === DROP CONSTRAINT IF EXISTS — silent on missing ===
+
+DROP TABLE IF EXISTS adc;
+CREATE TABLE adc (id INT PRIMARY KEY, code VARCHAR(10));
+ALTER TABLE adc DROP CONSTRAINT IF EXISTS no_such_constraint;
+
+--echo === DROP CONSTRAINT <fk_name> — supported ===
+
+DROP TABLE IF EXISTS afp;
+DROP TABLE IF EXISTS afc;
+CREATE TABLE afp (id INT PRIMARY KEY);
+CREATE TABLE afc (id INT PRIMARY KEY, pid INT);
+ALTER TABLE afc ADD CONSTRAINT fk_p FOREIGN KEY (pid) REFERENCES afp(id);
+ALTER TABLE afc DROP CONSTRAINT fk_p;
+
+--echo === KNOWN GAP: multi-clause ALTER TABLE — errno 1064 ===
+
+DROP TABLE IF EXISTS amc;
+CREATE TABLE amc (id INT PRIMARY KEY);
+--error 1064
+ALTER TABLE amc ADD COLUMN a INT, ADD COLUMN b VARCHAR(10);
+
+--echo === KNOWN GAP: DROP CONSTRAINT on UNIQUE-from-INDEX — errno 1105 ===
+--echo # ADD CONSTRAINT u UNIQUE routes through CREATE UNIQUE INDEX,
+--echo # not through the constraint table. DROP CONSTRAINT can't
+--echo # find it. Portable substitute: DROP INDEX <name>.
+
+DROP TABLE IF EXISTS auc;
+CREATE TABLE auc (id INT PRIMARY KEY, code VARCHAR(10));
+ALTER TABLE auc ADD CONSTRAINT u_code UNIQUE (code);
+--error 1105
+ALTER TABLE auc DROP CONSTRAINT u_code;
+
+--echo === KNOWN GAP: ALTER TABLE ENGINE = <name> — errno 1064 ===
+
+--error 1064
+ALTER TABLE ae ENGINE = InnoDB;
+
+--echo === KNOWN GAP: ALTER TABLE AUTO_INCREMENT = N — errno 1064 ===
+
+--error 1064
+ALTER TABLE ae AUTO_INCREMENT = 1000;
+
+--echo === KNOWN GAP: RENAME CONSTRAINT — errno 1064 ===
+
+--error 1064
+ALTER TABLE afc RENAME CONSTRAINT fk_p TO fk_p_new;
+
+--echo === KNOWN DIVERGENCE: GENERATED ALWAYS AS IDENTITY — silent, leaves NULL ===
+--echo # The IDENTITY counter is not wired through ADD COLUMN.
+--echo # INSERTs that omit the column leave it NULL instead of
+--echo # auto-incrementing. Portable substitute: SEQUENCE +
+--echo # DEFAULT NEXTVAL.
+
+DROP TABLE IF EXISTS ai;
+CREATE TABLE ai (id INT PRIMARY KEY);
+ALTER TABLE ai ADD COLUMN seq INT GENERATED ALWAYS AS IDENTITY;
+INSERT INTO ai (id) VALUES (1), (2);
+SELECT id, seq FROM ai ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE ae;
+DROP TABLE aen;
+DROP TABLE aen2;
+DROP TABLE aen3;
+DROP TABLE atp;
+DROP TABLE ag;
+DROP TABLE adc;
+DROP TABLE afc;
+DROP TABLE afp;
+DROP TABLE amc;
+DROP TABLE auc;
+DROP TABLE ai;

@@ -1,0 +1,127 @@
+=== Setup ===
+DROP TABLE IF EXISTS ae;
+CREATE TABLE ae (id INT PRIMARY KEY, name VARCHAR(20), age INT);
+INSERT INTO ae VALUES (1, 'a', 10);
+=== ALTER COLUMN SET DEFAULT ===
+ALTER TABLE ae ALTER COLUMN age SET DEFAULT 99;
+INSERT INTO ae (id, name) VALUES (2, 'b');
+SELECT id, age FROM ae ORDER BY id;
+id	age
+1	10
+2	99
+=== ALTER COLUMN DROP DEFAULT ===
+ALTER TABLE ae ALTER COLUMN age DROP DEFAULT;
+INSERT INTO ae (id, name) VALUES (3, 'c');
+SELECT id, age FROM ae ORDER BY id;
+id	age
+1	10
+2	99
+3	NULL
+=== ALTER COLUMN DROP NOT NULL ===
+# Backfill the column first so SET NOT NULL is meaningful.
+DROP TABLE IF EXISTS aen;
+CREATE TABLE aen (id INT PRIMARY KEY, x INT NOT NULL);
+INSERT INTO aen VALUES (1, 10), (2, 20);
+ALTER TABLE aen ALTER COLUMN x DROP NOT NULL;
+INSERT INTO aen (id, x) VALUES (3, NULL);
+SELECT id, x FROM aen;
+id	x
+1	10
+2	20
+3	NULL
+=== ALTER COLUMN SET NOT NULL — only when no existing NULL ===
+DROP TABLE IF EXISTS aen2;
+CREATE TABLE aen2 (id INT PRIMARY KEY, x INT);
+INSERT INTO aen2 VALUES (1, 10), (2, 20);
+ALTER TABLE aen2 ALTER COLUMN x SET NOT NULL;
+# Now NULL insert is rejected.
+INSERT INTO aen2 (id, x) VALUES (3, NULL);
+ERROR 1105: execution error: null value in column "x" of relation "test.public.aen2" violates not-null constraint
+=== KNOWN DIVERGENCE: SET NOT NULL with existing NULL — errno 1105 ===
+DROP TABLE IF EXISTS aen3;
+CREATE TABLE aen3 (id INT PRIMARY KEY, x INT);
+INSERT INTO aen3 (id) VALUES (1);
+ALTER TABLE aen3 ALTER COLUMN x SET NOT NULL;
+ERROR 1105: execution error: column "x" of relation "test.public.aen3" contains null values
+=== ALTER COLUMN TYPE — widen INT → BIGINT ===
+DROP TABLE IF EXISTS atp;
+CREATE TABLE atp (id INT PRIMARY KEY, n INT);
+INSERT INTO atp VALUES (1, 100);
+ALTER TABLE atp ALTER COLUMN n TYPE BIGINT;
+INSERT INTO atp VALUES (2, 4294967296);
+SELECT id, n FROM atp ORDER BY id;
+id	n
+1	100
+2	4294967296
+=== ALTER COLUMN SET DATA TYPE (alt syntax) ===
+ALTER TABLE atp ALTER COLUMN n SET DATA TYPE BIGINT;
+=== ADD COLUMN with COMMENT clause ===
+ALTER TABLE atp ADD COLUMN note VARCHAR(50) COMMENT 'free-form annotation';
+=== ADD COLUMN GENERATED ALWAYS AS (expr) STORED ===
+DROP TABLE IF EXISTS ag;
+CREATE TABLE ag (id INT PRIMARY KEY, x INT, y INT);
+ALTER TABLE ag ADD COLUMN z INT GENERATED ALWAYS AS (x + y) STORED;
+INSERT INTO ag (id, x, y) VALUES (1, 5, 10);
+SELECT id, x, y, z FROM ag;
+id	x	y	z
+1	5	10	15
+=== DROP CONSTRAINT IF EXISTS — silent on missing ===
+DROP TABLE IF EXISTS adc;
+CREATE TABLE adc (id INT PRIMARY KEY, code VARCHAR(10));
+ALTER TABLE adc DROP CONSTRAINT IF EXISTS no_such_constraint;
+=== DROP CONSTRAINT <fk_name> — supported ===
+DROP TABLE IF EXISTS afp;
+DROP TABLE IF EXISTS afc;
+CREATE TABLE afp (id INT PRIMARY KEY);
+CREATE TABLE afc (id INT PRIMARY KEY, pid INT);
+ALTER TABLE afc ADD CONSTRAINT fk_p FOREIGN KEY (pid) REFERENCES afp(id);
+ALTER TABLE afc DROP CONSTRAINT fk_p;
+=== KNOWN GAP: multi-clause ALTER TABLE — errno 1064 ===
+DROP TABLE IF EXISTS amc;
+CREATE TABLE amc (id INT PRIMARY KEY);
+ALTER TABLE amc ADD COLUMN a INT, ADD COLUMN b VARCHAR(10);
+ERROR 1064: SQL parse error: ALTER TABLE supports exactly one operation per statement
+=== KNOWN GAP: DROP CONSTRAINT on UNIQUE-from-INDEX — errno 1105 ===
+# ADD CONSTRAINT u UNIQUE routes through CREATE UNIQUE INDEX,
+# not through the constraint table. DROP CONSTRAINT can't
+# find it. Portable substitute: DROP INDEX <name>.
+DROP TABLE IF EXISTS auc;
+CREATE TABLE auc (id INT PRIMARY KEY, code VARCHAR(10));
+ALTER TABLE auc ADD CONSTRAINT u_code UNIQUE (code);
+ALTER TABLE auc DROP CONSTRAINT u_code;
+ERROR 1105: execution error: constraint "u_code" does not exist on table "test.public.auc"
+=== KNOWN GAP: ALTER TABLE ENGINE = <name> — errno 1064 ===
+ALTER TABLE ae ENGINE = InnoDB;
+ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: ENGINE at Line: 1, Column: 16
+=== KNOWN GAP: ALTER TABLE AUTO_INCREMENT = N — errno 1064 ===
+ALTER TABLE ae AUTO_INCREMENT = 1000;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: AUTO_INCREMENT = 1000
+=== KNOWN GAP: RENAME CONSTRAINT — errno 1064 ===
+ALTER TABLE afc RENAME CONSTRAINT fk_p TO fk_p_new;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: RENAME CONSTRAINT fk_p TO fk_p_new
+=== KNOWN DIVERGENCE: GENERATED ALWAYS AS IDENTITY — silent, leaves NULL ===
+# The IDENTITY counter is not wired through ADD COLUMN.
+# INSERTs that omit the column leave it NULL instead of
+# auto-incrementing. Portable substitute: SEQUENCE +
+# DEFAULT NEXTVAL.
+DROP TABLE IF EXISTS ai;
+CREATE TABLE ai (id INT PRIMARY KEY);
+ALTER TABLE ai ADD COLUMN seq INT GENERATED ALWAYS AS IDENTITY;
+INSERT INTO ai (id) VALUES (1), (2);
+SELECT id, seq FROM ai ORDER BY id;
+id	seq
+1	NULL
+2	NULL
+=== Cleanup ===
+DROP TABLE ae;
+DROP TABLE aen;
+DROP TABLE aen2;
+DROP TABLE aen3;
+DROP TABLE atp;
+DROP TABLE ag;
+DROP TABLE adc;
+DROP TABLE afc;
+DROP TABLE afp;
+DROP TABLE amc;
+DROP TABLE auc;
+DROP TABLE ai;
