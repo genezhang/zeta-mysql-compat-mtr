@@ -39,9 +39,9 @@
 #   # zeta-adapt: KNOWN DIVERGENCE — ASIN(x) for |x| > 1 returns
 #     a float NaN (Rust IEEE-754) instead of NULL (MySQL).
 #     Detected via the result-row literal "NaN".
-#   # zeta-adapt: KNOWN GAP — 2-arg ATAN(y, x) errors 1105 "ATAN
-#     requires 1 argument". Portable substitute: ATAN2(y, x)
-#     (covered positively in numeric_func_basic).
+#   # zeta-adapt: 2-arg ATAN(y, x) — FIXED via zeta #1185. ATAN
+#     now accepts 1 OR 2 args; the 2-arg form delegates to
+#     ATAN2(y, x) with the same NULL-propagation contract.
 #   # zeta-adapt: KNOWN GAP — RAND(seed) errors 1105 "RAND takes
 #     no arguments". zeta supports only the no-arg form (with
 #     no seedability through SQL).
@@ -106,10 +106,9 @@ SELECT LN(-1);
 
 SELECT ASIN(2) AS nan_val;
 
---echo === KNOWN GAP: 2-arg ATAN — errno 1105 (use ATAN2) ===
+--echo === 2-arg ATAN — FIXED via zeta #1185 (delegates to ATAN2) ===
 
---error 1105
-SELECT ATAN(1, 1);
+SELECT ATAN(1, 1) AS at2;
 
 --echo === KNOWN GAP: RAND(seed) — errno 1105 (only no-arg form) ===
 

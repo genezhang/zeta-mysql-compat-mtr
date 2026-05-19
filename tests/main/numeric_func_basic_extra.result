@@ -68,9 +68,10 @@ ERROR 1105: execution error: cannot take logarithm of zero or negative number
 SELECT ASIN(2) AS nan_val;
 nan_val
 NaN
-=== KNOWN GAP: 2-arg ATAN — errno 1105 (use ATAN2) ===
-SELECT ATAN(1, 1);
-ERROR 1105: execution error: ATAN requires 1 argument
+=== 2-arg ATAN — FIXED via zeta #1185 (delegates to ATAN2) ===
+SELECT ATAN(1, 1) AS at2;
+at2
+0.7853981633974483
 === KNOWN GAP: RAND(seed) — errno 1105 (only no-arg form) ===
 SELECT RAND(42);
 ERROR 1105: execution error: RAND takes no arguments
