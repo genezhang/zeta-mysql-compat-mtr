@@ -1,0 +1,114 @@
+# Independently authored numeric-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_math.test; pins zeta's behavior across the
+# numeric/math surface NOT held by numeric_func_basic (which
+# covers ABS/SIGN/SQRT/POW/POWER/MOD/CEIL/CEILING/FLOOR/ROUND
+# (1-2 arg)/RAND/EXP/LN/LOG (1-arg base-10, 2-arg)/SIN/COS/TAN/
+# ASIN/ACOS/ATAN/ATAN2/LOG2/LOG10/DEGREES/RADIANS/PI/TRUNCATE/
+# CONV).
+#
+# Adaptation notes:
+#   # zeta-adapt: CRC32(str) — supported (32-bit IEEE CRC).
+#   # zeta-adapt: ROUND uses half-away-from-zero (MySQL-aligned):
+#     2.5 → 3, -2.5 → -3, 3.5 → 4, -3.5 → -4. NOT banker's
+#     rounding (PG default).
+#   # zeta-adapt: ROUND with negative decimals — supported.
+#     `ROUND(1234.567, -2) → 1200` (rounds to the nearest
+#     10^|D| multiple).
+#   # zeta-adapt: POW edge cases — POW(0, 0) → 1, POW(2, -1) →
+#     0.5. NULL propagation through any arg.
+#   # zeta-adapt: KNOWN GAP — BIT_COUNT(n) errors 1105 "unknown
+#     function". Portable substitute: BIN(n) length minus count
+#     of '0' chars, or repeated bit-shifts.
+#   # zeta-adapt: KNOWN GAP — COT(n) errors 1105 "unknown
+#     function". Portable substitute: COS(n) / SIN(n).
+#   # zeta-adapt: KNOWN GAP — integer-division operator `DIV`
+#     (MySQL spelling) errors 1064 "No infix parser for token
+#     DIV". Portable substitute: FLOOR(a / b) or CAST(a / b AS
+#     SIGNED).
+#   # zeta-adapt: KNOWN GAP — FORMAT(n, dec, locale) 3-arg form
+#     errors 1105 "FORMAT requires 2 arguments". zeta supports
+#     the 2-arg US-locale form only; the locale-aware 3-arg form
+#     is a separate slice.
+#   # zeta-adapt: KNOWN DIVERGENCE — math domain errors raise
+#     instead of returning NULL (MySQL semantics). SQRT(-1),
+#     LN(0), LN(-1) all error 1105. Portable substitute: guard
+#     with CASE/NULLIF in the calling SQL, e.g.
+#     `CASE WHEN x > 0 THEN LN(x) ELSE NULL END`.
+#   # zeta-adapt: KNOWN DIVERGENCE — ASIN(x) for |x| > 1 returns
+#     a float NaN (Rust IEEE-754) instead of NULL (MySQL).
+#     Detected via the result-row literal "NaN".
+#   # zeta-adapt: KNOWN GAP — 2-arg ATAN(y, x) errors 1105 "ATAN
+#     requires 1 argument". Portable substitute: ATAN2(y, x)
+#     (covered positively in numeric_func_basic).
+#   # zeta-adapt: KNOWN GAP — RAND(seed) errors 1105 "RAND takes
+#     no arguments". zeta supports only the no-arg form (with
+#     no seedability through SQL).
+
+--echo === CRC32 — supported ===
+
+SELECT CRC32('hello') AS c;
+
+--echo === ROUND half-away-from-zero (MySQL-aligned) ===
+
+SELECT ROUND(2.5)   AS r_pos_half;
+SELECT ROUND(-2.5)  AS r_neg_half;
+SELECT ROUND(3.5)   AS r_pos_half2;
+SELECT ROUND(-3.5)  AS r_neg_half2;
+
+--echo === ROUND with negative decimals ===
+
+SELECT ROUND(1234.567, -2) AS r_neg_d;
+
+--echo === POW edge cases + NULL propagation ===
+
+SELECT POW(0, 0)   AS p_zerozero;
+SELECT POW(2, -1)  AS p_neg_exp;
+SELECT ABS(NULL)   AS a_null;
+SELECT POW(NULL, 2) AS p_null_base;
+SELECT POW(2, NULL) AS p_null_exp;
+
+--echo === KNOWN GAP: BIT_COUNT — errno 1105 ===
+
+--error 1105
+SELECT BIT_COUNT(13);
+
+--echo === KNOWN GAP: COT — errno 1105 ===
+
+--error 1105
+SELECT COT(1);
+
+--echo === KNOWN GAP: integer-division operator `DIV` — errno 1064 ===
+
+--error 1064
+SELECT 17 DIV 5;
+
+--echo === KNOWN GAP: FORMAT 3-arg (locale) — errno 1105 ===
+
+--error 1105
+SELECT FORMAT(1234567.891, 2, 'de_DE');
+
+--echo === KNOWN DIVERGENCE: math domain errors — errno 1105 (MySQL returns NULL) ===
+
+--error 1105
+SELECT SQRT(-1);
+
+--error 1105
+SELECT LN(0);
+
+--error 1105
+SELECT LN(-1);
+
+--echo === KNOWN DIVERGENCE: ASIN(2) — float NaN (MySQL: NULL) ===
+
+SELECT ASIN(2) AS nan_val;
+
+--echo === KNOWN GAP: 2-arg ATAN — errno 1105 (use ATAN2) ===
+
+--error 1105
+SELECT ATAN(1, 1);
+
+--echo === KNOWN GAP: RAND(seed) — errno 1105 (only no-arg form) ===
+
+--error 1105
+SELECT RAND(42);

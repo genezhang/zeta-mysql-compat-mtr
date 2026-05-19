@@ -1,0 +1,66 @@
+=== CRC32 — supported ===
+SELECT CRC32('hello') AS c;
+c
+907060870
+=== ROUND half-away-from-zero (MySQL-aligned) ===
+SELECT ROUND(2.5)   AS r_pos_half;
+r_pos_half
+3
+SELECT ROUND(-2.5)  AS r_neg_half;
+r_neg_half
+-3
+SELECT ROUND(3.5)   AS r_pos_half2;
+r_pos_half2
+4
+SELECT ROUND(-3.5)  AS r_neg_half2;
+r_neg_half2
+-4
+=== ROUND with negative decimals ===
+SELECT ROUND(1234.567, -2) AS r_neg_d;
+r_neg_d
+1200
+=== POW edge cases + NULL propagation ===
+SELECT POW(0, 0)   AS p_zerozero;
+p_zerozero
+1
+SELECT POW(2, -1)  AS p_neg_exp;
+p_neg_exp
+0.5
+SELECT ABS(NULL)   AS a_null;
+a_null
+NULL
+SELECT POW(NULL, 2) AS p_null_base;
+p_null_base
+NULL
+SELECT POW(2, NULL) AS p_null_exp;
+p_null_exp
+NULL
+=== KNOWN GAP: BIT_COUNT — errno 1105 ===
+SELECT BIT_COUNT(13);
+ERROR 1105: execution error: unknown function: BIT_COUNT
+=== KNOWN GAP: COT — errno 1105 ===
+SELECT COT(1);
+ERROR 1105: execution error: unknown function: COT
+=== KNOWN GAP: integer-division operator `DIV` — errno 1064 ===
+SELECT 17 DIV 5;
+ERROR 1064: SQL parse error: sql parser error: No infix parser for token Word(Word { value: "DIV", quote_style: None, keyword: DIV }) at Line: 1, Column: 11
+=== KNOWN GAP: FORMAT 3-arg (locale) — errno 1105 ===
+SELECT FORMAT(1234567.891, 2, 'de_DE');
+ERROR 1105: execution error: FORMAT requires 2 arguments (number, decimals)
+=== KNOWN DIVERGENCE: math domain errors — errno 1105 (MySQL returns NULL) ===
+SELECT SQRT(-1);
+ERROR 1105: execution error: cannot take square root of a negative number
+SELECT LN(0);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LN(-1);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+=== KNOWN DIVERGENCE: ASIN(2) — float NaN (MySQL: NULL) ===
+SELECT ASIN(2) AS nan_val;
+nan_val
+NaN
+=== KNOWN GAP: 2-arg ATAN — errno 1105 (use ATAN2) ===
+SELECT ATAN(1, 1);
+ERROR 1105: execution error: ATAN requires 1 argument
+=== KNOWN GAP: RAND(seed) — errno 1105 (only no-arg form) ===
+SELECT RAND(42);
+ERROR 1105: execution error: RAND takes no arguments
