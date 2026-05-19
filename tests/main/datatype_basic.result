@@ -34,11 +34,10 @@ INSERT INTO t_s VALUES ('hello', 'hi', 'world');
 SELECT v, c, t FROM t_s;
 v	c	t
 hello	hi	world
-=== VARCHAR length enforcement — KNOWN DIVERGENCE: errno 1105 vs 1406 ===
-# MySQL emits 1406 (ER_DATA_TOO_LONG); zeta emits the generic
-# 1105. Behavior (rejection) matches; only the errno differs.
+=== VARCHAR length enforcement — errno 1406 (FIXED via zeta #1147) ===
+# zeta now emits MySQL-standard 1406 (ER_DATA_TOO_LONG).
 INSERT INTO t_s VALUES ('this_is_too_long_for_varchar10', 'x', 'y');
-ERROR 1105: execution error: value too long for type character varying(10)
+ERROR 1406: execution error: value too long for type character varying(10)
 === DATE / TIMESTAMP / TIME ===
 DROP TABLE IF EXISTS t_t;
 CREATE TABLE t_t (d DATE, ts TIMESTAMP, tm TIME);
