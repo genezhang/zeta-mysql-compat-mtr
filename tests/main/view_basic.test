@@ -15,9 +15,9 @@
 #   # zeta-adapt: information_schema.VIEWS — supported. TABLE_SCHEMA
 #     reflects the connection's current database, TABLE_NAME the
 #     view name, VIEW_DEFINITION the original SELECT text.
-#   # zeta-adapt: DROP VIEW <missing> (no IF EXISTS) — KNOWN
-#     DIVERGENCE. zeta errors with 1105 (generic execution error);
-#     MySQL uses 1051 (Unknown table). Pinned below.
+#   # zeta-adapt: DROP VIEW <missing> (no IF EXISTS) — FIXED via
+#     zeta #1134. Now errors with the MySQL-standard errno 1051
+#     (ER_BAD_TABLE_ERROR — "Unknown table 'X'"). Pinned below.
 #   # zeta-adapt: SHOW CREATE VIEW — not pinned here (zeta does
 #     not currently emit the MySQL-style row shape; tracked
 #     separately).
@@ -73,11 +73,12 @@ DROP VIEW emp_dept;
 DROP VIEW IF EXISTS eng_emps;
 DROP VIEW IF EXISTS emp_dept;
 
---echo === DROP VIEW <missing> — KNOWN DIVERGENCE (errno 1105) ===
---echo # MySQL errno 1051 (Unknown table 'X'). zeta errors with
---echo # 1105 (generic execution error). Tracked as a follow-up.
+--echo === DROP VIEW <missing> — FIXED via zeta #1134 (errno 1051) ===
+--echo # zeta now emits MySQL-standard errno 1051 (ER_BAD_TABLE_ERROR
+--echo # — "Unknown table 'X'") for DROP VIEW against a non-existent
+--echo # object.
 
---error 1105
+--error 1051
 DROP VIEW does_not_exist;
 
 --echo === Cleanup ===

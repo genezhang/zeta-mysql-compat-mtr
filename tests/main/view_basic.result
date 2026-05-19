@@ -45,11 +45,12 @@ DROP VIEW eng_emps;
 DROP VIEW emp_dept;
 DROP VIEW IF EXISTS eng_emps;
 DROP VIEW IF EXISTS emp_dept;
-=== DROP VIEW <missing> — KNOWN DIVERGENCE (errno 1105) ===
-# MySQL errno 1051 (Unknown table 'X'). zeta errors with
-# 1105 (generic execution error). Tracked as a follow-up.
+=== DROP VIEW <missing> — FIXED via zeta #1134 (errno 1051) ===
+# zeta now emits MySQL-standard errno 1051 (ER_BAD_TABLE_ERROR
+# — "Unknown table 'X'") for DROP VIEW against a non-existent
+# object.
 DROP VIEW does_not_exist;
-ERROR 1105: execution error: view 'test.public.does_not_exist' does not exist
+ERROR 1051: execution error: view 'test.public.does_not_exist' does not exist
 === Cleanup ===
 DROP TABLE emp;
 DROP TABLE dept;
