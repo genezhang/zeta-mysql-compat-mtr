@@ -1,0 +1,129 @@
+# Independently authored JSON smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/json*.test
+# or json_functions.test; pins zeta's behavior across the JSON
+# shapes ORMs and analytics tools emit.
+#
+# zeta's primary JSON surface is JSONB-flavored (Postgres). The
+# MySQL `JSON` column type is accepted as an alias. A subset of
+# MySQL's JSON_xxx surface is implemented; many functions are still
+# gaps. This test pins both ends — supported AND missing — with
+# `--error 1105` for the missing ones, so a future implementation
+# of any missing function will trip this test and force a
+# retighten.
+#
+# Adaptation notes:
+#   # zeta-adapt: `CREATE TABLE … (col JSON)` — accepted (alias for
+#     JSONB internally).
+#   # zeta-adapt: JSON_OBJECT(k, v, …) — supported.
+#   # zeta-adapt: JSON_ARRAY(...) — supported.
+#   # zeta-adapt: JSON_EXTRACT(col, '$.path') — supported.
+#   # zeta-adapt: `->` (PG-style path extraction) — supported,
+#     returns quoted JSON.
+#   # zeta-adapt: `->>` (PG-style path extraction unquote) —
+#     supported, returns text.
+#   # zeta-adapt: JSON_TYPE — supported; returns OBJECT/ARRAY/etc.
+#   # zeta-adapt: JSON_VALID — supported.
+#   # zeta-adapt: JSON_QUOTE — supported.
+#   # zeta-adapt: JSON_UNQUOTE — supported.
+#   # zeta-adapt: `@>` (PG containment) and `?` (PG key-exists) —
+#     supported (zeta extras, not in MySQL).
+#   # zeta-adapt: CAST(... AS JSON) — supported.
+#   # zeta-adapt: KNOWN GAPS — the following MySQL JSON_xxx
+#     functions are NOT yet implemented and raise errno 1105
+#     "unknown function":
+#       JSON_LENGTH, JSON_KEYS, JSON_SET, JSON_INSERT,
+#       JSON_REPLACE, JSON_DEPTH, JSON_CONTAINS, JSON_OBJECTAGG.
+#     Pinned below — a future implementation that wires any of
+#     these to jsonb_* implementations will need to retighten.
+#   # zeta-adapt: JSON object keys are returned in sorted order
+#     (Postgres JSONB semantics), not insertion order (MySQL
+#     semantics). Asserted in the JSON_OBJECT output below.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS j;
+CREATE TABLE j (id INT PRIMARY KEY, data JSON);
+INSERT INTO j VALUES
+ (1, '{"name":"alice","age":30}'),
+ (2, '[1,2,3]'),
+ (3, '{"a":{"b":42}}');
+
+--echo === Stored JSON round-trips (keys sort lexicographically) ===
+
+SELECT id, data FROM j ORDER BY id;
+
+--echo === JSON_OBJECT ===
+
+SELECT JSON_OBJECT('k1', 'v1', 'k2', 42) AS o;
+
+--echo === JSON_ARRAY ===
+
+SELECT JSON_ARRAY(1, 2, 3, 'x') AS a;
+
+--echo === JSON_EXTRACT ===
+
+SELECT JSON_EXTRACT(data, '$.name') AS name FROM j WHERE id = 1;
+
+--echo === -> (path) returns quoted ===
+
+SELECT data->'name' AS n FROM j WHERE id = 1;
+
+--echo === ->> (path) returns unquoted text ===
+
+SELECT data->>'name' AS n FROM j WHERE id = 1;
+
+--echo === Numeric path on array ===
+
+SELECT data->0 AS first FROM j WHERE id = 2;
+
+--echo === JSON_TYPE ===
+
+SELECT id, JSON_TYPE(data) AS t FROM j ORDER BY id;
+
+--echo === JSON_VALID ===
+
+SELECT JSON_VALID('{"x":1}') AS ok;
+
+--echo === JSON_QUOTE / JSON_UNQUOTE ===
+
+SELECT JSON_QUOTE('hello') AS q;
+SELECT JSON_UNQUOTE('"hello"') AS u;
+
+--echo === CAST AS JSON ===
+
+SELECT CAST('{"x":1}' AS JSON) AS c;
+
+--echo === Zeta extras: @> containment and ? key-exists (PG) ===
+
+SELECT data @> '{"name":"alice"}' AS contains FROM j WHERE id = 1;
+SELECT data ? 'name' AS has_name FROM j WHERE id = 1;
+
+--echo === KNOWN GAPS: MySQL JSON_xxx functions not yet implemented ===
+--echo # All raise errno 1105 "unknown function". A future slice that
+--echo # wires these to the existing jsonb_* implementations must
+--echo # retighten each pin below.
+
+--error 1105
+SELECT JSON_LENGTH(data) FROM j WHERE id = 1;
+
+--error 1105
+SELECT JSON_KEYS(data) FROM j WHERE id = 1;
+
+--error 1105
+SELECT JSON_SET(data, '$.name', 'bob') FROM j WHERE id = 1;
+
+--error 1105
+SELECT JSON_INSERT(data, '$.new', 'x') FROM j WHERE id = 1;
+
+--error 1105
+SELECT JSON_REPLACE(data, '$.name', 'carol') FROM j WHERE id = 1;
+
+--error 1105
+SELECT JSON_DEPTH('{"a":{"b":1}}');
+
+--error 1105
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}');
+
+--echo === Cleanup ===
+
+DROP TABLE j;

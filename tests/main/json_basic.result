@@ -1,0 +1,85 @@
+=== Setup ===
+DROP TABLE IF EXISTS j;
+CREATE TABLE j (id INT PRIMARY KEY, data JSON);
+INSERT INTO j VALUES
+ (1, '{"name":"alice","age":30}'),
+ (2, '[1,2,3]'),
+ (3, '{"a":{"b":42}}');
+=== Stored JSON round-trips (keys sort lexicographically) ===
+SELECT id, data FROM j ORDER BY id;
+id	data
+1	{"age":30,"name":"alice"}
+2	[1,2,3]
+3	{"a":{"b":42}}
+=== JSON_OBJECT ===
+SELECT JSON_OBJECT('k1', 'v1', 'k2', 42) AS o;
+o
+{"k1":"v1","k2":42}
+=== JSON_ARRAY ===
+SELECT JSON_ARRAY(1, 2, 3, 'x') AS a;
+a
+[1,2,3,"x"]
+=== JSON_EXTRACT ===
+SELECT JSON_EXTRACT(data, '$.name') AS name FROM j WHERE id = 1;
+name
+"alice"
+=== -> (path) returns quoted ===
+SELECT data->'name' AS n FROM j WHERE id = 1;
+n
+"alice"
+=== ->> (path) returns unquoted text ===
+SELECT data->>'name' AS n FROM j WHERE id = 1;
+n
+alice
+=== Numeric path on array ===
+SELECT data->0 AS first FROM j WHERE id = 2;
+first
+1
+=== JSON_TYPE ===
+SELECT id, JSON_TYPE(data) AS t FROM j ORDER BY id;
+id	t
+1	OBJECT
+2	ARRAY
+3	OBJECT
+=== JSON_VALID ===
+SELECT JSON_VALID('{"x":1}') AS ok;
+ok
+1
+=== JSON_QUOTE / JSON_UNQUOTE ===
+SELECT JSON_QUOTE('hello') AS q;
+q
+"hello"
+SELECT JSON_UNQUOTE('"hello"') AS u;
+u
+hello
+=== CAST AS JSON ===
+SELECT CAST('{"x":1}' AS JSON) AS c;
+c
+{"x":1}
+=== Zeta extras: @> containment and ? key-exists (PG) ===
+SELECT data @> '{"name":"alice"}' AS contains FROM j WHERE id = 1;
+contains
+1
+SELECT data ? 'name' AS has_name FROM j WHERE id = 1;
+has_name
+1
+=== KNOWN GAPS: MySQL JSON_xxx functions not yet implemented ===
+# All raise errno 1105 "unknown function". A future slice that
+# wires these to the existing jsonb_* implementations must
+# retighten each pin below.
+SELECT JSON_LENGTH(data) FROM j WHERE id = 1;
+ERROR 1105: execution error: unknown function: JSON_LENGTH
+SELECT JSON_KEYS(data) FROM j WHERE id = 1;
+ERROR 1105: execution error: unknown function: JSON_KEYS
+SELECT JSON_SET(data, '$.name', 'bob') FROM j WHERE id = 1;
+ERROR 1105: execution error: unknown function: JSON_SET
+SELECT JSON_INSERT(data, '$.new', 'x') FROM j WHERE id = 1;
+ERROR 1105: execution error: unknown function: JSON_INSERT
+SELECT JSON_REPLACE(data, '$.name', 'carol') FROM j WHERE id = 1;
+ERROR 1105: execution error: unknown function: JSON_REPLACE
+SELECT JSON_DEPTH('{"a":{"b":1}}');
+ERROR 1105: execution error: unknown function: JSON_DEPTH
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}');
+ERROR 1105: execution error: unknown function: JSON_CONTAINS
+=== Cleanup ===
+DROP TABLE j;
