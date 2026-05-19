@@ -124,14 +124,36 @@ c	i
 SELECT CAST(3.7 AS INTEGER) AS r;
 r
 4
-=== KNOWN DIVERGENCE: IFNULL — unknown function (errno 1105) ===
-# MySQL standard. Substitute COALESCE(x, y).
-SELECT IFNULL(NULL, 'fallback');
-ERROR 1105: execution error: unknown function: IFNULL
-=== KNOWN DIVERGENCE: IF(cond, x, y) — unknown function (errno 1105) ===
-# MySQL standard. Substitute CASE WHEN cond THEN x ELSE y END.
-SELECT IF(1 = 1, 'yes', 'no');
-ERROR 1105: execution error: unknown function: IF
+=== IFNULL — FIXED via zeta #1127 ===
+# 2-arg alias for COALESCE. NULL first arg returns the second;
+# non-NULL first arg returns it unchanged.
+SELECT IFNULL(NULL, 'fallback') AS f;
+f
+fallback
+SELECT IFNULL('x', 'fallback') AS f;
+f
+x
+SELECT IFNULL(NULL, 42) AS f;
+f
+42
+=== IF(cond, x, y) — FIXED via zeta #1127 ===
+# 3-arg conditional with MySQL truthiness: NULL → false branch;
+# non-zero numeric / non-empty string → true; '0' → false.
+SELECT IF(1 = 1, 'yes', 'no') AS r;
+r
+yes
+SELECT IF(1 = 2, 'yes', 'no') AS r;
+r
+no
+SELECT IF(0, 'yes', 'no') AS r;
+r
+no
+SELECT IF(5, 'yes', 'no') AS r;
+r
+yes
+SELECT IF(NULL, 'yes', 'no') AS r;
+r
+no
 === KNOWN DIVERGENCE: VERSION() — unknown function (errno 1105) ===
 SELECT VERSION();
 ERROR 1105: execution error: unknown function: VERSION
