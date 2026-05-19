@@ -45,10 +45,12 @@
 #     "unsupported CAST target type: BYTEA". Portable
 #     substitute: store/process strings as TEXT until a true
 #     bytes column is needed.
-#   # zeta-adapt: KNOWN DIVERGENCE — `TRY_CAST` (SQL-standard
-#     fallible cast) behaves identically to plain CAST: errors
-#     on failure instead of returning NULL. Standard semantics
-#     would silently NULL the result.
+#   # zeta-adapt: TRY_CAST / SAFE_CAST — FIXED via zeta #1187.
+#     Both now silently return NULL on conversion failure
+#     (SQL-standard / BigQuery semantics). Implemented by
+#     wrapping the underlying Cast in a synthetic TRY_CAST()
+#     fn call that catches eval errors. The wrapped target
+#     type's inference still flows through arg[0].
 
 --echo === Integer targets — INTEGER / INT / BIGINT ===
 
@@ -118,7 +120,8 @@ SELECT CAST('abc' AS INT);
 --error 1105
 SELECT CAST('abc' AS BYTEA);
 
---echo === KNOWN DIVERGENCE: TRY_CAST behaves like CAST (errors on fail) ===
+--echo === TRY_CAST / SAFE_CAST — FIXED via zeta #1187 (NULL on fail) ===
 
---error 1105
-SELECT TRY_CAST('abc' AS INT);
+SELECT TRY_CAST('abc' AS INT) AS bad;
+SELECT TRY_CAST('42' AS INT)  AS good;
+SELECT SAFE_CAST('abc' AS INT) AS safe;
