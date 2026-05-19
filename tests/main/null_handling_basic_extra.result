@@ -1,0 +1,97 @@
+=== Setup ===
+DROP TABLE IF EXISTS nh;
+CREATE TABLE nh (id INT PRIMARY KEY, x INT);
+INSERT INTO nh VALUES (1, 10), (2, NULL), (3, 5);
+=== IS NULL / IS NOT NULL ===
+SELECT NULL IS NULL, NULL IS NOT NULL, 1 IS NULL, 1 IS NOT NULL;
+NULL IS NULL	NULL IS NOT NULL	1 IS NULL	1 IS NOT NULL
+1	0	0	1
+=== NULL comparisons all return NULL (3VL) ===
+SELECT NULL = NULL, NULL <> NULL, NULL = 1, NULL <> 1;
+NULL = NULL	NULL <> NULL	NULL = 1	NULL <> 1
+NULL	NULL	NULL	NULL
+=== IS DISTINCT FROM / IS NOT DISTINCT FROM ===
+SELECT NULL IS DISTINCT FROM NULL, NULL IS NOT DISTINCT FROM NULL;
+_IS_DISTINCT_FROM	_IS_NOT_DISTINCT_FROM
+0	1
+=== ORDER BY default — NULLs last on ASC ===
+SELECT id, x FROM nh ORDER BY x;
+id	x
+3	5
+1	10
+2	NULL
+=== ORDER BY ... DESC NULLS FIRST — works ===
+SELECT id, x FROM nh ORDER BY x DESC NULLS FIRST;
+id	x
+2	NULL
+1	10
+3	5
+=== COALESCE — first non-NULL ===
+SELECT COALESCE(NULL, NULL, 'first non-null') AS c;
+c
+first non-null
+=== NULLIF — same → NULL, diff → first ===
+SELECT NULLIF('a', 'a') AS same, NULLIF('a', 'b') AS diff;
+same	diff
+NULL	a
+=== IFNULL ===
+SELECT IFNULL(NULL, 'fallback') AS use_fb, IFNULL('val', 'fallback') AS keep;
+use_fb	keep
+fallback	val
+=== ISNULL — boolean wrapper ===
+SELECT ISNULL(NULL) AS yes, ISNULL(1) AS no;
+yes	no
+1	0
+=== NULL in IN list ===
+# `3 IN (1, 2, NULL)` returns NULL — the NULL comparison
+# makes the OR-chain indeterminate.
+SELECT 1 IN (1, 2, NULL) AS hit, 3 IN (1, 2, NULL) AS miss;
+hit	miss
+1	NULL
+=== NULL in NOT IN list — the 3VL gotcha ===
+# `1 NOT IN (1, 2, NULL)` returns 0 (the first equality
+# forces FALSE). `3 NOT IN (1, 2, NULL)` returns NULL
+# (no equality is TRUE, but the NULL element can't be
+# ruled out, so the AND-chain is NULL).
+SELECT 1 NOT IN (1, 2, NULL) AS hit, 3 NOT IN (1, 2, NULL) AS miss;
+hit	miss
+0	NULL
+=== NULL in arithmetic — poisons the result ===
+SELECT 1 + NULL, 1 * NULL, 1 / NULL, 1 - NULL;
+1 + NULL	1 * NULL	1 / NULL	1 - NULL
+NULL	NULL	NULL	NULL
+=== Three-valued boolean — AND ===
+SELECT TRUE AND NULL AS t_and_n, FALSE AND NULL AS f_and_n;
+t_and_n	f_and_n
+NULL	0
+=== Three-valued boolean — OR ===
+SELECT TRUE OR NULL AS t_or_n, FALSE OR NULL AS f_or_n;
+t_or_n	f_or_n
+1	NULL
+=== Three-valued boolean — NOT ===
+SELECT NOT NULL AS n;
+n
+NULL
+=== String concat with NULL — NULL propagates ===
+SELECT 'a' || NULL AS s;
+s
+NULL
+=== KNOWN DIVERGENCE: <=> spaceship NULL-safe equals — errno 1105 ===
+# zeta uses <=> as cosine distance for VECTOR columns,
+# NOT as MySQL's NULL-safe equals. On non-vector scalar
+# operands the executor errors 1105. (NULL operands
+# short-circuit to NULL before hitting the vector check,
+# which differs from MySQL where NULL <=> NULL = 1.)
+# Portable substitute: IS NOT DISTINCT FROM.
+SELECT 1 <=> 1;
+ERROR 1105: execution error: <=> requires vector operands
+=== KNOWN DIVERGENCE: NULLS FIRST on ASC — silently ignored ===
+# NULL still placed last despite NULLS FIRST. Compare with
+# the default-ordering pin above — same result.
+SELECT id, x FROM nh ORDER BY x NULLS FIRST;
+id	x
+3	5
+1	10
+2	NULL
+=== Cleanup ===
+DROP TABLE nh;
