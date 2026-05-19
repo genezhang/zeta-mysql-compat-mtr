@@ -1,0 +1,67 @@
+=== Setup ===
+DROP TABLE IF EXISTS t;
+CREATE TABLE t (id INT PRIMARY KEY, name VARCHAR(20), val INT);
+INSERT INTO t VALUES (1, 'a', 10), (2, 'b', 20), (3, 'c', 30);
+=== CREATE VIEW v(col-list) — column-rename ===
+CREATE VIEW v_rename(uid, who) AS SELECT id, name FROM t;
+SELECT uid, who FROM v_rename;
+uid	who
+1	a
+2	b
+3	c
+=== CREATE VIEW with aggregate (GROUP BY) ===
+CREATE VIEW v_agg AS
+  SELECT name, SUM(val) AS total FROM t GROUP BY name;
+SELECT name, total FROM v_agg;
+name	total
+a	10
+b	20
+c	30
+=== View-on-view chain ===
+CREATE VIEW v_base AS SELECT id, val FROM t WHERE val >= 20;
+CREATE VIEW v_on_v AS SELECT id FROM v_base WHERE id < 5;
+SELECT id FROM v_on_v;
+id
+2
+3
+=== JOIN with a view ===
+SELECT t.val, v_rename.who
+  FROM t JOIN v_rename ON t.id = v_rename.uid
+  ORDER BY t.id;
+val	who
+10	a
+20	b
+30	c
+=== KNOWN GAP: WITH CHECK OPTION — errno 1064 ===
+CREATE VIEW v_check AS SELECT id, name FROM t WHERE val > 15 WITH CHECK OPTION;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: WITH at Line: 1, Column: 62
+=== KNOWN GAP: ALTER VIEW — errno 1064 ===
+ALTER VIEW v_rename AS SELECT name AS who, id AS uid FROM t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== KNOWN GAP: INSERT INTO view — errno 1146 ===
+INSERT INTO v_rename (uid, who) VALUES (99, 'z');
+ERROR 1146: table not found: test.public.v_rename
+=== KNOWN GAP: UPDATE through view — errno 1146 ===
+UPDATE v_rename SET who = 'zz' WHERE uid = 1;
+ERROR 1146: table not found: test.public.v_rename
+=== KNOWN GAP: DELETE through view — errno 1146 ===
+DELETE FROM v_rename WHERE uid = 1;
+ERROR 1146: table not found: test.public.v_rename
+=== KNOWN GAP: CREATE VIEW IF NOT EXISTS — errno 1105 ===
+# MySQL silent-no-ops on a second IF NOT EXISTS; zeta
+# errors 1105 like a plain CREATE.
+CREATE VIEW IF NOT EXISTS v_rename AS SELECT id FROM t;
+ERROR 1105: internal error: view 'test.public.v_rename' already exists
+=== DROP VIEW … CASCADE — accept, no actual cascade ===
+# CASCADE is accepted at parse, the named view is dropped,
+# but a dependent view (v_on_v over v_base) is NOT also
+# dropped. The dependent's name persists; subsequent SELECT
+# errors 1146 because resolution fails on the missing base.
+DROP VIEW v_base CASCADE;
+SELECT id FROM v_on_v;
+ERROR 1146: table not found: test.public.v_base
+=== Cleanup ===
+DROP VIEW IF EXISTS v_on_v;
+DROP VIEW IF EXISTS v_agg;
+DROP VIEW IF EXISTS v_rename;
+DROP TABLE t;
