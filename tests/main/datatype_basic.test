@@ -24,9 +24,8 @@
 #     at DDL but treated as signed Int32 internally. Values that fit
 #     in u32 but exceed i32::MAX overflow at INSERT with errno 1105.
 #     MySQL would store them in u32. Asserted below.
-#   # zeta-adapt: KNOWN DIVERGENCE — VARCHAR length-violation errno is
-#     1105 (generic execution error) vs MySQL's 1406 (ER_DATA_TOO_LONG).
-#     Behavior (rejection) matches; only the errno differs.
+#   # zeta-adapt: VARCHAR length-violation errno — FIXED via
+#     zeta #1147 (now emits MySQL-standard 1406 ER_DATA_TOO_LONG).
 #   # zeta-adapt: DATETIME and DATETIME(precision) — supported (FIXED
 #     via zeta #1145). Aliased to TIMESTAMP at parse time; the
 #     precision parameter is accepted but currently ignored. Pinned
@@ -83,11 +82,10 @@ CREATE TABLE t_s (v VARCHAR(10), c CHAR(5), t TEXT);
 INSERT INTO t_s VALUES ('hello', 'hi', 'world');
 SELECT v, c, t FROM t_s;
 
---echo === VARCHAR length enforcement — KNOWN DIVERGENCE: errno 1105 vs 1406 ===
---echo # MySQL emits 1406 (ER_DATA_TOO_LONG); zeta emits the generic
---echo # 1105. Behavior (rejection) matches; only the errno differs.
+--echo === VARCHAR length enforcement — errno 1406 (FIXED via zeta #1147) ===
+--echo # zeta now emits MySQL-standard 1406 (ER_DATA_TOO_LONG).
 
---error 1105
+--error 1406
 INSERT INTO t_s VALUES ('this_is_too_long_for_varchar10', 'x', 'y');
 
 --echo === DATE / TIMESTAMP / TIME ===
