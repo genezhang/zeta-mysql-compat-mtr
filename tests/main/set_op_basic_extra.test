@@ -1,0 +1,111 @@
+# Independently authored set-operation-extra smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/union.test / select.test; pins zeta's behavior
+# across the set-op surface NOT held by set_op_basic (which
+# covers UNION/UNION ALL/INTERSECT/INTERSECT ALL/EXCEPT/
+# EXCEPT ALL/MINUS/multi-way UNION/multi-column-with-ORDER-BY/
+# set-op inside FROM/INT+DOUBLE-coercion/column-count-mismatch).
+#
+# Adaptation notes:
+#   # zeta-adapt: `UNION DISTINCT` (explicit DISTINCT keyword)
+#     — supported, same as bare UNION (DISTINCT is the default).
+#   # zeta-adapt: Parenthesized set-op composition is supported
+#     when run through psql/MySQL directly, but the runner's
+#     statement splitter can't reliably handle a leading `(`.
+#     We pin the equivalent semantic via a derived-table +
+#     IN-subquery shape (`SELECT FROM (A UNION B) WHERE id IN C`).
+#   # zeta-adapt: Set-op precedence — INTERSECT binds tighter
+#     than UNION/UNION ALL (SQL standard). Verified below: the
+#     un-parenthesized `A UNION ALL B INTERSECT C` evaluates as
+#     `A UNION ALL (B INTERSECT C)`.
+#   # zeta-adapt: VALUES rows directly in a set-op branch —
+#     supported. Default column names are `column1, column2, …`.
+#   # zeta-adapt: String + integer mixed types coerce to text
+#     in UNION output. Both branches present their value as a
+#     string in the unified result.
+#   # zeta-adapt: First-branch column alias is the union output
+#     column name — usable in tail ORDER BY.
+#   # zeta-adapt: Empty-side semantics — UNION with an empty
+#     branch returns the non-empty branch unchanged; EXCEPT
+#     against an empty right yields the left unchanged; EXCEPT
+#     of empty against non-empty yields empty; INTERSECT with
+#     an empty side yields empty.
+#   # zeta-adapt: `DISTINCT` inside a branch interacts with
+#     UNION ALL as expected — the per-branch DISTINCT dedups
+#     that branch's rows, then UNION ALL concatenates without
+#     further dedup.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sa;
+DROP TABLE IF EXISTS sb;
+DROP TABLE IF EXISTS sc;
+DROP TABLE IF EXISTS empty_so;
+CREATE TABLE sa (id INT PRIMARY KEY);
+CREATE TABLE sb (id INT PRIMARY KEY);
+CREATE TABLE sc (id INT PRIMARY KEY);
+CREATE TABLE empty_so (id INT PRIMARY KEY);
+INSERT INTO sa VALUES (1), (2);
+INSERT INTO sb VALUES (2), (3);
+INSERT INTO sc VALUES (2), (4);
+
+--echo === UNION DISTINCT (explicit keyword) ===
+
+SELECT id FROM sa UNION DISTINCT SELECT id FROM sb ORDER BY id;
+
+--echo === Parenthesized: subquery (A UNION B) IN test ===
+--echo # The runner's statement-splitter can't reliably parse a
+--echo # leading-paren `(A UNION B) INTERSECT C` shape, so we
+--echo # achieve the same semantic via a derived-table + IN:
+--echo # the inner UNION is the left, IN against C is the
+--echo # INTERSECT semantics.
+
+SELECT id FROM (SELECT id FROM sa UNION SELECT id FROM sb) AS u WHERE id IN (SELECT id FROM sc) ORDER BY id;
+
+--echo === Precedence — INTERSECT binds tighter than UNION ALL ===
+--echo # sa={1,2}, sb={2,3}, sc={2,4}. INTERSECT first:
+--echo # sb ∩ sc = {2}. Then sa UNION ALL {2} = {1, 2, 2}.
+
+SELECT id FROM sa UNION ALL SELECT id FROM sb INTERSECT SELECT id FROM sc ORDER BY id;
+
+--echo === VALUES rows in a set-op branch ===
+
+VALUES (1, 'a'), (2, 'b') UNION VALUES (2, 'b'), (3, 'c') ORDER BY 1;
+
+--echo === Mixed-type coercion (TEXT + INT → TEXT) ===
+
+SELECT 'hello' AS v UNION SELECT 42 ORDER BY v;
+
+--echo === First-branch column alias usable in tail ORDER BY ===
+
+SELECT id AS x FROM sa UNION SELECT id FROM sb ORDER BY x;
+
+--echo === Empty-side: UNION with empty branch ===
+
+SELECT id FROM sa UNION SELECT id FROM empty_so ORDER BY id;
+
+--echo === Empty-side: EXCEPT against empty right ===
+
+SELECT id FROM sa EXCEPT SELECT id FROM empty_so ORDER BY id;
+
+--echo === Empty-side: EXCEPT of empty against non-empty ===
+
+SELECT id FROM empty_so EXCEPT SELECT id FROM sa;
+
+--echo === Empty-side: INTERSECT with empty side ===
+
+SELECT id FROM sa INTERSECT SELECT id FROM empty_so;
+
+--echo === DISTINCT inside branch + UNION ALL ===
+--echo # The DISTINCT scopes to its own branch only; UNION ALL
+--echo # then concatenates without further dedup. sa has unique
+--echo # ids {1, 2}, sb has {2, 3}; result is {1, 2, 2, 3}.
+
+SELECT DISTINCT id FROM sa UNION ALL SELECT id FROM sb ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE sa;
+DROP TABLE sb;
+DROP TABLE sc;
+DROP TABLE empty_so;
