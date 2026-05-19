@@ -1,0 +1,121 @@
+# Independently authored numeric-function smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_math.test or similar; pins zeta's behavior
+# across the MySQL numeric / math functions.
+#
+# Adaptation notes:
+#   # zeta-adapt: ABS, SIGN, SQRT, POW/POWER, MOD, % operator,
+#     CEIL/CEILING, FLOOR, ROUND (1-arg and 2-arg), RAND — all
+#     supported.
+#   # zeta-adapt: EXP, LN — supported. LN(e) ≈ 1 with small
+#     floating drift (asserted as 0.9999999998311266 in the
+#     result).
+#   # zeta-adapt: KNOWN DIVERGENCE — `LOG(x)` in zeta is BASE-10
+#     (returns log10). In MySQL `LOG(x)` is the NATURAL log (ln).
+#     Pinned in the result. Portable substitutes: `LN(x)` for
+#     natural log (works on both); `LOG(10, x)` for explicit
+#     base-10.
+#   # zeta-adapt: `LOG(base, x)` 2-arg form — supported on both
+#     engines, same semantics. Asserted in the result.
+#   # zeta-adapt: KNOWN GAPS — the following MySQL numeric
+#     functions are NOT yet implemented and raise errno 1105
+#     "unknown function":
+#       TRUNCATE, LOG2, LOG10, SIN, COS, TAN, ASIN, ACOS, ATAN,
+#       ATAN2, DEGREES, RADIANS, PI, CONV, CRC32.
+#     12 of these are pinned below; each is a candidate slice.
+
+--echo === ABS / SIGN ===
+
+SELECT ABS(-5)                  AS a;
+SELECT ABS(-3.14)               AS af;
+SELECT SIGN(-7)                 AS sn;
+SELECT SIGN(0)                  AS sz;
+SELECT SIGN(7)                  AS sp;
+
+--echo === SQRT / POW / POWER ===
+
+SELECT SQRT(16)                 AS s;
+SELECT POW(2, 10)               AS p;
+SELECT POWER(2, 10)             AS p2;
+
+--echo === MOD and % operator ===
+
+SELECT MOD(10, 3)               AS m;
+SELECT 10 % 3                   AS m_op;
+
+--echo === CEIL / CEILING / FLOOR ===
+
+SELECT CEIL(3.2)                AS c;
+SELECT CEILING(3.2)             AS c2;
+SELECT FLOOR(3.8)               AS f;
+
+--echo === ROUND (1-arg and 2-arg) ===
+
+SELECT ROUND(3.567)             AS r1;
+SELECT ROUND(3.567, 2)          AS r2;
+
+--echo === RAND (sanity, just check > 0) ===
+
+SELECT RAND() > 0               AS positive;
+
+--echo === EXP / LN ===
+
+SELECT EXP(1)                   AS e;
+SELECT LN(2.718281828)          AS ln_e;
+
+--echo === LOG — DIVERGENCE: 1-arg is base-10 in zeta, natural in MySQL ===
+--echo # Portable substitute: use LN(x) for natural log.
+
+SELECT LOG(100)                 AS log_zeta_base10;
+SELECT LOG(10, 1000)            AS log_base10_2arg;
+
+--echo === KNOWN GAPS: trig + LOG2/LOG10 + DEGREES/RADIANS + PI ===
+--echo # All raise errno 1105 "unknown function". Each is a
+--echo # candidate slice (thin wrappers over Rust std).
+
+--error 1105
+SELECT LOG2(8);
+
+--error 1105
+SELECT LOG10(1000);
+
+--error 1105
+SELECT SIN(0);
+
+--error 1105
+SELECT COS(0);
+
+--error 1105
+SELECT TAN(0);
+
+--error 1105
+SELECT ASIN(1);
+
+--error 1105
+SELECT ACOS(1);
+
+--error 1105
+SELECT ATAN(1);
+
+--error 1105
+SELECT ATAN2(1, 1);
+
+--error 1105
+SELECT DEGREES(3.14159);
+
+--error 1105
+SELECT RADIANS(180);
+
+--error 1105
+SELECT PI();
+
+--echo === KNOWN GAPS: TRUNCATE / CONV / CRC32 ===
+
+--error 1105
+SELECT TRUNCATE(3.567, 1);
+
+--error 1105
+SELECT CONV(255, 10, 16);
+
+--error 1105
+SELECT CRC32('test');
