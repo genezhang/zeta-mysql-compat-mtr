@@ -1,0 +1,68 @@
+=== POSITION(substr IN str) — SQL-standard ===
+SELECT POSITION('lo' IN 'hello')    AS p;
+p
+4
+SELECT POSITION('xx' IN 'hello')    AS p_miss;
+p_miss
+0
+=== REGEXP_LIKE / REGEXP_INSTR ===
+SELECT REGEXP_LIKE('hello world', 'l+')        AS m;
+m
+1
+SELECT REGEXP_LIKE('xyz', 'l+')                AS m_miss;
+m_miss
+0
+SELECT REGEXP_INSTR('hello world', 'wo')       AS p;
+p
+7
+SELECT REGEXP_INSTR('hello world', 'zz')       AS p_miss;
+p_miss
+0
+=== ORD — first-character codepoint (MySQL alt to ASCII) ===
+SELECT ORD('A') AS a;
+a
+65
+SELECT ORD('z') AS z;
+z
+122
+=== HEX(int) — integer encoding ===
+SELECT HEX(255)    AS h1;
+h1
+FF
+SELECT HEX(123456) AS h2;
+h2
+1E240
+=== CONCAT with NULL — NULL propagates ===
+SELECT CONCAT('a', NULL, 'c') AS c;
+c
+NULL
+=== CONCAT_WS with NULL — silently skipped ===
+SELECT CONCAT_WS(',', 'a', NULL, 'c') AS c;
+c
+a,c
+=== CONCAT_WS with empty-string args — included ===
+SELECT CONCAT_WS('-', '', 'a', '') AS c;
+c
+-a-
+=== KNOWN GAP: REGEXP_SUBSTR — errno 1105 ===
+SELECT REGEXP_SUBSTR('hello world', 'w[a-z]+');
+ERROR 1105: execution error: unknown function: REGEXP_SUBSTR
+=== KNOWN GAP: infix REGEXP / RLIKE — errno 1064 ===
+SELECT 'hello' REGEXP 'l+';
+ERROR 1064: SQL parse error: unsupported expression: 'hello' REGEXP 'l+'
+SELECT 'hello' RLIKE 'l+';
+ERROR 1064: SQL parse error: unsupported expression: 'hello' RLIKE 'l+'
+=== KNOWN GAP: CONVERT(str USING charset) — errno 1064 ===
+SELECT CONVERT('hello' USING utf8);
+ERROR 1064: SQL parse error: unsupported expression: CONVERT('hello' USING utf8)
+=== KNOWN GAP: WEIGHT_STRING — errno 1105 ===
+SELECT WEIGHT_STRING('hello');
+ERROR 1105: execution error: unknown function: WEIGHT_STRING
+=== KNOWN GAP: COMPRESS / UNCOMPRESS — errno 1105 ===
+SELECT COMPRESS('hello');
+ERROR 1105: execution error: unknown function: COMPRESS
+SELECT UNCOMPRESS('some-bytes');
+ERROR 1105: execution error: unknown function: UNCOMPRESS
+=== KNOWN GAP: EXPORT_SET — errno 1105 ===
+SELECT EXPORT_SET(5, 'Y', 'N', ',', 4);
+ERROR 1105: execution error: unknown function: EXPORT_SET
