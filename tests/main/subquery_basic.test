@@ -19,10 +19,11 @@
 #     InSubquery path; comparison operators (`<`, `>`, `<=`, `>=`)
 #     are rewritten at parse to a scalar-subquery comparison with
 #     MIN or MAX wrapping the row set. Pinned below.
-#   # zeta-adapt: KNOWN DIVERGENCE — row-constructor IN
-#     (`WHERE (col1, col2) IN ((v1, v2), ...)`) is rejected at parse
-#     with errno 1064 "unsupported expression: (col1, col2)". MySQL
-#     supports it. Pinned below.
+#   # zeta-adapt: row-constructor IN
+#     (`WHERE (col1, col2) IN ((v1, v2), ...)`) — supported (FIXED
+#     via zeta #1151). Rewritten at parse to an OR-chain of
+#     AND-joined equalities. NOT IN form also supported. Pinned
+#     below.
 #   # zeta-adapt: KNOWN DIVERGENCE — explicit `LATERAL (correlated
 #     subquery)` returns 0 rows instead of the expected row-per-emp.
 #     The correlation binding doesn't fire through the LATERAL
@@ -136,13 +137,14 @@ SELECT id FROM emp WHERE salary < ANY (SELECT salary FROM emp WHERE dept_id = 10
 SELECT id FROM emp WHERE salary >= ALL (SELECT salary FROM emp WHERE dept_id = 10)
   ORDER BY id;
 
---echo === KNOWN DIVERGENCE: row-constructor IN — unsupported (errno 1064) ===
---echo # MySQL accepts `WHERE (col1, col2) IN ((v1, v2), ...)`. zeta
---echo # rejects the row constructor at parse. Substitute multiple
---echo # AND-joined equalities.
+--echo === Row-constructor IN — FIXED via zeta #1151 ===
+--echo # `(c1, c2) IN ((v1, v2), ...)` rewritten at parse to an
+--echo # OR-chain of AND-joined equalities.
 
---error 1064
-SELECT id FROM emp WHERE (dept_id, name) IN ((10, 'alice'), (30, 'eve'));
+SELECT id FROM emp WHERE (dept_id, name) IN ((10, 'alice'), (30, 'eve'))
+  ORDER BY id;
+SELECT id FROM emp WHERE (dept_id, name) NOT IN ((10, 'alice'), (30, 'eve'))
+  ORDER BY id;
 
 --echo === Scalar subquery >1 row — errno 1242 (FIXED via zeta #1143) ===
 --echo # zeta now emits MySQL-standard 1242 (ER_SUBQUERY_NO_1_ROW).
