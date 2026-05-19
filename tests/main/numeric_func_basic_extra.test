@@ -17,11 +17,12 @@
 #     10^|D| multiple).
 #   # zeta-adapt: POW edge cases — POW(0, 0) → 1, POW(2, -1) →
 #     0.5. NULL propagation through any arg.
-#   # zeta-adapt: KNOWN GAP — BIT_COUNT(n) errors 1105 "unknown
-#     function". Portable substitute: BIN(n) length minus count
-#     of '0' chars, or repeated bit-shifts.
-#   # zeta-adapt: KNOWN GAP — COT(n) errors 1105 "unknown
-#     function". Portable substitute: COS(n) / SIN(n).
+#   # zeta-adapt: BIT_COUNT(n) — FIXED via zeta #1184. 64-bit
+#     two's-complement popcount, returns Int32 (0..=64).
+#     BIT_COUNT(-1) = 64 (all bits set).
+#   # zeta-adapt: COT(x) — FIXED via zeta #1184. Returns
+#     1.0 / TAN(x) as Float64. tan(0)=0 → COT(0) emits +Inf via
+#     std::f64 (matching MySQL's "out of range value" behavior).
 #   # zeta-adapt: KNOWN GAP — integer-division operator `DIV`
 #     (MySQL spelling) errors 1064 "No infix parser for token
 #     DIV". Portable substitute: FLOOR(a / b) or CAST(a / b AS
@@ -68,15 +69,17 @@ SELECT ABS(NULL)   AS a_null;
 SELECT POW(NULL, 2) AS p_null_base;
 SELECT POW(2, NULL) AS p_null_exp;
 
---echo === KNOWN GAP: BIT_COUNT — errno 1105 ===
+--echo === BIT_COUNT — FIXED via zeta #1184 ===
 
---error 1105
-SELECT BIT_COUNT(13);
+SELECT BIT_COUNT(13) AS bc;
+SELECT BIT_COUNT(0)  AS bc_zero;
+SELECT BIT_COUNT(-1) AS bc_all_ones;
 
---echo === KNOWN GAP: COT — errno 1105 ===
+--echo === COT — FIXED via zeta #1184 ===
+--echo # Use a fixed-bit input (1.0 radian) to keep the result
+--echo # row-stable across runs. COT(1) ≈ 0.6420926159343306.
 
---error 1105
-SELECT COT(1);
+SELECT COT(1) AS c;
 
 --echo === KNOWN GAP: integer-division operator `DIV` — errno 1064 ===
 
