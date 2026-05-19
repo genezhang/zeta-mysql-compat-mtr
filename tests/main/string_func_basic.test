@@ -1,0 +1,180 @@
+# Independently authored MySQL string-function smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_str.test; pins zeta's coverage of the MySQL-
+# specific string-function surface that the existing
+# main/function_basic test doesn't already exercise.
+#
+# Adaptation notes:
+#   # zeta-adapt: SUBSTRING_INDEX(str, delim, count) — supported.
+#     Positive count returns the first `count` segments; negative
+#     count returns the last `|count|`.
+#   # zeta-adapt: LOCATE(needle, haystack) — supported. Returns the
+#     1-based position or 0 when absent.
+#   # zeta-adapt: INSERT(str, pos, len, new) — supported (MySQL
+#     string-function form, distinct from the INSERT statement).
+#   # zeta-adapt: HEX(str) / UNHEX(hex) — supported.
+#   # zeta-adapt: ELT(N, ...) — supported (1-indexed pick).
+#   # zeta-adapt: FIELD(needle, ...) — supported (1-indexed search).
+#   # zeta-adapt: FIND_IN_SET(needle, csv) — supported.
+#   # zeta-adapt: SPACE(n) — supported.
+#   # zeta-adapt: QUOTE(str) — supported (returns single-quoted +
+#     escaped form).
+#   # zeta-adapt: SOUNDEX(str) — supported (returns the 4-char
+#     Soundex code).
+#   # zeta-adapt: FORMAT(num, decimals) — supported (number-to-string
+#     with thousand separators).
+#   # zeta-adapt: LPAD(str, n, pad) / RPAD(str, n, pad) — supported.
+#   # zeta-adapt: MD5(str) — supported.
+#   # zeta-adapt: UCASE / LCASE / MID — supported (MySQL aliases for
+#     UPPER / LOWER / SUBSTRING).
+#   # zeta-adapt: ASCII(str) — supported (returns the leading byte's
+#     code).
+#   # zeta-adapt: TRIM(LEADING|TRAILING|BOTH 'x' FROM s) — supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — LENGTH(str) returns character
+#     count, not byte count. MySQL returns byte count and uses
+#     CHAR_LENGTH for character count. Use OCTET_LENGTH (PG standard)
+#     to get byte count. Asserted below.
+#   # zeta-adapt: KNOWN DIVERGENCE — SHA1, SHA2 — errno 1105
+#     unknown function. Use MD5 or implement via external script.
+#   # zeta-adapt: KNOWN DIVERGENCE — BIN, OCT, ORD — errno 1105.
+#     Substitute LPAD + ROUND on bit math, or just CAST.
+#   # zeta-adapt: KNOWN DIVERGENCE — CHARSET, COLLATION — errno 1105.
+#     MySQL-only introspection; no PG equivalent.
+#   # zeta-adapt: KNOWN DIVERGENCE — TO_BASE64, FROM_BASE64 —
+#     errno 1105. Use the PG `encode(bytea, 'base64')` instead
+#     (out of scope for this test).
+#   # zeta-adapt: KNOWN DIVERGENCE — `<str> REGEXP <pattern>` binary
+#     operator REJECTED at parse with errno 1064. Substitute the
+#     existing REGEXP_REPLACE / REGEXP_MATCH PG-style scalars (zeta
+#     supports those, exercised in main/function_basic).
+#   # zeta-adapt: KNOWN DIVERGENCE — STRCMP — errno 1105 unknown
+#     function. Substitute `CASE WHEN a<b THEN -1 WHEN a>b THEN 1
+#     ELSE 0 END`.
+
+--echo === Setup ===
+
+# Pure-expression test — no schema needed.
+
+--echo === SUBSTRING_INDEX — positive and negative count ===
+
+SELECT SUBSTRING_INDEX('a,b,c,d', ',', 2) AS r;
+SELECT SUBSTRING_INDEX('a,b,c,d', ',', -2) AS r;
+
+--echo === LOCATE — found and missing ===
+
+SELECT LOCATE('bc', 'abcdef') AS pos, LOCATE('xy', 'abcdef') AS missing;
+
+--echo === INSERT (string fn) ===
+
+SELECT INSERT('abcdef', 2, 3, 'XYZ') AS r;
+
+--echo === HEX / UNHEX round-trip ===
+
+SELECT HEX('A') AS h, UNHEX('41') AS u;
+
+--echo === ELT / FIELD / FIND_IN_SET ===
+
+SELECT ELT(2, 'a', 'b', 'c') AS pick;
+SELECT FIELD('b', 'a', 'b', 'c') AS pos;
+SELECT FIND_IN_SET('b', 'a,b,c') AS pos;
+
+--echo === SPACE / QUOTE / SOUNDEX ===
+
+SELECT LENGTH(SPACE(5)) AS sp_len;
+SELECT QUOTE('it''s') AS q;
+SELECT SOUNDEX('Robert') AS sx_robert, SOUNDEX('Rupert') AS sx_rupert;
+
+--echo === FORMAT — number-to-string with thousand separators ===
+
+SELECT FORMAT(1234567.89, 2) AS r;
+
+--echo === LPAD / RPAD ===
+
+SELECT LPAD('5', 3, '0') AS lp, RPAD('5', 3, '*') AS rp;
+
+--echo === MD5 ===
+
+SELECT MD5('hello') AS hash;
+
+--echo === UCASE / LCASE / MID (MySQL aliases) ===
+
+SELECT UCASE('hi') AS u, LCASE('HI') AS l, MID('hello', 2, 3) AS m;
+
+--echo === ASCII ===
+
+SELECT ASCII('A') AS a, ASCII('z') AS z;
+
+--echo === TRIM with LEADING / TRAILING / BOTH ===
+
+SELECT TRIM(LEADING '0' FROM '0000hello') AS lead;
+SELECT TRIM(TRAILING '0' FROM 'hello0000') AS trail;
+SELECT TRIM(BOTH 'x' FROM 'xxhelloxx') AS both;
+
+--echo === KNOWN DIVERGENCE: LENGTH returns char count, not bytes ===
+--echo # MySQL: LENGTH = bytes, CHAR_LENGTH = chars.
+--echo # zeta: LENGTH = chars (= CHAR_LENGTH). Use OCTET_LENGTH for bytes.
+
+SELECT LENGTH('héllo') AS zeta_len, OCTET_LENGTH('héllo') AS bytes;
+
+--echo === KNOWN DIVERGENCE: SHA1 — unknown function (errno 1105) ===
+
+--error 1105
+SELECT SHA1('hello');
+
+--echo === KNOWN DIVERGENCE: SHA2 — unknown function (errno 1105) ===
+
+--error 1105
+SELECT SHA2('hello', 256);
+
+--echo === KNOWN DIVERGENCE: BIN — unknown function (errno 1105) ===
+
+--error 1105
+SELECT BIN(10);
+
+--echo === KNOWN DIVERGENCE: OCT — unknown function (errno 1105) ===
+
+--error 1105
+SELECT OCT(10);
+
+--echo === KNOWN DIVERGENCE: ORD — unknown function (errno 1105) ===
+
+--error 1105
+SELECT ORD('A');
+
+--echo === KNOWN DIVERGENCE: CHARSET — unknown function (errno 1105) ===
+
+--error 1105
+SELECT CHARSET('hi');
+
+--echo === KNOWN DIVERGENCE: COLLATION — unknown function (errno 1105) ===
+
+--error 1105
+SELECT COLLATION('hi');
+
+--echo === KNOWN DIVERGENCE: TO_BASE64 — unknown function (errno 1105) ===
+
+--error 1105
+SELECT TO_BASE64('hello');
+
+--echo === KNOWN DIVERGENCE: FROM_BASE64 — unknown function (errno 1105) ===
+
+--error 1105
+SELECT FROM_BASE64('aGVsbG8=');
+
+--echo === KNOWN DIVERGENCE: REGEXP_LIKE — unknown function (errno 1105) ===
+
+--error 1105
+SELECT REGEXP_LIKE('hello', '^h');
+
+--echo === KNOWN DIVERGENCE: REGEXP_INSTR — unknown function (errno 1105) ===
+
+--error 1105
+SELECT REGEXP_INSTR('abcdef', 'cd');
+
+--echo === KNOWN DIVERGENCE: STRCMP — unknown function (errno 1105) ===
+
+--error 1105
+SELECT STRCMP('a', 'b');
+
+--echo === Cleanup ===
+# No schema to drop.
