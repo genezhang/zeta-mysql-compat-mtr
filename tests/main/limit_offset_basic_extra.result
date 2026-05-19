@@ -1,0 +1,67 @@
+=== Setup ===
+DROP TABLE IF EXISTS lo;
+CREATE TABLE lo (id INT PRIMARY KEY, n INT);
+INSERT INTO lo VALUES (1,10),(2,20),(3,30),(4,40),(5,50);
+=== LIMIT n OFFSET m (PG / SQL-standard) ===
+SELECT id FROM lo ORDER BY id LIMIT 2 OFFSET 1;
+id
+2
+3
+=== LIMIT m, n (MySQL alt syntax) ===
+SELECT id FROM lo ORDER BY id LIMIT 1, 2;
+id
+2
+3
+=== Bare LIMIT n (OFFSET defaults to 0) ===
+SELECT id FROM lo ORDER BY id LIMIT 3;
+id
+1
+2
+3
+=== LIMIT 0 — empty result ===
+SELECT id FROM lo ORDER BY id LIMIT 0;
+=== LIMIT exceeding row count returns all rows ===
+SELECT id FROM lo ORDER BY id LIMIT 100;
+id
+1
+2
+3
+4
+5
+=== Bare OFFSET (no LIMIT) ===
+SELECT id FROM lo ORDER BY id OFFSET 3;
+id
+4
+5
+=== FETCH FIRST n ROWS ONLY (SQL-standard) ===
+SELECT id FROM lo ORDER BY id FETCH FIRST 2 ROWS ONLY;
+id
+1
+2
+=== OFFSET m ROWS FETCH NEXT n ROWS ONLY ===
+SELECT id FROM lo ORDER BY id OFFSET 2 ROWS FETCH NEXT 2 ROWS ONLY;
+id
+3
+4
+=== LIMIT in subquery (derived table) ===
+SELECT MAX(id) AS mx FROM (SELECT id FROM lo ORDER BY id LIMIT 3) AS sub;
+mx
+3
+=== LIMIT NULL — all rows (NULL = no-limit) ===
+SELECT id FROM lo ORDER BY id LIMIT NULL;
+id
+1
+2
+3
+4
+5
+=== LIMIT expression ===
+SELECT id FROM lo ORDER BY id LIMIT 1+1;
+id
+1
+2
+=== KNOWN GAP: negative LIMIT — errno 1105 ===
+SELECT id FROM lo LIMIT -1;
+ERROR 1105: plan error: LIMIT/OFFSET must be non-negative, got -1
+=== Cleanup ===
+DROP TABLE lo;

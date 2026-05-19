@@ -1,0 +1,92 @@
+# Independently authored LIMIT/OFFSET smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/limit.test or select_limit.test; pins zeta's
+# behavior across the LIMIT/OFFSET surface ORMs and reporting
+# tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: `LIMIT <n> OFFSET <m>` (PG / SQL-standard) —
+#     supported.
+#   # zeta-adapt: `LIMIT <m>, <n>` (MySQL alternative syntax —
+#     skip-then-take) — supported; equivalent to
+#     `LIMIT <n> OFFSET <m>`.
+#   # zeta-adapt: Bare `LIMIT <n>` — supported (OFFSET defaults
+#     to 0).
+#   # zeta-adapt: Bare `OFFSET <m>` (no LIMIT) — supported (skip
+#     m, return all remaining).
+#   # zeta-adapt: `LIMIT 0` — empty result.
+#   # zeta-adapt: `LIMIT <N>` where N exceeds row count — returns
+#     all rows (no error).
+#   # zeta-adapt: `FETCH FIRST <n> ROWS ONLY` (SQL-standard) —
+#     supported.
+#   # zeta-adapt: `OFFSET <m> ROWS FETCH NEXT <n> ROWS ONLY`
+#     (SQL-standard composite) — supported.
+#   # zeta-adapt: LIMIT inside a subquery / derived table —
+#     supported.
+#   # zeta-adapt: `LIMIT NULL` — supported; NULL treated as
+#     no-limit, returns all rows. Matches PG semantics.
+#   # zeta-adapt: LIMIT expression (e.g. `LIMIT 1+1`) —
+#     supported.
+#   # zeta-adapt: KNOWN GAP — negative LIMIT errors 1105
+#     "LIMIT/OFFSET must be non-negative, got -N". MySQL
+#     historically allowed LIMIT -1 as a synonym for no-limit
+#     but the modern parser rejects it.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS lo;
+CREATE TABLE lo (id INT PRIMARY KEY, n INT);
+INSERT INTO lo VALUES (1,10),(2,20),(3,30),(4,40),(5,50);
+
+--echo === LIMIT n OFFSET m (PG / SQL-standard) ===
+
+SELECT id FROM lo ORDER BY id LIMIT 2 OFFSET 1;
+
+--echo === LIMIT m, n (MySQL alt syntax) ===
+
+SELECT id FROM lo ORDER BY id LIMIT 1, 2;
+
+--echo === Bare LIMIT n (OFFSET defaults to 0) ===
+
+SELECT id FROM lo ORDER BY id LIMIT 3;
+
+--echo === LIMIT 0 — empty result ===
+
+SELECT id FROM lo ORDER BY id LIMIT 0;
+
+--echo === LIMIT exceeding row count returns all rows ===
+
+SELECT id FROM lo ORDER BY id LIMIT 100;
+
+--echo === Bare OFFSET (no LIMIT) ===
+
+SELECT id FROM lo ORDER BY id OFFSET 3;
+
+--echo === FETCH FIRST n ROWS ONLY (SQL-standard) ===
+
+SELECT id FROM lo ORDER BY id FETCH FIRST 2 ROWS ONLY;
+
+--echo === OFFSET m ROWS FETCH NEXT n ROWS ONLY ===
+
+SELECT id FROM lo ORDER BY id OFFSET 2 ROWS FETCH NEXT 2 ROWS ONLY;
+
+--echo === LIMIT in subquery (derived table) ===
+
+SELECT MAX(id) AS mx FROM (SELECT id FROM lo ORDER BY id LIMIT 3) AS sub;
+
+--echo === LIMIT NULL — all rows (NULL = no-limit) ===
+
+SELECT id FROM lo ORDER BY id LIMIT NULL;
+
+--echo === LIMIT expression ===
+
+SELECT id FROM lo ORDER BY id LIMIT 1+1;
+
+--echo === KNOWN GAP: negative LIMIT — errno 1105 ===
+
+--error 1105
+SELECT id FROM lo LIMIT -1;
+
+--echo === Cleanup ===
+
+DROP TABLE lo;
