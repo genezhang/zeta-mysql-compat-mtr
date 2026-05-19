@@ -1,0 +1,98 @@
+# Independently authored date/time function smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/date_format.test or similar; pins zeta's behavior
+# across the date/time shapes ORMs and reporting tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: DATE_FORMAT — supported. All major specifiers
+#     (%Y/%m/%d/%H/%i/%s/%W/%M/%D etc.) implemented.
+#   # zeta-adapt: STR_TO_DATE — supported. Returns TIMESTAMP form
+#     (with `00:00:00` time) even for pure-date inputs.
+#   # zeta-adapt: DATE_ADD / DATE_SUB with INTERVAL — supported.
+#     KNOWN DIVERGENCE: zeta returns the TIMESTAMP form
+#     (`YYYY-MM-DD HH:MM:SS`) even when the input is a DATE
+#     (`YYYY-MM-DD`); MySQL keeps DATE-typed inputs as DATE.
+#     Pinned in the result.
+#   # zeta-adapt: DATEDIFF / TIMEDIFF / TIMESTAMPDIFF — supported
+#     (DAY/HOUR units verified; MONTH/YEAR/SECOND are stretched
+#     in MySQL but not exhaustively pinned here).
+#   # zeta-adapt: Component extractors — YEAR, MONTH, DAY, HOUR,
+#     MINUTE, SECOND, DAYNAME, MONTHNAME, DAYOFWEEK (Sun=1),
+#     DAYOFYEAR, WEEKDAY (Mon=0), WEEK, QUARTER, LAST_DAY —
+#     all supported.
+#   # zeta-adapt: UNIX_TIMESTAMP / FROM_UNIXTIME — supported.
+#   # zeta-adapt: ADDDATE / SUBDATE (integer-day form) — supported,
+#     and these DO return a bare DATE (unlike DATE_ADD/_SUB above).
+#   # zeta-adapt: KNOWN GAPS — `DATE(expr)` and `TIME(expr)`
+#     extractors raise errno 1105 "unknown function". MySQL accepts
+#     both as DATE-casting and TIME-casting one-arg functions.
+#     Substitute: `CAST(expr AS DATE)` / `CAST(expr AS TIME)`.
+#     Pinned below.
+#   # zeta-adapt: NOW()/CURDATE()/CURTIME() are time-dependent and
+#     are NOT pinned here — separate slice if we need to assert
+#     fractional-second formatting (zeta emits microseconds by
+#     default, MySQL prints whole seconds).
+
+--echo === DATE_FORMAT specifiers ===
+
+SELECT DATE_FORMAT('2026-05-19', '%Y-%m-%d')                AS iso;
+SELECT DATE_FORMAT('2026-05-19', '%d/%m/%Y')                AS dmy;
+SELECT DATE_FORMAT('2026-05-19 14:30:45', '%H:%i:%s')        AS hms;
+SELECT DATE_FORMAT('2026-05-19 14:30:45', '%W %M %D %Y')     AS pretty;
+
+--echo === STR_TO_DATE ===
+
+SELECT STR_TO_DATE('19-05-2026', '%d-%m-%Y')                AS d;
+SELECT STR_TO_DATE('May 19, 2026', '%M %d, %Y')             AS d;
+
+--echo === DATE_ADD / DATE_SUB with INTERVAL ===
+--echo # DIVERGENCE: zeta returns TIMESTAMP form even for DATE inputs.
+
+SELECT DATE_ADD('2026-05-19', INTERVAL 7 DAY)                AS plus7;
+SELECT DATE_SUB('2026-05-19', INTERVAL 1 MONTH)              AS minus1m;
+SELECT DATE_ADD('2026-05-19 12:00:00', INTERVAL 3 HOUR)      AS plus3h;
+
+--echo === ADDDATE / SUBDATE (integer-day shorthand, returns DATE) ===
+
+SELECT ADDDATE('2026-05-19', 7)                              AS plus7;
+SELECT SUBDATE('2026-05-19', 7)                              AS minus7;
+
+--echo === DATEDIFF / TIMEDIFF / TIMESTAMPDIFF ===
+
+SELECT DATEDIFF('2026-06-01', '2026-05-19')                  AS d;
+SELECT TIMEDIFF('14:30:00', '13:00:00')                      AS t;
+SELECT TIMESTAMPDIFF(DAY,  '2026-05-19', '2026-06-01')       AS d;
+SELECT TIMESTAMPDIFF(HOUR, '2026-05-19 00:00', '2026-05-20 14:00') AS h;
+
+--echo === Component extractors ===
+
+SELECT YEAR('2026-05-19')              AS y;
+SELECT MONTH('2026-05-19')             AS m;
+SELECT DAY('2026-05-19')               AS d;
+SELECT HOUR('14:30:45')                AS h;
+SELECT MINUTE('14:30:45')              AS mi;
+SELECT SECOND('14:30:45')              AS s;
+SELECT DAYNAME('2026-05-19')           AS dn;
+SELECT MONTHNAME('2026-05-19')         AS mn;
+SELECT DAYOFWEEK('2026-05-19')         AS dow;
+SELECT DAYOFYEAR('2026-05-19')         AS doy;
+SELECT WEEKDAY('2026-05-19')           AS wd;
+SELECT WEEK('2026-05-19')              AS w;
+SELECT QUARTER('2026-05-19')           AS q;
+SELECT LAST_DAY('2026-05-19')          AS ld;
+
+--echo === Unix timestamp round-trip ===
+
+SELECT UNIX_TIMESTAMP('2026-05-19 00:00:00') AS ts;
+SELECT FROM_UNIXTIME(1779148800)             AS dt;
+
+--echo === KNOWN GAPS: DATE(expr) and TIME(expr) extractors — errno 1105 ===
+--echo # MySQL accepts both as one-arg type-cast extractors. zeta
+--echo # rejects with "unknown function". Substitute: CAST AS DATE /
+--echo # CAST AS TIME.
+
+--error 1105
+SELECT DATE('2026-05-19 14:30:45');
+
+--error 1105
+SELECT TIME('2026-05-19 14:30:45');
