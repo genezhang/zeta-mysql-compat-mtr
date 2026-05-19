@@ -18,9 +18,9 @@
 #     the whole call (returns NULL — MySQL-compatible).
 #   # zeta-adapt: NULL = NULL inside CASE — evaluates to unknown,
 #     falls through to ELSE (SQL-standard / MySQL-compatible).
-#   # zeta-adapt: KNOWN GAP — `ISNULL(expr)` is NOT implemented and
-#     raises errno 1105. Portable substitute: `expr IS NULL`.
-#     Pinned below.
+#   # zeta-adapt: ISNULL(expr) — supported (FIXED via zeta #1174).
+#     Returns 1 if expr IS NULL, else 0. Unique among scalars in
+#     NOT propagating NULL. Pinned positively below.
 
 --echo === IF / IFNULL ===
 
@@ -57,9 +57,9 @@ SELECT GREATEST(1, 5, 3, 2)                      AS g;
 SELECT LEAST(4, 1, 9, 2)                         AS l;
 SELECT GREATEST(NULL, 1, 2)                      AS g_null;
 
---echo === KNOWN GAP: ISNULL function — errno 1105 ===
---echo # MySQL accepts ISNULL(expr) as a one-arg boolean. zeta
---echo # doesn't. Portable substitute: `expr IS NULL`.
+--echo === ISNULL — FIXED via zeta #1174 ===
+--echo # Unique among scalars in NOT propagating NULL.
 
---error 1105
-SELECT ISNULL(NULL);
+SELECT ISNULL(NULL)                              AS i;
+SELECT ISNULL('x')                               AS i;
+SELECT ISNULL(0)                                 AS i;

@@ -55,8 +55,14 @@ l
 SELECT GREATEST(NULL, 1, 2)                      AS g_null;
 g_null
 NULL
-=== KNOWN GAP: ISNULL function — errno 1105 ===
-# MySQL accepts ISNULL(expr) as a one-arg boolean. zeta
-# doesn't. Portable substitute: `expr IS NULL`.
-SELECT ISNULL(NULL);
-ERROR 1105: execution error: unknown function: ISNULL
+=== ISNULL — FIXED via zeta #1174 ===
+# Unique among scalars in NOT propagating NULL.
+SELECT ISNULL(NULL)                              AS i;
+i
+1
+SELECT ISNULL('x')                               AS i;
+i
+0
+SELECT ISNULL(0)                                 AS i;
+i
+0
