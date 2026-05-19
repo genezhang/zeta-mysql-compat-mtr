@@ -1,0 +1,76 @@
+# Independently authored ORDER BY smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/order_by.test;
+# pins zeta's behavior across ORDER BY shapes ORMs and BI tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: ORDER BY ASC / DESC — supported.
+#   # zeta-adapt: ORDER BY multiple columns — supported.
+#   # zeta-adapt: ORDER BY column-position (1, 2) — supported.
+#   # zeta-adapt: ORDER BY alias — supported.
+#   # zeta-adapt: ORDER BY expression (e.g. UPPER(col), col*2) —
+#     supported.
+#   # zeta-adapt: LIMIT N OFFSET M — supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — NULL ordering. zeta places
+#     NULL LAST in ASC and FIRST in DESC (PG semantics). MySQL is
+#     the opposite: NULL is the LOWEST value (FIRST in ASC, LAST
+#     in DESC). Pinned in the result; portable substitute: order
+#     by `col IS NULL` first to anchor the NULL position.
+#   # zeta-adapt: KNOWN DIVERGENCE — `ORDER BY col NULLS FIRST /
+#     NULLS LAST` is ACCEPTED by zeta at parse but IGNORED at
+#     runtime — the NULL position follows the ASC/DESC default
+#     above. This matches the window-frame variant pinned in
+#     window_func_basic. Pinned in the result.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sd;
+CREATE TABLE sd (id INT PRIMARY KEY, name VARCHAR(10), v INT);
+INSERT INTO sd VALUES (1, 'b', 20), (2, 'a', 30), (3, 'c', NULL), (4, 'a', 10);
+
+--echo === ORDER BY single column ASC / DESC ===
+
+SELECT id FROM sd ORDER BY id ASC;
+SELECT id FROM sd ORDER BY id DESC;
+
+--echo === ORDER BY multiple columns ===
+
+SELECT id, name FROM sd ORDER BY name, id;
+SELECT id, name FROM sd ORDER BY name DESC, id;
+
+--echo === ORDER BY with NULL — DIVERGENCE: PG-style placement ===
+--echo # zeta: NULL is HIGHEST (LAST in ASC, FIRST in DESC).
+--echo # MySQL: NULL is LOWEST (FIRST in ASC, LAST in DESC).
+
+SELECT id, v FROM sd ORDER BY v;
+SELECT id, v FROM sd ORDER BY v DESC;
+
+--echo === DIVERGENCE: NULLS FIRST / NULLS LAST clauses silently ignored ===
+--echo # zeta accepts the syntax but doesn't honor it — NULL falls
+--echo # to the ASC/DESC default. MySQL rejects the syntax at parse
+--echo # with 1064. Both forms below produce the SAME output as a
+--echo # plain ASC sort.
+
+SELECT id, v FROM sd ORDER BY v NULLS FIRST;
+SELECT id, v FROM sd ORDER BY v NULLS LAST;
+
+--echo === ORDER BY column position ===
+
+SELECT id, v FROM sd ORDER BY 2;
+SELECT id, name FROM sd ORDER BY 2, 1;
+
+--echo === ORDER BY alias ===
+
+SELECT id, v AS val FROM sd ORDER BY val DESC;
+
+--echo === ORDER BY expression ===
+
+SELECT id FROM sd ORDER BY UPPER(name), id;
+
+--echo === LIMIT / OFFSET ===
+
+SELECT id FROM sd ORDER BY id LIMIT 2;
+SELECT id FROM sd ORDER BY id LIMIT 2 OFFSET 1;
+
+--echo === Cleanup ===
+
+DROP TABLE sd;
