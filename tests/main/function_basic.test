@@ -1,0 +1,162 @@
+# Independently authored SCALAR FUNCTION smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/functions*.test; pins zeta's behavior across the
+# scalar functions ORMs, dashboards, and migration tools rely on,
+# plus the MySQL-isms that are KNOWN DIVERGENCES.
+#
+# Adaptation notes:
+#   # zeta-adapt: string functions — CONCAT, CONCAT_WS, LENGTH,
+#     CHAR_LENGTH, CHARACTER_LENGTH, SUBSTRING (both SQL-standard
+#     `FROM ... FOR ...` and MySQL-style `, pos, len` syntax),
+#     UPPER, LOWER, TRIM, LTRIM, RTRIM, REPLACE, LEFT, RIGHT,
+#     REPEAT, REVERSE, POSITION ... IN ..., INSTR, REGEXP_REPLACE
+#     — all supported.
+#   # zeta-adapt: numeric functions — ABS, ROUND (single-arg + 2-arg),
+#     CEIL, FLOOR, MOD (2-arg + `%` operator), POW / POWER, SQRT,
+#     SIGN, LN, LOG, GREATEST, LEAST — all supported.
+#   # zeta-adapt: ROUND(2.5) returns 3 (half-away-from-zero, matches
+#     MySQL); PG returns 2 (banker's rounding).
+#   # zeta-adapt: MOD(-10, 3) returns -1 (matches both MySQL + PG —
+#     result takes sign of the dividend).
+#   # zeta-adapt: null/conditional — COALESCE, NULLIF, CASE WHEN
+#     supported.
+#   # zeta-adapt: date/time — CURRENT_DATE, CURRENT_TIME, NOW,
+#     CURDATE (MySQL alias), CURTIME (MySQL alias), EXTRACT,
+#     DATE_TRUNC, DATE_FORMAT (MySQL-style %Y/%m/%d strftime),
+#     TO_CHAR (PG-style format), DATEDIFF (MySQL), YEAR(date)
+#     (MySQL), AGE (PG) — all supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — IFNULL(x, y) is NOT supported
+#     (errno 1105 "unknown function: IFNULL"). MySQL standard.
+#     Substitute COALESCE(x, y).
+#   # zeta-adapt: KNOWN DIVERGENCE — IF(cond, x, y) is NOT supported
+#     (errno 1105 "unknown function: IF"). MySQL standard.
+#     Substitute CASE WHEN cond THEN x ELSE y END.
+#   # zeta-adapt: KNOWN DIVERGENCE — VERSION() is NOT supported
+#     (errno 1105 "unknown function: VERSION"). MySQL standard.
+#   # zeta-adapt: KNOWN DIVERGENCE — CAST(x AS SIGNED) and
+#     CAST(x AS UNSIGNED) are NOT supported (errno 1105
+#     "unsupported CAST target type: SIGNED/UNSIGNED"). MySQL
+#     standard. Substitute CAST(x AS INTEGER).
+#   # zeta-adapt: KNOWN DIVERGENCE — DATE_ADD/DATE_SUB with bare-
+#     number `INTERVAL 10 DAY` syntax is REJECTED at parse
+#     (errno 1064 "INTERVAL value must be a string literal").
+#     Substitute `date + INTERVAL '10 days'`.
+
+--echo === Setup ===
+
+# All probes are pure expressions — no schema needed.
+
+--echo === String: CONCAT / LENGTH / SUBSTRING ===
+
+SELECT CONCAT('a', 'b', 'c') AS r;
+SELECT LENGTH('hello') AS l;
+# Standard SQL form: FROM ... FOR ...
+SELECT SUBSTRING('hello world' FROM 1 FOR 5) AS s;
+# MySQL/PG positional form
+SELECT SUBSTRING('hello world', 7, 5) AS s2;
+SELECT CHAR_LENGTH('abc') AS c1, CHARACTER_LENGTH('abc') AS c2;
+
+--echo === String: UPPER / LOWER / TRIM family ===
+
+SELECT UPPER('hello') AS u, LOWER('HELLO') AS l;
+SELECT TRIM(' hi ') AS t, LTRIM('  hi') AS lt, RTRIM('hi  ') AS rt;
+
+--echo === String: REPLACE / LEFT / RIGHT / REPEAT / REVERSE ===
+
+SELECT REPLACE('hello', 'l', 'L') AS r;
+SELECT LEFT('hello', 3) AS l, RIGHT('hello', 3) AS r;
+SELECT REPEAT('ab', 3) AS r, REVERSE('hello') AS rv;
+SELECT CONCAT_WS('-', 'a', 'b', 'c') AS r;
+
+--echo === String: POSITION / INSTR / REGEXP_REPLACE ===
+
+SELECT POSITION('ll' IN 'hello') AS p;
+SELECT INSTR('hello', 'll') AS p;
+SELECT REGEXP_REPLACE('abc123', '[0-9]+', 'X') AS r;
+
+--echo === Numeric: ABS / ROUND / CEIL / FLOOR / MOD / SIGN ===
+
+SELECT ABS(-5) AS a1, ABS(5) AS a2;
+# ROUND single-arg + 2-arg precision
+SELECT ROUND(3.5) AS r1, ROUND(3.45, 1) AS r2;
+# Half-away-from-zero (matches MySQL); PG would return 2 for ROUND(2.5).
+SELECT ROUND(2.5) AS r3, ROUND(3.5) AS r4, ROUND(-2.5) AS r5;
+SELECT CEIL(3.2) AS c, FLOOR(3.8) AS f;
+SELECT MOD(10, 3) AS m1, 10 % 3 AS m2;
+# Negative dividend retains sign (matches both MySQL + PG).
+SELECT MOD(-10, 3) AS m3;
+SELECT SIGN(-3) AS s1, SIGN(0) AS s2, SIGN(3) AS s3;
+
+--echo === Numeric: POW / SQRT / LN / LOG / GREATEST / LEAST ===
+
+SELECT POW(2, 10) AS p, POWER(2, 10) AS p2, SQRT(9) AS s;
+# LN(e) = 1, LOG(e) = log10(e) ≈ 0.4343 (LOG is base-10 in both MySQL + zeta).
+SELECT LN(EXP(1)) AS ln1, LOG(EXP(1)) AS log10_e;
+SELECT GREATEST(1, 2, 3) AS g, LEAST(1, 2, 3) AS l;
+
+--echo === Null / conditional: COALESCE / NULLIF / CASE ===
+
+SELECT COALESCE(NULL, NULL, 'x', 'y') AS c;
+SELECT NULLIF(1, 1) AS n1, NULLIF(1, 2) AS n2;
+SELECT CASE WHEN 1 = 1 THEN 'yes' ELSE 'no' END AS c1;
+SELECT CASE WHEN 1 = 2 THEN 'yes' ELSE 'no' END AS c2;
+
+--echo === Date/time: EXTRACT / DATE_TRUNC / YEAR / DATEDIFF / AGE ===
+
+SELECT EXTRACT(YEAR FROM DATE '2023-04-05') AS y;
+SELECT DATE_TRUNC('month', DATE '2023-04-05') AS m;
+SELECT YEAR(DATE '2023-04-05') AS y2;
+SELECT DATEDIFF(DATE '2023-03-01', DATE '2023-01-01') AS d;
+SELECT AGE(DATE '2023-04-05', DATE '2020-01-01') AS a;
+
+--echo === Date/time: DATE_FORMAT (MySQL) / TO_CHAR (PG) ===
+
+SELECT DATE_FORMAT(DATE '2023-04-05', '%Y/%m/%d') AS f;
+SELECT TO_CHAR(DATE '2023-04-05', 'YYYY-MM-DD') AS f;
+
+--echo === Date arith: PG-style string-literal INTERVAL ===
+
+SELECT DATE '2023-01-15' + INTERVAL '10 days' AS d;
+
+--echo === Casts: standard target types supported ===
+
+SELECT CAST(123 AS CHAR) AS c, CAST('123' AS INTEGER) AS i;
+SELECT CAST(3.7 AS INTEGER) AS r;
+
+--echo === KNOWN DIVERGENCE: IFNULL — unknown function (errno 1105) ===
+--echo # MySQL standard. Substitute COALESCE(x, y).
+
+--error 1105
+SELECT IFNULL(NULL, 'fallback');
+
+--echo === KNOWN DIVERGENCE: IF(cond, x, y) — unknown function (errno 1105) ===
+--echo # MySQL standard. Substitute CASE WHEN cond THEN x ELSE y END.
+
+--error 1105
+SELECT IF(1 = 1, 'yes', 'no');
+
+--echo === KNOWN DIVERGENCE: VERSION() — unknown function (errno 1105) ===
+
+--error 1105
+SELECT VERSION();
+
+--echo === KNOWN DIVERGENCE: CAST(x AS SIGNED) — unsupported (errno 1105) ===
+--echo # MySQL standard. Substitute CAST(x AS INTEGER).
+
+--error 1105
+SELECT CAST('123' AS SIGNED);
+
+--echo === KNOWN DIVERGENCE: CAST(x AS UNSIGNED) — unsupported (errno 1105) ===
+
+--error 1105
+SELECT CAST('123' AS UNSIGNED);
+
+--echo === KNOWN DIVERGENCE: DATE_ADD with bare INTERVAL n DAY — parse error (errno 1064) ===
+--echo # MySQL standard. zeta requires INTERVAL '10 days' string-literal
+--echo # form (PG-style). Substitute `date + INTERVAL '10 days'`.
+
+--error 1064
+SELECT DATE_ADD(DATE '2023-01-15', INTERVAL 10 DAY);
+
+--echo === Cleanup ===
+# No schema to drop.
