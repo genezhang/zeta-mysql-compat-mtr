@@ -1,0 +1,109 @@
+=== DATE_FORMAT specifiers ===
+SELECT DATE_FORMAT('2026-05-19', '%Y-%m-%d')                AS iso;
+iso
+2026-05-19
+SELECT DATE_FORMAT('2026-05-19', '%d/%m/%Y')                AS dmy;
+dmy
+19/05/2026
+SELECT DATE_FORMAT('2026-05-19 14:30:45', '%H:%i:%s')        AS hms;
+hms
+14:30:45
+SELECT DATE_FORMAT('2026-05-19 14:30:45', '%W %M %D %Y')     AS pretty;
+pretty
+Tuesday May 19th 2026
+=== STR_TO_DATE ===
+SELECT STR_TO_DATE('19-05-2026', '%d-%m-%Y')                AS d;
+d
+2026-05-19 00:00:00
+SELECT STR_TO_DATE('May 19, 2026', '%M %d, %Y')             AS d;
+d
+2026-05-19 00:00:00
+=== DATE_ADD / DATE_SUB with INTERVAL ===
+# DIVERGENCE: zeta returns TIMESTAMP form even for DATE inputs.
+SELECT DATE_ADD('2026-05-19', INTERVAL 7 DAY)                AS plus7;
+plus7
+2026-05-26 00:00:00
+SELECT DATE_SUB('2026-05-19', INTERVAL 1 MONTH)              AS minus1m;
+minus1m
+2026-04-19 00:00:00
+SELECT DATE_ADD('2026-05-19 12:00:00', INTERVAL 3 HOUR)      AS plus3h;
+plus3h
+2026-05-19 15:00:00
+=== ADDDATE / SUBDATE (integer-day shorthand, returns DATE) ===
+SELECT ADDDATE('2026-05-19', 7)                              AS plus7;
+plus7
+2026-05-26
+SELECT SUBDATE('2026-05-19', 7)                              AS minus7;
+minus7
+2026-05-12
+=== DATEDIFF / TIMEDIFF / TIMESTAMPDIFF ===
+SELECT DATEDIFF('2026-06-01', '2026-05-19')                  AS d;
+d
+13
+SELECT TIMEDIFF('14:30:00', '13:00:00')                      AS t;
+t
+01:30:00
+SELECT TIMESTAMPDIFF(DAY,  '2026-05-19', '2026-06-01')       AS d;
+d
+13
+SELECT TIMESTAMPDIFF(HOUR, '2026-05-19 00:00', '2026-05-20 14:00') AS h;
+h
+38
+=== Component extractors ===
+SELECT YEAR('2026-05-19')              AS y;
+y
+2026
+SELECT MONTH('2026-05-19')             AS m;
+m
+5
+SELECT DAY('2026-05-19')               AS d;
+d
+19
+SELECT HOUR('14:30:45')                AS h;
+h
+14
+SELECT MINUTE('14:30:45')              AS mi;
+mi
+30
+SELECT SECOND('14:30:45')              AS s;
+s
+45
+SELECT DAYNAME('2026-05-19')           AS dn;
+dn
+Tuesday
+SELECT MONTHNAME('2026-05-19')         AS mn;
+mn
+May
+SELECT DAYOFWEEK('2026-05-19')         AS dow;
+dow
+3
+SELECT DAYOFYEAR('2026-05-19')         AS doy;
+doy
+139
+SELECT WEEKDAY('2026-05-19')           AS wd;
+wd
+1
+SELECT WEEK('2026-05-19')              AS w;
+w
+21
+SELECT QUARTER('2026-05-19')           AS q;
+q
+2
+SELECT LAST_DAY('2026-05-19')          AS ld;
+ld
+2026-05-31
+=== Unix timestamp round-trip ===
+SELECT UNIX_TIMESTAMP('2026-05-19 00:00:00') AS ts;
+ts
+1779148800
+SELECT FROM_UNIXTIME(1779148800)             AS dt;
+dt
+2026-05-19 00:00:00
+=== KNOWN GAPS: DATE(expr) and TIME(expr) extractors — errno 1105 ===
+# MySQL accepts both as one-arg type-cast extractors. zeta
+# rejects with "unknown function". Substitute: CAST AS DATE /
+# CAST AS TIME.
+SELECT DATE('2026-05-19 14:30:45');
+ERROR 1105: execution error: unknown function: DATE
+SELECT TIME('2026-05-19 14:30:45');
+ERROR 1105: execution error: unknown function: TIME
