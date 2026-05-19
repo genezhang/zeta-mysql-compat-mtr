@@ -13,12 +13,11 @@
 #   # zeta-adapt: GROUP BY <col>, GROUP BY <col1>, <col2>, GROUP BY <N>
 #     (ordinal position) — all supported.
 #   # zeta-adapt: HAVING with a raw aggregate (`HAVING COUNT(*) > 1`)
-#     — supported. KNOWN DIVERGENCE — HAVING with a SELECT-list alias
-#     (`SELECT COUNT(*) AS c ... HAVING c > 1`) silently returns 0
-#     rows (the alias does not resolve in HAVING; the predicate
-#     evaluates to NULL, which filters out every group). MySQL accepts
-#     alias-in-HAVING. Substitute the raw aggregate expression.
-#     Asserted below.
+#     — supported. HAVING with a SELECT-list alias
+#     (`SELECT COUNT(*) AS c ... HAVING c > 1`) — supported (FIXED via
+#     zeta #1150; substitutes the alias to its underlying expression
+#     at plan time, reusing the existing GROUP BY alias resolver).
+#     Pinned below.
 #   # zeta-adapt: DISTINCT (single + multi-column) — supported.
 #   # zeta-adapt: ONLY_FULL_GROUP_BY-style enforcement — supported.
 #     A SELECT-list reference to a non-grouped, non-aggregated column
@@ -131,11 +130,9 @@ DROP TABLE IF EXISTS empty_t;
 CREATE TABLE empty_t (x INT);
 SELECT COUNT(*) AS c, MIN(x) AS mn, MAX(x) AS mx, SUM(x) AS s FROM empty_t;
 
---echo === KNOWN DIVERGENCE: HAVING with SELECT-list alias ===
---echo # MySQL resolves the alias; zeta silently returns 0 rows
---echo # (the alias doesn't resolve in HAVING; the predicate
---echo # evaluates to NULL, which filters every group).
---echo # Use the raw aggregate expression in HAVING instead.
+--echo === HAVING with SELECT-list alias — FIXED via zeta #1150 ===
+--echo # zeta now substitutes the alias to its underlying expression
+--echo # at plan time, matching MySQL.
 
 SELECT region, COUNT(*) AS c
   FROM sales
