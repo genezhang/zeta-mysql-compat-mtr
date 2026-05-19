@@ -103,12 +103,10 @@ o	o64
 SELECT ORD('A') AS a, ORD('') AS empty;
 a	empty
 65	0
-=== KNOWN DIVERGENCE: CHARSET — unknown function (errno 1105) ===
-SELECT CHARSET('hi');
-ERROR 1105: execution error: unknown function: CHARSET
-=== KNOWN DIVERGENCE: COLLATION — unknown function (errno 1105) ===
-SELECT COLLATION('hi');
-ERROR 1105: execution error: unknown function: COLLATION
+=== CHARSET / COLLATION — FIXED via zeta #1159 (constant stubs) ===
+SELECT CHARSET('hi') AS cs, COLLATION('hi') AS co;
+cs	co
+utf8mb4	utf8mb4_general_ci
 === TO_BASE64 / FROM_BASE64 — FIXED via zeta #1158 ===
 SELECT TO_BASE64('hello') AS b;
 b
