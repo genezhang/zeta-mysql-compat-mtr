@@ -121,7 +121,8 @@ ERROR 1105: execution error: unknown function: REGEXP_LIKE
 === KNOWN DIVERGENCE: REGEXP_INSTR — unknown function (errno 1105) ===
 SELECT REGEXP_INSTR('abcdef', 'cd');
 ERROR 1105: execution error: unknown function: REGEXP_INSTR
-=== KNOWN DIVERGENCE: STRCMP — unknown function (errno 1105) ===
-SELECT STRCMP('a', 'b');
-ERROR 1105: execution error: unknown function: STRCMP
+=== STRCMP — FIXED via zeta #1155 ===
+SELECT STRCMP('a', 'b') AS less, STRCMP('a', 'a') AS eq, STRCMP('b', 'a') AS greater;
+less	eq	greater
+-1	0	1
 === Cleanup ===
