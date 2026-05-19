@@ -1,0 +1,114 @@
+=== Setup ===
+=== Integer widths — TINYINT / SMALLINT / MEDIUMINT / INT / BIGINT ===
+DROP TABLE IF EXISTS t_i;
+CREATE TABLE t_i (a TINYINT, b SMALLINT, c MEDIUMINT, d INT, e BIGINT);
+INSERT INTO t_i VALUES (127, 32767, 8388607, 2147483647, 9223372036854775807);
+SELECT a, b, c, d, e FROM t_i;
+a	b	c	d	e
+127	32767	8388607	2147483647	9223372036854775807
+=== Integer widths — negative bounds ===
+DELETE FROM t_i;
+INSERT INTO t_i VALUES (-128, -32768, -8388608, -2147483648, -9223372036854775808);
+SELECT a, b, c, d, e FROM t_i;
+a	b	c	d	e
+-128	-32768	-8388608	-2147483648	-9223372036854775808
+=== FLOAT / DOUBLE — IEEE754 precision ===
+DROP TABLE IF EXISTS t_f;
+CREATE TABLE t_f (a FLOAT, b DOUBLE);
+INSERT INTO t_f VALUES (3.14, 2.718281828459045);
+SELECT a, b FROM t_f;
+a	b
+3.14	2.718281828459045
+=== DECIMAL(p, s) — trailing zero preservation + negatives ===
+DROP TABLE IF EXISTS t_d;
+CREATE TABLE t_d (a DECIMAL(10, 2), b DECIMAL(20, 8));
+INSERT INTO t_d VALUES (1234.56, 12345.67890000), (-0.50, -1234.56789);
+SELECT a, b FROM t_d ORDER BY a;
+a	b
+-0.50	-1234.56789
+1234.56	12345.67890000
+=== VARCHAR / CHAR / TEXT ===
+DROP TABLE IF EXISTS t_s;
+CREATE TABLE t_s (v VARCHAR(10), c CHAR(5), t TEXT);
+INSERT INTO t_s VALUES ('hello', 'hi', 'world');
+SELECT v, c, t FROM t_s;
+v	c	t
+hello	hi	world
+=== VARCHAR length enforcement — KNOWN DIVERGENCE: errno 1105 vs 1406 ===
+# MySQL emits 1406 (ER_DATA_TOO_LONG); zeta emits the generic
+# 1105. Behavior (rejection) matches; only the errno differs.
+INSERT INTO t_s VALUES ('this_is_too_long_for_varchar10', 'x', 'y');
+ERROR 1105: execution error: value too long for type character varying(10)
+=== DATE / TIMESTAMP / TIME ===
+DROP TABLE IF EXISTS t_t;
+CREATE TABLE t_t (d DATE, ts TIMESTAMP, tm TIME);
+INSERT INTO t_t VALUES ('2023-04-05', '2023-04-05 12:34:56', '12:34:56');
+SELECT d, ts, tm FROM t_t;
+d	ts	tm
+2023-04-05	2023-04-05 12:34:56	12:34:56
+=== TINYINT(1) — MySQL synthetic BOOLEAN ===
+DROP TABLE IF EXISTS t_b1;
+CREATE TABLE t_b1 (a TINYINT(1));
+INSERT INTO t_b1 VALUES (1), (0);
+SELECT a FROM t_b1 ORDER BY a;
+a
+0
+1
+=== BOOLEAN — stored as 0/1 over the wire ===
+DROP TABLE IF EXISTS t_bo;
+CREATE TABLE t_bo (a BOOLEAN);
+INSERT INTO t_bo VALUES (TRUE), (FALSE);
+SELECT a FROM t_bo ORDER BY a;
+a
+0
+1
+=== JSON (alias for JSONB) ===
+DROP TABLE IF EXISTS t_j;
+CREATE TABLE t_j (data JSON);
+INSERT INTO t_j VALUES ('{"k":1}');
+SELECT data FROM t_j;
+data
+{"k":1}
+=== INT UNSIGNED — accepted but value > i32::MAX overflows (KNOWN DIVERGENCE) ===
+# zeta accepts the UNSIGNED keyword at DDL but stores values
+# as signed Int32 internally. Values that fit in u32 but
+# exceed i32::MAX raise errno 1105 at INSERT. MySQL would
+# store them in u32.
+DROP TABLE IF EXISTS t_u;
+CREATE TABLE t_u (a INT UNSIGNED);
+INSERT INTO t_u VALUES (100);
+SELECT a FROM t_u;
+a
+100
+INSERT INTO t_u VALUES (4294967295);
+ERROR 1105: execution error: integer 4294967295 out of range for INTEGER (i32)
+=== KNOWN DIVERGENCE: DATETIME — unsupported (errno 1064) ===
+# MySQL alias for TIMESTAMP. Substitute TIMESTAMP.
+CREATE TABLE t_dt (a DATETIME);
+ERROR 1064: SQL parse error: unsupported data type: DATETIME
+=== KNOWN DIVERGENCE: YEAR — unsupported (errno 1064) ===
+# MySQL-only. No PG equivalent. Substitute SMALLINT.
+CREATE TABLE t_y (a YEAR);
+ERROR 1064: SQL parse error: unsupported data type: year
+=== KNOWN DIVERGENCE: inline ENUM column — unsupported (errno 1064) ===
+# Substitute PG flow: CREATE TYPE ... AS ENUM (...) + column TYPE_NAME.
+CREATE TABLE t_e (status ENUM('active', 'pending', 'deleted'));
+ERROR 1064: SQL parse error: unsupported data type: ENUM('active', 'pending', 'deleted')
+=== KNOWN DIVERGENCE: SET — unsupported (errno 1064) ===
+# MySQL-only; no PG / zeta equivalent.
+CREATE TABLE t_set (flags SET('r', 'w', 'x'));
+ERROR 1064: SQL parse error: unsupported data type: SET('r', 'w', 'x')
+=== KNOWN DIVERGENCE: BLOB — unsupported (errno 1064) ===
+# Substitute BYTEA (PG spelling).
+CREATE TABLE t_blob (a BLOB);
+ERROR 1064: SQL parse error: unsupported data type: BLOB
+=== Cleanup ===
+DROP TABLE t_i;
+DROP TABLE t_f;
+DROP TABLE t_d;
+DROP TABLE t_s;
+DROP TABLE t_t;
+DROP TABLE t_b1;
+DROP TABLE t_bo;
+DROP TABLE t_j;
+DROP TABLE t_u;

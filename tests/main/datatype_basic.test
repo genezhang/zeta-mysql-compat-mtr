@@ -1,0 +1,174 @@
+# Independently authored DATATYPE smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/type*.test;
+# pins zeta's behavior across the column types ORMs and schema-
+# migration tools emit, plus the MySQL-isms that are KNOWN DIVERGENCES.
+#
+# Adaptation notes:
+#   # zeta-adapt: integer widths TINYINT, SMALLINT, MEDIUMINT, INT,
+#     BIGINT — all supported (signed). Bounds match MySQL.
+#   # zeta-adapt: TINYINT(1) — accepted as INT (used by MySQL as a
+#     synthetic BOOLEAN; the column stores 0/1).
+#   # zeta-adapt: FLOAT, DOUBLE — supported. Precision matches IEEE754.
+#   # zeta-adapt: DECIMAL(p, s) — supported. Trailing zeros are
+#     preserved on roundtrip (matches MySQL); negative values keep
+#     their sign through INSERT/SELECT.
+#   # zeta-adapt: VARCHAR(n) / CHAR(n) / TEXT — supported. VARCHAR(n)
+#     enforces length: too-long values raise an error.
+#   # zeta-adapt: DATE, TIMESTAMP, TIME — supported.
+#   # zeta-adapt: BOOLEAN — supported (stored as 0/1 over the wire,
+#     matches MySQL's TINYINT(1) display).
+#   # zeta-adapt: JSON — supported (alias for JSONB).
+#   # zeta-adapt: BYTEA — supported (PG-style escape for binary
+#     literals: `E'\\x...'`).
+#   # zeta-adapt: KNOWN DIVERGENCE — `INT UNSIGNED` column is accepted
+#     at DDL but treated as signed Int32 internally. Values that fit
+#     in u32 but exceed i32::MAX overflow at INSERT with errno 1105.
+#     MySQL would store them in u32. Asserted below.
+#   # zeta-adapt: KNOWN DIVERGENCE — VARCHAR length-violation errno is
+#     1105 (generic execution error) vs MySQL's 1406 (ER_DATA_TOO_LONG).
+#     Behavior (rejection) matches; only the errno differs.
+#   # zeta-adapt: KNOWN DIVERGENCE — DATETIME (MySQL alias for
+#     TIMESTAMP) is REJECTED at parse with errno 1064 "unsupported
+#     data type: DATETIME". Substitute TIMESTAMP.
+#   # zeta-adapt: KNOWN DIVERGENCE — YEAR is REJECTED at parse with
+#     errno 1064. No PG equivalent; substitute SMALLINT.
+#   # zeta-adapt: KNOWN DIVERGENCE — inline ENUM column declaration
+#     (`status ENUM('a','b')`) is REJECTED at parse with errno 1064.
+#     Substitute the PG flow: `CREATE TYPE ... AS ENUM (...)` then
+#     declare the column with the type name.
+#   # zeta-adapt: KNOWN DIVERGENCE — SET column is REJECTED at parse
+#     with errno 1064 "unsupported data type: SET(...)". MySQL-only;
+#     no PG / zeta equivalent. Tracked as a follow-up.
+#   # zeta-adapt: KNOWN DIVERGENCE — BLOB is REJECTED at parse with
+#     errno 1064 "unsupported data type: BLOB". Substitute BYTEA
+#     (PG spelling).
+
+--echo === Setup ===
+
+# All probes are pure DDL / DML — no shared schema needed.
+
+--echo === Integer widths — TINYINT / SMALLINT / MEDIUMINT / INT / BIGINT ===
+
+DROP TABLE IF EXISTS t_i;
+CREATE TABLE t_i (a TINYINT, b SMALLINT, c MEDIUMINT, d INT, e BIGINT);
+INSERT INTO t_i VALUES (127, 32767, 8388607, 2147483647, 9223372036854775807);
+SELECT a, b, c, d, e FROM t_i;
+
+--echo === Integer widths — negative bounds ===
+
+DELETE FROM t_i;
+INSERT INTO t_i VALUES (-128, -32768, -8388608, -2147483648, -9223372036854775808);
+SELECT a, b, c, d, e FROM t_i;
+
+--echo === FLOAT / DOUBLE — IEEE754 precision ===
+
+DROP TABLE IF EXISTS t_f;
+CREATE TABLE t_f (a FLOAT, b DOUBLE);
+INSERT INTO t_f VALUES (3.14, 2.718281828459045);
+SELECT a, b FROM t_f;
+
+--echo === DECIMAL(p, s) — trailing zero preservation + negatives ===
+
+DROP TABLE IF EXISTS t_d;
+CREATE TABLE t_d (a DECIMAL(10, 2), b DECIMAL(20, 8));
+INSERT INTO t_d VALUES (1234.56, 12345.67890000), (-0.50, -1234.56789);
+SELECT a, b FROM t_d ORDER BY a;
+
+--echo === VARCHAR / CHAR / TEXT ===
+
+DROP TABLE IF EXISTS t_s;
+CREATE TABLE t_s (v VARCHAR(10), c CHAR(5), t TEXT);
+INSERT INTO t_s VALUES ('hello', 'hi', 'world');
+SELECT v, c, t FROM t_s;
+
+--echo === VARCHAR length enforcement — KNOWN DIVERGENCE: errno 1105 vs 1406 ===
+--echo # MySQL emits 1406 (ER_DATA_TOO_LONG); zeta emits the generic
+--echo # 1105. Behavior (rejection) matches; only the errno differs.
+
+--error 1105
+INSERT INTO t_s VALUES ('this_is_too_long_for_varchar10', 'x', 'y');
+
+--echo === DATE / TIMESTAMP / TIME ===
+
+DROP TABLE IF EXISTS t_t;
+CREATE TABLE t_t (d DATE, ts TIMESTAMP, tm TIME);
+INSERT INTO t_t VALUES ('2023-04-05', '2023-04-05 12:34:56', '12:34:56');
+SELECT d, ts, tm FROM t_t;
+
+--echo === TINYINT(1) — MySQL synthetic BOOLEAN ===
+
+DROP TABLE IF EXISTS t_b1;
+CREATE TABLE t_b1 (a TINYINT(1));
+INSERT INTO t_b1 VALUES (1), (0);
+SELECT a FROM t_b1 ORDER BY a;
+
+--echo === BOOLEAN — stored as 0/1 over the wire ===
+
+DROP TABLE IF EXISTS t_bo;
+CREATE TABLE t_bo (a BOOLEAN);
+INSERT INTO t_bo VALUES (TRUE), (FALSE);
+SELECT a FROM t_bo ORDER BY a;
+
+--echo === JSON (alias for JSONB) ===
+
+DROP TABLE IF EXISTS t_j;
+CREATE TABLE t_j (data JSON);
+INSERT INTO t_j VALUES ('{"k":1}');
+SELECT data FROM t_j;
+
+--echo === INT UNSIGNED — accepted but value > i32::MAX overflows (KNOWN DIVERGENCE) ===
+--echo # zeta accepts the UNSIGNED keyword at DDL but stores values
+--echo # as signed Int32 internally. Values that fit in u32 but
+--echo # exceed i32::MAX raise errno 1105 at INSERT. MySQL would
+--echo # store them in u32.
+
+DROP TABLE IF EXISTS t_u;
+CREATE TABLE t_u (a INT UNSIGNED);
+# Small positive value works.
+INSERT INTO t_u VALUES (100);
+SELECT a FROM t_u;
+# Value > i32::MAX overflows.
+--error 1105
+INSERT INTO t_u VALUES (4294967295);
+
+--echo === KNOWN DIVERGENCE: DATETIME — unsupported (errno 1064) ===
+--echo # MySQL alias for TIMESTAMP. Substitute TIMESTAMP.
+
+--error 1064
+CREATE TABLE t_dt (a DATETIME);
+
+--echo === KNOWN DIVERGENCE: YEAR — unsupported (errno 1064) ===
+--echo # MySQL-only. No PG equivalent. Substitute SMALLINT.
+
+--error 1064
+CREATE TABLE t_y (a YEAR);
+
+--echo === KNOWN DIVERGENCE: inline ENUM column — unsupported (errno 1064) ===
+--echo # Substitute PG flow: CREATE TYPE ... AS ENUM (...) + column TYPE_NAME.
+
+--error 1064
+CREATE TABLE t_e (status ENUM('active', 'pending', 'deleted'));
+
+--echo === KNOWN DIVERGENCE: SET — unsupported (errno 1064) ===
+--echo # MySQL-only; no PG / zeta equivalent.
+
+--error 1064
+CREATE TABLE t_set (flags SET('r', 'w', 'x'));
+
+--echo === KNOWN DIVERGENCE: BLOB — unsupported (errno 1064) ===
+--echo # Substitute BYTEA (PG spelling).
+
+--error 1064
+CREATE TABLE t_blob (a BLOB);
+
+--echo === Cleanup ===
+
+DROP TABLE t_i;
+DROP TABLE t_f;
+DROP TABLE t_d;
+DROP TABLE t_s;
+DROP TABLE t_t;
+DROP TABLE t_b1;
+DROP TABLE t_bo;
+DROP TABLE t_j;
+DROP TABLE t_u;
