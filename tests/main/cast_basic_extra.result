@@ -63,6 +63,13 @@ ERROR 1105: execution error: cannot cast 'abc' to INTEGER
 === KNOWN GAP: CAST AS BYTEA — errno 1105 ===
 SELECT CAST('abc' AS BYTEA);
 ERROR 1105: execution error: unsupported CAST target type: BYTEA
-=== KNOWN DIVERGENCE: TRY_CAST behaves like CAST (errors on fail) ===
-SELECT TRY_CAST('abc' AS INT);
-ERROR 1105: execution error: cannot cast 'abc' to INTEGER
+=== TRY_CAST / SAFE_CAST — FIXED via zeta #1187 (NULL on fail) ===
+SELECT TRY_CAST('abc' AS INT) AS bad;
+bad
+NULL
+SELECT TRY_CAST('42' AS INT)  AS good;
+good
+42
+SELECT SAFE_CAST('abc' AS INT) AS safe;
+safe
+NULL
