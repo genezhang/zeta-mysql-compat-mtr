@@ -35,12 +35,22 @@ NULL
 SELECT POW(2, NULL) AS p_null_exp;
 p_null_exp
 NULL
-=== KNOWN GAP: BIT_COUNT — errno 1105 ===
-SELECT BIT_COUNT(13);
-ERROR 1105: execution error: unknown function: BIT_COUNT
-=== KNOWN GAP: COT — errno 1105 ===
-SELECT COT(1);
-ERROR 1105: execution error: unknown function: COT
+=== BIT_COUNT — FIXED via zeta #1184 ===
+SELECT BIT_COUNT(13) AS bc;
+bc
+3
+SELECT BIT_COUNT(0)  AS bc_zero;
+bc_zero
+0
+SELECT BIT_COUNT(-1) AS bc_all_ones;
+bc_all_ones
+64
+=== COT — FIXED via zeta #1184 ===
+# Use a fixed-bit input (1.0 radian) to keep the result
+# row-stable across runs. COT(1) ≈ 0.6420926159343306.
+SELECT COT(1) AS c;
+c
+0.6420926159343306
 === KNOWN GAP: integer-division operator `DIV` — errno 1064 ===
 SELECT 17 DIV 5;
 ERROR 1064: SQL parse error: sql parser error: No infix parser for token Word(Word { value: "DIV", quote_style: None, keyword: DIV }) at Line: 1, Column: 11
