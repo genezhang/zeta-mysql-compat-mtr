@@ -1,0 +1,147 @@
+# Independently authored aggregate-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/group_by.test or func_group.test; pins zeta's
+# aggregate-function surface NOT held by group_basic (which
+# covers COUNT family / SUM / MIN / MAX / GROUP BY single/multi
+# col / GROUP BY ordinal / HAVING / DISTINCT / STRING_AGG /
+# empty-table aggregate / HAVING-with-alias).
+#
+# Adaptation notes:
+#   # zeta-adapt: AVG over a NULL-containing column — NULL
+#     rows are SKIPPED (not coerced to 0). MySQL and PG agree.
+#   # zeta-adapt: GROUP_CONCAT(col) — supported with the default
+#     ',' separator. KNOWN GAP — the `SEPARATOR '<lit>'` clause
+#     is parser-rejected with errno 1064. Portable substitute:
+#     STRING_AGG(col, '<sep>') (covered in group_basic).
+#   # zeta-adapt: GROUP_CONCAT(DISTINCT col ORDER BY col) —
+#     supported.
+#   # zeta-adapt: Statistical aggregates — VAR_POP, VAR_SAMP,
+#     STDDEV (= STDDEV_SAMP), STDDEV_POP, STDDEV_SAMP all
+#     supported with PG/standard semantics.
+#   # zeta-adapt: KNOWN DIVERGENCE — VARIANCE delegates to
+#     VAR_SAMP in zeta (PG semantics); MySQL delegates VARIANCE
+#     to VAR_POP. The numeric result diverges. Portable
+#     substitute: use the explicit VAR_POP / VAR_SAMP name to
+#     get unambiguous semantics.
+#   # zeta-adapt: BIT_AND, BIT_OR — supported, integer reducer
+#     aggregates.
+#   # zeta-adapt: JSON_ARRAYAGG, JSON_OBJECTAGG — supported,
+#     return JSONB.
+#   # zeta-adapt: COUNT(*) FILTER (WHERE <pred>) — PG extension,
+#     supported. Each row contributes to COUNT only when the
+#     filter predicate is true.
+#   # zeta-adapt: Empty-table aggregate semantics — SUM/AVG/MIN/
+#     MAX return NULL; COUNT(*) and COUNT(col) both return 0.
+#   # zeta-adapt: All-NULL column aggregate — SUM/AVG/MIN/MAX
+#     return NULL; COUNT(*) counts rows; COUNT(col) returns 0.
+#   # zeta-adapt: KNOWN GAP — `GROUP_CONCAT(... SEPARATOR
+#     '<lit>')` errors 1064 "Expected: ), found: SEPARATOR".
+#     The MySQL-specific SEPARATOR clause isn't honored.
+#     Portable substitute: STRING_AGG(col, '<sep>') or the
+#     default-comma GROUP_CONCAT.
+#   # zeta-adapt: KNOWN GAP — STD(n) errors 1105 "unknown
+#     function: STD". MySQL alias for STDDEV_POP. Portable
+#     substitute: STDDEV_POP(n).
+#   # zeta-adapt: KNOWN GAP — BIT_XOR(n) errors 1105 "unknown
+#     function: BIT_XOR". Portable substitute: SUM(n) % 2 over
+#     a 0/1 column, or fold via XOR in application code.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS af;
+CREATE TABLE af (id INT PRIMARY KEY, region VARCHAR(10), product VARCHAR(10), n INT);
+INSERT INTO af VALUES
+  (1, 'east', 'a', 10),
+  (2, 'east', 'b', 20),
+  (3, 'east', 'a', 30),
+  (4, 'west', 'a', 40),
+  (5, 'west', 'b', 50),
+  (6, 'east', 'c', NULL);
+
+--echo === AVG over NULL-containing column ===
+--echo # `east` has 4 rows with n in {10, 20, 30, NULL}; AVG
+--echo # skips NULL → (10+20+30)/3 = 20.
+
+SELECT region, AVG(n) AS av FROM af GROUP BY region ORDER BY region;
+
+--echo === GROUP_CONCAT — default separator ===
+
+SELECT region, GROUP_CONCAT(DISTINCT product ORDER BY product) AS prods
+  FROM af GROUP BY region ORDER BY region;
+
+--echo === Statistical aggregates — VAR_POP / VAR_SAMP / STDDEV* ===
+
+SELECT VAR_POP(n)     AS vp,
+       VAR_SAMP(n)    AS vs,
+       STDDEV(n)      AS sd,
+       STDDEV_POP(n)  AS sdp,
+       STDDEV_SAMP(n) AS sds
+  FROM af;
+
+--echo === BIT_AND / BIT_OR ===
+
+SELECT BIT_AND(n) AS b_and, BIT_OR(n) AS b_or FROM af;
+
+--echo === JSON_ARRAYAGG / JSON_OBJECTAGG ===
+
+SELECT JSON_ARRAYAGG(product) AS arr FROM af;
+SELECT JSON_OBJECTAGG(id, product) AS obj FROM af;
+
+--echo === COUNT(*) FILTER (WHERE pred) — PG ext ===
+
+SELECT COUNT(*) FILTER (WHERE n > 20) AS gt20 FROM af;
+
+--echo === Empty-table aggregates ===
+
+DROP TABLE IF EXISTS empty_af;
+CREATE TABLE empty_af (id INT PRIMARY KEY, n INT);
+
+SELECT SUM(n)               AS s,
+       AVG(n)               AS av,
+       MIN(n)               AS mn,
+       MAX(n)               AS mx,
+       COUNT(*)             AS c_star,
+       COUNT(n)             AS c_col,
+       COUNT(DISTINCT n)    AS c_dist
+  FROM empty_af;
+
+--echo === All-NULL column aggregates ===
+
+DROP TABLE IF EXISTS null_af;
+CREATE TABLE null_af (id INT PRIMARY KEY, n INT);
+INSERT INTO null_af (id) VALUES (1), (2);
+
+SELECT SUM(n)   AS s,
+       AVG(n)   AS av,
+       MIN(n)   AS mn,
+       MAX(n)   AS mx,
+       COUNT(*) AS c_star,
+       COUNT(n) AS c_col
+  FROM null_af;
+
+--echo === KNOWN DIVERGENCE: VARIANCE — zeta uses VAR_SAMP, MySQL uses VAR_POP ===
+--echo # zeta result is 250 (VAR_SAMP). MySQL would return 200
+--echo # (VAR_POP). Use explicit VAR_POP/VAR_SAMP to disambiguate.
+
+SELECT VARIANCE(n) AS v FROM af;
+
+--echo === KNOWN GAP: GROUP_CONCAT … SEPARATOR — errno 1064 ===
+
+--error 1064
+SELECT GROUP_CONCAT(product SEPARATOR '|') FROM af;
+
+--echo === KNOWN GAP: STD — errno 1105 (alias for STDDEV_POP) ===
+
+--error 1105
+SELECT STD(n) FROM af;
+
+--echo === KNOWN GAP: BIT_XOR — errno 1105 ===
+
+--error 1105
+SELECT BIT_XOR(n) FROM af;
+
+--echo === Cleanup ===
+
+DROP TABLE af;
+DROP TABLE empty_af;
+DROP TABLE null_af;

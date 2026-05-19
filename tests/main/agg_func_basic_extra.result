@@ -1,0 +1,92 @@
+=== Setup ===
+DROP TABLE IF EXISTS af;
+CREATE TABLE af (id INT PRIMARY KEY, region VARCHAR(10), product VARCHAR(10), n INT);
+INSERT INTO af VALUES
+  (1, 'east', 'a', 10),
+  (2, 'east', 'b', 20),
+  (3, 'east', 'a', 30),
+  (4, 'west', 'a', 40),
+  (5, 'west', 'b', 50),
+  (6, 'east', 'c', NULL);
+=== AVG over NULL-containing column ===
+# `east` has 4 rows with n in {10, 20, 30, NULL}; AVG
+# skips NULL → (10+20+30)/3 = 20.
+SELECT region, AVG(n) AS av FROM af GROUP BY region ORDER BY region;
+region	av
+east	20
+west	45
+=== GROUP_CONCAT — default separator ===
+SELECT region, GROUP_CONCAT(DISTINCT product ORDER BY product) AS prods
+  FROM af GROUP BY region ORDER BY region;
+region	prods
+east	a,b,c
+west	a,b
+=== Statistical aggregates — VAR_POP / VAR_SAMP / STDDEV* ===
+SELECT VAR_POP(n)     AS vp,
+       VAR_SAMP(n)    AS vs,
+       STDDEV(n)      AS sd,
+       STDDEV_POP(n)  AS sdp,
+       STDDEV_SAMP(n) AS sds
+  FROM af;
+vp	vs	sd	sdp	sds
+200	250	15.811388300841896	14.142135623730951	15.811388300841896
+=== BIT_AND / BIT_OR ===
+SELECT BIT_AND(n) AS b_and, BIT_OR(n) AS b_or FROM af;
+b_and	b_or
+0	62
+=== JSON_ARRAYAGG / JSON_OBJECTAGG ===
+SELECT JSON_ARRAYAGG(product) AS arr FROM af;
+arr
+["a","b","a","a","b","c"]
+SELECT JSON_OBJECTAGG(id, product) AS obj FROM af;
+obj
+{"1":"a","2":"b","3":"a","4":"a","5":"b","6":"c"}
+=== COUNT(*) FILTER (WHERE pred) — PG ext ===
+SELECT COUNT(*) FILTER (WHERE n > 20) AS gt20 FROM af;
+gt20
+3
+=== Empty-table aggregates ===
+DROP TABLE IF EXISTS empty_af;
+CREATE TABLE empty_af (id INT PRIMARY KEY, n INT);
+SELECT SUM(n)               AS s,
+       AVG(n)               AS av,
+       MIN(n)               AS mn,
+       MAX(n)               AS mx,
+       COUNT(*)             AS c_star,
+       COUNT(n)             AS c_col,
+       COUNT(DISTINCT n)    AS c_dist
+  FROM empty_af;
+s	av	mn	mx	c_star	c_col	c_dist
+NULL	NULL	NULL	NULL	0	0	0
+=== All-NULL column aggregates ===
+DROP TABLE IF EXISTS null_af;
+CREATE TABLE null_af (id INT PRIMARY KEY, n INT);
+INSERT INTO null_af (id) VALUES (1), (2);
+SELECT SUM(n)   AS s,
+       AVG(n)   AS av,
+       MIN(n)   AS mn,
+       MAX(n)   AS mx,
+       COUNT(*) AS c_star,
+       COUNT(n) AS c_col
+  FROM null_af;
+s	av	mn	mx	c_star	c_col
+NULL	NULL	NULL	NULL	2	0
+=== KNOWN DIVERGENCE: VARIANCE — zeta uses VAR_SAMP, MySQL uses VAR_POP ===
+# zeta result is 250 (VAR_SAMP). MySQL would return 200
+# (VAR_POP). Use explicit VAR_POP/VAR_SAMP to disambiguate.
+SELECT VARIANCE(n) AS v FROM af;
+v
+250
+=== KNOWN GAP: GROUP_CONCAT … SEPARATOR — errno 1064 ===
+SELECT GROUP_CONCAT(product SEPARATOR '|') FROM af;
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: SEPARATOR at Line: 1, Column: 29
+=== KNOWN GAP: STD — errno 1105 (alias for STDDEV_POP) ===
+SELECT STD(n) FROM af;
+ERROR 1105: execution error: unknown function: STD
+=== KNOWN GAP: BIT_XOR — errno 1105 ===
+SELECT BIT_XOR(n) FROM af;
+ERROR 1105: execution error: unknown function: BIT_XOR
+=== Cleanup ===
+DROP TABLE af;
+DROP TABLE empty_af;
+DROP TABLE null_af;
