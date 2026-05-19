@@ -1,0 +1,106 @@
+# Independently authored CTE (Common Table Expression) smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/cte.test or with.test; pins zeta's behavior across
+# WITH / WITH RECURSIVE shapes ORMs and analytics tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: WITH cte AS (SELECT …) SELECT — supported.
+#   # zeta-adapt: WITH cte(a, b) AS (SELECT …) — column-alias list
+#     supported.
+#   # zeta-adapt: Multiple CTEs in one WITH `WITH a AS …, b AS …` —
+#     supported (and second CTE may reference the first).
+#   # zeta-adapt: CTE referenced multiple times in the outer query —
+#     supported.
+#   # zeta-adapt: WITH RECURSIVE — supported. Anchor / recursive
+#     branches via UNION ALL. Validated with both a numeric counter
+#     and a hierarchical org-chart traversal.
+#   # zeta-adapt: CTE inside a scalar subquery in SELECT-list —
+#     supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — WITH-prefixed DML (`WITH … INSERT`,
+#     `WITH … UPDATE`, `WITH … DELETE`) REJECTED at parse with errno
+#     1064 "unsupported query form (only SELECT supported)". MySQL
+#     8.0+ accepts these. Substitute: declare the CTE in a derived
+#     table inside the DML statement instead. Pinned below.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS emp;
+CREATE TABLE emp (id INT PRIMARY KEY, name VARCHAR(20), mgr INT, dept VARCHAR(20));
+INSERT INTO emp VALUES
+ (1, 'alice', NULL, 'eng'),
+ (2, 'bob',   1,    'eng'),
+ (3, 'carol', 1,    'sales'),
+ (4, 'dave',  2,    'eng'),
+ (5, 'eve',   3,    'sales');
+
+--echo === Simple WITH ===
+
+WITH x AS (SELECT 1 AS v) SELECT * FROM x;
+
+--echo === WITH with column-alias list ===
+
+WITH x(a, b) AS (SELECT 1, 'hello') SELECT a, b FROM x;
+
+--echo === Multiple CTEs in one WITH ===
+
+WITH a AS (SELECT 1 AS v), b AS (SELECT 2 AS v)
+SELECT a.v + b.v AS sm FROM a, b;
+
+--echo === Second CTE references first ===
+
+WITH a AS (SELECT 5 AS v), b AS (SELECT v + 1 AS v FROM a)
+SELECT * FROM b;
+
+--echo === CTE referenced multiple times ===
+
+WITH eng AS (SELECT * FROM emp WHERE dept='eng')
+SELECT COUNT(*) AS c FROM eng
+UNION ALL
+SELECT COUNT(*) AS c FROM eng;
+
+--echo === WITH RECURSIVE — numeric counter ===
+
+WITH RECURSIVE n(v) AS (
+  SELECT 1
+  UNION ALL
+  SELECT v + 1 FROM n WHERE v < 5
+)
+SELECT * FROM n ORDER BY v;
+
+--echo === WITH RECURSIVE — hierarchy traversal ===
+
+WITH RECURSIVE org AS (
+  SELECT id, name, mgr, 0 AS depth FROM emp WHERE mgr IS NULL
+  UNION ALL
+  SELECT e.id, e.name, e.mgr, org.depth + 1
+  FROM emp e JOIN org ON e.mgr = org.id
+)
+SELECT id, name, depth FROM org ORDER BY id;
+
+--echo === CTE inside scalar subquery in SELECT-list ===
+
+SELECT (WITH x AS (SELECT 1 AS v) SELECT v FROM x) AS r;
+
+--echo === KNOWN DIVERGENCE: WITH-prefixed DML rejected (errno 1064) ===
+--echo # MySQL 8.0+ accepts `WITH … INSERT/UPDATE/DELETE`; zeta does
+--echo # not. Substitute: inline the CTE as a derived table inside
+--echo # the DML statement.
+
+DROP TABLE IF EXISTS dest;
+CREATE TABLE dest (v INT);
+
+--error 1064
+WITH x AS (SELECT 42 AS v) INSERT INTO dest SELECT * FROM x;
+
+INSERT INTO dest VALUES (5);
+
+--error 1064
+WITH y AS (SELECT 99 AS v) UPDATE dest SET v = (SELECT v FROM y);
+
+--error 1064
+WITH y AS (SELECT 5 AS v) DELETE FROM dest WHERE v = (SELECT v FROM y);
+
+--echo === Cleanup ===
+
+DROP TABLE emp;
+DROP TABLE dest;
