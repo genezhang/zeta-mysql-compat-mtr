@@ -1,0 +1,59 @@
+=== Setup ===
+DROP TABLE IF EXISTS uex;
+CREATE TABLE uex (id INT PRIMARY KEY, name VARCHAR(20), age INT);
+INSERT INTO uex VALUES (1, 'alice', 30), (2, 'bob', 17), (3, 'cara', 22);
+=== CREATE INDEX … WHERE <predicate> (partial index, PG ext) ===
+CREATE INDEX idx_uex_adult ON uex(name) WHERE age >= 18;
+=== CREATE INDEX USING BTREE (explicit storage clause) ===
+DROP TABLE IF EXISTS sb;
+CREATE TABLE sb (id INT PRIMARY KEY, x INT);
+CREATE INDEX idx_sb_x USING BTREE ON sb(x);
+=== CREATE INDEX USING HASH — silently coerced to BTREE ===
+DROP TABLE IF EXISTS sh;
+CREATE TABLE sh (id INT PRIMARY KEY, x INT);
+CREATE INDEX idx_sh_x USING HASH ON sh(x);
+# SHOW INDEX reports Index_type as BTREE — the requested
+# HASH storage was silently coerced.
+SHOW INDEX FROM sh;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+sh	0	PRIMARY	1	id	BTREE
+sh	1	idx_sh_x	1	x	BTREE
+=== CREATE INDEX <col> DESC — sort direction accepted, ignored ===
+DROP TABLE IF EXISTS sd;
+CREATE TABLE sd (id INT PRIMARY KEY, x INT);
+CREATE INDEX idx_sd_x_desc ON sd(x DESC);
+=== Composite UNIQUE — enforces tuple uniqueness ===
+DROP TABLE IF EXISTS comp;
+CREATE TABLE comp (a INT, b INT, c INT);
+CREATE UNIQUE INDEX idx_comp_ab ON comp(a, b);
+INSERT INTO comp VALUES (1, 2, 100), (1, 3, 101), (2, 2, 102);
+SELECT * FROM comp ORDER BY a, b;
+a	b	c
+1	2	100
+1	3	101
+2	2	102
+=== Composite UNIQUE — duplicate tuple errno 1062 ===
+INSERT INTO comp VALUES (1, 2, 999);
+ERROR 1062: duplicate key value violates unique constraint "idx_comp_ab": Key already exists in index "idx_comp_ab"
+=== DROP INDEX IF EXISTS — silent no-op on missing ===
+DROP INDEX IF EXISTS idx_does_not_exist_xyz ON comp;
+=== KNOWN GAP: DROP INDEX … CASCADE — errno 1064 ===
+DROP INDEX idx_comp_ab ON comp CASCADE;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: CASCADE at Line: 1, Column: 32
+=== KNOWN GAP: DROP INDEX … RESTRICT — errno 1064 ===
+DROP INDEX idx_comp_ab ON comp RESTRICT;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: RESTRICT at Line: 1, Column: 32
+=== KNOWN GAP: ALTER INDEX RENAME — silent no-op ===
+# Statement returns OK but the rename is not applied.
+# SHOW INDEX still lists the original name.
+ALTER INDEX idx_comp_ab RENAME TO idx_comp_ab_renamed;
+SHOW INDEX FROM comp;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+comp	0	idx_comp_ab	1	a	BTREE
+comp	0	idx_comp_ab	2	b	BTREE
+=== Cleanup ===
+DROP TABLE uex;
+DROP TABLE sb;
+DROP TABLE sh;
+DROP TABLE sd;
+DROP TABLE comp;
