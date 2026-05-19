@@ -1,0 +1,82 @@
+# Independently authored comparison-predicate smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/compare.test or func_op.test; pins zeta's
+# comparison-operator + pattern-match + boolean-test surface.
+#
+# Adaptation notes:
+#   # zeta-adapt: BETWEEN / NOT BETWEEN — supported. Lower > upper
+#     yields 0 (no value satisfies); BETWEEN is inclusive on both
+#     ends.
+#   # zeta-adapt: Comparison operators — `<`, `<=`, `>`, `>=`,
+#     `=`, `<>`, `!=` — all supported. `!=` is the MySQL/C alias
+#     for `<>`.
+#   # zeta-adapt: Comparison NULL propagation — `1 < NULL`,
+#     `1 = NULL` etc. all return NULL (3VL).
+#   # zeta-adapt: LIKE / NOT LIKE — supported with `%` (any
+#     run) and `_` (single character).
+#   # zeta-adapt: `LIKE NULL` → NULL (pattern NULL propagates).
+#   # zeta-adapt: ILIKE — case-insensitive LIKE (PG extension)
+#     — supported.
+#   # zeta-adapt: `IS TRUE` / `IS FALSE` / `IS UNKNOWN` and
+#     their `IS NOT ...` forms — supported. `NULL IS UNKNOWN`
+#     = 1; `NULL IS NOT TRUE` = 1; `NULL IS NOT FALSE` = 1.
+#   # zeta-adapt: KNOWN GAP — `SIMILAR TO` (PG regex-LIKE
+#     hybrid) errors 1064 "unsupported expression". Portable
+#     substitute: REGEXP_LIKE or LIKE with extended patterns.
+
+--echo === BETWEEN / NOT BETWEEN ===
+
+SELECT 5 BETWEEN 1 AND 10, 15 BETWEEN 1 AND 10;
+SELECT 5 NOT BETWEEN 1 AND 10, 15 NOT BETWEEN 1 AND 10;
+
+--echo === BETWEEN with lower > upper (empty range) ===
+
+SELECT 5 BETWEEN 10 AND 1 AS empty_range;
+
+--echo === Comparison operators — <, <=, >, >=, =, <>, != ===
+
+SELECT 1 < 2 AS lt, 2 <= 2 AS le, 3 > 2 AS gt, 3 >= 3 AS ge,
+       5 = 5 AS eq, 5 <> 4 AS ne, 5 != 4 AS ne_c;
+
+--echo === Comparison NULL propagation (3VL) ===
+
+SELECT 1 < NULL AS lt_n, 1 = NULL AS eq_n, 1 <> NULL AS ne_n;
+
+--echo === LIKE with % and _ ===
+
+SELECT 'hello' LIKE 'h%'   AS prefix,
+       'hello' LIKE '%lo'  AS suffix,
+       'hello' LIKE '_e%'  AS single,
+       'hello' LIKE 'xyz'  AS no_match;
+
+--echo === NOT LIKE ===
+
+SELECT 'hello' NOT LIKE 'h%' AS nl_match, 'hello' NOT LIKE 'xyz' AS nl_no;
+
+--echo === LIKE NULL — NULL propagation ===
+
+SELECT 'abc' LIKE NULL AS null_pat;
+
+--echo === ILIKE — case-insensitive (PG) ===
+
+SELECT 'Hello' ILIKE 'hello' AS i;
+
+--echo === IS TRUE / IS FALSE / IS UNKNOWN ===
+
+SELECT TRUE IS TRUE, FALSE IS TRUE, NULL IS TRUE;
+SELECT TRUE IS FALSE, FALSE IS FALSE, NULL IS FALSE;
+SELECT NULL IS UNKNOWN, TRUE IS UNKNOWN, FALSE IS UNKNOWN;
+
+--echo === IS NOT TRUE / IS NOT FALSE ===
+
+SELECT TRUE IS NOT TRUE, FALSE IS NOT TRUE, NULL IS NOT TRUE;
+SELECT TRUE IS NOT FALSE, FALSE IS NOT FALSE, NULL IS NOT FALSE;
+
+--echo === IS NOT NULL chain ===
+
+SELECT 1 IS NOT NULL AND 'x' IS NOT NULL AS both_present;
+
+--echo === KNOWN GAP: SIMILAR TO — errno 1064 ===
+
+--error 1064
+SELECT 'abc' SIMILAR TO 'a%';
