@@ -25,12 +25,11 @@
 #     DATE_TRUNC, DATE_FORMAT (MySQL-style %Y/%m/%d strftime),
 #     TO_CHAR (PG-style format), DATEDIFF (MySQL), YEAR(date)
 #     (MySQL), AGE (PG) — all supported.
-#   # zeta-adapt: KNOWN DIVERGENCE — IFNULL(x, y) is NOT supported
-#     (errno 1105 "unknown function: IFNULL"). MySQL standard.
-#     Substitute COALESCE(x, y).
-#   # zeta-adapt: KNOWN DIVERGENCE — IF(cond, x, y) is NOT supported
-#     (errno 1105 "unknown function: IF"). MySQL standard.
-#     Substitute CASE WHEN cond THEN x ELSE y END.
+#   # zeta-adapt: IFNULL(x, y) — supported (FIXED via zeta #1127). 2-arg
+#     alias for COALESCE. Pinned below as a positive assertion.
+#   # zeta-adapt: IF(cond, x, y) — supported (FIXED via zeta #1127). 3-arg
+#     conditional with MySQL truthiness (NULL → false branch; non-zero
+#     numeric / non-empty string → true; '0' → false). Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — VERSION() is NOT supported
 #     (errno 1105 "unknown function: VERSION"). MySQL standard.
 #   # zeta-adapt: KNOWN DIVERGENCE — CAST(x AS SIGNED) and
@@ -123,17 +122,25 @@ SELECT DATE '2023-01-15' + INTERVAL '10 days' AS d;
 SELECT CAST(123 AS CHAR) AS c, CAST('123' AS INTEGER) AS i;
 SELECT CAST(3.7 AS INTEGER) AS r;
 
---echo === KNOWN DIVERGENCE: IFNULL — unknown function (errno 1105) ===
---echo # MySQL standard. Substitute COALESCE(x, y).
+--echo === IFNULL — FIXED via zeta #1127 ===
+--echo # 2-arg alias for COALESCE. NULL first arg returns the second;
+--echo # non-NULL first arg returns it unchanged.
 
---error 1105
-SELECT IFNULL(NULL, 'fallback');
+SELECT IFNULL(NULL, 'fallback') AS f;
+SELECT IFNULL('x', 'fallback') AS f;
+SELECT IFNULL(NULL, 42) AS f;
 
---echo === KNOWN DIVERGENCE: IF(cond, x, y) — unknown function (errno 1105) ===
---echo # MySQL standard. Substitute CASE WHEN cond THEN x ELSE y END.
+--echo === IF(cond, x, y) — FIXED via zeta #1127 ===
+--echo # 3-arg conditional with MySQL truthiness: NULL → false branch;
+--echo # non-zero numeric / non-empty string → true; '0' → false.
 
---error 1105
-SELECT IF(1 = 1, 'yes', 'no');
+SELECT IF(1 = 1, 'yes', 'no') AS r;
+SELECT IF(1 = 2, 'yes', 'no') AS r;
+# Numeric truthiness: 0 is false, non-zero is true.
+SELECT IF(0, 'yes', 'no') AS r;
+SELECT IF(5, 'yes', 'no') AS r;
+# NULL cond → false branch.
+SELECT IF(NULL, 'yes', 'no') AS r;
 
 --echo === KNOWN DIVERGENCE: VERSION() — unknown function (errno 1105) ===
 
