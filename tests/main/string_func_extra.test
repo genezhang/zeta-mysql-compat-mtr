@@ -1,0 +1,109 @@
+# Independently authored extra-string-function smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_str.test or similar; pins zeta's behavior
+# across MySQL string functions that aren't covered by the
+# earlier string_func_basic test.
+#
+# Adaptation notes:
+#   # zeta-adapt: LPAD / RPAD (3-arg form) — supported.
+#   # zeta-adapt: REPEAT — supported.
+#   # zeta-adapt: REVERSE — supported.
+#   # zeta-adapt: FIELD(val, list…) — supported (returns 1-based
+#     position of val in the trailing list, 0 if not found).
+#   # zeta-adapt: ELT(n, list…) — supported (returns the N-th
+#     argument from the trailing list, 1-based).
+#   # zeta-adapt: LOCATE(substr, str [, pos]) — supported, both
+#     2-arg and 3-arg forms. 1-based, 0 if not found.
+#   # zeta-adapt: INSTR(str, substr) — supported (alias for LOCATE
+#     with swapped args).
+#   # zeta-adapt: INSERT(str, pos, len, newstr) — supported.
+#   # zeta-adapt: SOUNDEX — supported (S530-style 4-char codes).
+#   # zeta-adapt: HEX / UNHEX — supported (string-text encoding).
+#   # zeta-adapt: BIT_LENGTH — supported, returns bits = bytes × 8
+#     (byte-count basis, MySQL-compatible).
+#   # zeta-adapt: CHAR_LENGTH / CHARACTER_LENGTH — supported,
+#     returns character count.
+#   # zeta-adapt: KNOWN DIVERGENCE — `LENGTH(str)` returns CHARACTER
+#     count in zeta but BYTE count in MySQL. For multibyte input
+#     the values diverge (e.g. `LENGTH('héllo')` is 5 in zeta, 6
+#     in MySQL). zeta's `BIT_LENGTH` is byte-based, so the
+#     LENGTH=chars / BIT_LENGTH=bytes split is internal to zeta.
+#     Pinned in the result; portable substitute for byte length:
+#     `BIT_LENGTH(str) / 8`.
+#   # zeta-adapt: SPACE(n) — supported.
+#   # zeta-adapt: QUOTE — supported (wraps text in single quotes,
+#     escapes embedded apostrophes and backslashes).
+#   # zeta-adapt: FORMAT(n, dec) — supported, returns text with
+#     comma thousands separators and fixed decimals (US locale;
+#     the 3-arg locale form is a separate slice).
+#   # zeta-adapt: ASCII / CHAR — supported.
+#   # zeta-adapt: BIN / OCT — supported (already covered in
+#     string_func_basic, included here only for completeness of
+#     the conversion family).
+
+--echo === LPAD / RPAD ===
+
+SELECT LPAD('x', 5, '0')                 AS l;
+SELECT RPAD('x', 5, '*')                 AS r;
+
+--echo === REPEAT / REVERSE ===
+
+SELECT REPEAT('ab', 3)                   AS r;
+SELECT REVERSE('hello')                  AS r;
+
+--echo === FIELD / ELT ===
+
+SELECT FIELD('b', 'a', 'b', 'c')         AS f;
+SELECT FIELD('z', 'a', 'b', 'c')         AS f_missing;
+SELECT ELT(2, 'a', 'b', 'c')             AS e;
+SELECT ELT(9, 'a', 'b', 'c')             AS e_oob;
+
+--echo === LOCATE / INSTR ===
+
+SELECT LOCATE('lo', 'hello')             AS l;
+SELECT LOCATE('lo', 'hellohello', 4)     AS l3;
+SELECT LOCATE('zz', 'hello')             AS l_miss;
+SELECT INSTR('hello', 'lo')              AS i;
+
+--echo === INSERT(str, pos, len, newstr) ===
+
+SELECT INSERT('hello', 2, 3, 'XY')       AS s;
+
+--echo === SOUNDEX ===
+
+SELECT SOUNDEX('Smith')                  AS sx;
+SELECT SOUNDEX('Smythe')                 AS sx;
+
+--echo === HEX / UNHEX (text-encoding) ===
+
+SELECT HEX('AB')                         AS h;
+SELECT UNHEX('4142')                     AS s;
+
+--echo === Length family (KNOWN DIVERGENCE — see result for LENGTH) ===
+
+SELECT CHAR_LENGTH('héllo')              AS cl;
+SELECT CHARACTER_LENGTH('héllo')         AS cl2;
+SELECT BIT_LENGTH('abc')                 AS bl_ascii;
+SELECT BIT_LENGTH('héllo')               AS bl_multi;
+SELECT LENGTH('abc')                     AS l_ascii;
+SELECT LENGTH('héllo')                   AS l_multi;
+
+--echo === SPACE / QUOTE ===
+
+SELECT SPACE(3)                          AS s;
+SELECT QUOTE('hello world')              AS q;
+SELECT QUOTE('')                         AS q_empty;
+
+--echo === FORMAT ===
+
+SELECT FORMAT(1234567.891, 2)            AS f;
+
+--echo === ASCII / CHAR ===
+
+SELECT ASCII('A')                        AS a;
+SELECT CHAR(65, 66, 67)                  AS s;
+
+--echo === BIN / OCT (numeric→string conversion) ===
+
+SELECT BIN(13)                           AS b;
+SELECT OCT(13)                           AS o;

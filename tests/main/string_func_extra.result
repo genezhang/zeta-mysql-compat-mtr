@@ -1,0 +1,105 @@
+=== LPAD / RPAD ===
+SELECT LPAD('x', 5, '0')                 AS l;
+l
+0000x
+SELECT RPAD('x', 5, '*')                 AS r;
+r
+x****
+=== REPEAT / REVERSE ===
+SELECT REPEAT('ab', 3)                   AS r;
+r
+ababab
+SELECT REVERSE('hello')                  AS r;
+r
+olleh
+=== FIELD / ELT ===
+SELECT FIELD('b', 'a', 'b', 'c')         AS f;
+f
+2
+SELECT FIELD('z', 'a', 'b', 'c')         AS f_missing;
+f_missing
+0
+SELECT ELT(2, 'a', 'b', 'c')             AS e;
+e
+b
+SELECT ELT(9, 'a', 'b', 'c')             AS e_oob;
+e_oob
+NULL
+=== LOCATE / INSTR ===
+SELECT LOCATE('lo', 'hello')             AS l;
+l
+4
+SELECT LOCATE('lo', 'hellohello', 4)     AS l3;
+l3
+4
+SELECT LOCATE('zz', 'hello')             AS l_miss;
+l_miss
+0
+SELECT INSTR('hello', 'lo')              AS i;
+i
+4
+=== INSERT(str, pos, len, newstr) ===
+SELECT INSERT('hello', 2, 3, 'XY')       AS s;
+s
+hXYo
+=== SOUNDEX ===
+SELECT SOUNDEX('Smith')                  AS sx;
+sx
+S530
+SELECT SOUNDEX('Smythe')                 AS sx;
+sx
+S530
+=== HEX / UNHEX (text-encoding) ===
+SELECT HEX('AB')                         AS h;
+h
+4142
+SELECT UNHEX('4142')                     AS s;
+s
+AB
+=== Length family (KNOWN DIVERGENCE — see result for LENGTH) ===
+SELECT CHAR_LENGTH('héllo')              AS cl;
+cl
+5
+SELECT CHARACTER_LENGTH('héllo')         AS cl2;
+cl2
+5
+SELECT BIT_LENGTH('abc')                 AS bl_ascii;
+bl_ascii
+24
+SELECT BIT_LENGTH('héllo')               AS bl_multi;
+bl_multi
+48
+SELECT LENGTH('abc')                     AS l_ascii;
+l_ascii
+3
+SELECT LENGTH('héllo')                   AS l_multi;
+l_multi
+5
+=== SPACE / QUOTE ===
+SELECT SPACE(3)                          AS s;
+s
+   
+SELECT QUOTE('hello world')              AS q;
+q
+'hello world'
+SELECT QUOTE('')                         AS q_empty;
+q_empty
+''
+=== FORMAT ===
+SELECT FORMAT(1234567.891, 2)            AS f;
+f
+1,234,567.89
+=== ASCII / CHAR ===
+SELECT ASCII('A')                        AS a;
+a
+65
+SELECT CHAR(65, 66, 67)                  AS s;
+s
+ABC
+=== BIN / OCT (numeric→string conversion) ===
+SELECT BIN(13)                           AS b;
+b
+1101
+SELECT OCT(13)                           AS o;
+o
+15
