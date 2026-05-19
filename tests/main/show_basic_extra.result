@@ -1,0 +1,44 @@
+=== Setup ===
+DROP TABLE IF EXISTS sh1;
+DROP TABLE IF EXISTS sh2;
+CREATE TABLE sh1 (id INT PRIMARY KEY);
+CREATE TABLE sh2 (id INT PRIMARY KEY, name VARCHAR(20));
+=== SHOW DATABASES ===
+SHOW DATABASES;
+Database
+test
+zeta
+=== SHOW TABLES — single column ===
+SHOW TABLES;
+Tables_in_test
+sh1
+sh2
+=== SHOW FULL TABLES — adds Table_type column ===
+SHOW FULL TABLES;
+Tables_in_test	Table_type
+sh1	BASE TABLE
+sh2	BASE TABLE
+=== SHOW COLUMNS FROM <tbl> ===
+SHOW COLUMNS FROM sh2;
+Field	Type	Null	Key	Default	Extra
+id	int	NO	PRI	NULL	
+name	varchar(20)	YES		NULL	
+=== SHOW CREATE TABLE — synth DDL ===
+# Body uses backtick identifiers + `\n` escape sequences
+# in the transport layer. ENGINE/CHARSET claim is a
+# compatibility marker; storage backend is zeta-internal.
+SHOW CREATE TABLE sh2;
+Table	Create Table
+sh2	CREATE TABLE `sh2` (
+  `id` int NOT NULL,
+  `name` varchar(20),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+=== SHOW TABLES LIKE pattern ===
+SHOW TABLES LIKE 'sh%';
+Tables_in_test
+sh1
+sh2
+=== Cleanup ===
+DROP TABLE sh1;
+DROP TABLE sh2;

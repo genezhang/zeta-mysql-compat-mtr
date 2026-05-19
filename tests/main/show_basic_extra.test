@@ -1,0 +1,76 @@
+# Independently authored SHOW smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/
+# show.test files; pins zeta's MySQL-shape SHOW surface that
+# psql/mysql clients depend on for autocomplete and `\d`-style
+# introspection.
+#
+# Adaptation notes:
+#   # zeta-adapt: SHOW DATABASES — supported. Single column
+#     `Database`, default `zeta` connection database returns
+#     just `zeta`.
+#   # zeta-adapt: SHOW TABLES — supported. Single column
+#     `Tables_in_<db>` populated from the current connection
+#     database's user tables.
+#   # zeta-adapt: SHOW FULL TABLES — supported. Two columns
+#     (`Tables_in_<db>`, `Table_type`). User-created tables
+#     report `BASE TABLE`.
+#   # zeta-adapt: SHOW COLUMNS FROM <tbl> — supported. Returns
+#     6 columns (Field, Type, Null, Key, Default, Extra)
+#     matching MySQL's row shape.
+#   # zeta-adapt: SHOW CREATE TABLE <tbl> — supported. Returns
+#     (Table, Create Table) with a synth `CREATE TABLE ...`
+#     DDL string. The body uses MySQL-style backtick
+#     identifiers and embeds `\n` escape sequences in the
+#     transport-level rendering; the trailing options claim
+#     `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4` for compatibility
+#     even though the storage backend is zeta's own.
+#   # zeta-adapt: SHOW TABLES LIKE '<pattern>' — supported.
+#     `%` and `_` LIKE wildcards filter the table-name column.
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW GRANTS / SHOW
+#     PROCESSLIST / SHOW VARIABLES / SHOW STATUS — all parse
+#     and execute without error but return empty result sets.
+#     zeta does not currently expose user privileges, active
+#     sessions, server-side variables, or runtime status
+#     counters through the MySQL SHOW surface. Documented here;
+#     NOT pinned positively in the body because empty-result
+#     rows are hard to differentiate from runner-strip in the
+#     MTR format.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sh1;
+DROP TABLE IF EXISTS sh2;
+CREATE TABLE sh1 (id INT PRIMARY KEY);
+CREATE TABLE sh2 (id INT PRIMARY KEY, name VARCHAR(20));
+
+--echo === SHOW DATABASES ===
+
+SHOW DATABASES;
+
+--echo === SHOW TABLES — single column ===
+--sorted_result
+SHOW TABLES;
+
+--echo === SHOW FULL TABLES — adds Table_type column ===
+--sorted_result
+SHOW FULL TABLES;
+
+--echo === SHOW COLUMNS FROM <tbl> ===
+
+SHOW COLUMNS FROM sh2;
+
+--echo === SHOW CREATE TABLE — synth DDL ===
+--echo # Body uses backtick identifiers + `\n` escape sequences
+--echo # in the transport layer. ENGINE/CHARSET claim is a
+--echo # compatibility marker; storage backend is zeta-internal.
+
+SHOW CREATE TABLE sh2;
+
+--echo === SHOW TABLES LIKE pattern ===
+--sorted_result
+SHOW TABLES LIKE 'sh%';
+
+--echo === Cleanup ===
+
+DROP TABLE sh1;
+DROP TABLE sh2;
