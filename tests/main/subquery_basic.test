@@ -15,9 +15,10 @@
 #   # zeta-adapt: derived table in FROM (subquery as a relation) —
 #     supported.
 #   # zeta-adapt: `<op> ANY (subquery)` and `<op> ALL (subquery)` —
-#     partially supported. `= ANY`, `<> ALL`, etc. work, but the
-#     comparison operators (`<`, `>`, `<=`, `>=`) are rejected at
-#     parse with errno 1064. Documented + asserted below.
+#     supported (FIXED via zeta #1144). `= ANY` / `<> ALL` use the
+#     InSubquery path; comparison operators (`<`, `>`, `<=`, `>=`)
+#     are rewritten at parse to a scalar-subquery comparison with
+#     MIN or MAX wrapping the row set. Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — row-constructor IN
 #     (`WHERE (col1, col2) IN ((v1, v2), ...)`) is rejected at parse
 #     with errno 1064 "unsupported expression: (col1, col2)". MySQL
@@ -112,12 +113,28 @@ SELECT id
   WHERE salary <> ALL (SELECT salary FROM emp WHERE dept_id = 30)
   ORDER BY id;
 
---echo === KNOWN DIVERGENCE: > ANY (subquery) — unsupported (errno 1064) ===
---echo # Comparison operators (`<`, `>`, `<=`, `>=`) are not yet
---echo # implemented for ANY / ALL. `=` and `<>` work.
+--echo === Comparison `> ANY (subquery)` — FIXED via zeta #1144 ===
+--echo # Rewritten at parse to `salary > (SELECT MIN(_v) FROM (sub) AS _t(_v))`.
+--echo # dept 30 has salary 60; rows with salary > 60 match.
 
---error 1064
-SELECT id FROM emp WHERE salary > ANY (SELECT salary FROM emp WHERE dept_id = 30);
+SELECT id FROM emp WHERE salary > ANY (SELECT salary FROM emp WHERE dept_id = 30)
+  ORDER BY id;
+
+--echo === Comparison `> ALL (subquery)` — FIXED via zeta #1144 ===
+--echo # Rewritten to `salary > (SELECT MAX(_v) FROM (sub) AS _t(_v))`.
+
+SELECT id FROM emp WHERE salary > ALL (SELECT salary FROM emp WHERE dept_id = 30)
+  ORDER BY id;
+
+--echo === Comparison `< ANY (subquery)` — FIXED via zeta #1144 ===
+
+SELECT id FROM emp WHERE salary < ANY (SELECT salary FROM emp WHERE dept_id = 10)
+  ORDER BY id;
+
+--echo === Comparison `>= ALL (subquery)` — FIXED via zeta #1144 ===
+
+SELECT id FROM emp WHERE salary >= ALL (SELECT salary FROM emp WHERE dept_id = 10)
+  ORDER BY id;
 
 --echo === KNOWN DIVERGENCE: row-constructor IN — unsupported (errno 1064) ===
 --echo # MySQL accepts `WHERE (col1, col2) IN ((v1, v2), ...)`. zeta
