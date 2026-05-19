@@ -1,0 +1,60 @@
+=== Setup ===
+DROP TABLE IF EXISTS ep;
+CREATE TABLE ep (id INT PRIMARY KEY, name VARCHAR(20), age INT);
+INSERT INTO ep VALUES (1, 'a', 10), (2, 'b', 20);
+=== EXPLAIN SELECT — simple SeqScan ===
+EXPLAIN SELECT * FROM ep;
+QUERY PLAN
+SeqScan (ep) [id, name, age]
+  (cost=1.00 rows=0)
+=== EXPLAIN SELECT with WHERE filter ===
+EXPLAIN SELECT * FROM ep WHERE id = 1;
+QUERY PLAN
+SeqScan (ep) [id, name, age] (filter: id = 1)
+  (cost=1.00 rows=0)
+=== EXPLAIN UPDATE ===
+EXPLAIN UPDATE ep SET age = age + 1 WHERE id = 1;
+QUERY PLAN
+Update test.public.ep
+=== EXPLAIN DELETE ===
+EXPLAIN DELETE FROM ep WHERE id = 99;
+QUERY PLAN
+Delete from test.public.ep
+=== EXPLAIN with JOIN — HashJoin tree ===
+DROP TABLE IF EXISTS j2;
+CREATE TABLE j2 (id INT PRIMARY KEY, name VARCHAR(20));
+EXPLAIN SELECT * FROM ep JOIN j2 ON ep.id = j2.id;
+QUERY PLAN
+Project [ep.id, ep.name, ep.age, j2.id, j2.name]
+  HashJoin INNER keys: [ep.id] = [j2.id]
+    Build:
+      SeqScan (j2) [id, name]
+    Probe:
+      SeqScan (ep) [id, name, age]
+  (cost=2.00 rows=0)
+=== EXPLAIN with ORDER BY + LIMIT — Limit > Sort > SeqScan ===
+EXPLAIN SELECT * FROM ep ORDER BY age LIMIT 10;
+QUERY PLAN
+Limit 10
+  Sort [age ASC]
+    SeqScan (ep) [id, name, age]
+  (cost=1.00 rows=0)
+=== EXPLAIN FORMAT=JSON — accept, plain output (divergence) ===
+EXPLAIN FORMAT=JSON SELECT * FROM ep;
+QUERY PLAN
+SeqScan (ep) [id, name, age]
+  (cost=1.00 rows=0)
+=== EXPLAIN (VERBOSE) — accept, no extra detail (divergence) ===
+EXPLAIN (VERBOSE) SELECT * FROM ep;
+QUERY PLAN
+SeqScan (ep) [id, name, age]
+  (cost=1.00 rows=0)
+=== KNOWN GAP: EXPLAIN EXTENDED — errno 1064 ===
+EXPLAIN EXTENDED SELECT * FROM ep;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: * at Line: 1, Column: 25
+=== KNOWN GAP: EXPLAIN PARTITIONS — errno 1064 ===
+EXPLAIN PARTITIONS SELECT * FROM ep;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: SELECT at Line: 1, Column: 20
+=== Cleanup ===
+DROP TABLE ep;
+DROP TABLE j2;

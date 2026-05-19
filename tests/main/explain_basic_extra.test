@@ -1,0 +1,100 @@
+# Independently authored EXPLAIN smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/
+# explain.test or func_explain.test; pins zeta's EXPLAIN
+# behavior across the shapes ORMs and DBAs depend on.
+#
+# Adaptation notes:
+#   # zeta-adapt: EXPLAIN SELECT — supported. Output is zeta's
+#     own indented plan tree (NOT MySQL's columnar shape with
+#     `id / select_type / table / type / possible_keys / key /
+#     key_len / ref / rows / Extra`). Pinned text-shape below.
+#   # zeta-adapt: EXPLAIN UPDATE / DELETE — supported. Output
+#     is a single-line summary (`Update <schema>.<table>` /
+#     `Delete from <schema>.<table>`). zeta doesn't expand the
+#     DML target through the planner the way SELECT does, so
+#     the plan tree is intentionally terse.
+#   # zeta-adapt: EXPLAIN with JOIN — supported. Output shows
+#     the join algorithm (HashJoin), the join keys, and the
+#     Build/Probe partition labels.
+#   # zeta-adapt: EXPLAIN with ORDER BY + LIMIT — supported.
+#     Pipeline nodes appear in top-down execution order:
+#     Limit > Sort > SeqScan.
+#   # zeta-adapt: EXPLAIN with WHERE filter — supported. The
+#     filter predicate appears inline on the SeqScan node
+#     (`filter: <pred>`).
+#   # zeta-adapt: EXPLAIN FORMAT=JSON — KNOWN DIVERGENCE.
+#     Accepted at parse, but the output is unchanged from
+#     plain EXPLAIN (the JSON format directive is a silent
+#     no-op). Pinned positively for the no-op stability.
+#   # zeta-adapt: EXPLAIN (VERBOSE) (PG-style options syntax)
+#     — KNOWN DIVERGENCE. Accepted at parse, no extra detail
+#     is emitted. Pinned positively for the no-op stability.
+#   # zeta-adapt: KNOWN GAP — EXPLAIN ANALYZE — supported but
+#     NOT pinned here. The output includes wall-clock
+#     `Execution Time: N ms` which varies per run; the
+#     MTR runner has no `--replace_regex` equivalent for
+#     masking. Documented here; functional behavior is
+#     covered by zeta-server's own integration tests.
+#   # zeta-adapt: KNOWN GAP — EXPLAIN EXTENDED (deprecated
+#     MySQL 5.7-era syntax) errors 1064 at parse. Portable
+#     substitute: plain EXPLAIN — modern MySQL has folded
+#     the extended output into the default.
+#   # zeta-adapt: KNOWN GAP — EXPLAIN PARTITIONS errors 1064
+#     at parse. zeta doesn't expose partition pruning through
+#     EXPLAIN (the partitioning is internal to the storage
+#     layer).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ep;
+CREATE TABLE ep (id INT PRIMARY KEY, name VARCHAR(20), age INT);
+INSERT INTO ep VALUES (1, 'a', 10), (2, 'b', 20);
+
+--echo === EXPLAIN SELECT — simple SeqScan ===
+
+EXPLAIN SELECT * FROM ep;
+
+--echo === EXPLAIN SELECT with WHERE filter ===
+
+EXPLAIN SELECT * FROM ep WHERE id = 1;
+
+--echo === EXPLAIN UPDATE ===
+
+EXPLAIN UPDATE ep SET age = age + 1 WHERE id = 1;
+
+--echo === EXPLAIN DELETE ===
+
+EXPLAIN DELETE FROM ep WHERE id = 99;
+
+--echo === EXPLAIN with JOIN — HashJoin tree ===
+
+DROP TABLE IF EXISTS j2;
+CREATE TABLE j2 (id INT PRIMARY KEY, name VARCHAR(20));
+EXPLAIN SELECT * FROM ep JOIN j2 ON ep.id = j2.id;
+
+--echo === EXPLAIN with ORDER BY + LIMIT — Limit > Sort > SeqScan ===
+
+EXPLAIN SELECT * FROM ep ORDER BY age LIMIT 10;
+
+--echo === EXPLAIN FORMAT=JSON — accept, plain output (divergence) ===
+
+EXPLAIN FORMAT=JSON SELECT * FROM ep;
+
+--echo === EXPLAIN (VERBOSE) — accept, no extra detail (divergence) ===
+
+EXPLAIN (VERBOSE) SELECT * FROM ep;
+
+--echo === KNOWN GAP: EXPLAIN EXTENDED — errno 1064 ===
+
+--error 1064
+EXPLAIN EXTENDED SELECT * FROM ep;
+
+--echo === KNOWN GAP: EXPLAIN PARTITIONS — errno 1064 ===
+
+--error 1064
+EXPLAIN PARTITIONS SELECT * FROM ep;
+
+--echo === Cleanup ===
+
+DROP TABLE ep;
+DROP TABLE j2;
