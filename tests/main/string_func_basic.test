@@ -49,8 +49,11 @@
 #     (out of scope for this test).
 #   # zeta-adapt: KNOWN DIVERGENCE — `<str> REGEXP <pattern>` binary
 #     operator REJECTED at parse with errno 1064. Substitute the
-#     existing REGEXP_REPLACE / REGEXP_MATCH PG-style scalars (zeta
-#     supports those, exercised in main/function_basic).
+#     existing REGEXP_REPLACE / REGEXP_MATCH PG-style scalars OR the
+#     newly-added REGEXP_LIKE function (pinned below).
+#   # zeta-adapt: REGEXP_LIKE, REGEXP_INSTR — supported (FIXED via
+#     zeta #1157). REGEXP_LIKE returns 0/1; REGEXP_INSTR returns the
+#     1-based byte position of the first match or 0.
 #   # zeta-adapt: STRCMP — supported (FIXED via zeta #1155). Returns
 #     -1, 0, or 1 by lexicographic order. NULL → NULL.
 
@@ -155,15 +158,12 @@ SELECT TO_BASE64('hello');
 --error 1105
 SELECT FROM_BASE64('aGVsbG8=');
 
---echo === KNOWN DIVERGENCE: REGEXP_LIKE — unknown function (errno 1105) ===
+--echo === REGEXP_LIKE / REGEXP_INSTR — FIXED via zeta #1157 ===
 
---error 1105
-SELECT REGEXP_LIKE('hello', '^h');
-
---echo === KNOWN DIVERGENCE: REGEXP_INSTR — unknown function (errno 1105) ===
-
---error 1105
-SELECT REGEXP_INSTR('abcdef', 'cd');
+SELECT REGEXP_LIKE('hello', '^h') AS l_yes, REGEXP_LIKE('hello', '^x') AS l_no;
+SELECT REGEXP_LIKE('HELLO', '^h', 'i') AS l_ci;
+SELECT REGEXP_INSTR('abcdef', 'cd') AS p_match, REGEXP_INSTR('abcdef', 'xy') AS p_miss;
+SELECT REGEXP_INSTR('abcabc', 'a', 2) AS pos2;
 
 --echo === STRCMP — FIXED via zeta #1155 ===
 
