@@ -1,0 +1,113 @@
+=== Setup ===
+=== SUBSTRING_INDEX — positive and negative count ===
+SELECT SUBSTRING_INDEX('a,b,c,d', ',', 2) AS r;
+r
+a,b
+SELECT SUBSTRING_INDEX('a,b,c,d', ',', -2) AS r;
+r
+c,d
+=== LOCATE — found and missing ===
+SELECT LOCATE('bc', 'abcdef') AS pos, LOCATE('xy', 'abcdef') AS missing;
+pos	missing
+2	0
+=== INSERT (string fn) ===
+SELECT INSERT('abcdef', 2, 3, 'XYZ') AS r;
+r
+aXYZef
+=== HEX / UNHEX round-trip ===
+SELECT HEX('A') AS h, UNHEX('41') AS u;
+h	u
+41	A
+=== ELT / FIELD / FIND_IN_SET ===
+SELECT ELT(2, 'a', 'b', 'c') AS pick;
+pick
+b
+SELECT FIELD('b', 'a', 'b', 'c') AS pos;
+pos
+2
+SELECT FIND_IN_SET('b', 'a,b,c') AS pos;
+pos
+2
+=== SPACE / QUOTE / SOUNDEX ===
+SELECT LENGTH(SPACE(5)) AS sp_len;
+sp_len
+5
+SELECT QUOTE('it''s') AS q;
+q
+'it\'s'
+SELECT SOUNDEX('Robert') AS sx_robert, SOUNDEX('Rupert') AS sx_rupert;
+sx_robert	sx_rupert
+R163	R163
+=== FORMAT — number-to-string with thousand separators ===
+SELECT FORMAT(1234567.89, 2) AS r;
+r
+1,234,567.89
+=== LPAD / RPAD ===
+SELECT LPAD('5', 3, '0') AS lp, RPAD('5', 3, '*') AS rp;
+lp	rp
+005	5**
+=== MD5 ===
+SELECT MD5('hello') AS hash;
+hash
+5d41402abc4b2a76b9719d911017c592
+=== UCASE / LCASE / MID (MySQL aliases) ===
+SELECT UCASE('hi') AS u, LCASE('HI') AS l, MID('hello', 2, 3) AS m;
+u	l	m
+HI	hi	ell
+=== ASCII ===
+SELECT ASCII('A') AS a, ASCII('z') AS z;
+a	z
+65	122
+=== TRIM with LEADING / TRAILING / BOTH ===
+SELECT TRIM(LEADING '0' FROM '0000hello') AS lead;
+lead
+hello
+SELECT TRIM(TRAILING '0' FROM 'hello0000') AS trail;
+trail
+hello
+SELECT TRIM(BOTH 'x' FROM 'xxhelloxx') AS both;
+both
+hello
+=== KNOWN DIVERGENCE: LENGTH returns char count, not bytes ===
+# MySQL: LENGTH = bytes, CHAR_LENGTH = chars.
+# zeta: LENGTH = chars (= CHAR_LENGTH). Use OCTET_LENGTH for bytes.
+SELECT LENGTH('héllo') AS zeta_len, OCTET_LENGTH('héllo') AS bytes;
+zeta_len	bytes
+5	6
+=== KNOWN DIVERGENCE: SHA1 — unknown function (errno 1105) ===
+SELECT SHA1('hello');
+ERROR 1105: execution error: unknown function: SHA1
+=== KNOWN DIVERGENCE: SHA2 — unknown function (errno 1105) ===
+SELECT SHA2('hello', 256);
+ERROR 1105: execution error: unknown function: SHA2
+=== KNOWN DIVERGENCE: BIN — unknown function (errno 1105) ===
+SELECT BIN(10);
+ERROR 1105: execution error: unknown function: BIN
+=== KNOWN DIVERGENCE: OCT — unknown function (errno 1105) ===
+SELECT OCT(10);
+ERROR 1105: execution error: unknown function: OCT
+=== KNOWN DIVERGENCE: ORD — unknown function (errno 1105) ===
+SELECT ORD('A');
+ERROR 1105: execution error: unknown function: ORD
+=== KNOWN DIVERGENCE: CHARSET — unknown function (errno 1105) ===
+SELECT CHARSET('hi');
+ERROR 1105: execution error: unknown function: CHARSET
+=== KNOWN DIVERGENCE: COLLATION — unknown function (errno 1105) ===
+SELECT COLLATION('hi');
+ERROR 1105: execution error: unknown function: COLLATION
+=== KNOWN DIVERGENCE: TO_BASE64 — unknown function (errno 1105) ===
+SELECT TO_BASE64('hello');
+ERROR 1105: execution error: unknown function: TO_BASE64
+=== KNOWN DIVERGENCE: FROM_BASE64 — unknown function (errno 1105) ===
+SELECT FROM_BASE64('aGVsbG8=');
+ERROR 1105: execution error: unknown function: FROM_BASE64
+=== KNOWN DIVERGENCE: REGEXP_LIKE — unknown function (errno 1105) ===
+SELECT REGEXP_LIKE('hello', '^h');
+ERROR 1105: execution error: unknown function: REGEXP_LIKE
+=== KNOWN DIVERGENCE: REGEXP_INSTR — unknown function (errno 1105) ===
+SELECT REGEXP_INSTR('abcdef', 'cd');
+ERROR 1105: execution error: unknown function: REGEXP_INSTR
+=== KNOWN DIVERGENCE: STRCMP — unknown function (errno 1105) ===
+SELECT STRCMP('a', 'b');
+ERROR 1105: execution error: unknown function: STRCMP
+=== Cleanup ===
