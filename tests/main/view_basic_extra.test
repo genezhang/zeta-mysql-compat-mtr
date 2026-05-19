@@ -1,0 +1,129 @@
+# Independently authored VIEW-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/view.test or view_*.test files; pins zeta's
+# behavior across the CREATE/ALTER/DROP VIEW and through-view DML
+# shapes NOT already covered by view_basic.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE VIEW v(<col-list>) AS SELECT … —
+#     supported. Column-list rename projects the view columns
+#     under the new names; underlying SELECT positions map by
+#     ordinal.
+#   # zeta-adapt: CREATE VIEW … with aggregate (GROUP BY / SUM
+#     / COUNT) — supported.
+#   # zeta-adapt: View-on-view chain — supported. A view defined
+#     over another view resolves transitively at query time.
+#   # zeta-adapt: JOIN with a view in the FROM clause — supported.
+#   # zeta-adapt: DROP VIEW … CASCADE — accepted at parse, but
+#     does NOT actually cascade-drop dependent views (true MySQL
+#     also accepts but treats CASCADE as a no-op on dependency
+#     analysis — zeta matches MySQL on this even though it
+#     diverges from PG's true cascade). Pinned below: a chained
+#     view becomes broken after its base is dropped CASCADE; the
+#     dependent's name persists but resolution errors 1146 on
+#     SELECT.
+#   # zeta-adapt: KNOWN GAP — `WITH CHECK OPTION` (MySQL/PG/SQL
+#     standard) raises errno 1064 at parse. Portable substitute:
+#     enforce the predicate at insert/update via a trigger or
+#     application code.
+#   # zeta-adapt: KNOWN GAP — `ALTER VIEW v AS SELECT …` raises
+#     errno 1064 "unsupported statement: sqlparser::ast::Statement".
+#     Portable substitute: CREATE OR REPLACE VIEW (pinned in
+#     view_basic.test).
+#   # zeta-adapt: KNOWN GAP — INSERT / UPDATE / DELETE through a
+#     view (updatable view DML) errors 1146 "table not found".
+#     Through-view DML resolution is not wired through the
+#     pgwire path. Portable substitute: target the underlying
+#     base table directly.
+#   # zeta-adapt: KNOWN GAP — CREATE VIEW IF NOT EXISTS does NOT
+#     silently no-op like MySQL — it errors 1105 "view already
+#     exists" identically to CREATE VIEW. Header tracks the
+#     errno mismatch (also wrong: should be 1050
+#     ER_TABLE_EXISTS_ERROR, not 1105). Portable substitute:
+#     `DROP VIEW IF EXISTS x; CREATE VIEW x ...` or `CREATE OR
+#     REPLACE VIEW`.
+#   # zeta-adapt: KNOWN DIVERGENCE — `SHOW CREATE VIEW`, `DESCRIBE
+#     v`, and `SHOW [FULL] TABLES` all return empty / exclude
+#     views; not pinned positively (empty result is hard to
+#     differentiate from a runner-strip), documented here.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS t;
+CREATE TABLE t (id INT PRIMARY KEY, name VARCHAR(20), val INT);
+INSERT INTO t VALUES (1, 'a', 10), (2, 'b', 20), (3, 'c', 30);
+
+--echo === CREATE VIEW v(col-list) — column-rename ===
+
+CREATE VIEW v_rename(uid, who) AS SELECT id, name FROM t;
+--sorted_result
+SELECT uid, who FROM v_rename;
+
+--echo === CREATE VIEW with aggregate (GROUP BY) ===
+
+CREATE VIEW v_agg AS
+  SELECT name, SUM(val) AS total FROM t GROUP BY name;
+--sorted_result
+SELECT name, total FROM v_agg;
+
+--echo === View-on-view chain ===
+
+CREATE VIEW v_base AS SELECT id, val FROM t WHERE val >= 20;
+CREATE VIEW v_on_v AS SELECT id FROM v_base WHERE id < 5;
+--sorted_result
+SELECT id FROM v_on_v;
+
+--echo === JOIN with a view ===
+
+SELECT t.val, v_rename.who
+  FROM t JOIN v_rename ON t.id = v_rename.uid
+  ORDER BY t.id;
+
+--echo === KNOWN GAP: WITH CHECK OPTION — errno 1064 ===
+
+--error 1064
+CREATE VIEW v_check AS SELECT id, name FROM t WHERE val > 15 WITH CHECK OPTION;
+
+--echo === KNOWN GAP: ALTER VIEW — errno 1064 ===
+
+--error 1064
+ALTER VIEW v_rename AS SELECT name AS who, id AS uid FROM t;
+
+--echo === KNOWN GAP: INSERT INTO view — errno 1146 ===
+
+--error 1146
+INSERT INTO v_rename (uid, who) VALUES (99, 'z');
+
+--echo === KNOWN GAP: UPDATE through view — errno 1146 ===
+
+--error 1146
+UPDATE v_rename SET who = 'zz' WHERE uid = 1;
+
+--echo === KNOWN GAP: DELETE through view — errno 1146 ===
+
+--error 1146
+DELETE FROM v_rename WHERE uid = 1;
+
+--echo === KNOWN GAP: CREATE VIEW IF NOT EXISTS — errno 1105 ===
+--echo # MySQL silent-no-ops on a second IF NOT EXISTS; zeta
+--echo # errors 1105 like a plain CREATE.
+
+--error 1105
+CREATE VIEW IF NOT EXISTS v_rename AS SELECT id FROM t;
+
+--echo === DROP VIEW … CASCADE — accept, no actual cascade ===
+--echo # CASCADE is accepted at parse, the named view is dropped,
+--echo # but a dependent view (v_on_v over v_base) is NOT also
+--echo # dropped. The dependent's name persists; subsequent SELECT
+--echo # errors 1146 because resolution fails on the missing base.
+
+DROP VIEW v_base CASCADE;
+--error 1146
+SELECT id FROM v_on_v;
+
+--echo === Cleanup ===
+
+DROP VIEW IF EXISTS v_on_v;
+DROP VIEW IF EXISTS v_agg;
+DROP VIEW IF EXISTS v_rename;
+DROP TABLE t;
