@@ -34,10 +34,13 @@
 #     zeta #1183. Returns the substring of the first regex match
 #     (or NULL if none). Same arg shape as REGEXP_INSTR. Extra
 #     MySQL args (occurrence, match_type) aren't supported yet.
-#   # zeta-adapt: KNOWN GAP — `str REGEXP pattern` (and
-#     synonym `str RLIKE pattern`) infix operator errors 1064
-#     "unsupported expression". Portable substitute: REGEXP_LIKE
-#     (covered positively above) or REGEXP_INSTR > 0.
+#   # zeta-adapt: `str REGEXP pattern` (and synonym
+#     `str RLIKE pattern`) infix — FIXED via zeta #1189.
+#     Both forms convert to a synthetic REGEXP_LIKE(expr,
+#     pattern) function call at AST conversion. NOT REGEXP /
+#     NOT RLIKE builds as `REGEXP_LIKE(...) = 0` to preserve
+#     NULL propagation (REGEXP_LIKE returns Int64 1/0; the
+#     `= 0` keeps NULL → NULL via standard comparison 3VL).
 #   # zeta-adapt: KNOWN GAP — `CONVERT(str USING <charset>)`
 #     errors 1064 "unsupported expression". zeta is UTF-8
 #     throughout (no per-column charset). Portable substitute:
@@ -92,13 +95,11 @@ SELECT CONCAT_WS('-', '', 'a', '') AS c;
 SELECT REGEXP_SUBSTR('hello world', 'w[a-z]+') AS r;
 SELECT REGEXP_SUBSTR('hello world', 'zz[a-z]+') AS r_miss;
 
---echo === KNOWN GAP: infix REGEXP / RLIKE — errno 1064 ===
+--echo === infix REGEXP / RLIKE — FIXED via zeta #1189 ===
 
---error 1064
-SELECT 'hello' REGEXP 'l+';
-
---error 1064
-SELECT 'hello' RLIKE 'l+';
+SELECT 'hello' REGEXP 'l+' AS m;
+SELECT 'hello' RLIKE 'l+'  AS r;
+SELECT 'xyz'   NOT REGEXP 'l+' AS nr;
 
 --echo === KNOWN GAP: CONVERT(str USING charset) — errno 1064 ===
 
