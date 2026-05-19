@@ -43,11 +43,15 @@
 #     Two-arg form: returns 1 if candidate contained in target,
 #     0 otherwise; NULL on NULL. Routes through zeta-jsonb's PG
 #     `@>` semantics. Three-arg path form is a separate slice.
+#   # zeta-adapt: JSON_OBJECTAGG — supported (existing zeta
+#     aggregate; MySQL alias for jsonb_object_agg). Pinned
+#     positively below. NULL key raises errno 1105 (MySQL emits
+#     1582 ER_JSON_DOCUMENT_NULL_KEY) — not pinned for errno
+#     stability.
 #   # zeta-adapt: KNOWN GAPS — the following MySQL JSON_xxx
 #     functions are NOT yet implemented and raise errno 1105
 #     "unknown function":
-#       JSON_SET, JSON_INSERT, JSON_REPLACE,
-#       JSON_OBJECTAGG.
+#       JSON_SET, JSON_INSERT, JSON_REPLACE.
 #     Pinned below — a future implementation that wires any of
 #     these to jsonb_* implementations will need to retighten.
 #   # zeta-adapt: JSON object keys are returned in sorted order
@@ -167,6 +171,16 @@ SELECT JSON_CONTAINS('[1,2,3]', '2') AS r;
 SELECT JSON_CONTAINS('[1,2,3]', '4') AS r;
 SELECT JSON_CONTAINS('[1,2,3]', '[2,3]') AS r;
 SELECT JSON_CONTAINS(CAST(NULL AS JSON), '1') AS r;
+
+--echo === JSON_OBJECTAGG — supported (alias for jsonb_object_agg) ===
+--echo # Builds a JSON object from a (key, value) pair across the
+--echo # group. Keys are sorted (JSONB semantics).
+
+DROP TABLE IF EXISTS kv;
+CREATE TABLE kv (k VARCHAR(10), v INT);
+INSERT INTO kv VALUES ('a', 1), ('b', 2), ('c', 3);
+SELECT JSON_OBJECTAGG(k, v) AS o FROM kv;
+DROP TABLE kv;
 
 --echo === Cleanup ===
 
