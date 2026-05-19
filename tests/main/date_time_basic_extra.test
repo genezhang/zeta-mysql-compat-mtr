@@ -1,0 +1,155 @@
+# Independently authored DATE/TIME-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/date_*.test or func_time.test files; pins zeta's
+# behavior across the SQL-standard / PG date-time surface NOT
+# held by datetime_format_basic (which covers the MySQL
+# DATE_FORMAT / STR_TO_DATE / DATE_ADD-INTERVAL / DATEDIFF /
+# component-extractor / UNIX_TIMESTAMP / one-arg DATE/TIME
+# surface).
+#
+# Adaptation notes:
+#   # zeta-adapt: SQL-standard typed literals `DATE 'YYYY-MM-DD'`,
+#     `TIME 'HH:MM:SS'`, `TIMESTAMP 'YYYY-MM-DD HH:MM:SS'` —
+#     all supported.
+#   # zeta-adapt: PG-style INTERVAL string literal `INTERVAL
+#     '<n> <unit>'` — supported. Also supports `INTERVAL '<n>'
+#     <unit>` (sqlparser-flavored) and `INTERVAL <n> <unit>`
+#     (MySQL-flavored). All three render as HH:MM:SS in the
+#     wire output (zeta's INTERVAL display format).
+#   # zeta-adapt: DATE +/- INTERVAL arithmetic — supported.
+#     KNOWN DIVERGENCE: zeta promotes DATE to TIMESTAMP form in
+#     the result (`YYYY-MM-DD 00:00:00`) even when the input is
+#     a bare DATE — matches the datetime_format_basic
+#     DATE_ADD/DATE_SUB pin.
+#   # zeta-adapt: DATE - DATE → integer day difference (PG/Spark
+#     semantics); TIMESTAMP - TIMESTAMP → INTERVAL `HH:MM:SS`.
+#   # zeta-adapt: EXTRACT(<field> FROM expr) — supported for
+#     YEAR/MONTH/DAY/HOUR/MINUTE/SECOND.
+#   # zeta-adapt: DATE_TRUNC('<unit>', ts) — supported for
+#     'year', 'month', 'week', 'day', 'hour'. Returns the
+#     TIMESTAMP at the truncated boundary.
+#   # zeta-adapt: CURRENT_DATE, CURRENT_TIMESTAMP — supported.
+#     Returned values are time-dependent, so only relational
+#     assertions are pinned (CURRENT_DATE = CURRENT_DATE,
+#     CURRENT_TIMESTAMP > <fixed past timestamp>).
+#   # zeta-adapt: DATE / TIMESTAMP columns can be filtered by
+#     a typed literal in WHERE (predicate pushdown is
+#     orthogonal — this just confirms equality/comparison
+#     semantics through the wire).
+#   # zeta-adapt: `AT TIME ZONE '<tz>'` — accepted at parse,
+#     SILENT PASS-THROUGH: returns the input timestamp unchanged
+#     (no actual TZ conversion). Documented divergence; pinned
+#     positively for the no-op stability.
+#   # zeta-adapt: KNOWN GAP — WEEKOFYEAR(date) errors 1105
+#     "unknown function: WEEKOFYEAR". Portable substitute: WEEK
+#     (covered in datetime_format_basic) which returns the same
+#     ISO week number for most inputs.
+#   # zeta-adapt: KNOWN GAP — ADDTIME(t, n), SUBTIME(t, n)
+#     error 1105 "unknown function". Portable substitute: cast
+#     TIME to TIMESTAMP and add/subtract an INTERVAL.
+#   # zeta-adapt: KNOWN GAP — MAKEDATE(year, dayofyear),
+#     MAKETIME(h, m, s) error 1105 "unknown function". Portable
+#     substitute: MAKE_DATE / MAKE_TIME (PG-style) — pinned
+#     positively below for the substitute path.
+
+--echo === DATE / TIME / TIMESTAMP typed literals ===
+
+SELECT DATE '2024-01-01'           AS d;
+SELECT TIME '14:30:00'             AS t;
+SELECT TIMESTAMP '2024-01-01 14:30:00' AS ts;
+
+--echo === DATE + INTERVAL '<n> <unit>' (PG syntax) ===
+
+SELECT DATE '2024-01-01' + INTERVAL '7 days'   AS d_plus_7;
+SELECT DATE '2024-01-01' - INTERVAL '1 month'  AS d_minus_1m;
+SELECT TIMESTAMP '2024-01-01 12:00:00' + INTERVAL '3 hours' AS ts_plus_3h;
+
+--echo === Negative-literal INTERVAL ===
+
+SELECT DATE '2024-05-19' + INTERVAL '-3 days'  AS d_minus_3;
+
+--echo === DATE - DATE → integer days; TIMESTAMP - TIMESTAMP → HH:MM:SS ===
+
+SELECT DATE '2024-05-19' - DATE '2024-05-10'   AS day_diff;
+SELECT TIMESTAMP '2024-05-19 14:00:00' - TIMESTAMP '2024-05-19 10:00:00' AS hr_diff;
+
+--echo === INTERVAL syntax variants — all render as HH:MM:SS ===
+
+SELECT INTERVAL '1 day' AS i_pg;
+SELECT INTERVAL '1' DAY AS i_quoted;
+SELECT INTERVAL 1 DAY   AS i_mysql;
+
+--echo === EXTRACT(<field> FROM expr) ===
+
+SELECT EXTRACT(YEAR  FROM DATE '2024-05-19')                  AS y;
+SELECT EXTRACT(MONTH FROM TIMESTAMP '2024-05-19 14:30:45')    AS m;
+SELECT EXTRACT(DAY   FROM TIMESTAMP '2024-05-19 14:30:45')    AS d;
+SELECT EXTRACT(HOUR  FROM TIME '14:30:45')                    AS h;
+SELECT EXTRACT(MINUTE FROM TIMESTAMP '2024-05-19 14:30:45')   AS mi;
+SELECT EXTRACT(SECOND FROM TIMESTAMP '2024-05-19 14:30:45')   AS s;
+
+--echo === DATE_TRUNC('<unit>', ts) ===
+
+SELECT DATE_TRUNC('year',  TIMESTAMP '2024-05-19 14:30:45') AS d_yr;
+SELECT DATE_TRUNC('month', TIMESTAMP '2024-05-19 14:30:45') AS d_mo;
+SELECT DATE_TRUNC('week',  TIMESTAMP '2024-05-19 14:30:45') AS d_wk;
+SELECT DATE_TRUNC('day',   TIMESTAMP '2024-05-19 14:30:45') AS d_da;
+SELECT DATE_TRUNC('hour',  TIMESTAMP '2024-05-19 14:30:45') AS d_hr;
+
+--echo === CURRENT_DATE / CURRENT_TIMESTAMP — relational only ===
+--echo # Values are wall-clock; only the relational predicates
+--echo # are pinned for stability.
+
+SELECT CURRENT_DATE = CURRENT_DATE                            AS same_date;
+SELECT CURRENT_TIMESTAMP > TIMESTAMP '2020-01-01 00:00:00'    AS in_future;
+
+--echo === DATE / TIMESTAMP filter through WHERE ===
+
+DROP TABLE IF EXISTS dts;
+CREATE TABLE dts (id INT PRIMARY KEY, d DATE, t TIMESTAMP);
+INSERT INTO dts VALUES
+  (1, '2024-05-19', '2024-05-19 10:00:00'),
+  (2, '2024-06-01', '2024-06-01 15:30:00');
+
+--sorted_result
+SELECT id FROM dts WHERE d = DATE '2024-05-19';
+
+--sorted_result
+SELECT id FROM dts WHERE t < TIMESTAMP '2024-06-01 00:00:00';
+
+--echo === AT TIME ZONE '<tz>' — silent pass-through ===
+--echo # KNOWN DIVERGENCE: zeta accepts the syntax at parse and
+--echo # returns the input timestamp unchanged. No actual TZ
+--echo # conversion is performed.
+
+SELECT TIMESTAMP '2024-01-01 14:30:00' AT TIME ZONE 'UTC' AS ts_utc;
+
+--echo === MAKE_DATE / MAKE_TIME — PG-style constructors (substitutes for MAKEDATE/MAKETIME) ===
+
+SELECT MAKE_DATE(2024, 5, 19) AS md;
+SELECT MAKE_TIME(14, 30, 45)  AS mt;
+
+--echo === KNOWN GAP: WEEKOFYEAR — errno 1105 ===
+
+--error 1105
+SELECT WEEKOFYEAR('2024-05-19');
+
+--echo === KNOWN GAP: ADDTIME / SUBTIME — errno 1105 ===
+
+--error 1105
+SELECT ADDTIME('14:30:00', '1:30:00');
+
+--error 1105
+SELECT SUBTIME('14:30:00', '1:30:00');
+
+--echo === KNOWN GAP: MAKEDATE / MAKETIME (MySQL spellings) — errno 1105 ===
+
+--error 1105
+SELECT MAKEDATE(2024, 140);
+
+--error 1105
+SELECT MAKETIME(14, 30, 45);
+
+--echo === Cleanup ===
+
+DROP TABLE dts;
