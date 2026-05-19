@@ -6,10 +6,8 @@
 # Adaptation notes:
 #   # zeta-adapt: scalar subquery in SELECT — supported.
 #   # zeta-adapt: scalar subquery in WHERE — supported.
-#   # zeta-adapt: scalar subquery returning >1 row — rejected at
-#     execution. Errno is 1105 (generic execution error) vs MySQL's
-#     1242 (ER_SUBQUERY_NO_1_ROW). Behavior matches; only the errno
-#     differs.
+#   # zeta-adapt: scalar subquery returning >1 row — rejected with
+#     MySQL-standard errno 1242 (ER_SUBQUERY_NO_1_ROW) via zeta #1143.
 #   # zeta-adapt: IN / NOT IN (subquery) — supported.
 #   # zeta-adapt: EXISTS / NOT EXISTS — supported.
 #   # zeta-adapt: correlated subquery (outer-row binding in the WHERE
@@ -129,12 +127,10 @@ SELECT id FROM emp WHERE salary > ANY (SELECT salary FROM emp WHERE dept_id = 30
 --error 1064
 SELECT id FROM emp WHERE (dept_id, name) IN ((10, 'alice'), (30, 'eve'));
 
---echo === KNOWN DIVERGENCE: scalar subquery >1 row — errno 1105 ===
---echo # MySQL emits 1242 (ER_SUBQUERY_NO_1_ROW); zeta emits the
---echo # generic 1105. Behavior (rejection) matches; only the errno
---echo # differs.
+--echo === Scalar subquery >1 row — errno 1242 (FIXED via zeta #1143) ===
+--echo # zeta now emits MySQL-standard 1242 (ER_SUBQUERY_NO_1_ROW).
 
---error 1105
+--error 1242
 SELECT (SELECT id FROM emp) AS x FROM emp LIMIT 1;
 
 --echo === KNOWN DIVERGENCE: LATERAL with correlated subquery ===
