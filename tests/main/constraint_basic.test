@@ -1,0 +1,149 @@
+# Independently authored CONSTRAINT smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/constraint*.test;
+# pins zeta's behavior across the constraint shapes ORMs and migration
+# tools depend on.
+#
+# Adaptation notes:
+#   # zeta-adapt: PRIMARY KEY — supported. Duplicate-key violations
+#     surface MySQL errno 1062 (Duplicate entry). PRIMARY KEY columns
+#     are implicitly NOT NULL.
+#   # zeta-adapt: UNIQUE (inline and composite) — supported. Duplicate
+#     surfaces errno 1062 (matches MySQL).
+#   # zeta-adapt: DEFAULT <literal> — supported for inserted-omitted
+#     columns.
+#   # zeta-adapt: NOT NULL — enforced on INSERT but error code is 1105
+#     ("execution error") rather than MySQL's 1048 ("Column ... cannot
+#     be null"). Pinned below.
+#   # zeta-adapt: CHECK — enforced on INSERT but error code is 1105
+#     rather than MySQL's 3819 ("Check constraint ... is violated").
+#     Pinned below.
+#   # zeta-adapt: FOREIGN KEY (inline + table-level, RESTRICT default)
+#     — enforced on both INSERT-of-orphan and DELETE-of-referenced-
+#     parent, but error code is 1105 rather than MySQL's 1452 / 1451.
+#     NULL child values bypass the FK check (MySQL behavior). Pinned
+#     below.
+#   # zeta-adapt: KNOWN DIVERGENCE — UPDATE that sets a NOT NULL
+#     column to NULL is silently accepted (the row ends up with
+#     a NULL value in the NOT NULL column). MySQL errors with 1048.
+#     Documented + asserted below; alignment is tracked as a follow-up.
+#   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE ADD CONSTRAINT CHECK
+#     is rejected at parse with errno 1064 ("unsupported ALTER TABLE
+#     ADD CONSTRAINT type"). MySQL supports it. Not exercised here.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS c_pk;
+CREATE TABLE c_pk (id INT PRIMARY KEY, name VARCHAR(20));
+
+--echo === PRIMARY KEY duplicate — errno 1062 ===
+
+INSERT INTO c_pk VALUES (1, 'a');
+--error 1062
+INSERT INTO c_pk VALUES (1, 'a-again');
+
+--echo === PRIMARY KEY is implicitly NOT NULL ===
+--echo # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 1048.
+--echo # Behavior (rejection) is correct; only the errno differs.
+
+--error 1105
+INSERT INTO c_pk VALUES (NULL, 'x');
+
+--echo === UNIQUE inline + composite ===
+
+DROP TABLE IF EXISTS c_uniq;
+CREATE TABLE c_uniq (id INT PRIMARY KEY, email VARCHAR(30) UNIQUE);
+INSERT INTO c_uniq VALUES (1, 'a@x'), (2, 'b@x');
+--error 1062
+INSERT INTO c_uniq VALUES (3, 'a@x');
+
+DROP TABLE IF EXISTS c_uniq2;
+CREATE TABLE c_uniq2 (a INT, b INT, UNIQUE(a, b));
+INSERT INTO c_uniq2 VALUES (1, 2), (1, 3);
+# (1, 2) again violates the composite UNIQUE.
+--error 1062
+INSERT INTO c_uniq2 VALUES (1, 2);
+
+--echo === DEFAULT — literal value substituted for omitted column ===
+
+DROP TABLE IF EXISTS c_def;
+CREATE TABLE c_def (
+  id INT PRIMARY KEY,
+  status VARCHAR(10) DEFAULT 'active',
+  n INT DEFAULT 0
+);
+INSERT INTO c_def (id) VALUES (1);
+INSERT INTO c_def (id, status) VALUES (2, 'pending');
+SELECT id, status, n FROM c_def ORDER BY id;
+
+--echo === NOT NULL on INSERT — explicit NULL is rejected ===
+--echo # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 1048.
+
+DROP TABLE IF EXISTS c_nn;
+CREATE TABLE c_nn (id INT PRIMARY KEY, name VARCHAR(20) NOT NULL);
+--error 1105
+INSERT INTO c_nn VALUES (1, NULL);
+
+--echo === NOT NULL on INSERT — missing column is rejected ===
+
+--error 1105
+INSERT INTO c_nn (id) VALUES (2);
+
+--echo === KNOWN DIVERGENCE: NOT NULL on UPDATE — zeta silently ===
+--echo # accepts a NULL update. MySQL errors with 1048. The row ends
+--echo # up with a NULL value in the NOT NULL column. Asserted
+--echo # explicitly so the divergence is impossible to miss.
+
+INSERT INTO c_nn VALUES (10, 'alice');
+UPDATE c_nn SET name = NULL WHERE id = 10;
+SELECT id, name FROM c_nn WHERE id = 10;
+
+--echo === CHECK — violation rejected ===
+--echo # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 3819.
+
+DROP TABLE IF EXISTS c_chk;
+CREATE TABLE c_chk (id INT PRIMARY KEY, age INT CHECK (age >= 0));
+INSERT INTO c_chk VALUES (1, 30);
+--error 1105
+INSERT INTO c_chk VALUES (2, -5);
+SELECT id, age FROM c_chk ORDER BY id;
+
+--echo === FOREIGN KEY — insert of orphan rejected ===
+--echo # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 1452.
+
+DROP TABLE IF EXISTS c_child;
+DROP TABLE IF EXISTS c_parent;
+CREATE TABLE c_parent (id INT PRIMARY KEY, name VARCHAR(10));
+INSERT INTO c_parent VALUES (1, 'p1'), (2, 'p2');
+CREATE TABLE c_child (
+  id INT PRIMARY KEY,
+  parent_id INT,
+  FOREIGN KEY (parent_id) REFERENCES c_parent(id)
+);
+INSERT INTO c_child VALUES (10, 1);
+--error 1105
+INSERT INTO c_child VALUES (11, 999);
+
+--echo === FOREIGN KEY — NULL child value is allowed (MySQL behavior) ===
+
+INSERT INTO c_child VALUES (12, NULL);
+SELECT id, parent_id FROM c_child ORDER BY id;
+
+--echo === FOREIGN KEY — delete of referenced parent rejected (RESTRICT) ===
+--echo # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 1451.
+
+--error 1105
+DELETE FROM c_parent WHERE id = 1;
+# Unreferenced parent deletes fine.
+DELETE FROM c_parent WHERE id = 2;
+SELECT id FROM c_parent ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE c_child;
+DROP TABLE c_parent;
+DROP TABLE c_chk;
+DROP TABLE c_nn;
+DROP TABLE c_def;
+DROP TABLE c_uniq2;
+DROP TABLE c_uniq;
+DROP TABLE c_pk;
