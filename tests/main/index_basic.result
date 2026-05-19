@@ -1,0 +1,59 @@
+=== Setup ===
+DROP TABLE IF EXISTS u;
+CREATE TABLE u (id INT PRIMARY KEY, email VARCHAR(40), name VARCHAR(20), age INT);
+=== CREATE INDEX (non-unique) ===
+CREATE INDEX idx_name ON u(name);
+=== CREATE UNIQUE INDEX + uniqueness enforcement ===
+CREATE UNIQUE INDEX idx_email ON u(email);
+INSERT INTO u VALUES (1, 'a@x', 'alice', 30), (2, 'b@x', 'bob', 25);
+SELECT id, email FROM u ORDER BY id;
+id	email
+1	a@x
+2	b@x
+=== Duplicate unique value — errno 1062 ===
+INSERT INTO u VALUES (3, 'a@x', 'alice2', 28);
+ERROR 1062: duplicate key value violates unique constraint "idx_email": Key already exists in index "idx_email"
+=== DROP INDEX ===
+DROP INDEX idx_name ON u;
+=== CREATE INDEX IF NOT EXISTS — first call creates ===
+# KNOWN DIVERGENCE (NOT pinned with --error): MySQL
+# treats a second CREATE INDEX IF NOT EXISTS on the same
+# name as a silent no-op; zeta errors with 1105. The
+# equivalent CREATE INDEX without IF NOT EXISTS also
+# errors with 1105 (MySQL uses 1061). Both error messages
+# contain the internal table_id which varies with suite
+# run order — not pinned to avoid brittleness.
+CREATE INDEX IF NOT EXISTS idx_age ON u(age);
+=== Multi-column CREATE INDEX ===
+DROP TABLE IF EXISTS mc;
+CREATE TABLE mc (id INT PRIMARY KEY, a INT, b INT);
+CREATE INDEX idx_ab ON mc(a, b);
+=== SHOW INDEX FROM u — 6-column shape ===
+SHOW INDEX FROM u;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+u	0	PRIMARY	1	id	BTREE
+u	0	idx_email	1	email	BTREE
+u	1	idx_age	1	age	BTREE
+=== SHOW INDEX FROM mc — multi-column index has one row per column ===
+SHOW INDEX FROM mc;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+mc	0	PRIMARY	1	id	BTREE
+mc	1	idx_ab	1	a	BTREE
+mc	1	idx_ab	2	b	BTREE
+=== information_schema.STATISTICS metadata ===
+# zeta does not currently honor ORDER BY on
+# information_schema.STATISTICS rows; --sorted_result
+# lex-sorts client-side to keep the assertion stable.
+SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME
+  FROM information_schema.STATISTICS
+  WHERE TABLE_NAME IN ('u', 'mc');
+TABLE_NAME	INDEX_NAME	COLUMN_NAME
+mc	PRIMARY	id
+mc	idx_ab	a
+mc	idx_ab	b
+u	PRIMARY	id
+u	idx_age	age
+u	idx_email	email
+=== Cleanup ===
+DROP TABLE u;
+DROP TABLE mc;
