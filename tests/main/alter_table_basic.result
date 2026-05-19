@@ -1,0 +1,94 @@
+=== Setup ===
+DROP TABLE IF EXISTS at1;
+CREATE TABLE at1 (id INT PRIMARY KEY, name VARCHAR(20));
+INSERT INTO at1 VALUES (1, 'alice'), (2, 'bob');
+=== ADD COLUMN — bare ===
+ALTER TABLE at1 ADD COLUMN age INT;
+SELECT id, age FROM at1 ORDER BY id;
+id	age
+1	NULL
+2	NULL
+=== ADD COLUMN — with DEFAULT ===
+ALTER TABLE at1 ADD COLUMN status VARCHAR(10) DEFAULT 'active';
+SELECT id, status FROM at1 ORDER BY id;
+id	status
+1	active
+2	active
+=== ADD COLUMN — NOT NULL with DEFAULT ===
+ALTER TABLE at1 ADD COLUMN city VARCHAR(20) NOT NULL DEFAULT 'unknown';
+SELECT id, city FROM at1 ORDER BY id;
+id	city
+1	unknown
+2	unknown
+=== ADD COLUMN IF NOT EXISTS — silent on duplicate ===
+ALTER TABLE at1 ADD COLUMN IF NOT EXISTS age INT;
+=== DROP COLUMN ===
+ALTER TABLE at1 DROP COLUMN age;
+=== DROP COLUMN IF EXISTS — silent on missing ===
+ALTER TABLE at1 DROP COLUMN IF EXISTS does_not_exist;
+=== RENAME COLUMN ===
+ALTER TABLE at1 RENAME COLUMN status TO state;
+SELECT id, state FROM at1 ORDER BY id;
+id	state
+1	active
+2	active
+=== MODIFY COLUMN (MySQL) ===
+ALTER TABLE at1 MODIFY COLUMN name VARCHAR(40);
+=== CHANGE COLUMN (MySQL — rename + retype) ===
+ALTER TABLE at1 CHANGE COLUMN city town VARCHAR(30) NOT NULL;
+SELECT id, town FROM at1 ORDER BY id;
+id	town
+1	unknown
+2	unknown
+=== RENAME TABLE TO ===
+ALTER TABLE at1 RENAME TO at_renamed;
+SELECT id FROM at_renamed ORDER BY id;
+id
+1
+2
+ALTER TABLE at_renamed RENAME TO at1;
+=== ADD CONSTRAINT PRIMARY KEY — enforced ===
+DROP TABLE IF EXISTS no_pk;
+CREATE TABLE no_pk (id INT);
+ALTER TABLE no_pk ADD CONSTRAINT pk_id PRIMARY KEY (id);
+INSERT INTO no_pk VALUES (1);
+INSERT INTO no_pk VALUES (1);
+ERROR 1062: duplicate key value violates primary key "test.public.no_pk": Key already exists in table "test.public.no_pk"
+=== ADD CONSTRAINT FOREIGN KEY — enforced ===
+DROP TABLE IF EXISTS at_parent;
+DROP TABLE IF EXISTS at_child;
+CREATE TABLE at_parent (id INT PRIMARY KEY);
+INSERT INTO at_parent VALUES (10), (20);
+CREATE TABLE at_child (id INT PRIMARY KEY, pid INT);
+ALTER TABLE at_child ADD CONSTRAINT fk_pid FOREIGN KEY (pid) REFERENCES at_parent(id);
+INSERT INTO at_child VALUES (1, 10);
+INSERT INTO at_child VALUES (2, 999);
+ERROR 1105: foreign key violation: insert or update on table "test.public.at_child" violates foreign key constraint "fk_pid": key is not present in table "test.public.at_parent"
+=== KNOWN DIVERGENCE: ADD CONSTRAINT UNIQUE — errno 1064 ===
+# MySQL accepts; zeta rejects. Substitute standalone
+# CREATE UNIQUE INDEX.
+ALTER TABLE at1 ADD CONSTRAINT u_name UNIQUE (name);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE ADD CONSTRAINT type
+=== KNOWN DIVERGENCE: ADD CONSTRAINT CHECK — errno 1064 ===
+# MySQL accepts; zeta rejects. Substitute CHECK at CREATE TABLE.
+ALTER TABLE at1 ADD CONSTRAINT c_id CHECK (id > 0);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE ADD CONSTRAINT type
+=== KNOWN DIVERGENCE: ADD INDEX (MySQL form) — silent no-op ===
+# `ALTER TABLE t ADD INDEX idx (col)` parses OK but the index
+# is NOT created. Asserted via SHOW INDEX FROM after the ALTER:
+# only PRIMARY remains, no idx_name. Substitute standalone
+# `CREATE INDEX idx ON t (col)`.
+ALTER TABLE at1 ADD INDEX idx_name (name);
+SHOW INDEX FROM at1;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+at1	0	PRIMARY	1	id	BTREE
+=== KNOWN DIVERGENCE: DROP INDEX (MySQL form) — errno 1064 ===
+# `ALTER TABLE t DROP INDEX idx` rejected. Substitute
+# standalone `DROP INDEX idx ON t`.
+ALTER TABLE at1 DROP INDEX idx_name;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: DROP INDEX idx_name
+=== Cleanup ===
+DROP TABLE at1;
+DROP TABLE no_pk;
+DROP TABLE at_child;
+DROP TABLE at_parent;
