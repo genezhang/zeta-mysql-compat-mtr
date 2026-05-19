@@ -1,0 +1,115 @@
+# Independently authored window-function smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/window_functions.test or similar; pins zeta's
+# behavior across the window shapes ORMs and analytics tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: ROW_NUMBER / RANK / DENSE_RANK — supported.
+#   # zeta-adapt: PARTITION BY + ORDER BY inside OVER — supported.
+#   # zeta-adapt: LAG / LEAD with default value — supported.
+#   # zeta-adapt: FIRST_VALUE — supported.
+#   # zeta-adapt: NTILE(N) — supported.
+#   # zeta-adapt: COUNT(*) OVER (PARTITION BY …) — supported.
+#   # zeta-adapt: SUM(...) OVER () — empty-OVER total — supported.
+#   # zeta-adapt: SUM(...) OVER (ORDER BY … ROWS BETWEEN UNBOUNDED
+#     PRECEDING AND CURRENT ROW) — running total, supported.
+#   # zeta-adapt: SUM(...) OVER (ORDER BY … ROWS BETWEEN N PRECEDING
+#     AND CURRENT ROW) — bounded preceding, supported.
+#   # zeta-adapt: SUM(...) OVER (ORDER BY … RANGE BETWEEN N PRECEDING
+#     AND N FOLLOWING) — numeric RANGE offsets, supported (zeta
+#     #1051).
+#   # zeta-adapt: WINDOW clause (named window spec) — supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — `ORDER BY col NULLS FIRST` /
+#     `NULLS LAST` inside OVER is accepted by zeta (inherits PG
+#     dialect) but rejected by MySQL 8.0 at parse. Pinned below as
+#     supported in zeta; portable workaround: order by an IS NULL
+#     expression first.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sales;
+CREATE TABLE sales (id INT PRIMARY KEY, dept VARCHAR(10), amt INT);
+INSERT INTO sales VALUES
+ (1, 'a', 10), (2, 'a', 20), (3, 'a', 30),
+ (4, 'b', 15), (5, 'b', 25),
+ (6, 'c', 50);
+
+--echo === ROW_NUMBER over ORDER BY ===
+
+SELECT id, dept, ROW_NUMBER() OVER (ORDER BY id) AS rn FROM sales ORDER BY id;
+
+--echo === RANK with PARTITION BY ===
+
+SELECT id, dept, amt, RANK() OVER (PARTITION BY dept ORDER BY amt DESC) AS rk
+FROM sales ORDER BY id;
+
+--echo === DENSE_RANK with PARTITION BY ===
+
+SELECT id, dept, amt, DENSE_RANK() OVER (PARTITION BY dept ORDER BY amt DESC) AS dr
+FROM sales ORDER BY id;
+
+--echo === LAG / LEAD with default ===
+
+SELECT id, amt,
+       LAG(amt, 1, 0)  OVER (ORDER BY id) AS lg,
+       LEAD(amt, 1, 0) OVER (ORDER BY id) AS ld
+FROM sales ORDER BY id;
+
+--echo === FIRST_VALUE per partition ===
+
+SELECT id, dept, FIRST_VALUE(amt) OVER (PARTITION BY dept ORDER BY id) AS fv
+FROM sales ORDER BY id;
+
+--echo === NTILE(2) ===
+
+SELECT id, NTILE(2) OVER (ORDER BY id) AS nt FROM sales ORDER BY id;
+
+--echo === COUNT(*) OVER (PARTITION BY …) ===
+
+SELECT id, dept, COUNT(*) OVER (PARTITION BY dept) AS cnt
+FROM sales ORDER BY id;
+
+--echo === SUM(...) OVER () — empty-OVER total ===
+
+SELECT id, SUM(amt) OVER () AS total FROM sales ORDER BY id;
+
+--echo === Running total via ROWS UNBOUNDED PRECEDING ===
+
+SELECT id, amt,
+       SUM(amt) OVER (ORDER BY id
+                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS run_sum
+FROM sales ORDER BY id;
+
+--echo === ROWS BETWEEN N PRECEDING AND CURRENT ROW ===
+
+SELECT id, amt,
+       SUM(amt) OVER (ORDER BY id
+                      ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS rs
+FROM sales ORDER BY id;
+
+--echo === RANGE BETWEEN N PRECEDING AND N FOLLOWING (numeric offsets, zeta #1051) ===
+
+SELECT id, amt,
+       SUM(amt) OVER (ORDER BY amt
+                      RANGE BETWEEN 10 PRECEDING AND 10 FOLLOWING) AS rg
+FROM sales ORDER BY id;
+
+--echo === Named WINDOW clause ===
+
+SELECT id,
+       ROW_NUMBER() OVER w AS rn,
+       RANK()       OVER w AS rk
+FROM sales
+WINDOW w AS (ORDER BY id);
+
+--echo === Zeta extension: NULLS FIRST inside OVER (rejected by MySQL 8.0) ===
+--echo # zeta accepts `ORDER BY … NULLS FIRST` via the PG dialect;
+--echo # MySQL 8.0 rejects this at parse with errno 1064. Documented
+--echo # as a zeta extra. Portable substitute: ORDER BY x IS NULL …
+
+SELECT id, ROW_NUMBER() OVER (ORDER BY amt NULLS FIRST) AS rn
+FROM sales ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE sales;
