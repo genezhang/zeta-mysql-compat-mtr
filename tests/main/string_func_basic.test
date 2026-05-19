@@ -51,9 +51,8 @@
 #     operator REJECTED at parse with errno 1064. Substitute the
 #     existing REGEXP_REPLACE / REGEXP_MATCH PG-style scalars (zeta
 #     supports those, exercised in main/function_basic).
-#   # zeta-adapt: KNOWN DIVERGENCE — STRCMP — errno 1105 unknown
-#     function. Substitute `CASE WHEN a<b THEN -1 WHEN a>b THEN 1
-#     ELSE 0 END`.
+#   # zeta-adapt: STRCMP — supported (FIXED via zeta #1155). Returns
+#     -1, 0, or 1 by lexicographic order. NULL → NULL.
 
 --echo === Setup ===
 
@@ -166,10 +165,9 @@ SELECT REGEXP_LIKE('hello', '^h');
 --error 1105
 SELECT REGEXP_INSTR('abcdef', 'cd');
 
---echo === KNOWN DIVERGENCE: STRCMP — unknown function (errno 1105) ===
+--echo === STRCMP — FIXED via zeta #1155 ===
 
---error 1105
-SELECT STRCMP('a', 'b');
+SELECT STRCMP('a', 'b') AS less, STRCMP('a', 'a') AS eq, STRCMP('b', 'a') AS greater;
 
 --echo === Cleanup ===
 # No schema to drop.
