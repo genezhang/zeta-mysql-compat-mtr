@@ -1,0 +1,137 @@
+# Independently authored NULL-handling smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/null.test or null_key.test; pins zeta's three-
+# valued-logic surface — the part that bites every cross-
+# database SQL author.
+#
+# Adaptation notes:
+#   # zeta-adapt: `IS NULL` / `IS NOT NULL` — supported. Returns
+#     1/0 via the MySQL wire (boolean coerces to bit-byte).
+#   # zeta-adapt: `NULL = NULL`, `NULL <> NULL`, `NULL = 1`,
+#     `NULL <> 1` — all NULL (standard SQL 3VL).
+#   # zeta-adapt: `IS DISTINCT FROM` / `IS NOT DISTINCT FROM`
+#     (SQL-standard NULL-safe comparison, PG syntax) —
+#     supported. `NULL IS DISTINCT FROM NULL` = 0 (they are
+#     not distinct); `NULL IS NOT DISTINCT FROM NULL` = 1.
+#   # zeta-adapt: KNOWN DIVERGENCE — MySQL `<=>` (spaceship
+#     NULL-safe equals) errors 1105 "<=> requires vector
+#     operands". zeta uses `<=>` for cosine distance over
+#     VECTOR columns; the MySQL meaning is not honored.
+#     Portable substitute: `IS NOT DISTINCT FROM`.
+#   # zeta-adapt: KNOWN DIVERGENCE — `ORDER BY x NULLS FIRST`
+#     on ASC ordering silently ignores the NULLS FIRST clause
+#     and places NULL LAST (the PG/MySQL ASC default). DESC
+#     NULLS FIRST works correctly. Portable substitute on ASC:
+#     `ORDER BY (x IS NULL) DESC, x` to put NULLs first.
+#   # zeta-adapt: COALESCE / NULLIF / IFNULL / ISNULL — all
+#     supported with standard semantics.
+#   # zeta-adapt: 3VL on `NOT IN` — the classic gotcha works
+#     as standard: `3 NOT IN (1, 2, NULL)` returns NULL
+#     (because `3 = NULL` is NULL, so the AND with the rest
+#     can't reduce to TRUE). `1 NOT IN (1, 2, NULL)` returns
+#     0 (because `1 = 1` is TRUE; first term forces 0).
+#   # zeta-adapt: NULL in arithmetic — every operand poisons
+#     the result.
+#   # zeta-adapt: Three-valued boolean — `TRUE AND NULL` =
+#     NULL; `FALSE AND NULL` = 0; `TRUE OR NULL` = 1;
+#     `FALSE OR NULL` = NULL; `NOT NULL` = NULL.
+#   # zeta-adapt: String concatenation with NULL — `'a' || NULL`
+#     = NULL (matches PG; MySQL `CONCAT` has the same NULL-
+#     propagation behavior).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS nh;
+CREATE TABLE nh (id INT PRIMARY KEY, x INT);
+INSERT INTO nh VALUES (1, 10), (2, NULL), (3, 5);
+
+--echo === IS NULL / IS NOT NULL ===
+
+SELECT NULL IS NULL, NULL IS NOT NULL, 1 IS NULL, 1 IS NOT NULL;
+
+--echo === NULL comparisons all return NULL (3VL) ===
+
+SELECT NULL = NULL, NULL <> NULL, NULL = 1, NULL <> 1;
+
+--echo === IS DISTINCT FROM / IS NOT DISTINCT FROM ===
+
+SELECT NULL IS DISTINCT FROM NULL, NULL IS NOT DISTINCT FROM NULL;
+
+--echo === ORDER BY default — NULLs last on ASC ===
+
+SELECT id, x FROM nh ORDER BY x;
+
+--echo === ORDER BY ... DESC NULLS FIRST — works ===
+
+SELECT id, x FROM nh ORDER BY x DESC NULLS FIRST;
+
+--echo === COALESCE — first non-NULL ===
+
+SELECT COALESCE(NULL, NULL, 'first non-null') AS c;
+
+--echo === NULLIF — same → NULL, diff → first ===
+
+SELECT NULLIF('a', 'a') AS same, NULLIF('a', 'b') AS diff;
+
+--echo === IFNULL ===
+
+SELECT IFNULL(NULL, 'fallback') AS use_fb, IFNULL('val', 'fallback') AS keep;
+
+--echo === ISNULL — boolean wrapper ===
+
+SELECT ISNULL(NULL) AS yes, ISNULL(1) AS no;
+
+--echo === NULL in IN list ===
+--echo # `3 IN (1, 2, NULL)` returns NULL — the NULL comparison
+--echo # makes the OR-chain indeterminate.
+
+SELECT 1 IN (1, 2, NULL) AS hit, 3 IN (1, 2, NULL) AS miss;
+
+--echo === NULL in NOT IN list — the 3VL gotcha ===
+--echo # `1 NOT IN (1, 2, NULL)` returns 0 (the first equality
+--echo # forces FALSE). `3 NOT IN (1, 2, NULL)` returns NULL
+--echo # (no equality is TRUE, but the NULL element can't be
+--echo # ruled out, so the AND-chain is NULL).
+
+SELECT 1 NOT IN (1, 2, NULL) AS hit, 3 NOT IN (1, 2, NULL) AS miss;
+
+--echo === NULL in arithmetic — poisons the result ===
+
+SELECT 1 + NULL, 1 * NULL, 1 / NULL, 1 - NULL;
+
+--echo === Three-valued boolean — AND ===
+
+SELECT TRUE AND NULL AS t_and_n, FALSE AND NULL AS f_and_n;
+
+--echo === Three-valued boolean — OR ===
+
+SELECT TRUE OR NULL AS t_or_n, FALSE OR NULL AS f_or_n;
+
+--echo === Three-valued boolean — NOT ===
+
+SELECT NOT NULL AS n;
+
+--echo === String concat with NULL — NULL propagates ===
+
+SELECT 'a' || NULL AS s;
+
+--echo === KNOWN DIVERGENCE: <=> spaceship NULL-safe equals — errno 1105 ===
+--echo # zeta uses <=> as cosine distance for VECTOR columns,
+--echo # NOT as MySQL's NULL-safe equals. On non-vector scalar
+--echo # operands the executor errors 1105. (NULL operands
+--echo # short-circuit to NULL before hitting the vector check,
+--echo # which differs from MySQL where NULL <=> NULL = 1.)
+--echo # Portable substitute: IS NOT DISTINCT FROM.
+
+--error 1105
+SELECT 1 <=> 1;
+
+--echo === KNOWN DIVERGENCE: NULLS FIRST on ASC — silently ignored ===
+--echo # NULL still placed last despite NULLS FIRST. Compare with
+--echo # the default-ordering pin above — same result.
+
+SELECT id, x FROM nh ORDER BY x NULLS FIRST;
+
+--echo === Cleanup ===
+
+DROP TABLE nh;
