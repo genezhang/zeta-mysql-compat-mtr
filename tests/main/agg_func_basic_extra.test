@@ -39,9 +39,11 @@
 #     The MySQL-specific SEPARATOR clause isn't honored.
 #     Portable substitute: STRING_AGG(col, '<sep>') or the
 #     default-comma GROUP_CONCAT.
-#   # zeta-adapt: KNOWN GAP — STD(n) errors 1105 "unknown
-#     function: STD". MySQL alias for STDDEV_POP. Portable
-#     substitute: STDDEV_POP(n).
+#   # zeta-adapt: STD(n) — FIXED via zeta #1186. Canonicalizes
+#     to STDDEV_POP at planner intake (joining the EVERY→
+#     BOOL_AND / GROUP_CONCAT→STRING_AGG canonical-name
+#     family). Same Welford accumulator, POP (not SAMP)
+#     variance semantics.
 #   # zeta-adapt: KNOWN GAP — BIT_XOR(n) errors 1105 "unknown
 #     function: BIT_XOR". Portable substitute: SUM(n) % 2 over
 #     a 0/1 column, or fold via XOR in application code.
@@ -130,10 +132,9 @@ SELECT VARIANCE(n) AS v FROM af;
 --error 1064
 SELECT GROUP_CONCAT(product SEPARATOR '|') FROM af;
 
---echo === KNOWN GAP: STD — errno 1105 (alias for STDDEV_POP) ===
+--echo === STD — FIXED via zeta #1186 (alias for STDDEV_POP) ===
 
---error 1105
-SELECT STD(n) FROM af;
+SELECT STD(n) AS sd FROM af;
 
 --echo === KNOWN GAP: BIT_XOR — errno 1105 ===
 
