@@ -64,11 +64,14 @@ ALTER TABLE at_child ADD CONSTRAINT fk_pid FOREIGN KEY (pid) REFERENCES at_paren
 INSERT INTO at_child VALUES (1, 10);
 INSERT INTO at_child VALUES (2, 999);
 ERROR 1105: foreign key violation: insert or update on table "test.public.at_child" violates foreign key constraint "fk_pid": key is not present in table "test.public.at_parent"
-=== KNOWN DIVERGENCE: ADD CONSTRAINT UNIQUE — errno 1064 ===
-# MySQL accepts; zeta rejects. Substitute standalone
-# CREATE UNIQUE INDEX.
-ALTER TABLE at1 ADD CONSTRAINT u_name UNIQUE (name);
-ERROR 1064: SQL parse error: unsupported ALTER TABLE ADD CONSTRAINT type
+=== ADD CONSTRAINT UNIQUE — FIXED via zeta #1160 ===
+# Routes through CREATE UNIQUE INDEX internally.
+DROP TABLE IF EXISTS au_t;
+CREATE TABLE au_t (id INT PRIMARY KEY, code VARCHAR(10));
+ALTER TABLE au_t ADD CONSTRAINT u_code UNIQUE (code);
+INSERT INTO au_t VALUES (1, 'x'), (2, 'y');
+INSERT INTO au_t VALUES (3, 'x');
+ERROR 1062: duplicate key value violates unique constraint "u_code": Key already exists in index "u_code"
 === KNOWN DIVERGENCE: ADD CONSTRAINT CHECK — errno 1064 ===
 # MySQL accepts; zeta rejects. Substitute CHECK at CREATE TABLE.
 ALTER TABLE at1 ADD CONSTRAINT c_id CHECK (id > 0);
@@ -92,3 +95,4 @@ DROP TABLE at1;
 DROP TABLE no_pk;
 DROP TABLE at_child;
 DROP TABLE at_parent;
+DROP TABLE au_t;
