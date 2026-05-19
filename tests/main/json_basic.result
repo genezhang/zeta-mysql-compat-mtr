@@ -63,12 +63,25 @@ contains
 SELECT data ? 'name' AS has_name FROM j WHERE id = 1;
 has_name
 1
+=== JSON_LENGTH — FIXED via zeta #1162 ===
+# array → element count, object → key count, scalar → 1,
+# NULL → NULL. Single-arg form only; the two-arg path form
+# `JSON_LENGTH(j, '$.path')` is a separate slice.
+SELECT id, JSON_LENGTH(data) AS n FROM j ORDER BY id;
+id	n
+1	2
+2	3
+3	1
+SELECT JSON_LENGTH('42') AS scalar_n;
+scalar_n
+1
+SELECT JSON_LENGTH(CAST(NULL AS JSON)) AS null_n;
+null_n
+NULL
 === KNOWN GAPS: MySQL JSON_xxx functions not yet implemented ===
 # All raise errno 1105 "unknown function". A future slice that
 # wires these to the existing jsonb_* implementations must
 # retighten each pin below.
-SELECT JSON_LENGTH(data) FROM j WHERE id = 1;
-ERROR 1105: execution error: unknown function: JSON_LENGTH
 SELECT JSON_KEYS(data) FROM j WHERE id = 1;
 ERROR 1105: execution error: unknown function: JSON_KEYS
 SELECT JSON_SET(data, '$.name', 'bob') FROM j WHERE id = 1;
