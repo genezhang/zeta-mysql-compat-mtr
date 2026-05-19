@@ -1,0 +1,82 @@
+=== Setup ===
+DROP TABLE IF EXISTS isr;
+DROP TABLE IF EXISTS isc;
+DROP TABLE IF EXISTS isp;
+DROP VIEW  IF EXISTS vw_isr;
+CREATE TABLE isr (id INT PRIMARY KEY, n VARCHAR(20));
+CREATE INDEX idx_isr_n ON isr(n);
+CREATE TABLE isp (id INT PRIMARY KEY);
+CREATE TABLE isc (id INT PRIMARY KEY, pid INT, FOREIGN KEY (pid) REFERENCES isp(id));
+CREATE VIEW vw_isr AS SELECT id FROM isr;
+=== information_schema.tables — BASE TABLE for user table ===
+SELECT TABLE_NAME, TABLE_TYPE
+  FROM information_schema.tables
+  WHERE TABLE_NAME = 'isr';
+TABLE_NAME	TABLE_TYPE
+isr	BASE TABLE
+=== information_schema.columns — name, type, nullable ===
+SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+  FROM information_schema.columns
+  WHERE TABLE_NAME = 'isr'
+  ORDER BY ORDINAL_POSITION;
+COLUMN_NAME	DATA_TYPE	IS_NULLABLE
+id	int	NO
+n	varchar	YES
+=== information_schema.columns — COLUMN_DEFAULT ===
+DROP TABLE IF EXISTS def_t;
+CREATE TABLE def_t (id INT PRIMARY KEY, x INT DEFAULT 5);
+SELECT COLUMN_NAME, COLUMN_DEFAULT
+  FROM information_schema.columns
+  WHERE TABLE_NAME = 'def_t'
+  ORDER BY ORDINAL_POSITION;
+COLUMN_NAME	COLUMN_DEFAULT
+id	NULL
+x	5
+=== information_schema.statistics — index metadata ===
+# PRIMARY KEY surfaces as INDEX_NAME = 'PRIMARY'; named
+# indexes use their declared name.
+SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME
+  FROM information_schema.statistics
+  WHERE TABLE_NAME = 'isr';
+TABLE_NAME	INDEX_NAME	COLUMN_NAME
+isr	PRIMARY	id
+isr	idx_isr_n	n
+=== information_schema.views — VIEW_DEFINITION text ===
+SELECT TABLE_NAME, VIEW_DEFINITION
+  FROM information_schema.views
+  WHERE TABLE_NAME = 'vw_isr';
+TABLE_NAME	VIEW_DEFINITION
+vw_isr	SELECT id FROM isr
+=== information_schema.table_constraints — PRIMARY KEY ===
+SELECT TABLE_NAME, CONSTRAINT_NAME, CONSTRAINT_TYPE
+  FROM information_schema.table_constraints
+  WHERE TABLE_NAME = 'isr';
+TABLE_NAME	CONSTRAINT_NAME	CONSTRAINT_TYPE
+isr	PRIMARY	PRIMARY KEY
+=== information_schema.key_column_usage — PK column ===
+SELECT TABLE_NAME, COLUMN_NAME
+  FROM information_schema.key_column_usage
+  WHERE TABLE_NAME = 'isr';
+TABLE_NAME	COLUMN_NAME
+isr	id
+=== information_schema.key_column_usage — FK column references parent ===
+SELECT TABLE_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+  FROM information_schema.key_column_usage
+  WHERE TABLE_NAME = 'isc';
+TABLE_NAME	COLUMN_NAME	REFERENCED_TABLE_NAME	REFERENCED_COLUMN_NAME
+isc	id	NULL	NULL
+isc	pid	isp	id
+=== information_schema.referential_constraints — FK metadata ===
+# KNOWN DIVERGENCE: FK constraint name embeds `public.`
+# schema prefix (zeta-internal); MySQL uses unqualified.
+SELECT TABLE_NAME, REFERENCED_TABLE_NAME
+  FROM information_schema.referential_constraints
+  WHERE TABLE_NAME = 'isc';
+TABLE_NAME	REFERENCED_TABLE_NAME
+isc	isp
+=== Cleanup ===
+DROP VIEW vw_isr;
+DROP TABLE isc;
+DROP TABLE isp;
+DROP TABLE isr;
+DROP TABLE def_t;
