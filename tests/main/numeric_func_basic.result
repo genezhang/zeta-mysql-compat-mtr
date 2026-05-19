@@ -109,5 +109,17 @@ SELECT TRUNCATE(3.567, 1);
 ERROR 1105: execution error: unknown function: TRUNCATE
 SELECT CONV(255, 10, 16);
 ERROR 1105: execution error: unknown function: CONV
-SELECT CRC32('test');
-ERROR 1105: execution error: unknown function: CRC32
+=== CRC32 — FIXED via zeta #1168 ===
+# IEEE CRC32; values cross-checked against MySQL.
+SELECT CRC32('test')                     AS c;
+c
+3632233996
+SELECT CRC32('MySQL')                    AS c2;
+c2
+3259397556
+SELECT CRC32('')                         AS c_empty;
+c_empty
+0
+SELECT CRC32(CAST(NULL AS CHAR))         AS c_null;
+c_null
+NULL
