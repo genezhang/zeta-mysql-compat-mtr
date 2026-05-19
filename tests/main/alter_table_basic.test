@@ -1,0 +1,154 @@
+# Independently authored ALTER TABLE smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/alter_table.test;
+# pins zeta's behavior across the ALTER TABLE shapes ORMs and
+# migration tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: ALTER TABLE ADD COLUMN (bare, with DEFAULT, with
+#     NOT NULL DEFAULT) — all supported.
+#   # zeta-adapt: ALTER TABLE ADD COLUMN IF NOT EXISTS — supported
+#     (silent no-op when column already exists).
+#   # zeta-adapt: ALTER TABLE DROP COLUMN — supported.
+#   # zeta-adapt: ALTER TABLE DROP COLUMN IF EXISTS — supported.
+#   # zeta-adapt: ALTER TABLE RENAME COLUMN ... TO ... — supported.
+#   # zeta-adapt: ALTER TABLE MODIFY COLUMN (MySQL) — supported.
+#   # zeta-adapt: ALTER TABLE CHANGE COLUMN (MySQL rename+modify) —
+#     supported.
+#   # zeta-adapt: ALTER TABLE RENAME TO — supported.
+#   # zeta-adapt: ALTER TABLE ADD CONSTRAINT PRIMARY KEY — supported
+#     (enforced via duplicate-PK 1062 check).
+#   # zeta-adapt: ALTER TABLE ADD CONSTRAINT FOREIGN KEY — supported
+#     (enforced via FK violation check).
+#   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE ADD CONSTRAINT UNIQUE
+#     / CHECK is REJECTED at parse with errno 1064 "unsupported ALTER
+#     TABLE ADD CONSTRAINT type". UNIQUE substitute: standalone
+#     `CREATE UNIQUE INDEX`. CHECK substitute: declare at CREATE
+#     TABLE time. Pinned below.
+#   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE ADD INDEX (MySQL form)
+#     parses OK but is a silent no-op — the index is NOT created.
+#     Substitute the standalone `CREATE INDEX` statement. Asserted
+#     below via SHOW INDEX FROM after the ALTER.
+#   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE DROP INDEX (MySQL
+#     form) REJECTED at parse with errno 1064 "unsupported ALTER
+#     TABLE operation: DROP INDEX X". Substitute standalone
+#     `DROP INDEX X ON tbl`.
+#   # zeta-adapt: KNOWN DIVERGENCE — `ALTER TABLE ENGINE=InnoDB` /
+#     `CHARACTER SET ...` / `AUTO_INCREMENT=N` REJECTED at parse
+#     with errno 1064. The sqlparser default dialect doesn't accept
+#     these MySQL extensions. NOT pinned with --error here — the
+#     error messages contain line/col offsets that vary with .test
+#     formatting. Documented in this header only.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS at1;
+CREATE TABLE at1 (id INT PRIMARY KEY, name VARCHAR(20));
+INSERT INTO at1 VALUES (1, 'alice'), (2, 'bob');
+
+--echo === ADD COLUMN — bare ===
+
+ALTER TABLE at1 ADD COLUMN age INT;
+SELECT id, age FROM at1 ORDER BY id;
+
+--echo === ADD COLUMN — with DEFAULT ===
+
+ALTER TABLE at1 ADD COLUMN status VARCHAR(10) DEFAULT 'active';
+SELECT id, status FROM at1 ORDER BY id;
+
+--echo === ADD COLUMN — NOT NULL with DEFAULT ===
+
+ALTER TABLE at1 ADD COLUMN city VARCHAR(20) NOT NULL DEFAULT 'unknown';
+SELECT id, city FROM at1 ORDER BY id;
+
+--echo === ADD COLUMN IF NOT EXISTS — silent on duplicate ===
+
+ALTER TABLE at1 ADD COLUMN IF NOT EXISTS age INT;
+
+--echo === DROP COLUMN ===
+
+ALTER TABLE at1 DROP COLUMN age;
+
+--echo === DROP COLUMN IF EXISTS — silent on missing ===
+
+ALTER TABLE at1 DROP COLUMN IF EXISTS does_not_exist;
+
+--echo === RENAME COLUMN ===
+
+ALTER TABLE at1 RENAME COLUMN status TO state;
+SELECT id, state FROM at1 ORDER BY id;
+
+--echo === MODIFY COLUMN (MySQL) ===
+
+ALTER TABLE at1 MODIFY COLUMN name VARCHAR(40);
+
+--echo === CHANGE COLUMN (MySQL — rename + retype) ===
+
+ALTER TABLE at1 CHANGE COLUMN city town VARCHAR(30) NOT NULL;
+SELECT id, town FROM at1 ORDER BY id;
+
+--echo === RENAME TABLE TO ===
+
+ALTER TABLE at1 RENAME TO at_renamed;
+SELECT id FROM at_renamed ORDER BY id;
+ALTER TABLE at_renamed RENAME TO at1;
+
+--echo === ADD CONSTRAINT PRIMARY KEY — enforced ===
+
+DROP TABLE IF EXISTS no_pk;
+CREATE TABLE no_pk (id INT);
+ALTER TABLE no_pk ADD CONSTRAINT pk_id PRIMARY KEY (id);
+INSERT INTO no_pk VALUES (1);
+# Duplicate PK now rejected (errno 1062 ER_DUP_ENTRY).
+--error 1062
+INSERT INTO no_pk VALUES (1);
+
+--echo === ADD CONSTRAINT FOREIGN KEY — enforced ===
+
+DROP TABLE IF EXISTS at_parent;
+DROP TABLE IF EXISTS at_child;
+CREATE TABLE at_parent (id INT PRIMARY KEY);
+INSERT INTO at_parent VALUES (10), (20);
+CREATE TABLE at_child (id INT PRIMARY KEY, pid INT);
+ALTER TABLE at_child ADD CONSTRAINT fk_pid FOREIGN KEY (pid) REFERENCES at_parent(id);
+INSERT INTO at_child VALUES (1, 10);
+# FK violation now rejected (errno 1105 — see compat-mtr#48 follow-up;
+# FK errno alignment is a separate slice).
+--error 1105
+INSERT INTO at_child VALUES (2, 999);
+
+--echo === KNOWN DIVERGENCE: ADD CONSTRAINT UNIQUE — errno 1064 ===
+--echo # MySQL accepts; zeta rejects. Substitute standalone
+--echo # CREATE UNIQUE INDEX.
+
+--error 1064
+ALTER TABLE at1 ADD CONSTRAINT u_name UNIQUE (name);
+
+--echo === KNOWN DIVERGENCE: ADD CONSTRAINT CHECK — errno 1064 ===
+--echo # MySQL accepts; zeta rejects. Substitute CHECK at CREATE TABLE.
+
+--error 1064
+ALTER TABLE at1 ADD CONSTRAINT c_id CHECK (id > 0);
+
+--echo === KNOWN DIVERGENCE: ADD INDEX (MySQL form) — silent no-op ===
+--echo # `ALTER TABLE t ADD INDEX idx (col)` parses OK but the index
+--echo # is NOT created. Asserted via SHOW INDEX FROM after the ALTER:
+--echo # only PRIMARY remains, no idx_name. Substitute standalone
+--echo # `CREATE INDEX idx ON t (col)`.
+
+ALTER TABLE at1 ADD INDEX idx_name (name);
+--sorted_result
+SHOW INDEX FROM at1;
+
+--echo === KNOWN DIVERGENCE: DROP INDEX (MySQL form) — errno 1064 ===
+--echo # `ALTER TABLE t DROP INDEX idx` rejected. Substitute
+--echo # standalone `DROP INDEX idx ON t`.
+
+--error 1064
+ALTER TABLE at1 DROP INDEX idx_name;
+
+--echo === Cleanup ===
+
+DROP TABLE at1;
+DROP TABLE no_pk;
+DROP TABLE at_child;
+DROP TABLE at_parent;
