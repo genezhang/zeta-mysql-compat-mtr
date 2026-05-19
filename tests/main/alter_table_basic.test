@@ -19,10 +19,13 @@
 #     (enforced via duplicate-PK 1062 check).
 #   # zeta-adapt: ALTER TABLE ADD CONSTRAINT FOREIGN KEY — supported
 #     (enforced via FK violation check).
-#   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE ADD CONSTRAINT UNIQUE
-#     / CHECK is REJECTED at parse with errno 1064 "unsupported ALTER
-#     TABLE ADD CONSTRAINT type". UNIQUE substitute: standalone
-#     `CREATE UNIQUE INDEX`. CHECK substitute: declare at CREATE
+#   # zeta-adapt: ALTER TABLE ADD CONSTRAINT [name] UNIQUE — supported
+#     (FIXED via zeta #1160). Routes through CREATE UNIQUE INDEX
+#     internally; duplicate INSERT raises 1062 ER_DUP_ENTRY. Pinned
+#     below.
+#   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE ADD CONSTRAINT CHECK
+#     is REJECTED at parse with errno 1064 "unsupported ALTER TABLE
+#     ADD CONSTRAINT type". CHECK substitute: declare at CREATE
 #     TABLE time. Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE ADD INDEX (MySQL form)
 #     parses OK but is a silent no-op — the index is NOT created.
@@ -116,12 +119,16 @@ INSERT INTO at_child VALUES (1, 10);
 --error 1105
 INSERT INTO at_child VALUES (2, 999);
 
---echo === KNOWN DIVERGENCE: ADD CONSTRAINT UNIQUE — errno 1064 ===
---echo # MySQL accepts; zeta rejects. Substitute standalone
---echo # CREATE UNIQUE INDEX.
+--echo === ADD CONSTRAINT UNIQUE — FIXED via zeta #1160 ===
+--echo # Routes through CREATE UNIQUE INDEX internally.
 
---error 1064
-ALTER TABLE at1 ADD CONSTRAINT u_name UNIQUE (name);
+DROP TABLE IF EXISTS au_t;
+CREATE TABLE au_t (id INT PRIMARY KEY, code VARCHAR(10));
+ALTER TABLE au_t ADD CONSTRAINT u_code UNIQUE (code);
+INSERT INTO au_t VALUES (1, 'x'), (2, 'y');
+# Duplicate now rejected (errno 1062).
+--error 1062
+INSERT INTO au_t VALUES (3, 'x');
 
 --echo === KNOWN DIVERGENCE: ADD CONSTRAINT CHECK — errno 1064 ===
 --echo # MySQL accepts; zeta rejects. Substitute CHECK at CREATE TABLE.
@@ -152,3 +159,4 @@ DROP TABLE at1;
 DROP TABLE no_pk;
 DROP TABLE at_child;
 DROP TABLE at_parent;
+DROP TABLE au_t;
