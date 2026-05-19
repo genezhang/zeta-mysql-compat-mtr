@@ -30,10 +30,10 @@
 #     CONCAT_WS('-', '', 'a', '') → '-a-' (the separator is
 #     placed between every pair of non-NULL args including
 #     empties).
-#   # zeta-adapt: KNOWN GAP — REGEXP_SUBSTR(str, pattern) errors
-#     1105 "unknown function: REGEXP_SUBSTR". Portable
-#     substitute: REGEXP_INSTR + SUBSTRING, or REGEXP_REPLACE
-#     to extract via capture group.
+#   # zeta-adapt: REGEXP_SUBSTR(str, pattern[, pos]) — FIXED via
+#     zeta #1183. Returns the substring of the first regex match
+#     (or NULL if none). Same arg shape as REGEXP_INSTR. Extra
+#     MySQL args (occurrence, match_type) aren't supported yet.
 #   # zeta-adapt: KNOWN GAP — `str REGEXP pattern` (and
 #     synonym `str RLIKE pattern`) infix operator errors 1064
 #     "unsupported expression". Portable substitute: REGEXP_LIKE
@@ -87,10 +87,10 @@ SELECT CONCAT_WS(',', 'a', NULL, 'c') AS c;
 
 SELECT CONCAT_WS('-', '', 'a', '') AS c;
 
---echo === KNOWN GAP: REGEXP_SUBSTR — errno 1105 ===
+--echo === REGEXP_SUBSTR — FIXED via zeta #1183 ===
 
---error 1105
-SELECT REGEXP_SUBSTR('hello world', 'w[a-z]+');
+SELECT REGEXP_SUBSTR('hello world', 'w[a-z]+') AS r;
+SELECT REGEXP_SUBSTR('hello world', 'zz[a-z]+') AS r_miss;
 
 --echo === KNOWN GAP: infix REGEXP / RLIKE — errno 1064 ===
 

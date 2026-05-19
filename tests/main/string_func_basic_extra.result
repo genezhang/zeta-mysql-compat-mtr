@@ -44,9 +44,13 @@ a,c
 SELECT CONCAT_WS('-', '', 'a', '') AS c;
 c
 -a-
-=== KNOWN GAP: REGEXP_SUBSTR — errno 1105 ===
-SELECT REGEXP_SUBSTR('hello world', 'w[a-z]+');
-ERROR 1105: execution error: unknown function: REGEXP_SUBSTR
+=== REGEXP_SUBSTR — FIXED via zeta #1183 ===
+SELECT REGEXP_SUBSTR('hello world', 'w[a-z]+') AS r;
+r
+world
+SELECT REGEXP_SUBSTR('hello world', 'zz[a-z]+') AS r_miss;
+r_miss
+NULL
 === KNOWN GAP: infix REGEXP / RLIKE — errno 1064 ===
 SELECT 'hello' REGEXP 'l+';
 ERROR 1064: SQL parse error: unsupported expression: 'hello' REGEXP 'l+'
