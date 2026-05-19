@@ -44,9 +44,12 @@
 #     multibyte code of the first character.
 #   # zeta-adapt: KNOWN DIVERGENCE — CHARSET, COLLATION — errno 1105.
 #     MySQL-only introspection; no PG equivalent.
-#   # zeta-adapt: KNOWN DIVERGENCE — TO_BASE64, FROM_BASE64 —
-#     errno 1105. Use the PG `encode(bytea, 'base64')` instead
-#     (out of scope for this test).
+#   # zeta-adapt: TO_BASE64, FROM_BASE64 — supported (FIXED via
+#     zeta #1158). Standard base64 encode/decode; minor cosmetic
+#     divergence vs MySQL which inserts a `\n` every 76 chars in
+#     TO_BASE64 output (zeta returns a single unbroken line).
+#     FROM_BASE64 ignores whitespace in the input so MySQL's wrapped
+#     output round-trips correctly. Invalid base64 → NULL.
 #   # zeta-adapt: KNOWN DIVERGENCE — `<str> REGEXP <pattern>` binary
 #     operator REJECTED at parse with errno 1064. Substitute the
 #     existing REGEXP_REPLACE / REGEXP_MATCH PG-style scalars OR the
@@ -148,15 +151,14 @@ SELECT CHARSET('hi');
 --error 1105
 SELECT COLLATION('hi');
 
---echo === KNOWN DIVERGENCE: TO_BASE64 — unknown function (errno 1105) ===
+--echo === TO_BASE64 / FROM_BASE64 — FIXED via zeta #1158 ===
 
---error 1105
-SELECT TO_BASE64('hello');
-
---echo === KNOWN DIVERGENCE: FROM_BASE64 — unknown function (errno 1105) ===
-
---error 1105
-SELECT FROM_BASE64('aGVsbG8=');
+SELECT TO_BASE64('hello') AS b;
+# Round-trip through CHAR_LENGTH to avoid binary in the .result.
+SELECT CHAR_LENGTH(FROM_BASE64('aGVsbG8=')) AS decoded_len;
+SELECT CHAR_LENGTH(FROM_BASE64(TO_BASE64('hello world'))) AS roundtrip_len;
+# Invalid base64 → NULL (matches MySQL).
+SELECT FROM_BASE64('not_base64_!!!') AS bad;
 
 --echo === REGEXP_LIKE / REGEXP_INSTR — FIXED via zeta #1157 ===
 

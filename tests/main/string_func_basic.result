@@ -109,12 +109,19 @@ ERROR 1105: execution error: unknown function: CHARSET
 === KNOWN DIVERGENCE: COLLATION — unknown function (errno 1105) ===
 SELECT COLLATION('hi');
 ERROR 1105: execution error: unknown function: COLLATION
-=== KNOWN DIVERGENCE: TO_BASE64 — unknown function (errno 1105) ===
-SELECT TO_BASE64('hello');
-ERROR 1105: execution error: unknown function: TO_BASE64
-=== KNOWN DIVERGENCE: FROM_BASE64 — unknown function (errno 1105) ===
-SELECT FROM_BASE64('aGVsbG8=');
-ERROR 1105: execution error: unknown function: FROM_BASE64
+=== TO_BASE64 / FROM_BASE64 — FIXED via zeta #1158 ===
+SELECT TO_BASE64('hello') AS b;
+b
+aGVsbG8=
+SELECT CHAR_LENGTH(FROM_BASE64('aGVsbG8=')) AS decoded_len;
+decoded_len
+5
+SELECT CHAR_LENGTH(FROM_BASE64(TO_BASE64('hello world'))) AS roundtrip_len;
+roundtrip_len
+11
+SELECT FROM_BASE64('not_base64_!!!') AS bad;
+bad
+NULL
 === REGEXP_LIKE / REGEXP_INSTR — FIXED via zeta #1157 ===
 SELECT REGEXP_LIKE('hello', '^h') AS l_yes, REGEXP_LIKE('hello', '^x') AS l_no;
 l_yes	l_no
