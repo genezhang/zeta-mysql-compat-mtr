@@ -119,9 +119,21 @@ t_neg
 SELECT TRUNCATE(123.456, -2)             AS t_neg_d;
 t_neg_d
 100
-=== KNOWN GAP: CONV ===
-SELECT CONV(255, 10, 16);
-ERROR 1105: execution error: unknown function: CONV
+=== CONV — FIXED via zeta #1170 ===
+# Base conversion 2..36; returns string with uppercase
+# letters. Negative to_base → signed output.
+SELECT CONV(255, 10, 16)                 AS c;
+c
+FF
+SELECT CONV('FF', 16, 10)                AS c;
+c
+255
+SELECT CONV(13, 10, 2)                   AS c;
+c
+1101
+SELECT CONV(CAST(NULL AS CHAR), 10, 16)  AS c_null;
+c_null
+NULL
 === CRC32 — FIXED via zeta #1168 ===
 # IEEE CRC32; values cross-checked against MySQL.
 SELECT CRC32('test')                     AS c;

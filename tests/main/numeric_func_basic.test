@@ -31,9 +31,14 @@
 #     to a multiple of 10^|D|. Decimal input stays Decimal; Float
 #     stays Float; integer + D >= 0 is identity. NULL → NULL.
 #     Pinned positively below.
-#   # zeta-adapt: KNOWN GAPS — only one MySQL numeric function
-#     still pinned: CONV (base conversion). One candidate slice
-#     remains.
+#   # zeta-adapt: CONV(N, from_base, to_base) — supported
+#     (FIXED via zeta #1170). Base conversion 2..36 (or negative
+#     to_base for signed output). Always returns string;
+#     uppercase letters. NULL on NULL or invalid base.
+#
+#   ALL MySQL numeric/math functions pinned in this test are now
+#   supported via zeta #1167 (12 math fns) / #1168 (CRC32) /
+#   #1169 (TRUNCATE) / #1170 (CONV).
 
 --echo === ABS / SIGN ===
 
@@ -104,10 +109,14 @@ SELECT TRUNCATE(3.567, 2)                AS t;
 SELECT TRUNCATE(-3.567, 1)               AS t_neg;
 SELECT TRUNCATE(123.456, -2)             AS t_neg_d;
 
---echo === KNOWN GAP: CONV ===
+--echo === CONV — FIXED via zeta #1170 ===
+--echo # Base conversion 2..36; returns string with uppercase
+--echo # letters. Negative to_base → signed output.
 
---error 1105
-SELECT CONV(255, 10, 16);
+SELECT CONV(255, 10, 16)                 AS c;
+SELECT CONV('FF', 16, 10)                AS c;
+SELECT CONV(13, 10, 2)                   AS c;
+SELECT CONV(CAST(NULL AS CHAR), 10, 16)  AS c_null;
 
 --echo === CRC32 — FIXED via zeta #1168 ===
 --echo # IEEE CRC32; values cross-checked against MySQL.
