@@ -1,0 +1,48 @@
+# Independently authored SQL-comment smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/comments.test; pins zeta's behavior across BLOCK
+# comment styles ORMs and migration tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: `/* block comment */` — supported (before, mid,
+#     and after SQL).
+#   # zeta-adapt: `/*+ optimizer hint */` (PG/zeta extension) —
+#     supported, parsed and ignored.
+#   # zeta-adapt: `/*! ... */` MySQL version-gated executable hint
+#     — accepted at parse, content treated as PLAIN COMMENT (NOT
+#     executed). Documented divergence; deliberately not pinned
+#     positively (result depends on whether body is interpreted
+#     or skipped).
+#   # zeta-adapt: Line comments (`-- ...`, `# ...`) work for
+#     single statements but are not portably testable in the
+#     MTR runner — the runner treats `--` at line start as a
+#     directive prefix and multi-statement chunks reject `#`
+#     after `;`. Single-statement line comments work fine
+#     against zeta directly via the mysql client.
+#   # zeta-adapt: Nested block comments — the first inner `*/`
+#     closes the outer (PG-matching behavior). Verified directly
+#     against zeta via the mysql client; not pinned through the
+#     MTR runner because the runner's SQL transport is brittle
+#     for the runaway-tokens after the close.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS cb;
+CREATE TABLE cb (id INT PRIMARY KEY, v INT);
+INSERT INTO cb VALUES (1, 10), (2, 20);
+
+--echo === Block comment mid-query ===
+
+SELECT /* block inside */ 6 AS w;
+
+--echo === /*+ optimizer hint */ — parsed and ignored ===
+
+SELECT /*+ NO_INDEX(t) */ 9 AS o;
+
+--echo === Block comment around table reference ===
+
+SELECT id FROM cb /* the source table */ ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE cb;

@@ -1,0 +1,19 @@
+=== Setup ===
+DROP TABLE IF EXISTS cb;
+CREATE TABLE cb (id INT PRIMARY KEY, v INT);
+INSERT INTO cb VALUES (1, 10), (2, 20);
+=== Block comment mid-query ===
+SELECT /* block inside */ 6 AS w;
+w
+6
+=== /*+ optimizer hint */ — parsed and ignored ===
+SELECT /*+ NO_INDEX(t) */ 9 AS o;
+o
+9
+=== Block comment around table reference ===
+SELECT id FROM cb /* the source table */ ORDER BY id;
+id
+1
+2
+=== Cleanup ===
+DROP TABLE cb;
