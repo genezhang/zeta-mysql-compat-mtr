@@ -76,11 +76,16 @@ CREATE TABLE afp (id INT PRIMARY KEY);
 CREATE TABLE afc (id INT PRIMARY KEY, pid INT);
 ALTER TABLE afc ADD CONSTRAINT fk_p FOREIGN KEY (pid) REFERENCES afp(id);
 ALTER TABLE afc DROP CONSTRAINT fk_p;
-=== KNOWN GAP: multi-clause ALTER TABLE — errno 1064 ===
+=== Multi-clause ALTER TABLE — FIXED via zeta #1181 ===
+# Comma-separated ops iterate via Vec<AlterTableOperation>;
+# each runs through its existing single-op catalog path.
 DROP TABLE IF EXISTS amc;
 CREATE TABLE amc (id INT PRIMARY KEY);
 ALTER TABLE amc ADD COLUMN a INT, ADD COLUMN b VARCHAR(10);
-ERROR 1064: SQL parse error: ALTER TABLE supports exactly one operation per statement
+INSERT INTO amc (id, a, b) VALUES (1, 100, 'x');
+SELECT id, a, b FROM amc;
+id	a	b
+1	100	x
 === KNOWN GAP: DROP CONSTRAINT on UNIQUE-from-INDEX — errno 1105 ===
 # ADD CONSTRAINT u UNIQUE routes through CREATE UNIQUE INDEX,
 # not through the constraint table. DROP CONSTRAINT can't

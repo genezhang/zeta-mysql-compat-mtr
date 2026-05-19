@@ -35,12 +35,12 @@
 #     leaving the rows null-bearing. Matches PG semantics
 #     (correct invariant), but the errno is zeta-generic — MySQL
 #     would surface 1138.
-#   # zeta-adapt: KNOWN GAP — multi-clause ALTER TABLE (e.g.
-#     `ALTER TABLE t ADD COLUMN a INT, ADD COLUMN b VARCHAR(10)`)
-#     errors 1064 "ALTER TABLE supports exactly one operation
-#     per statement". Portable substitute: split into separate
-#     ALTER TABLE statements (still atomic to the user when
-#     wrapped in a single transaction).
+#   # zeta-adapt: Multi-clause ALTER TABLE — FIXED via zeta #1181.
+#     Comma-separated ops iterate via Vec<AlterTableOperation>;
+#     each op runs through its existing single-op catalog path.
+#     Auto-commit path is NOT atomic across ops in a multi-
+#     clause batch — each op commits independently. Raft-catalog
+#     in-txn mode IS atomic via the shared overlay.
 #   # zeta-adapt: KNOWN GAP — `DROP CONSTRAINT <uniq_name>` where
 #     the named constraint was added as a UNIQUE constraint (via
 #     `ADD CONSTRAINT u UNIQUE (col)`) errors 1105 "constraint
@@ -152,12 +152,15 @@ CREATE TABLE afc (id INT PRIMARY KEY, pid INT);
 ALTER TABLE afc ADD CONSTRAINT fk_p FOREIGN KEY (pid) REFERENCES afp(id);
 ALTER TABLE afc DROP CONSTRAINT fk_p;
 
---echo === KNOWN GAP: multi-clause ALTER TABLE — errno 1064 ===
+--echo === Multi-clause ALTER TABLE — FIXED via zeta #1181 ===
+--echo # Comma-separated ops iterate via Vec<AlterTableOperation>;
+--echo # each runs through its existing single-op catalog path.
 
 DROP TABLE IF EXISTS amc;
 CREATE TABLE amc (id INT PRIMARY KEY);
---error 1064
 ALTER TABLE amc ADD COLUMN a INT, ADD COLUMN b VARCHAR(10);
+INSERT INTO amc (id, a, b) VALUES (1, 100, 'x');
+SELECT id, a, b FROM amc;
 
 --echo === KNOWN GAP: DROP CONSTRAINT on UNIQUE-from-INDEX — errno 1105 ===
 --echo # ADD CONSTRAINT u UNIQUE routes through CREATE UNIQUE INDEX,
