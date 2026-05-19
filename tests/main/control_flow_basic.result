@@ -1,0 +1,62 @@
+=== IF / IFNULL ===
+SELECT IF(1<2, 'yes', 'no')                      AS i;
+i
+yes
+SELECT IF(NULL, 'a', 'b')                        AS i_null;
+i_null
+b
+SELECT IFNULL(NULL, 'default')                   AS in_null;
+in_null
+default
+SELECT IFNULL('val', 'default')                  AS in_val;
+in_val
+val
+=== COALESCE ===
+SELECT COALESCE(NULL, NULL, 3, 4)                AS c;
+c
+3
+SELECT COALESCE(NULL, NULL, NULL)                AS c_all_null;
+c_all_null
+NULL
+=== NULLIF ===
+SELECT NULLIF(5, 5)                              AS n_eq;
+n_eq
+NULL
+SELECT NULLIF(5, 6)                              AS n_ne;
+n_ne
+5
+SELECT NULLIF('a', 'a')                          AS n_str;
+n_str
+NULL
+=== CASE (simple — value-matched) ===
+SELECT CASE 1 WHEN 1 THEN 'one' WHEN 2 THEN 'two' ELSE 'other' END   AS s;
+s
+one
+SELECT CASE 99 WHEN 1 THEN 'one' ELSE 'other' END                    AS s_else;
+s_else
+other
+=== CASE (searched — condition-driven) ===
+SELECT CASE WHEN 5>3 THEN 'big' ELSE 'small' END                     AS w;
+w
+big
+SELECT CASE WHEN NULL = NULL THEN 'yes' ELSE 'no' END                AS w_null;
+w_null
+no
+SELECT CASE WHEN 1=1 THEN 'a' END                                    AS w_no_else;
+w_no_else
+a
+=== GREATEST / LEAST ===
+SELECT GREATEST(1, 5, 3, 2)                      AS g;
+g
+5
+SELECT LEAST(4, 1, 9, 2)                         AS l;
+l
+1
+SELECT GREATEST(NULL, 1, 2)                      AS g_null;
+g_null
+NULL
+=== KNOWN GAP: ISNULL function — errno 1105 ===
+# MySQL accepts ISNULL(expr) as a one-arg boolean. zeta
+# doesn't. Portable substitute: `expr IS NULL`.
+SELECT ISNULL(NULL);
+ERROR 1105: execution error: unknown function: ISNULL
