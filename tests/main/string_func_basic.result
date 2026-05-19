@@ -74,12 +74,25 @@ hello
 SELECT LENGTH('héllo') AS zeta_len, OCTET_LENGTH('héllo') AS bytes;
 zeta_len	bytes
 5	6
-=== KNOWN DIVERGENCE: SHA1 — unknown function (errno 1105) ===
-SELECT SHA1('hello');
-ERROR 1105: execution error: unknown function: SHA1
-=== KNOWN DIVERGENCE: SHA2 — unknown function (errno 1105) ===
-SELECT SHA2('hello', 256);
-ERROR 1105: execution error: unknown function: SHA2
+=== SHA1, SHA, SHA2 — FIXED via zeta #1153 ===
+SELECT SHA1('hello') AS h;
+h
+aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d
+SELECT SHA('hello') AS h;
+h
+aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d
+SELECT SHA2('hello', 256) AS h;
+h
+2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+SELECT SHA2('hello', 0) AS h_default;
+h_default
+2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+SELECT SHA2('hello', 224) AS h224;
+h224
+ea09ae9cc6768c50fcee903ed054556e5bfc8347907f12598aa24193
+SELECT SHA2('hello', 999) AS bad;
+bad
+NULL
 === KNOWN DIVERGENCE: BIN — unknown function (errno 1105) ===
 SELECT BIN(10);
 ERROR 1105: execution error: unknown function: BIN

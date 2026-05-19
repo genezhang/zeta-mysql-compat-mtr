@@ -34,8 +34,10 @@
 #     count, not byte count. MySQL returns byte count and uses
 #     CHAR_LENGTH for character count. Use OCTET_LENGTH (PG standard)
 #     to get byte count. Asserted below.
-#   # zeta-adapt: KNOWN DIVERGENCE — SHA1, SHA2 — errno 1105
-#     unknown function. Use MD5 or implement via external script.
+#   # zeta-adapt: SHA1, SHA, SHA2 — supported (FIXED via zeta #1153).
+#     SHA1 / SHA (alias) return 40-char lowercase hex. SHA2 takes
+#     bits ∈ {0 (=256), 224, 256, 384, 512}; invalid bits → NULL
+#     (matches MySQL).
 #   # zeta-adapt: KNOWN DIVERGENCE — BIN, OCT, ORD — errno 1105.
 #     Substitute LPAD + ROUND on bit math, or just CAST.
 #   # zeta-adapt: KNOWN DIVERGENCE — CHARSET, COLLATION — errno 1105.
@@ -116,15 +118,15 @@ SELECT TRIM(BOTH 'x' FROM 'xxhelloxx') AS both;
 
 SELECT LENGTH('héllo') AS zeta_len, OCTET_LENGTH('héllo') AS bytes;
 
---echo === KNOWN DIVERGENCE: SHA1 — unknown function (errno 1105) ===
+--echo === SHA1, SHA, SHA2 — FIXED via zeta #1153 ===
 
---error 1105
-SELECT SHA1('hello');
-
---echo === KNOWN DIVERGENCE: SHA2 — unknown function (errno 1105) ===
-
---error 1105
-SELECT SHA2('hello', 256);
+SELECT SHA1('hello') AS h;
+SELECT SHA('hello') AS h;
+SELECT SHA2('hello', 256) AS h;
+SELECT SHA2('hello', 0) AS h_default;
+SELECT SHA2('hello', 224) AS h224;
+# Invalid bits → NULL (matches MySQL).
+SELECT SHA2('hello', 999) AS bad;
 
 --echo === KNOWN DIVERGENCE: BIN — unknown function (errno 1105) ===
 
