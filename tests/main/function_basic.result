@@ -186,9 +186,26 @@ r
 SELECT CAST(-1 AS UNSIGNED) AS r;
 r
 18446744073709551615
-=== KNOWN DIVERGENCE: DATE_ADD with bare INTERVAL n DAY — parse error (errno 1064) ===
-# MySQL standard. zeta requires INTERVAL '10 days' string-literal
-# form (PG-style). Substitute `date + INTERVAL '10 days'`.
-SELECT DATE_ADD(DATE '2023-01-15', INTERVAL 10 DAY);
-ERROR 1064: SQL parse error: INTERVAL value must be a string literal
+=== DATE_ADD + bare INTERVAL n UNIT — FIXED via zeta #1130 ===
+# Bare-number INTERVAL works whenever a unit field follows.
+# DATE_ADD/DATE_SUB return Timestamp (matches the BinOp arith
+# result type — date + interval produces DATETIME).
+SELECT DATE '2023-01-15' + INTERVAL 10 DAY AS d;
+d
+2023-01-25 00:00:00
+SELECT DATE_ADD(DATE '2023-01-15', INTERVAL 10 DAY) AS d;
+d
+2023-01-25 00:00:00
+SELECT DATE_SUB(DATE '2023-01-15', INTERVAL 1 MONTH) AS d;
+d
+2022-12-15 00:00:00
+SELECT DATE '2023-01-15' + INTERVAL -5 DAY AS d;
+d
+2023-01-10 00:00:00
+SELECT DATE_ADD(DATE '2023-01-15', INTERVAL 6 HOUR) AS d;
+d
+2023-01-15 06:00:00
+SELECT DATE_ADD(DATE '2023-01-15', INTERVAL '10 days') AS d;
+d
+2023-01-25 00:00:00
 === Cleanup ===
