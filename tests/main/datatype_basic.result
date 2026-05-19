@@ -102,10 +102,21 @@ ERROR 1064: SQL parse error: unsupported data type: ENUM('active', 'pending', 'd
 # MySQL-only; no PG / zeta equivalent.
 CREATE TABLE t_set (flags SET('r', 'w', 'x'));
 ERROR 1064: SQL parse error: unsupported data type: SET('r', 'w', 'x')
-=== KNOWN DIVERGENCE: BLOB — unsupported (errno 1064) ===
-# Substitute BYTEA (PG spelling).
-CREATE TABLE t_blob (a BLOB);
-ERROR 1064: SQL parse error: unsupported data type: BLOB
+=== BLOB family — FIXED via zeta #1146 (alias for BYTEA) ===
+# BLOB, BLOB(n), TINYBLOB, MEDIUMBLOB, LONGBLOB all accepted.
+DROP TABLE IF EXISTS t_blob;
+CREATE TABLE t_blob (
+  a BLOB,
+  b BLOB(1024),
+  c TINYBLOB,
+  d MEDIUMBLOB,
+  e LONGBLOB
+);
+INSERT INTO t_blob VALUES ('hello', 'world', 'xyz', 'abcdef', 'ghi');
+SELECT LENGTH(a) AS la, LENGTH(b) AS lb, LENGTH(c) AS lc, LENGTH(d) AS ld, LENGTH(e) AS le
+  FROM t_blob;
+la	lb	lc	ld	le
+5	5	3	6	3
 === Cleanup ===
 DROP TABLE t_i;
 DROP TABLE t_f;
@@ -117,3 +128,4 @@ DROP TABLE t_bo;
 DROP TABLE t_j;
 DROP TABLE t_u;
 DROP TABLE t_dt;
+DROP TABLE t_blob;
