@@ -117,10 +117,32 @@ SELECT region, COUNT(*) AS c
   GROUP BY region
   HAVING c > 1
   ORDER BY region;
-=== KNOWN DIVERGENCE: GROUP_CONCAT — unknown function (errno 1105) ===
-# MySQL standard. Substitute STRING_AGG.
-SELECT region, GROUP_CONCAT(product) FROM sales GROUP BY region;
-ERROR 1105: execution error: unknown function: GROUP_CONCAT
+=== GROUP_CONCAT — FIXED via zeta #1141 ===
+# Aliased to STRING_AGG. 1-arg form defaults the separator to `,`.
+SELECT region, GROUP_CONCAT(product) AS p
+  FROM sales
+  GROUP BY region
+  ORDER BY region;
+region	p
+AP	widget
+EU	widget,gadget
+NA	widget,widget,gadget
+SELECT region, GROUP_CONCAT(product, '|') AS p
+  FROM sales
+  GROUP BY region
+  ORDER BY region;
+region	p
+AP	widget
+EU	widget|gadget
+NA	widget|widget|gadget
+SELECT region, GROUP_CONCAT(product, ',' ORDER BY product) AS p
+  FROM sales
+  GROUP BY region
+  ORDER BY region;
+region	p
+AP	widget
+EU	gadget,widget
+NA	gadget,widget,widget
 === KNOWN DIVERGENCE: ANY_VALUE — unknown function (errno 1105) ===
 SELECT region, ANY_VALUE(product) FROM sales GROUP BY region;
 ERROR 1105: execution error: unknown function: ANY_VALUE
