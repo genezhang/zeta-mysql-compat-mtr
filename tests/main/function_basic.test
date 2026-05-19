@@ -32,10 +32,11 @@
 #     numeric / non-empty string → true; '0' → false). Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — VERSION() is NOT supported
 #     (errno 1105 "unknown function: VERSION"). MySQL standard.
-#   # zeta-adapt: KNOWN DIVERGENCE — CAST(x AS SIGNED) and
-#     CAST(x AS UNSIGNED) are NOT supported (errno 1105
-#     "unsupported CAST target type: SIGNED/UNSIGNED"). MySQL
-#     standard. Substitute CAST(x AS INTEGER).
+#   # zeta-adapt: CAST(x AS SIGNED) — supported (FIXED via zeta #1128).
+#     Signed 64-bit cast; same range/rounding as BIGINT/INT8. Pinned below.
+#   # zeta-adapt: CAST(x AS UNSIGNED) — supported (FIXED via zeta #1128).
+#     Unsigned 64-bit cast; negatives wrap to MySQL's two's-complement
+#     bit pattern (CAST(-1 AS UNSIGNED) = u64::MAX). Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — DATE_ADD/DATE_SUB with bare-
 #     number `INTERVAL 10 DAY` syntax is REJECTED at parse
 #     (errno 1064 "INTERVAL value must be a string literal").
@@ -147,16 +148,22 @@ SELECT IF(NULL, 'yes', 'no') AS r;
 --error 1105
 SELECT VERSION();
 
---echo === KNOWN DIVERGENCE: CAST(x AS SIGNED) — unsupported (errno 1105) ===
---echo # MySQL standard. Substitute CAST(x AS INTEGER).
+--echo === CAST(x AS SIGNED) — FIXED via zeta #1128 ===
+--echo # Signed 64-bit cast; same range/rounding as BIGINT.
 
---error 1105
-SELECT CAST('123' AS SIGNED);
+SELECT CAST('123' AS SIGNED) AS r;
+SELECT CAST('-42' AS SIGNED) AS r;
+# Float rounds half-to-even.
+SELECT CAST(3.7 AS SIGNED) AS r;
+SELECT CAST(-3.7 AS SIGNED) AS r;
 
---echo === KNOWN DIVERGENCE: CAST(x AS UNSIGNED) — unsupported (errno 1105) ===
+--echo === CAST(x AS UNSIGNED) — FIXED via zeta #1128 ===
+--echo # Unsigned 64-bit cast; negatives wrap to MySQL's two's-
+--echo # complement bit pattern (CAST(-1 AS UNSIGNED) = 18446744073709551615).
 
---error 1105
-SELECT CAST('123' AS UNSIGNED);
+SELECT CAST('123' AS UNSIGNED) AS r;
+SELECT CAST('9999999999' AS UNSIGNED) AS r;
+SELECT CAST(-1 AS UNSIGNED) AS r;
 
 --echo === KNOWN DIVERGENCE: DATE_ADD with bare INTERVAL n DAY — parse error (errno 1064) ===
 --echo # MySQL standard. zeta requires INTERVAL '10 days' string-literal
