@@ -15,10 +15,18 @@
 #     a generic mysql client that doesn't go through zeta's
 #     protocol-level system-variable handler. Not pinned here for
 #     stability; covered separately at the wire-protocol level.
-#   # zeta-adapt: KNOWN GAP — `REPLACE INTO` (MySQL upsert variant
-#     that deletes then inserts) raises errno 1064
-#     "Unsupported statement REPLACE". Portable substitute:
-#     INSERT ... ON DUPLICATE KEY UPDATE.
+#   # zeta-adapt: `REPLACE INTO` — supported as a first-pass
+#     rewrite via the mysqlwire shim (FIXED via zeta #1177). The
+#     shim parses the statement under sqlparser's MySqlDialect and
+#     reconstructs it as `INSERT ... ON DUPLICATE KEY UPDATE col =
+#     VALUES(col), ...` excluding PK columns. Both bare-VALUES and
+#     explicit-column forms work. KNOWN SEMANTIC DIVERGENCES:
+#     trigger firing semantics (true MySQL fires BEFORE DELETE,
+#     AFTER DELETE, BEFORE INSERT, AFTER INSERT — zeta fires only
+#     BEFORE/AFTER UPDATE on conflict), and AUTO_INCREMENT bumping
+#     (true MySQL bumps the counter on the synthesized insert
+#     post-delete — zeta does not on UPDATE path). The final row
+#     state matches MySQL semantics for the common case.
 #   # zeta-adapt: KNOWN GAP — `@user_var` references at READ time
 #     raise errno 1064 "unsupported unary operator: @". `SET @x =
 #     value` is accepted (no-op silently) but the value can't be
@@ -46,14 +54,18 @@ SELECT * FROM up WHERE id = 2;
 INSERT INTO up VALUES (1, 50) ON DUPLICATE KEY UPDATE v = v + 1;
 SELECT * FROM up WHERE id = 1;
 
---echo === KNOWN GAP: REPLACE INTO — errno 1064 ===
---echo # MySQL semantics: delete the conflicting row, then insert
---echo # the new one (different from ON DUPLICATE KEY UPDATE which
---echo # just updates in place). Portable substitute: INSERT ... ON
---echo # DUPLICATE KEY UPDATE.
+--echo === REPLACE INTO — bare VALUES, conflict ===
+--echo # zeta rewrites this to INSERT (1, 11) ON DUPLICATE KEY
+--echo # UPDATE v = VALUES(v). Final row: (1, 11).
 
---error 1064
 REPLACE INTO up VALUES (1, 11);
+SELECT * FROM up WHERE id = 1;
+
+--echo === REPLACE INTO — explicit columns, no conflict ===
+--echo # No existing row with id=3; behaves as a plain INSERT.
+
+REPLACE INTO up (id, v) VALUES (3, 33);
+SELECT * FROM up WHERE id = 3;
 
 --echo === KNOWN GAP: @user_var read — errno 1064 ===
 --echo # SET @x = value is accepted but reading @x errors with
