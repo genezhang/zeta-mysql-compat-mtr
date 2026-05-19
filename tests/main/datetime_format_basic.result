@@ -99,11 +99,31 @@ ts
 SELECT FROM_UNIXTIME(1779148800)             AS dt;
 dt
 2026-05-19 00:00:00
-=== KNOWN GAPS: DATE(expr) and TIME(expr) extractors — errno 1105 ===
-# MySQL accepts both as one-arg type-cast extractors. zeta
-# rejects with "unknown function". Substitute: CAST AS DATE /
-# CAST AS TIME.
-SELECT DATE('2026-05-19 14:30:45');
-ERROR 1105: execution error: unknown function: DATE
-SELECT TIME('2026-05-19 14:30:45');
-ERROR 1105: execution error: unknown function: TIME
+=== DATE(expr) / TIME(expr) one-arg extractors — FIXED via zeta #1166 ===
+# DATE returns date portion; TIME returns time portion.
+# Cross-type rules: DATE(time-only) → NULL; TIME(date-only)
+# → 00:00:00; NULL → NULL.
+SELECT DATE('2026-05-19 14:30:45') AS d;
+d
+2026-05-19
+SELECT TIME('2026-05-19 14:30:45') AS t;
+t
+14:30:45
+SELECT DATE('2026-05-19')           AS d;
+d
+2026-05-19
+SELECT TIME('2026-05-19')           AS t;
+t
+00:00:00
+SELECT DATE('14:30:45')             AS d;
+d
+NULL
+SELECT TIME('14:30:45')             AS t;
+t
+14:30:45
+SELECT DATE(CAST(NULL AS DATE))     AS d;
+d
+NULL
+SELECT TIME(CAST(NULL AS TIME))     AS t;
+t
+NULL

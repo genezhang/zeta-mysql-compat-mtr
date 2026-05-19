@@ -23,11 +23,11 @@
 #   # zeta-adapt: UNIX_TIMESTAMP / FROM_UNIXTIME — supported.
 #   # zeta-adapt: ADDDATE / SUBDATE (integer-day form) — supported,
 #     and these DO return a bare DATE (unlike DATE_ADD/_SUB above).
-#   # zeta-adapt: KNOWN GAPS — `DATE(expr)` and `TIME(expr)`
-#     extractors raise errno 1105 "unknown function". MySQL accepts
-#     both as DATE-casting and TIME-casting one-arg functions.
-#     Substitute: `CAST(expr AS DATE)` / `CAST(expr AS TIME)`.
-#     Pinned below.
+#   # zeta-adapt: DATE(expr) / TIME(expr) one-arg extractors —
+#     supported (FIXED via zeta #1166). DATE returns the date
+#     portion (NULL on time-only input); TIME returns the time
+#     portion (00:00:00 on date-only input). NULL → NULL.
+#     Pinned positively below.
 #   # zeta-adapt: NOW()/CURDATE()/CURTIME() are time-dependent and
 #     are NOT pinned here — separate slice if we need to assert
 #     fractional-second formatting (zeta emits microseconds by
@@ -86,13 +86,16 @@ SELECT LAST_DAY('2026-05-19')          AS ld;
 SELECT UNIX_TIMESTAMP('2026-05-19 00:00:00') AS ts;
 SELECT FROM_UNIXTIME(1779148800)             AS dt;
 
---echo === KNOWN GAPS: DATE(expr) and TIME(expr) extractors — errno 1105 ===
---echo # MySQL accepts both as one-arg type-cast extractors. zeta
---echo # rejects with "unknown function". Substitute: CAST AS DATE /
---echo # CAST AS TIME.
+--echo === DATE(expr) / TIME(expr) one-arg extractors — FIXED via zeta #1166 ===
+--echo # DATE returns date portion; TIME returns time portion.
+--echo # Cross-type rules: DATE(time-only) → NULL; TIME(date-only)
+--echo # → 00:00:00; NULL → NULL.
 
---error 1105
-SELECT DATE('2026-05-19 14:30:45');
-
---error 1105
-SELECT TIME('2026-05-19 14:30:45');
+SELECT DATE('2026-05-19 14:30:45') AS d;
+SELECT TIME('2026-05-19 14:30:45') AS t;
+SELECT DATE('2026-05-19')           AS d;
+SELECT TIME('2026-05-19')           AS t;
+SELECT DATE('14:30:45')             AS d;
+SELECT TIME('14:30:45')             AS t;
+SELECT DATE(CAST(NULL AS DATE))     AS d;
+SELECT TIME(CAST(NULL AS TIME))     AS t;
