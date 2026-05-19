@@ -27,9 +27,10 @@
 #   # zeta-adapt: KNOWN DIVERGENCE — VARCHAR length-violation errno is
 #     1105 (generic execution error) vs MySQL's 1406 (ER_DATA_TOO_LONG).
 #     Behavior (rejection) matches; only the errno differs.
-#   # zeta-adapt: KNOWN DIVERGENCE — DATETIME (MySQL alias for
-#     TIMESTAMP) is REJECTED at parse with errno 1064 "unsupported
-#     data type: DATETIME". Substitute TIMESTAMP.
+#   # zeta-adapt: DATETIME and DATETIME(precision) — supported (FIXED
+#     via zeta #1145). Aliased to TIMESTAMP at parse time; the
+#     precision parameter is accepted but currently ignored. Pinned
+#     below as a positive round-trip.
 #   # zeta-adapt: KNOWN DIVERGENCE — YEAR is REJECTED at parse with
 #     errno 1064. No PG equivalent; substitute SMALLINT.
 #   # zeta-adapt: KNOWN DIVERGENCE — inline ENUM column declaration
@@ -131,11 +132,13 @@ SELECT a FROM t_u;
 --error 1105
 INSERT INTO t_u VALUES (4294967295);
 
---echo === KNOWN DIVERGENCE: DATETIME — unsupported (errno 1064) ===
---echo # MySQL alias for TIMESTAMP. Substitute TIMESTAMP.
+--echo === DATETIME — FIXED via zeta #1145 (alias for TIMESTAMP) ===
+--echo # Bare DATETIME and DATETIME(precision) both supported.
 
---error 1064
-CREATE TABLE t_dt (a DATETIME);
+DROP TABLE IF EXISTS t_dt;
+CREATE TABLE t_dt (a DATETIME, b DATETIME(6));
+INSERT INTO t_dt VALUES ('2023-04-05 12:34:56', '2023-04-05 12:34:56');
+SELECT a, b FROM t_dt;
 
 --echo === KNOWN DIVERGENCE: YEAR — unsupported (errno 1064) ===
 --echo # MySQL-only. No PG equivalent. Substitute SMALLINT.
@@ -172,3 +175,4 @@ DROP TABLE t_b1;
 DROP TABLE t_bo;
 DROP TABLE t_j;
 DROP TABLE t_u;
+DROP TABLE t_dt;
