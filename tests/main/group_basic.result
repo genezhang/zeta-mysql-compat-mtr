@@ -107,16 +107,17 @@ CREATE TABLE empty_t (x INT);
 SELECT COUNT(*) AS c, MIN(x) AS mn, MAX(x) AS mx, SUM(x) AS s FROM empty_t;
 c	mn	mx	s
 0	NULL	NULL	NULL
-=== KNOWN DIVERGENCE: HAVING with SELECT-list alias ===
-# MySQL resolves the alias; zeta silently returns 0 rows
-# (the alias doesn't resolve in HAVING; the predicate
-# evaluates to NULL, which filters every group).
-# Use the raw aggregate expression in HAVING instead.
+=== HAVING with SELECT-list alias — FIXED via zeta #1150 ===
+# zeta now substitutes the alias to its underlying expression
+# at plan time, matching MySQL.
 SELECT region, COUNT(*) AS c
   FROM sales
   GROUP BY region
   HAVING c > 1
   ORDER BY region;
+region	c
+EU	2
+NA	3
 === GROUP_CONCAT — FIXED via zeta #1141 ===
 # Aliased to STRING_AGG. 1-arg form defaults the separator to `,`.
 SELECT region, GROUP_CONCAT(product) AS p
