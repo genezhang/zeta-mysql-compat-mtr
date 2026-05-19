@@ -1,0 +1,69 @@
+# Independently authored MySQL-extensions smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/insert_on_dup.test or similar; pins zeta's behavior
+# across the MySQL-specific surface that doesn't have a clean PG
+# equivalent.
+#
+# Adaptation notes:
+#   # zeta-adapt: INSERT … ON DUPLICATE KEY UPDATE — supported.
+#     All three value forms accepted:
+#       UPDATE col = literal
+#       UPDATE col = VALUES(col)        — refer to incoming row
+#       UPDATE col = col + expr         — derived from current row
+#   # zeta-adapt: System variables (@@autocommit, @@version, etc.)
+#     are accepted at parse — values may be NULL when read through
+#     a generic mysql client that doesn't go through zeta's
+#     protocol-level system-variable handler. Not pinned here for
+#     stability; covered separately at the wire-protocol level.
+#   # zeta-adapt: KNOWN GAP — `REPLACE INTO` (MySQL upsert variant
+#     that deletes then inserts) raises errno 1064
+#     "Unsupported statement REPLACE". Portable substitute:
+#     INSERT ... ON DUPLICATE KEY UPDATE.
+#   # zeta-adapt: KNOWN GAP — `@user_var` references at READ time
+#     raise errno 1064 "unsupported unary operator: @". `SET @x =
+#     value` is accepted (no-op silently) but the value can't be
+#     read back. Portable substitute: fold constants into the SQL
+#     directly or use a temp table.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS up;
+CREATE TABLE up (id INT PRIMARY KEY, v INT);
+
+--echo === INSERT ... ON DUPLICATE KEY UPDATE ===
+
+INSERT INTO up VALUES (1, 10);
+
+--echo # Literal value on UPDATE clause
+INSERT INTO up VALUES (1, 99) ON DUPLICATE KEY UPDATE v = 99;
+SELECT * FROM up WHERE id = 1;
+
+--echo # VALUES(col) referring to incoming row
+INSERT INTO up VALUES (2, 20) ON DUPLICATE KEY UPDATE v = VALUES(v);
+SELECT * FROM up WHERE id = 2;
+
+--echo # Expression on existing row
+INSERT INTO up VALUES (1, 50) ON DUPLICATE KEY UPDATE v = v + 1;
+SELECT * FROM up WHERE id = 1;
+
+--echo === KNOWN GAP: REPLACE INTO — errno 1064 ===
+--echo # MySQL semantics: delete the conflicting row, then insert
+--echo # the new one (different from ON DUPLICATE KEY UPDATE which
+--echo # just updates in place). Portable substitute: INSERT ... ON
+--echo # DUPLICATE KEY UPDATE.
+
+--error 1064
+REPLACE INTO up VALUES (1, 11);
+
+--echo === KNOWN GAP: @user_var read — errno 1064 ===
+--echo # SET @x = value is accepted but reading @x errors with
+--echo # "unsupported unary operator: @". Portable substitute: fold
+--echo # constants into the SQL or use a temp table.
+
+SET @x = 42;
+--error 1064
+SELECT @x;
+
+--echo === Cleanup ===
+
+DROP TABLE up;
