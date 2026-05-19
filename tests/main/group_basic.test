@@ -33,10 +33,10 @@
 #     Aliased to STRING_AGG; 1-arg form defaults the separator to `,`;
 #     2-arg form passes through. Internal ORDER BY also works. Pinned
 #     below as a positive assertion.
-#   # zeta-adapt: KNOWN DIVERGENCE — ANY_VALUE (MySQL) is NOT
-#     supported (errno 1105 "unknown function: ANY_VALUE"). No PG
-#     substitute; typically the wrapped column needs to be added to
-#     GROUP BY or wrapped in MIN/MAX.
+#   # zeta-adapt: ANY_VALUE — supported (FIXED via zeta #1142).
+#     Aliased to MIN: returns one of the group's values for any
+#     orderable type. Deterministic, which is strictly stronger
+#     than MySQL's no-ordering-guarantee contract. Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — `GROUP BY ... WITH ROLLUP` is
 #     REJECTED at parse (errno 1064). MySQL extension; no zeta
 #     equivalent yet. NOT pinned with --error because the parser's
@@ -163,10 +163,15 @@ SELECT region, GROUP_CONCAT(product, ',' ORDER BY product) AS p
   GROUP BY region
   ORDER BY region;
 
---echo === KNOWN DIVERGENCE: ANY_VALUE — unknown function (errno 1105) ===
+--echo === ANY_VALUE — FIXED via zeta #1142 ===
+--echo # Aliased to MIN. Returns one of the group's values for any
+--echo # orderable type. Deterministic (stronger than MySQL's
+--echo # contract). For `sales` ('gadget'/'widget'), lex-MIN is 'gadget'.
 
---error 1105
-SELECT region, ANY_VALUE(product) FROM sales GROUP BY region;
+SELECT region, ANY_VALUE(product) AS p
+  FROM sales
+  GROUP BY region
+  ORDER BY region;
 
 --echo === KNOWN DIVERGENCE: ONLY_FULL_GROUP_BY violation — errno 1054 ===
 --echo # zeta rejects a SELECT-list reference to a non-grouped,
