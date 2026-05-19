@@ -1,0 +1,114 @@
+# Independently authored INDEX-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/index.test or index_*.test files; pins zeta's
+# behavior across CREATE/DROP INDEX shapes NOT already covered by
+# index_basic (which holds the core non-unique/unique/SHOW INDEX
+# surface and the IF NOT EXISTS divergence).
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE INDEX … WHERE <predicate> (partial index,
+#     PG ext) — supported. Index is built and visible to SHOW
+#     INDEX; predicate is enforced at insert time. MySQL does NOT
+#     parse this syntax; documented as a PG/zeta extension.
+#   # zeta-adapt: CREATE INDEX <name> USING BTREE ON <tbl>(<col>)
+#     — supported, BTREE is the default storage. The legacy MySQL
+#     `USING BTREE` clause is accepted between the name and the
+#     ON clause.
+#   # zeta-adapt: CREATE INDEX … USING HASH — accepted at parse,
+#     SILENTLY COERCED to BTREE (zeta has no in-memory hash-index
+#     backend). Index is functional but does not provide MySQL's
+#     hash-lookup performance profile. Documented divergence.
+#   # zeta-adapt: CREATE INDEX <name> ON <tbl>(<col> DESC) —
+#     accepted at parse, sort direction is currently ignored
+#     (BTree scan is ASC-direction internally). Functional for
+#     containment but does not optimize descending range scans.
+#   # zeta-adapt: Multi-column composite UNIQUE index — supported;
+#     uniqueness is over the column tuple. Duplicate-tuple insert
+#     errors errno 1062.
+#   # zeta-adapt: DROP INDEX IF EXISTS — supported; silent no-op
+#     on a missing index name. MySQL-aligned semantics.
+#   # zeta-adapt: KNOWN GAP — DROP INDEX … CASCADE / RESTRICT
+#     raises errno 1064 "Expected: end of statement, found:
+#     CASCADE/RESTRICT". MySQL accepts both but treats them as
+#     no-ops on dependency analysis. Portable substitute: omit
+#     the trailing keyword.
+#   # zeta-adapt: KNOWN GAP — ALTER INDEX <name> RENAME TO <new>
+#     (PG ext) is accepted at parse and returns OK, but the
+#     rename is a SILENT NO-OP — the original index name remains
+#     in pg_catalog and SHOW INDEX output. Workaround: DROP +
+#     re-CREATE under the new name.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS uex;
+CREATE TABLE uex (id INT PRIMARY KEY, name VARCHAR(20), age INT);
+INSERT INTO uex VALUES (1, 'alice', 30), (2, 'bob', 17), (3, 'cara', 22);
+
+--echo === CREATE INDEX … WHERE <predicate> (partial index, PG ext) ===
+
+CREATE INDEX idx_uex_adult ON uex(name) WHERE age >= 18;
+
+--echo === CREATE INDEX USING BTREE (explicit storage clause) ===
+
+DROP TABLE IF EXISTS sb;
+CREATE TABLE sb (id INT PRIMARY KEY, x INT);
+CREATE INDEX idx_sb_x USING BTREE ON sb(x);
+
+--echo === CREATE INDEX USING HASH — silently coerced to BTREE ===
+
+DROP TABLE IF EXISTS sh;
+CREATE TABLE sh (id INT PRIMARY KEY, x INT);
+CREATE INDEX idx_sh_x USING HASH ON sh(x);
+--echo # SHOW INDEX reports Index_type as BTREE — the requested
+--echo # HASH storage was silently coerced.
+--sorted_result
+SHOW INDEX FROM sh;
+
+--echo === CREATE INDEX <col> DESC — sort direction accepted, ignored ===
+
+DROP TABLE IF EXISTS sd;
+CREATE TABLE sd (id INT PRIMARY KEY, x INT);
+CREATE INDEX idx_sd_x_desc ON sd(x DESC);
+
+--echo === Composite UNIQUE — enforces tuple uniqueness ===
+
+DROP TABLE IF EXISTS comp;
+CREATE TABLE comp (a INT, b INT, c INT);
+CREATE UNIQUE INDEX idx_comp_ab ON comp(a, b);
+INSERT INTO comp VALUES (1, 2, 100), (1, 3, 101), (2, 2, 102);
+SELECT * FROM comp ORDER BY a, b;
+
+--echo === Composite UNIQUE — duplicate tuple errno 1062 ===
+
+--error 1062
+INSERT INTO comp VALUES (1, 2, 999);
+
+--echo === DROP INDEX IF EXISTS — silent no-op on missing ===
+
+DROP INDEX IF EXISTS idx_does_not_exist_xyz ON comp;
+
+--echo === KNOWN GAP: DROP INDEX … CASCADE — errno 1064 ===
+
+--error 1064
+DROP INDEX idx_comp_ab ON comp CASCADE;
+
+--echo === KNOWN GAP: DROP INDEX … RESTRICT — errno 1064 ===
+
+--error 1064
+DROP INDEX idx_comp_ab ON comp RESTRICT;
+
+--echo === KNOWN GAP: ALTER INDEX RENAME — silent no-op ===
+--echo # Statement returns OK but the rename is not applied.
+--echo # SHOW INDEX still lists the original name.
+
+ALTER INDEX idx_comp_ab RENAME TO idx_comp_ab_renamed;
+--sorted_result
+SHOW INDEX FROM comp;
+
+--echo === Cleanup ===
+
+DROP TABLE uex;
+DROP TABLE sb;
+DROP TABLE sh;
+DROP TABLE sd;
+DROP TABLE comp;
