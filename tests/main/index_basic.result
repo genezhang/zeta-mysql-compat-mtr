@@ -16,13 +16,11 @@ ERROR 1062: duplicate key value violates unique constraint "idx_email": Key alre
 === DROP INDEX ===
 DROP INDEX idx_name ON u;
 === CREATE INDEX IF NOT EXISTS — first call creates ===
-# KNOWN DIVERGENCE (NOT pinned with --error): MySQL
-# treats a second CREATE INDEX IF NOT EXISTS on the same
-# name as a silent no-op; zeta errors with 1105. The
-# equivalent CREATE INDEX without IF NOT EXISTS also
-# errors with 1105 (MySQL uses 1061). Both error messages
-# contain the internal table_id which varies with suite
-# run order — not pinned to avoid brittleness.
+# KNOWN DIVERGENCE (semantics): MySQL treats a second
+# CREATE INDEX IF NOT EXISTS on the same name as a silent
+# no-op; zeta errors. Errno is now MySQL-aligned (1061 via
+# zeta #1137), but the no-op semantics are still wrong —
+# tracked as a follow-up.
 CREATE INDEX IF NOT EXISTS idx_age ON u(age);
 === Multi-column CREATE INDEX ===
 DROP TABLE IF EXISTS mc;

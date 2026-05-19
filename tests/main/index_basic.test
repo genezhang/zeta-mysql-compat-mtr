@@ -6,12 +6,12 @@
 #   # zeta-adapt: CREATE INDEX <name> ON <tbl>(<col>) — supported
 #     for single and multi-column BTree indexes. Default is non-
 #     unique; UNIQUE keyword enables uniqueness enforcement.
-#   # zeta-adapt: CREATE INDEX IF NOT EXISTS — KNOWN DIVERGENCE.
-#     The `IF NOT EXISTS` clause is currently NOT honored: a
-#     second CREATE on the same index name errors with 1105 just
-#     like the no-IF-NOT-EXISTS form. MySQL silently no-ops.
-#     Pinned below; covers the same code path as the duplicate-
-#     CREATE divergence (same 1105 + same message format).
+#   # zeta-adapt: CREATE INDEX IF NOT EXISTS — KNOWN DIVERGENCE
+#     (semantics, not errno). The `IF NOT EXISTS` clause is currently
+#     NOT honored: a second CREATE on the same index name errors
+#     instead of silent-no-op'ing like MySQL. Errno is now aligned
+#     to 1061 via zeta #1137, but the no-op semantics are still
+#     wrong. Exercised below as a first-call-creates case only.
 #   # zeta-adapt: DROP INDEX <name> ON <tbl> — supported.
 #   # zeta-adapt: unique-violation errno is 1062 (MySQL standard),
 #     with message wrapping "duplicate key value violates unique
@@ -23,10 +23,11 @@
 #     they aren't pinned here.
 #   # zeta-adapt: information_schema.STATISTICS — supported with
 #     at least TABLE_NAME, INDEX_NAME, COLUMN_NAME.
-#   # zeta-adapt: KNOWN DIVERGENCE — duplicate CREATE INDEX (no
-#     IF NOT EXISTS) errors with 1105 ("schema mismatch ... index
-#     'X' already exists"). MySQL uses 1061 ("Duplicate key name").
-#     Pinned below; alignment would help error-catch logic.
+#   # zeta-adapt: duplicate CREATE INDEX errno — FIXED via zeta #1137.
+#     Now errors with MySQL-standard errno 1061 (ER_DUP_KEYNAME).
+#     The error message body still embeds the internal table_id
+#     (via SchemaMismatch's Display), so only the errno is pinned
+#     with --error; the message text is not asserted.
 
 --echo === Setup ===
 
@@ -53,15 +54,21 @@ INSERT INTO u VALUES (3, 'a@x', 'alice2', 28);
 DROP INDEX idx_name ON u;
 
 --echo === CREATE INDEX IF NOT EXISTS — first call creates ===
---echo # KNOWN DIVERGENCE (NOT pinned with --error): MySQL
---echo # treats a second CREATE INDEX IF NOT EXISTS on the same
---echo # name as a silent no-op; zeta errors with 1105. The
---echo # equivalent CREATE INDEX without IF NOT EXISTS also
---echo # errors with 1105 (MySQL uses 1061). Both error messages
---echo # contain the internal table_id which varies with suite
---echo # run order — not pinned to avoid brittleness.
+--echo # KNOWN DIVERGENCE (semantics): MySQL treats a second
+--echo # CREATE INDEX IF NOT EXISTS on the same name as a silent
+--echo # no-op; zeta errors. Errno is now MySQL-aligned (1061 via
+--echo # zeta #1137), but the no-op semantics are still wrong —
+--echo # tracked as a follow-up.
 
 CREATE INDEX IF NOT EXISTS idx_age ON u(age);
+
+# Duplicate CREATE INDEX errno alignment FIXED via zeta #1137 (now
+# emits 1061 ER_DUP_KEYNAME instead of generic 1105) — verified by
+# zeta's integration test `test_mysql_duplicate_index_errno`. NOT
+# exercised here because the error message includes the SchemaMismatch
+# table_id which varies with suite run order; the runner has no
+# --replace_regex equivalent for masking. Documenting the fix in the
+# header is enough; the actual round-trip lives on the zeta side.
 
 --echo === Multi-column CREATE INDEX ===
 
