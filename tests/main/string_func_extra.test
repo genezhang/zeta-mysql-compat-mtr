@@ -26,10 +26,14 @@
 #   # zeta-adapt: KNOWN DIVERGENCE — `LENGTH(str)` returns CHARACTER
 #     count in zeta but BYTE count in MySQL. For multibyte input
 #     the values diverge (e.g. `LENGTH('héllo')` is 5 in zeta, 6
-#     in MySQL). zeta's `BIT_LENGTH` is byte-based, so the
-#     LENGTH=chars / BIT_LENGTH=bytes split is internal to zeta.
-#     Pinned in the result; portable substitute for byte length:
-#     `BIT_LENGTH(str) / 8`.
+#     in MySQL). zeta's `BIT_LENGTH` and `OCTET_LENGTH` are both
+#     byte-based, so the LENGTH=chars / OCTET_LENGTH=bytes split
+#     is internal to zeta. Pinned in the result; portable
+#     substitute for byte length: `OCTET_LENGTH(str)` (preferred,
+#     standard SQL) or `BIT_LENGTH(str) / 8`.
+#   # zeta-adapt: OCTET_LENGTH — supported, byte-based (standard
+#     SQL, also supported by PG and MySQL with matching
+#     semantics). Pinned positively below.
 #   # zeta-adapt: SPACE(n) — supported.
 #   # zeta-adapt: QUOTE — supported (wraps text in single quotes,
 #     escapes embedded apostrophes and backslashes).
@@ -87,6 +91,8 @@ SELECT BIT_LENGTH('abc')                 AS bl_ascii;
 SELECT BIT_LENGTH('héllo')               AS bl_multi;
 SELECT LENGTH('abc')                     AS l_ascii;
 SELECT LENGTH('héllo')                   AS l_multi;
+SELECT OCTET_LENGTH('abc')               AS ol_ascii;
+SELECT OCTET_LENGTH('héllo')             AS ol_multi;
 
 --echo === SPACE / QUOTE ===
 

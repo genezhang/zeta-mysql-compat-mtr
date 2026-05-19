@@ -75,6 +75,12 @@ l_ascii
 SELECT LENGTH('héllo')                   AS l_multi;
 l_multi
 5
+SELECT OCTET_LENGTH('abc')               AS ol_ascii;
+ol_ascii
+3
+SELECT OCTET_LENGTH('héllo')             AS ol_multi;
+ol_multi
+6
 === SPACE / QUOTE ===
 SELECT SPACE(3)                          AS s;
 s
