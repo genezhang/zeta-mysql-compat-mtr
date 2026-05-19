@@ -1,0 +1,65 @@
+# Independently authored control-flow / NULL-handling smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_if.test or similar; pins zeta's behavior across
+# MySQL control-flow / NULL-handling shapes ORMs emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: IF(cond, a, b) — supported. NULL cond is FALSEY
+#     (returns b).
+#   # zeta-adapt: IFNULL(x, default) — supported.
+#   # zeta-adapt: COALESCE(...) — supported, returns first non-NULL.
+#     If all NULL → NULL.
+#   # zeta-adapt: NULLIF(a, b) — supported, NULL if a=b else a.
+#   # zeta-adapt: CASE expr WHEN v THEN … (simple form) — supported.
+#   # zeta-adapt: CASE WHEN cond THEN … (searched form) — supported.
+#   # zeta-adapt: CASE without ELSE — supported (returns NULL when no
+#     branch matches).
+#   # zeta-adapt: GREATEST / LEAST — supported. NULL input poisons
+#     the whole call (returns NULL — MySQL-compatible).
+#   # zeta-adapt: NULL = NULL inside CASE — evaluates to unknown,
+#     falls through to ELSE (SQL-standard / MySQL-compatible).
+#   # zeta-adapt: KNOWN GAP — `ISNULL(expr)` is NOT implemented and
+#     raises errno 1105. Portable substitute: `expr IS NULL`.
+#     Pinned below.
+
+--echo === IF / IFNULL ===
+
+SELECT IF(1<2, 'yes', 'no')                      AS i;
+SELECT IF(NULL, 'a', 'b')                        AS i_null;
+SELECT IFNULL(NULL, 'default')                   AS in_null;
+SELECT IFNULL('val', 'default')                  AS in_val;
+
+--echo === COALESCE ===
+
+SELECT COALESCE(NULL, NULL, 3, 4)                AS c;
+SELECT COALESCE(NULL, NULL, NULL)                AS c_all_null;
+
+--echo === NULLIF ===
+
+SELECT NULLIF(5, 5)                              AS n_eq;
+SELECT NULLIF(5, 6)                              AS n_ne;
+SELECT NULLIF('a', 'a')                          AS n_str;
+
+--echo === CASE (simple — value-matched) ===
+
+SELECT CASE 1 WHEN 1 THEN 'one' WHEN 2 THEN 'two' ELSE 'other' END   AS s;
+SELECT CASE 99 WHEN 1 THEN 'one' ELSE 'other' END                    AS s_else;
+
+--echo === CASE (searched — condition-driven) ===
+
+SELECT CASE WHEN 5>3 THEN 'big' ELSE 'small' END                     AS w;
+SELECT CASE WHEN NULL = NULL THEN 'yes' ELSE 'no' END                AS w_null;
+SELECT CASE WHEN 1=1 THEN 'a' END                                    AS w_no_else;
+
+--echo === GREATEST / LEAST ===
+
+SELECT GREATEST(1, 5, 3, 2)                      AS g;
+SELECT LEAST(4, 1, 9, 2)                         AS l;
+SELECT GREATEST(NULL, 1, 2)                      AS g_null;
+
+--echo === KNOWN GAP: ISNULL function — errno 1105 ===
+--echo # MySQL accepts ISNULL(expr) as a one-arg boolean. zeta
+--echo # doesn't. Portable substitute: `expr IS NULL`.
+
+--error 1105
+SELECT ISNULL(NULL);
