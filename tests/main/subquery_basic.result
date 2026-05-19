@@ -99,11 +99,38 @@ id
 2
 3
 4
-=== KNOWN DIVERGENCE: > ANY (subquery) — unsupported (errno 1064) ===
-# Comparison operators (`<`, `>`, `<=`, `>=`) are not yet
-# implemented for ANY / ALL. `=` and `<>` work.
-SELECT id FROM emp WHERE salary > ANY (SELECT salary FROM emp WHERE dept_id = 30);
-ERROR 1064: SQL parse error: unsupported operator '>' for ANY(subquery)
+=== Comparison `> ANY (subquery)` — FIXED via zeta #1144 ===
+# Rewritten at parse to `salary > (SELECT MIN(_v) FROM (sub) AS _t(_v))`.
+# dept 30 has salary 60; rows with salary > 60 match.
+SELECT id FROM emp WHERE salary > ANY (SELECT salary FROM emp WHERE dept_id = 30)
+  ORDER BY id;
+id
+1
+2
+3
+4
+=== Comparison `> ALL (subquery)` — FIXED via zeta #1144 ===
+# Rewritten to `salary > (SELECT MAX(_v) FROM (sub) AS _t(_v))`.
+SELECT id FROM emp WHERE salary > ALL (SELECT salary FROM emp WHERE dept_id = 30)
+  ORDER BY id;
+id
+1
+2
+3
+4
+=== Comparison `< ANY (subquery)` — FIXED via zeta #1144 ===
+SELECT id FROM emp WHERE salary < ANY (SELECT salary FROM emp WHERE dept_id = 10)
+  ORDER BY id;
+id
+2
+3
+5
+=== Comparison `>= ALL (subquery)` — FIXED via zeta #1144 ===
+SELECT id FROM emp WHERE salary >= ALL (SELECT salary FROM emp WHERE dept_id = 10)
+  ORDER BY id;
+id
+1
+4
 === KNOWN DIVERGENCE: row-constructor IN — unsupported (errno 1064) ===
 # MySQL accepts `WHERE (col1, col2) IN ((v1, v2), ...)`. zeta
 # rejects the row constructor at parse. Substitute multiple
