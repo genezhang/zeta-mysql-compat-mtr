@@ -135,11 +135,23 @@ emp	dept
 alice	eng
 bob	eng
 carol	sales
-=== KNOWN DIVERGENCE: INNER JOIN without ON — errno 1064 ===
-# MySQL treats this as CROSS JOIN; zeta requires ON.
-# Substitute CROSS JOIN or `ON 1=1`.
-SELECT e.name FROM emp e INNER JOIN dept d;
-ERROR 1064: SQL parse error: INNER JOIN requires an ON clause
+=== INNER JOIN without ON — FIXED via zeta #1135 ===
+# zeta now treats bare INNER JOIN as CROSS JOIN (matches
+# MySQL). 4 emp rows × 3 dept rows = 12 rows.
+SELECT e.name AS emp, d.name AS dept FROM emp e INNER JOIN dept d;
+emp	dept
+alice	eng
+alice	ops
+alice	sales
+bob	eng
+bob	ops
+bob	sales
+carol	eng
+carol	ops
+carol	sales
+dan	eng
+dan	ops
+dan	sales
 === Cleanup ===
 DROP TABLE mgr;
 DROP TABLE sales;

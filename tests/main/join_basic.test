@@ -33,10 +33,10 @@
 #     Treated as a synonym for INNER JOIN; the MySQL optimizer hint
 #     is non-binding here since zeta's planner doesn't honor any join
 #     hints. Pinned below as a positive assertion.
-#   # zeta-adapt: KNOWN DIVERGENCE — INNER JOIN without ON. MySQL
-#     accepts (equivalent to CROSS JOIN); zeta requires an ON clause
-#     and errors with 1064. Substitute CROSS JOIN or `ON 1=1`. Pinned
-#     below.
+#   # zeta-adapt: INNER JOIN without ON — supported (FIXED via zeta
+#     #1135). Bare INNER JOIN with no ON/USING/NATURAL constraint is
+#     now treated as CROSS JOIN (cartesian product), matching MySQL.
+#     Pinned below as a positive assertion.
 
 --echo === Setup ===
 
@@ -146,12 +146,12 @@ SELECT e.name AS emp, d.name AS dept
   FROM emp e STRAIGHT_JOIN dept d ON e.dept_id = d.id
   ORDER BY emp;
 
---echo === KNOWN DIVERGENCE: INNER JOIN without ON — errno 1064 ===
---echo # MySQL treats this as CROSS JOIN; zeta requires ON.
---echo # Substitute CROSS JOIN or `ON 1=1`.
+--echo === INNER JOIN without ON — FIXED via zeta #1135 ===
+--echo # zeta now treats bare INNER JOIN as CROSS JOIN (matches
+--echo # MySQL). 4 emp rows × 3 dept rows = 12 rows.
 
---error 1064
-SELECT e.name FROM emp e INNER JOIN dept d;
+--sorted_result
+SELECT e.name AS emp, d.name AS dept FROM emp e INNER JOIN dept d;
 
 --echo === Cleanup ===
 
