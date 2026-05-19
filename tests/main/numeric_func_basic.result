@@ -67,33 +67,43 @@ log_zeta_base10
 SELECT LOG(10, 1000)            AS log_base10_2arg;
 log_base10_2arg
 2.9999999999999996
-=== KNOWN GAPS: trig + LOG2/LOG10 + DEGREES/RADIANS + PI ===
-# All raise errno 1105 "unknown function". Each is a
-# candidate slice (thin wrappers over Rust std).
-SELECT LOG2(8);
-ERROR 1105: execution error: unknown function: LOG2
-SELECT LOG10(1000);
-ERROR 1105: execution error: unknown function: LOG10
-SELECT SIN(0);
-ERROR 1105: execution error: unknown function: SIN
-SELECT COS(0);
-ERROR 1105: execution error: unknown function: COS
-SELECT TAN(0);
-ERROR 1105: execution error: unknown function: TAN
-SELECT ASIN(1);
-ERROR 1105: execution error: unknown function: ASIN
-SELECT ACOS(1);
-ERROR 1105: execution error: unknown function: ACOS
-SELECT ATAN(1);
-ERROR 1105: execution error: unknown function: ATAN
-SELECT ATAN2(1, 1);
-ERROR 1105: execution error: unknown function: ATAN2
-SELECT DEGREES(3.14159);
-ERROR 1105: execution error: unknown function: DEGREES
-SELECT RADIANS(180);
-ERROR 1105: execution error: unknown function: RADIANS
-SELECT PI();
-ERROR 1105: execution error: unknown function: PI
+=== Trig + LOG2/LOG10 + DEGREES/RADIANS + PI — FIXED via zeta #1167 ===
+SELECT SIN(0)                            AS s;
+s
+0
+SELECT COS(0)                            AS c;
+c
+1
+SELECT TAN(0)                            AS t;
+t
+0
+SELECT ASIN(1)                           AS asn;
+asn
+1.5707963267948966
+SELECT ACOS(1)                           AS acs;
+acs
+0
+SELECT ATAN(1)                           AS atn;
+atn
+0.7853981633974483
+SELECT ATAN2(1, 1)                       AS at2;
+at2
+0.7853981633974483
+SELECT LOG2(8)                           AS l2;
+l2
+3
+SELECT LOG10(1000)                       AS l10;
+l10
+3
+SELECT DEGREES(3.141592653589793)        AS deg;
+deg
+180
+SELECT RADIANS(180)                      AS rad;
+rad
+3.141592653589793
+SELECT PI()                              AS pi;
+pi
+3.141592653589793
 === KNOWN GAPS: TRUNCATE / CONV / CRC32 ===
 SELECT TRUNCATE(3.567, 1);
 ERROR 1105: execution error: unknown function: TRUNCATE
