@@ -48,10 +48,15 @@
 #     positively below. NULL key raises errno 1105 (MySQL emits
 #     1582 ER_JSON_DOCUMENT_NULL_KEY) — not pinned for errno
 #     stability.
+#   # zeta-adapt: JSON_SET — supported (FIXED via zeta #1171,
+#     first-pass). Object-key paths only; replaces existing keys
+#     and adds new ones; variadic (path, value) pairs. NULL on
+#     NULL. Array-index paths (`$[0]`) still return NULL —
+#     covered when zeta-jsonb::set_path is extended for arrays.
 #   # zeta-adapt: KNOWN GAPS — the following MySQL JSON_xxx
 #     functions are NOT yet implemented and raise errno 1105
 #     "unknown function":
-#       JSON_SET, JSON_INSERT, JSON_REPLACE.
+#       JSON_INSERT, JSON_REPLACE.
 #     Pinned below — a future implementation that wires any of
 #     these to jsonb_* implementations will need to retighten.
 #   # zeta-adapt: JSON object keys are returned in sorted order
@@ -141,8 +146,12 @@ SELECT JSON_KEYS(CAST(NULL AS JSON)) AS null_k;
 --echo # wires these to the existing jsonb_* implementations must
 --echo # retighten each pin below.
 
---error 1105
-SELECT JSON_SET(data, '$.name', 'bob') FROM j WHERE id = 1;
+--echo === JSON_SET — FIXED via zeta #1171 (first-pass, object keys) ===
+--echo # Replaces existing keys; adds new ones. Variadic (path, value).
+
+SELECT JSON_SET('{"a":1}', '$.a', 99) AS s;
+SELECT JSON_SET('{"a":1}', '$.b', 2) AS s;
+SELECT JSON_SET('{"a":1}', '$.a', 2, '$.b', 3) AS s;
 
 --error 1105
 SELECT JSON_INSERT(data, '$.new', 'x') FROM j WHERE id = 1;

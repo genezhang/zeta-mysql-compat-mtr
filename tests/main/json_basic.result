@@ -98,8 +98,17 @@ NULL
 # All raise errno 1105 "unknown function". A future slice that
 # wires these to the existing jsonb_* implementations must
 # retighten each pin below.
-SELECT JSON_SET(data, '$.name', 'bob') FROM j WHERE id = 1;
-ERROR 1105: execution error: unknown function: JSON_SET
+=== JSON_SET — FIXED via zeta #1171 (first-pass, object keys) ===
+# Replaces existing keys; adds new ones. Variadic (path, value).
+SELECT JSON_SET('{"a":1}', '$.a', 99) AS s;
+s
+{"a":99}
+SELECT JSON_SET('{"a":1}', '$.b', 2) AS s;
+s
+{"a":1,"b":2}
+SELECT JSON_SET('{"a":1}', '$.a', 2, '$.b', 3) AS s;
+s
+{"a":2,"b":3}
 SELECT JSON_INSERT(data, '$.new', 'x') FROM j WHERE id = 1;
 ERROR 1105: execution error: unknown function: JSON_INSERT
 SELECT JSON_REPLACE(data, '$.name', 'carol') FROM j WHERE id = 1;
