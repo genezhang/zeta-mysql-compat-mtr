@@ -1,0 +1,63 @@
+=== BETWEEN / NOT BETWEEN ===
+SELECT 5 BETWEEN 1 AND 10, 15 BETWEEN 1 AND 10;
+5 BETWEEN 1 AND 10	15 BETWEEN 1 AND 10
+1	0
+SELECT 5 NOT BETWEEN 1 AND 10, 15 NOT BETWEEN 1 AND 10;
+5 NOT BETWEEN 1 AND 10	15 NOT BETWEEN 1 AND 10
+0	1
+=== BETWEEN with lower > upper (empty range) ===
+SELECT 5 BETWEEN 10 AND 1 AS empty_range;
+empty_range
+0
+=== Comparison operators — <, <=, >, >=, =, <>, != ===
+SELECT 1 < 2 AS lt, 2 <= 2 AS le, 3 > 2 AS gt, 3 >= 3 AS ge,
+       5 = 5 AS eq, 5 <> 4 AS ne, 5 != 4 AS ne_c;
+lt	le	gt	ge	eq	ne	ne_c
+1	1	1	1	1	1	1
+=== Comparison NULL propagation (3VL) ===
+SELECT 1 < NULL AS lt_n, 1 = NULL AS eq_n, 1 <> NULL AS ne_n;
+lt_n	eq_n	ne_n
+NULL	NULL	NULL
+=== LIKE with % and _ ===
+SELECT 'hello' LIKE 'h%'   AS prefix,
+       'hello' LIKE '%lo'  AS suffix,
+       'hello' LIKE '_e%'  AS single,
+       'hello' LIKE 'xyz'  AS no_match;
+prefix	suffix	single	no_match
+1	1	1	0
+=== NOT LIKE ===
+SELECT 'hello' NOT LIKE 'h%' AS nl_match, 'hello' NOT LIKE 'xyz' AS nl_no;
+nl_match	nl_no
+0	1
+=== LIKE NULL — NULL propagation ===
+SELECT 'abc' LIKE NULL AS null_pat;
+null_pat
+NULL
+=== ILIKE — case-insensitive (PG) ===
+SELECT 'Hello' ILIKE 'hello' AS i;
+i
+1
+=== IS TRUE / IS FALSE / IS UNKNOWN ===
+SELECT TRUE IS TRUE, FALSE IS TRUE, NULL IS TRUE;
+TRUE IS TRUE	FALSE IS TRUE	NULL IS TRUE
+1	0	0
+SELECT TRUE IS FALSE, FALSE IS FALSE, NULL IS FALSE;
+TRUE IS FALSE	FALSE IS FALSE	NULL IS FALSE
+0	1	0
+SELECT NULL IS UNKNOWN, TRUE IS UNKNOWN, FALSE IS UNKNOWN;
+NULL IS UNKNOWN	TRUE IS UNKNOWN	FALSE IS UNKNOWN
+1	0	0
+=== IS NOT TRUE / IS NOT FALSE ===
+SELECT TRUE IS NOT TRUE, FALSE IS NOT TRUE, NULL IS NOT TRUE;
+TRUE IS NOT TRUE	FALSE IS NOT TRUE	NULL IS NOT TRUE
+0	1	1
+SELECT TRUE IS NOT FALSE, FALSE IS NOT FALSE, NULL IS NOT FALSE;
+TRUE IS NOT FALSE	FALSE IS NOT FALSE	NULL IS NOT FALSE
+1	0	1
+=== IS NOT NULL chain ===
+SELECT 1 IS NOT NULL AND 'x' IS NOT NULL AS both_present;
+both_present
+1
+=== KNOWN GAP: SIMILAR TO — errno 1064 ===
+SELECT 'abc' SIMILAR TO 'a%';
+ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a%'
