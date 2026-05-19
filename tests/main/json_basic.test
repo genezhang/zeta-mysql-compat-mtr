@@ -31,10 +31,14 @@
 #   # zeta-adapt: JSON_LENGTH — supported (FIXED via zeta #1162).
 #     Single-arg form; array → element count, object → key count,
 #     scalar → 1, NULL → NULL. Pinned positively below.
+#   # zeta-adapt: JSON_KEYS — supported (FIXED via zeta #1163).
+#     object → JSON ARRAY of keys (sorted, matching zeta's JSONB
+#     sorted-keys storage); array / scalar / JSON null → SQL NULL;
+#     SQL NULL → SQL NULL. Single-arg form only.
 #   # zeta-adapt: KNOWN GAPS — the following MySQL JSON_xxx
 #     functions are NOT yet implemented and raise errno 1105
 #     "unknown function":
-#       JSON_KEYS, JSON_SET, JSON_INSERT, JSON_REPLACE,
+#       JSON_SET, JSON_INSERT, JSON_REPLACE,
 #       JSON_DEPTH, JSON_CONTAINS, JSON_OBJECTAGG.
 #     Pinned below — a future implementation that wires any of
 #     these to jsonb_* implementations will need to retighten.
@@ -110,13 +114,20 @@ SELECT id, JSON_LENGTH(data) AS n FROM j ORDER BY id;
 SELECT JSON_LENGTH('42') AS scalar_n;
 SELECT JSON_LENGTH(CAST(NULL AS JSON)) AS null_n;
 
+--echo === JSON_KEYS — FIXED via zeta #1163 ===
+--echo # object → JSON ARRAY of keys (sorted, since zeta JSONB
+--echo # stores object keys sorted); array / scalar / JSON null
+--echo # → SQL NULL.
+
+SELECT JSON_KEYS(data) AS k FROM j WHERE id = 1;
+SELECT JSON_KEYS(data) AS k FROM j WHERE id = 2;
+SELECT JSON_KEYS(data) AS k FROM j WHERE id = 3;
+SELECT JSON_KEYS(CAST(NULL AS JSON)) AS null_k;
+
 --echo === KNOWN GAPS: MySQL JSON_xxx functions not yet implemented ===
 --echo # All raise errno 1105 "unknown function". A future slice that
 --echo # wires these to the existing jsonb_* implementations must
 --echo # retighten each pin below.
-
---error 1105
-SELECT JSON_KEYS(data) FROM j WHERE id = 1;
 
 --error 1105
 SELECT JSON_SET(data, '$.name', 'bob') FROM j WHERE id = 1;
