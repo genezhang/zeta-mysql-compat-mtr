@@ -126,6 +126,15 @@ SELECT e.name AS emp, s.amt
 emp	amt
 alice	500
 bob	300
+=== STRAIGHT_JOIN — FIXED via zeta #1133 ===
+# MySQL optimizer hint; zeta accepts and treats as INNER JOIN.
+SELECT e.name AS emp, d.name AS dept
+  FROM emp e STRAIGHT_JOIN dept d ON e.dept_id = d.id
+  ORDER BY emp;
+emp	dept
+alice	eng
+bob	eng
+carol	sales
 === KNOWN DIVERGENCE: INNER JOIN without ON — errno 1064 ===
 # MySQL treats this as CROSS JOIN; zeta requires ON.
 # Substitute CROSS JOIN or `ON 1=1`.
