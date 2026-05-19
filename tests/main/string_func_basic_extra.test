@@ -1,0 +1,124 @@
+# Independently authored string-extra-extra smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_str.test or func_regexp.test files; pins
+# zeta's behavior across MySQL string surface NOT covered by
+# string_func_basic (which holds SUBSTRING_INDEX / HEX-UNHEX /
+# ELT-FIELD-FIND_IN_SET / SPACE / QUOTE / SOUNDEX / FORMAT /
+# LPAD-RPAD / MD5 / UCASE-LCASE-MID / ASCII / TRIM / SHA1-SHA-
+# SHA2) or string_func_extra (LOCATE/INSTR/INSERT/SOUNDEX/HEX/
+# UNHEX/CHAR_LENGTH/CHARACTER_LENGTH/BIT_LENGTH/OCTET_LENGTH/
+# SPACE/QUOTE/FORMAT/ASCII/CHAR/BIN/OCT).
+#
+# Adaptation notes:
+#   # zeta-adapt: POSITION(substr IN str) — SQL-standard
+#     spelling of LOCATE. Supported, 1-based, 0 on miss.
+#   # zeta-adapt: REGEXP_LIKE(str, pattern) — supported. Returns
+#     1/0 instead of true/false through the MySQL wire (boolean
+#     bridges as 0/1 byte).
+#   # zeta-adapt: REGEXP_INSTR(str, pattern) — supported. 1-based
+#     start position of the first match, 0 on miss.
+#   # zeta-adapt: ORD(char) — MySQL alt to ASCII for first
+#     character; supported.
+#   # zeta-adapt: HEX(int) — integer encoding to uppercase hex
+#     string. Supported (HEX overloaded: HEX('AB') → string-of-
+#     hex-bytes; HEX(255) → 'FF').
+#   # zeta-adapt: CONCAT('a', NULL, 'c') — NULL propagates;
+#     result is NULL (matches both MySQL and PG semantics).
+#     CONCAT_WS('-', 'a', NULL, 'c') skips NULL arguments,
+#     produces 'a-c' (MySQL semantics — PG returns 'a--c').
+#   # zeta-adapt: CONCAT_WS includes empty-string arguments —
+#     CONCAT_WS('-', '', 'a', '') → '-a-' (the separator is
+#     placed between every pair of non-NULL args including
+#     empties).
+#   # zeta-adapt: KNOWN GAP — REGEXP_SUBSTR(str, pattern) errors
+#     1105 "unknown function: REGEXP_SUBSTR". Portable
+#     substitute: REGEXP_INSTR + SUBSTRING, or REGEXP_REPLACE
+#     to extract via capture group.
+#   # zeta-adapt: KNOWN GAP — `str REGEXP pattern` (and
+#     synonym `str RLIKE pattern`) infix operator errors 1064
+#     "unsupported expression". Portable substitute: REGEXP_LIKE
+#     (covered positively above) or REGEXP_INSTR > 0.
+#   # zeta-adapt: KNOWN GAP — `CONVERT(str USING <charset>)`
+#     errors 1064 "unsupported expression". zeta is UTF-8
+#     throughout (no per-column charset). Portable substitute:
+#     no-op — strings are already UTF-8.
+#   # zeta-adapt: KNOWN GAP — WEIGHT_STRING(str) errors 1105
+#     "unknown function". MySQL-specific collation-byte
+#     accessor with no clean cross-database substitute.
+#   # zeta-adapt: KNOWN GAP — COMPRESS(s), UNCOMPRESS(b) error
+#     1105 "unknown function". MySQL-specific zlib wrappers;
+#     no portable substitute via SQL.
+#   # zeta-adapt: KNOWN GAP — EXPORT_SET(bits, on, off, sep, cnt)
+#     errors 1105 "unknown function". MySQL-specific bit-string
+#     formatter. Portable substitute: BIN(bits) + REPLACE for
+#     1/0-to-on/off.
+
+--echo === POSITION(substr IN str) — SQL-standard ===
+
+SELECT POSITION('lo' IN 'hello')    AS p;
+SELECT POSITION('xx' IN 'hello')    AS p_miss;
+
+--echo === REGEXP_LIKE / REGEXP_INSTR ===
+
+SELECT REGEXP_LIKE('hello world', 'l+')        AS m;
+SELECT REGEXP_LIKE('xyz', 'l+')                AS m_miss;
+SELECT REGEXP_INSTR('hello world', 'wo')       AS p;
+SELECT REGEXP_INSTR('hello world', 'zz')       AS p_miss;
+
+--echo === ORD — first-character codepoint (MySQL alt to ASCII) ===
+
+SELECT ORD('A') AS a;
+SELECT ORD('z') AS z;
+
+--echo === HEX(int) — integer encoding ===
+
+SELECT HEX(255)    AS h1;
+SELECT HEX(123456) AS h2;
+
+--echo === CONCAT with NULL — NULL propagates ===
+
+SELECT CONCAT('a', NULL, 'c') AS c;
+
+--echo === CONCAT_WS with NULL — silently skipped ===
+
+SELECT CONCAT_WS(',', 'a', NULL, 'c') AS c;
+
+--echo === CONCAT_WS with empty-string args — included ===
+
+SELECT CONCAT_WS('-', '', 'a', '') AS c;
+
+--echo === KNOWN GAP: REGEXP_SUBSTR — errno 1105 ===
+
+--error 1105
+SELECT REGEXP_SUBSTR('hello world', 'w[a-z]+');
+
+--echo === KNOWN GAP: infix REGEXP / RLIKE — errno 1064 ===
+
+--error 1064
+SELECT 'hello' REGEXP 'l+';
+
+--error 1064
+SELECT 'hello' RLIKE 'l+';
+
+--echo === KNOWN GAP: CONVERT(str USING charset) — errno 1064 ===
+
+--error 1064
+SELECT CONVERT('hello' USING utf8);
+
+--echo === KNOWN GAP: WEIGHT_STRING — errno 1105 ===
+
+--error 1105
+SELECT WEIGHT_STRING('hello');
+
+--echo === KNOWN GAP: COMPRESS / UNCOMPRESS — errno 1105 ===
+
+--error 1105
+SELECT COMPRESS('hello');
+
+--error 1105
+SELECT UNCOMPRESS('some-bytes');
+
+--echo === KNOWN GAP: EXPORT_SET — errno 1105 ===
+
+--error 1105
+SELECT EXPORT_SET(5, 'Y', 'N', ',', 4);
