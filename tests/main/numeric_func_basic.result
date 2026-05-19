@@ -1,0 +1,103 @@
+=== ABS / SIGN ===
+SELECT ABS(-5)                  AS a;
+a
+5
+SELECT ABS(-3.14)               AS af;
+af
+3.14
+SELECT SIGN(-7)                 AS sn;
+sn
+-1
+SELECT SIGN(0)                  AS sz;
+sz
+0
+SELECT SIGN(7)                  AS sp;
+sp
+1
+=== SQRT / POW / POWER ===
+SELECT SQRT(16)                 AS s;
+s
+4
+SELECT POW(2, 10)               AS p;
+p
+1024
+SELECT POWER(2, 10)             AS p2;
+p2
+1024
+=== MOD and % operator ===
+SELECT MOD(10, 3)               AS m;
+m
+1
+SELECT 10 % 3                   AS m_op;
+m_op
+1
+=== CEIL / CEILING / FLOOR ===
+SELECT CEIL(3.2)                AS c;
+c
+4
+SELECT CEILING(3.2)             AS c2;
+c2
+4
+SELECT FLOOR(3.8)               AS f;
+f
+3
+=== ROUND (1-arg and 2-arg) ===
+SELECT ROUND(3.567)             AS r1;
+r1
+4
+SELECT ROUND(3.567, 2)          AS r2;
+r2
+3.57
+=== RAND (sanity, just check > 0) ===
+SELECT RAND() > 0               AS positive;
+positive
+1
+=== EXP / LN ===
+SELECT EXP(1)                   AS e;
+e
+2.718281828459045
+SELECT LN(2.718281828)          AS ln_e;
+ln_e
+0.9999999998311266
+=== LOG — DIVERGENCE: 1-arg is base-10 in zeta, natural in MySQL ===
+# Portable substitute: use LN(x) for natural log.
+SELECT LOG(100)                 AS log_zeta_base10;
+log_zeta_base10
+2
+SELECT LOG(10, 1000)            AS log_base10_2arg;
+log_base10_2arg
+2.9999999999999996
+=== KNOWN GAPS: trig + LOG2/LOG10 + DEGREES/RADIANS + PI ===
+# All raise errno 1105 "unknown function". Each is a
+# candidate slice (thin wrappers over Rust std).
+SELECT LOG2(8);
+ERROR 1105: execution error: unknown function: LOG2
+SELECT LOG10(1000);
+ERROR 1105: execution error: unknown function: LOG10
+SELECT SIN(0);
+ERROR 1105: execution error: unknown function: SIN
+SELECT COS(0);
+ERROR 1105: execution error: unknown function: COS
+SELECT TAN(0);
+ERROR 1105: execution error: unknown function: TAN
+SELECT ASIN(1);
+ERROR 1105: execution error: unknown function: ASIN
+SELECT ACOS(1);
+ERROR 1105: execution error: unknown function: ACOS
+SELECT ATAN(1);
+ERROR 1105: execution error: unknown function: ATAN
+SELECT ATAN2(1, 1);
+ERROR 1105: execution error: unknown function: ATAN2
+SELECT DEGREES(3.14159);
+ERROR 1105: execution error: unknown function: DEGREES
+SELECT RADIANS(180);
+ERROR 1105: execution error: unknown function: RADIANS
+SELECT PI();
+ERROR 1105: execution error: unknown function: PI
+=== KNOWN GAPS: TRUNCATE / CONV / CRC32 ===
+SELECT TRUNCATE(3.567, 1);
+ERROR 1105: execution error: unknown function: TRUNCATE
+SELECT CONV(255, 10, 16);
+ERROR 1105: execution error: unknown function: CONV
+SELECT CRC32('test');
+ERROR 1105: execution error: unknown function: CRC32
