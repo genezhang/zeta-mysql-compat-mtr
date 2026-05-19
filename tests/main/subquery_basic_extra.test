@@ -1,0 +1,74 @@
+# Independently authored subquery smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/subquery.test;
+# pins zeta's behavior across the subquery shapes ORMs and analytics
+# tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: EXISTS / NOT EXISTS — supported.
+#   # zeta-adapt: IN (subquery) / NOT IN (subquery) — supported.
+#   # zeta-adapt: = ANY (subquery) — supported (equivalent to IN).
+#   # zeta-adapt: cmp ALL (subquery) — supported (e.g. > ALL).
+#   # zeta-adapt: Scalar subquery in SELECT-list — supported (both
+#     uncorrelated and correlated).
+#   # zeta-adapt: Scalar subquery in WHERE — supported.
+#   # zeta-adapt: Correlated subquery in WHERE — supported.
+#   # zeta-adapt: Correlated scalar subquery in SELECT-list —
+#     supported (per-row evaluation).
+#   # zeta-adapt: Scalar subquery returning >1 row raises errno
+#     1242 ER_SUBQUERY_NO_1_ROW (MySQL-aligned, closed in prior
+#     errno-alignment slice).
+#   # zeta-adapt: EXISTS (SELECT 1) without FROM — supported
+#     (always truthy when the subquery returns any row, which
+#     a constant-row SELECT always does).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS t;
+DROP TABLE IF EXISTS s;
+CREATE TABLE t (id INT PRIMARY KEY, v INT);
+CREATE TABLE s (id INT PRIMARY KEY);
+INSERT INTO t VALUES (1, 10), (2, 20), (3, 30);
+INSERT INTO s VALUES (2), (3);
+
+--echo === EXISTS (correlated) ===
+
+SELECT id FROM t WHERE EXISTS (SELECT 1 FROM s WHERE s.id = t.id) ORDER BY id;
+
+--echo === NOT EXISTS (correlated) ===
+
+SELECT id FROM t WHERE NOT EXISTS (SELECT 1 FROM s WHERE s.id = t.id) ORDER BY id;
+
+--echo === IN (subquery) / NOT IN (subquery) ===
+
+SELECT id FROM t WHERE id IN (SELECT id FROM s) ORDER BY id;
+SELECT id FROM t WHERE id NOT IN (SELECT id FROM s) ORDER BY id;
+
+--echo === = ANY / > ALL / < ALL ===
+
+SELECT id FROM t WHERE id = ANY (SELECT id FROM s) ORDER BY id;
+SELECT id FROM t WHERE id > ALL (SELECT id FROM s) ORDER BY id;
+SELECT id FROM t WHERE id < ALL (SELECT id FROM s) ORDER BY id;
+
+--echo === Scalar subquery (uncorrelated) in SELECT-list / WHERE ===
+
+SELECT (SELECT MAX(v) FROM t) AS m;
+SELECT v FROM t WHERE v > (SELECT AVG(v) FROM t) ORDER BY v;
+
+--echo === Scalar subquery (correlated) in SELECT-list ===
+
+SELECT id, (SELECT COUNT(*) FROM s WHERE s.id <= t.id) AS cnt
+FROM t ORDER BY id;
+
+--echo === EXISTS (SELECT 1) — constant-row subquery, always truthy ===
+
+SELECT id FROM t WHERE EXISTS (SELECT 1) ORDER BY id;
+
+--echo === Pinned errno: scalar subquery returns > 1 row → 1242 ===
+
+--error 1242
+SELECT id FROM t WHERE id = (SELECT id FROM s);
+
+--echo === Cleanup ===
+
+DROP TABLE t;
+DROP TABLE s;
