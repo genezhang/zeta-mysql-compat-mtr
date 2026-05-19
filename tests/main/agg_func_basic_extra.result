@@ -80,9 +80,10 @@ v
 === KNOWN GAP: GROUP_CONCAT … SEPARATOR — errno 1064 ===
 SELECT GROUP_CONCAT(product SEPARATOR '|') FROM af;
 ERROR 1064: SQL parse error: sql parser error: Expected: ), found: SEPARATOR at Line: 1, Column: 29
-=== KNOWN GAP: STD — errno 1105 (alias for STDDEV_POP) ===
-SELECT STD(n) FROM af;
-ERROR 1105: execution error: unknown function: STD
+=== STD — FIXED via zeta #1186 (alias for STDDEV_POP) ===
+SELECT STD(n) AS sd FROM af;
+sd
+14.142135623730951
 === KNOWN GAP: BIT_XOR — errno 1105 ===
 SELECT BIT_XOR(n) FROM af;
 ERROR 1105: execution error: unknown function: BIT_XOR
