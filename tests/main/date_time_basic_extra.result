@@ -1,0 +1,126 @@
+=== DATE / TIME / TIMESTAMP typed literals ===
+SELECT DATE '2024-01-01'           AS d;
+d
+2024-01-01
+SELECT TIME '14:30:00'             AS t;
+t
+14:30:00
+SELECT TIMESTAMP '2024-01-01 14:30:00' AS ts;
+ts
+2024-01-01 14:30:00
+=== DATE + INTERVAL '<n> <unit>' (PG syntax) ===
+SELECT DATE '2024-01-01' + INTERVAL '7 days'   AS d_plus_7;
+d_plus_7
+2024-01-08 00:00:00
+SELECT DATE '2024-01-01' - INTERVAL '1 month'  AS d_minus_1m;
+d_minus_1m
+2023-12-01 00:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' + INTERVAL '3 hours' AS ts_plus_3h;
+ts_plus_3h
+2024-01-01 15:00:00
+=== Negative-literal INTERVAL ===
+SELECT DATE '2024-05-19' + INTERVAL '-3 days'  AS d_minus_3;
+d_minus_3
+2024-05-16 00:00:00
+=== DATE - DATE → integer days; TIMESTAMP - TIMESTAMP → HH:MM:SS ===
+SELECT DATE '2024-05-19' - DATE '2024-05-10'   AS day_diff;
+day_diff
+9
+SELECT TIMESTAMP '2024-05-19 14:00:00' - TIMESTAMP '2024-05-19 10:00:00' AS hr_diff;
+hr_diff
+04:00:00
+=== INTERVAL syntax variants — all render as HH:MM:SS ===
+SELECT INTERVAL '1 day' AS i_pg;
+i_pg
+24:00:00
+SELECT INTERVAL '1' DAY AS i_quoted;
+i_quoted
+24:00:00
+SELECT INTERVAL 1 DAY   AS i_mysql;
+i_mysql
+24:00:00
+=== EXTRACT(<field> FROM expr) ===
+SELECT EXTRACT(YEAR  FROM DATE '2024-05-19')                  AS y;
+y
+2024
+SELECT EXTRACT(MONTH FROM TIMESTAMP '2024-05-19 14:30:45')    AS m;
+m
+5
+SELECT EXTRACT(DAY   FROM TIMESTAMP '2024-05-19 14:30:45')    AS d;
+d
+19
+SELECT EXTRACT(HOUR  FROM TIME '14:30:45')                    AS h;
+h
+14
+SELECT EXTRACT(MINUTE FROM TIMESTAMP '2024-05-19 14:30:45')   AS mi;
+mi
+30
+SELECT EXTRACT(SECOND FROM TIMESTAMP '2024-05-19 14:30:45')   AS s;
+s
+45
+=== DATE_TRUNC('<unit>', ts) ===
+SELECT DATE_TRUNC('year',  TIMESTAMP '2024-05-19 14:30:45') AS d_yr;
+d_yr
+2024-01-01 00:00:00
+SELECT DATE_TRUNC('month', TIMESTAMP '2024-05-19 14:30:45') AS d_mo;
+d_mo
+2024-05-01 00:00:00
+SELECT DATE_TRUNC('week',  TIMESTAMP '2024-05-19 14:30:45') AS d_wk;
+d_wk
+2024-05-13 00:00:00
+SELECT DATE_TRUNC('day',   TIMESTAMP '2024-05-19 14:30:45') AS d_da;
+d_da
+2024-05-19 00:00:00
+SELECT DATE_TRUNC('hour',  TIMESTAMP '2024-05-19 14:30:45') AS d_hr;
+d_hr
+2024-05-19 14:00:00
+=== CURRENT_DATE / CURRENT_TIMESTAMP — relational only ===
+# Values are wall-clock; only the relational predicates
+# are pinned for stability.
+SELECT CURRENT_DATE = CURRENT_DATE                            AS same_date;
+same_date
+1
+SELECT CURRENT_TIMESTAMP > TIMESTAMP '2020-01-01 00:00:00'    AS in_future;
+in_future
+1
+=== DATE / TIMESTAMP filter through WHERE ===
+DROP TABLE IF EXISTS dts;
+CREATE TABLE dts (id INT PRIMARY KEY, d DATE, t TIMESTAMP);
+INSERT INTO dts VALUES
+  (1, '2024-05-19', '2024-05-19 10:00:00'),
+  (2, '2024-06-01', '2024-06-01 15:30:00');
+SELECT id FROM dts WHERE d = DATE '2024-05-19';
+id
+1
+SELECT id FROM dts WHERE t < TIMESTAMP '2024-06-01 00:00:00';
+id
+1
+=== AT TIME ZONE '<tz>' — silent pass-through ===
+# KNOWN DIVERGENCE: zeta accepts the syntax at parse and
+# returns the input timestamp unchanged. No actual TZ
+# conversion is performed.
+SELECT TIMESTAMP '2024-01-01 14:30:00' AT TIME ZONE 'UTC' AS ts_utc;
+ts_utc
+2024-01-01 14:30:00
+=== MAKE_DATE / MAKE_TIME — PG-style constructors (substitutes for MAKEDATE/MAKETIME) ===
+SELECT MAKE_DATE(2024, 5, 19) AS md;
+md
+2024-05-19
+SELECT MAKE_TIME(14, 30, 45)  AS mt;
+mt
+14:30:45
+=== KNOWN GAP: WEEKOFYEAR — errno 1105 ===
+SELECT WEEKOFYEAR('2024-05-19');
+ERROR 1105: execution error: unknown function: WEEKOFYEAR
+=== KNOWN GAP: ADDTIME / SUBTIME — errno 1105 ===
+SELECT ADDTIME('14:30:00', '1:30:00');
+ERROR 1105: execution error: unknown function: ADDTIME
+SELECT SUBTIME('14:30:00', '1:30:00');
+ERROR 1105: execution error: unknown function: SUBTIME
+=== KNOWN GAP: MAKEDATE / MAKETIME (MySQL spellings) — errno 1105 ===
+SELECT MAKEDATE(2024, 140);
+ERROR 1105: execution error: unknown function: MAKEDATE
+SELECT MAKETIME(14, 30, 45);
+ERROR 1105: execution error: unknown function: MAKETIME
+=== Cleanup ===
+DROP TABLE dts;
