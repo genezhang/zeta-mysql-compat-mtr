@@ -85,14 +85,25 @@ ALTER TABLE at1 ADD INDEX idx_name (name);
 SHOW INDEX FROM at1;
 Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
 at1	0	PRIMARY	1	id	BTREE
-=== KNOWN DIVERGENCE: DROP INDEX (MySQL form) — errno 1064 ===
-# `ALTER TABLE t DROP INDEX idx` rejected. Substitute
-# standalone `DROP INDEX idx ON t`.
-ALTER TABLE at1 DROP INDEX idx_name;
-ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: DROP INDEX idx_name
+=== DROP INDEX (MySQL form) — FIXED via zeta #1161 ===
+# `ALTER TABLE t DROP INDEX idx` now routes through the
+# standalone DROP INDEX path. Create via CREATE INDEX first
+# (the ADD INDEX form is still a separate gap — see header).
+DROP TABLE IF EXISTS adi;
+CREATE TABLE adi (id INT PRIMARY KEY, name VARCHAR(20));
+CREATE INDEX idx_adi_name ON adi (name);
+SHOW INDEX FROM adi;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+adi	0	PRIMARY	1	id	BTREE
+adi	1	idx_adi_name	1	name	BTREE
+ALTER TABLE adi DROP INDEX idx_adi_name;
+SHOW INDEX FROM adi;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+adi	0	PRIMARY	1	id	BTREE
 === Cleanup ===
 DROP TABLE at1;
 DROP TABLE no_pk;
 DROP TABLE at_child;
 DROP TABLE at_parent;
 DROP TABLE au_t;
+DROP TABLE adi;

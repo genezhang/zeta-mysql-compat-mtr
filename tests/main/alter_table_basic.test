@@ -31,10 +31,9 @@
 #     parses OK but is a silent no-op — the index is NOT created.
 #     Substitute the standalone `CREATE INDEX` statement. Asserted
 #     below via SHOW INDEX FROM after the ALTER.
-#   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE DROP INDEX (MySQL
-#     form) REJECTED at parse with errno 1064 "unsupported ALTER
-#     TABLE operation: DROP INDEX X". Substitute standalone
-#     `DROP INDEX X ON tbl`.
+#   # zeta-adapt: ALTER TABLE DROP INDEX (MySQL form) — supported
+#     (FIXED via zeta #1161). Routes through standalone DROP INDEX
+#     path. Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — `ALTER TABLE ENGINE=InnoDB` /
 #     `CHARACTER SET ...` / `AUTO_INCREMENT=N` REJECTED at parse
 #     with errno 1064. The sqlparser default dialect doesn't accept
@@ -146,12 +145,20 @@ ALTER TABLE at1 ADD INDEX idx_name (name);
 --sorted_result
 SHOW INDEX FROM at1;
 
---echo === KNOWN DIVERGENCE: DROP INDEX (MySQL form) — errno 1064 ===
---echo # `ALTER TABLE t DROP INDEX idx` rejected. Substitute
---echo # standalone `DROP INDEX idx ON t`.
+--echo === DROP INDEX (MySQL form) — FIXED via zeta #1161 ===
+--echo # `ALTER TABLE t DROP INDEX idx` now routes through the
+--echo # standalone DROP INDEX path. Create via CREATE INDEX first
+--echo # (the ADD INDEX form is still a separate gap — see header).
 
---error 1064
-ALTER TABLE at1 DROP INDEX idx_name;
+DROP TABLE IF EXISTS adi;
+CREATE TABLE adi (id INT PRIMARY KEY, name VARCHAR(20));
+CREATE INDEX idx_adi_name ON adi (name);
+--sorted_result
+SHOW INDEX FROM adi;
+# Drop via the MySQL ALTER form.
+ALTER TABLE adi DROP INDEX idx_adi_name;
+--sorted_result
+SHOW INDEX FROM adi;
 
 --echo === Cleanup ===
 
@@ -160,3 +167,4 @@ DROP TABLE no_pk;
 DROP TABLE at_child;
 DROP TABLE at_parent;
 DROP TABLE au_t;
+DROP TABLE adi;
