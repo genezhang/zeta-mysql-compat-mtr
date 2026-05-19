@@ -143,9 +143,18 @@ region	p
 AP	widget
 EU	gadget,widget
 NA	gadget,widget,widget
-=== KNOWN DIVERGENCE: ANY_VALUE — unknown function (errno 1105) ===
-SELECT region, ANY_VALUE(product) FROM sales GROUP BY region;
-ERROR 1105: execution error: unknown function: ANY_VALUE
+=== ANY_VALUE — FIXED via zeta #1142 ===
+# Aliased to MIN. Returns one of the group's values for any
+# orderable type. Deterministic (stronger than MySQL's
+# contract). For `sales` ('gadget'/'widget'), lex-MIN is 'gadget'.
+SELECT region, ANY_VALUE(product) AS p
+  FROM sales
+  GROUP BY region
+  ORDER BY region;
+region	p
+AP	widget
+EU	gadget
+NA	gadget
 === KNOWN DIVERGENCE: ONLY_FULL_GROUP_BY violation — errno 1054 ===
 # zeta rejects a SELECT-list reference to a non-grouped,
 # non-aggregated column with errno 1054 (column not found);
