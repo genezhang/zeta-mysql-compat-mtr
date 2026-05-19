@@ -35,13 +35,13 @@
 #     Through-view DML resolution is not wired through the
 #     pgwire path. Portable substitute: target the underlying
 #     base table directly.
-#   # zeta-adapt: KNOWN GAP — CREATE VIEW IF NOT EXISTS does NOT
-#     silently no-op like MySQL — it errors 1105 "view already
-#     exists" identically to CREATE VIEW. Header tracks the
-#     errno mismatch (also wrong: should be 1050
-#     ER_TABLE_EXISTS_ERROR, not 1105). Portable substitute:
-#     `DROP VIEW IF EXISTS x; CREATE VIEW x ...` or `CREATE OR
-#     REPLACE VIEW`.
+#   # zeta-adapt: CREATE VIEW IF NOT EXISTS — FIXED via zeta
+#     #1179. Now silent-no-ops when the named view exists
+#     (MySQL/SQLite semantics). The view body is NOT redefined
+#     by the no-op (that's `OR REPLACE`'s job). Plain CREATE
+#     VIEW dup-handling errno alignment (currently 1105, should
+#     be 1050 ER_TABLE_EXISTS_ERROR) remains a separate item
+#     and is NOT pinned here.
 #   # zeta-adapt: KNOWN DIVERGENCE — `SHOW CREATE VIEW`, `DESCRIBE
 #     v`, and `SHOW [FULL] TABLES` all return empty / exclude
 #     views; not pinned positively (empty result is hard to
@@ -104,12 +104,19 @@ UPDATE v_rename SET who = 'zz' WHERE uid = 1;
 --error 1146
 DELETE FROM v_rename WHERE uid = 1;
 
---echo === KNOWN GAP: CREATE VIEW IF NOT EXISTS — errno 1105 ===
---echo # MySQL silent-no-ops on a second IF NOT EXISTS; zeta
---echo # errors 1105 like a plain CREATE.
+--echo === CREATE VIEW IF NOT EXISTS — silent no-op when exists ===
+--echo # FIXED via zeta #1179. The second call is a no-op — the
+--echo # original body (uid, who from line ~58) is preserved.
 
---error 1105
 CREATE VIEW IF NOT EXISTS v_rename AS SELECT id FROM t;
+--sorted_result
+SELECT uid, who FROM v_rename;
+
+--echo === CREATE VIEW IF NOT EXISTS — creates when missing ===
+
+CREATE VIEW IF NOT EXISTS v_new_ifne AS SELECT id FROM t;
+--sorted_result
+SELECT id FROM v_new_ifne;
 
 --echo === DROP VIEW … CASCADE — accept, no actual cascade ===
 --echo # CASCADE is accepted at parse, the named view is dropped,
@@ -126,4 +133,5 @@ SELECT id FROM v_on_v;
 DROP VIEW IF EXISTS v_on_v;
 DROP VIEW IF EXISTS v_agg;
 DROP VIEW IF EXISTS v_rename;
+DROP VIEW IF EXISTS v_new_ifne;
 DROP TABLE t;
