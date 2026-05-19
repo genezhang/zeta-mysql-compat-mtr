@@ -1,0 +1,36 @@
+=== Setup ===
+DROP TABLE IF EXISTS up;
+CREATE TABLE up (id INT PRIMARY KEY, v INT);
+=== INSERT ... ON DUPLICATE KEY UPDATE ===
+INSERT INTO up VALUES (1, 10);
+# Literal value on UPDATE clause
+INSERT INTO up VALUES (1, 99) ON DUPLICATE KEY UPDATE v = 99;
+SELECT * FROM up WHERE id = 1;
+id	v
+1	99
+# VALUES(col) referring to incoming row
+INSERT INTO up VALUES (2, 20) ON DUPLICATE KEY UPDATE v = VALUES(v);
+SELECT * FROM up WHERE id = 2;
+id	v
+2	20
+# Expression on existing row
+INSERT INTO up VALUES (1, 50) ON DUPLICATE KEY UPDATE v = v + 1;
+SELECT * FROM up WHERE id = 1;
+id	v
+1	100
+=== KNOWN GAP: REPLACE INTO — errno 1064 ===
+# MySQL semantics: delete the conflicting row, then insert
+# the new one (different from ON DUPLICATE KEY UPDATE which
+# just updates in place). Portable substitute: INSERT ... ON
+# DUPLICATE KEY UPDATE.
+REPLACE INTO up VALUES (1, 11);
+ERROR 1064: SQL parse error: sql parser error: Unsupported statement REPLACE at Line: 1, Column: 9
+=== KNOWN GAP: @user_var read — errno 1064 ===
+# SET @x = value is accepted but reading @x errors with
+# "unsupported unary operator: @". Portable substitute: fold
+# constants into the SQL or use a temp table.
+SET @x = 42;
+SELECT @x;
+ERROR 1064: SQL parse error: unsupported unary operator: @
+=== Cleanup ===
+DROP TABLE up;
