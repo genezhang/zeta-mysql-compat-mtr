@@ -42,8 +42,11 @@
 #     BIN/OCT return string representations; negatives wrap to
 #     two's-complement 64-bit (matches MySQL). ORD returns the
 #     multibyte code of the first character.
-#   # zeta-adapt: KNOWN DIVERGENCE — CHARSET, COLLATION — errno 1105.
-#     MySQL-only introspection; no PG equivalent.
+#   # zeta-adapt: CHARSET, COLLATION — supported via constant stubs
+#     (FIXED via zeta #1159). CHARSET returns 'utf8mb4'; COLLATION
+#     returns 'utf8mb4_general_ci'. zeta operates as utf8mb4
+#     throughout (no per-column charset/collation override), so the
+#     constants match the only mode zeta runs in.
 #   # zeta-adapt: TO_BASE64, FROM_BASE64 — supported (FIXED via
 #     zeta #1158). Standard base64 encode/decode; minor cosmetic
 #     divergence vs MySQL which inserts a `\n` every 76 chars in
@@ -141,15 +144,9 @@ SELECT BIN(10) AS b, BIN(255) AS b255, BIN(0) AS b0;
 SELECT OCT(10) AS o, OCT(64) AS o64;
 SELECT ORD('A') AS a, ORD('') AS empty;
 
---echo === KNOWN DIVERGENCE: CHARSET — unknown function (errno 1105) ===
+--echo === CHARSET / COLLATION — FIXED via zeta #1159 (constant stubs) ===
 
---error 1105
-SELECT CHARSET('hi');
-
---echo === KNOWN DIVERGENCE: COLLATION — unknown function (errno 1105) ===
-
---error 1105
-SELECT COLLATION('hi');
+SELECT CHARSET('hi') AS cs, COLLATION('hi') AS co;
 
 --echo === TO_BASE64 / FROM_BASE64 — FIXED via zeta #1158 ===
 
