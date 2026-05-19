@@ -1,0 +1,155 @@
+# Independently authored SUBQUERY smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/subquery*.test;
+# pins zeta's behavior across the subquery shapes ORMs and query
+# generators emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: scalar subquery in SELECT — supported.
+#   # zeta-adapt: scalar subquery in WHERE — supported.
+#   # zeta-adapt: scalar subquery returning >1 row — rejected at
+#     execution. Errno is 1105 (generic execution error) vs MySQL's
+#     1242 (ER_SUBQUERY_NO_1_ROW). Behavior matches; only the errno
+#     differs.
+#   # zeta-adapt: IN / NOT IN (subquery) — supported.
+#   # zeta-adapt: EXISTS / NOT EXISTS — supported.
+#   # zeta-adapt: correlated subquery (outer-row binding in the WHERE
+#     of a SELECT-list scalar subquery or in IN) — supported.
+#   # zeta-adapt: derived table in FROM (subquery as a relation) —
+#     supported.
+#   # zeta-adapt: `<op> ANY (subquery)` and `<op> ALL (subquery)` —
+#     partially supported. `= ANY`, `<> ALL`, etc. work, but the
+#     comparison operators (`<`, `>`, `<=`, `>=`) are rejected at
+#     parse with errno 1064. Documented + asserted below.
+#   # zeta-adapt: KNOWN DIVERGENCE — row-constructor IN
+#     (`WHERE (col1, col2) IN ((v1, v2), ...)`) is rejected at parse
+#     with errno 1064 "unsupported expression: (col1, col2)". MySQL
+#     supports it. Pinned below.
+#   # zeta-adapt: KNOWN DIVERGENCE — explicit `LATERAL (correlated
+#     subquery)` returns 0 rows instead of the expected row-per-emp.
+#     The correlation binding doesn't fire through the LATERAL
+#     boundary. Asserted below as observed; substitute by hoisting
+#     the correlated reference into the JOIN's ON clause or using a
+#     correlated subquery in WHERE / SELECT directly.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS emp;
+CREATE TABLE emp (id INT PRIMARY KEY, name VARCHAR(10), dept_id INT, salary INT);
+INSERT INTO emp VALUES
+  (1, 'alice', 10, 100),
+  (2, 'bob', 10, 90),
+  (3, 'carol', 20, 80),
+  (4, 'dan', 20, 120),
+  (5, 'eve', 30, 60);
+
+DROP TABLE IF EXISTS dept;
+CREATE TABLE dept (id INT PRIMARY KEY, name VARCHAR(10));
+INSERT INTO dept VALUES (10, 'eng'), (20, 'sales'), (30, 'ops');
+
+--echo === Scalar subquery in SELECT ===
+
+SELECT id, name, (SELECT MAX(salary) FROM emp) AS max_s
+  FROM emp
+  ORDER BY id;
+
+--echo === Scalar subquery in WHERE ===
+
+SELECT id, name
+  FROM emp
+  WHERE salary > (SELECT AVG(salary) FROM emp)
+  ORDER BY id;
+
+--echo === IN (subquery) ===
+
+SELECT id, name
+  FROM emp
+  WHERE dept_id IN (SELECT id FROM dept WHERE name = 'eng')
+  ORDER BY id;
+
+--echo === NOT IN (subquery) ===
+
+SELECT id, name
+  FROM emp
+  WHERE dept_id NOT IN (SELECT id FROM dept WHERE name = 'eng')
+  ORDER BY id;
+
+--echo === EXISTS ===
+
+SELECT id, name
+  FROM emp e
+  WHERE EXISTS (SELECT 1 FROM dept d WHERE d.id = e.dept_id AND d.name = 'eng')
+  ORDER BY id;
+
+--echo === NOT EXISTS ===
+
+SELECT id, name
+  FROM emp e
+  WHERE NOT EXISTS (SELECT 1 FROM dept d WHERE d.id = e.dept_id AND d.name = 'eng')
+  ORDER BY id;
+
+--echo === Correlated scalar subquery in SELECT ===
+
+SELECT e.id, e.name,
+       (SELECT d.name FROM dept d WHERE d.id = e.dept_id) AS dept_name
+  FROM emp e
+  ORDER BY e.id;
+
+--echo === Derived table in FROM ===
+
+SELECT t.dept_id, t.cnt
+  FROM (SELECT dept_id, COUNT(*) AS cnt FROM emp GROUP BY dept_id) AS t
+  ORDER BY t.dept_id;
+
+--echo === = ANY (subquery) — supported ===
+
+SELECT id
+  FROM emp
+  WHERE salary = ANY (SELECT salary FROM emp WHERE dept_id = 10)
+  ORDER BY id;
+
+--echo === <> ALL (subquery) — supported ===
+
+SELECT id
+  FROM emp
+  WHERE salary <> ALL (SELECT salary FROM emp WHERE dept_id = 30)
+  ORDER BY id;
+
+--echo === KNOWN DIVERGENCE: > ANY (subquery) — unsupported (errno 1064) ===
+--echo # Comparison operators (`<`, `>`, `<=`, `>=`) are not yet
+--echo # implemented for ANY / ALL. `=` and `<>` work.
+
+--error 1064
+SELECT id FROM emp WHERE salary > ANY (SELECT salary FROM emp WHERE dept_id = 30);
+
+--echo === KNOWN DIVERGENCE: row-constructor IN — unsupported (errno 1064) ===
+--echo # MySQL accepts `WHERE (col1, col2) IN ((v1, v2), ...)`. zeta
+--echo # rejects the row constructor at parse. Substitute multiple
+--echo # AND-joined equalities.
+
+--error 1064
+SELECT id FROM emp WHERE (dept_id, name) IN ((10, 'alice'), (30, 'eve'));
+
+--echo === KNOWN DIVERGENCE: scalar subquery >1 row — errno 1105 ===
+--echo # MySQL emits 1242 (ER_SUBQUERY_NO_1_ROW); zeta emits the
+--echo # generic 1105. Behavior (rejection) matches; only the errno
+--echo # differs.
+
+--error 1105
+SELECT (SELECT id FROM emp) AS x FROM emp LIMIT 1;
+
+--echo === KNOWN DIVERGENCE: LATERAL with correlated subquery ===
+--echo # Returns 0 rows instead of the expected row-per-outer. The
+--echo # correlation binding doesn't fire through the LATERAL boundary.
+--echo # `e.dept_id` evaluates to NULL inside the lateral SELECT, so
+--echo # the `WHERE id = NULL` filter excludes every row. Asserted
+--echo # explicitly so the divergence is impossible to miss in diffs.
+--echo # Substitute with a correlated subquery in WHERE or SELECT.
+
+SELECT COUNT(*) AS c
+  FROM emp e
+  JOIN LATERAL (SELECT name FROM dept WHERE id = e.dept_id) d ON 1 = 1;
+
+--echo === Cleanup ===
+
+DROP TABLE emp;
+DROP TABLE dept;

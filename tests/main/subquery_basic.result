@@ -1,0 +1,133 @@
+=== Setup ===
+DROP TABLE IF EXISTS emp;
+CREATE TABLE emp (id INT PRIMARY KEY, name VARCHAR(10), dept_id INT, salary INT);
+INSERT INTO emp VALUES
+  (1, 'alice', 10, 100),
+  (2, 'bob', 10, 90),
+  (3, 'carol', 20, 80),
+  (4, 'dan', 20, 120),
+  (5, 'eve', 30, 60);
+DROP TABLE IF EXISTS dept;
+CREATE TABLE dept (id INT PRIMARY KEY, name VARCHAR(10));
+INSERT INTO dept VALUES (10, 'eng'), (20, 'sales'), (30, 'ops');
+=== Scalar subquery in SELECT ===
+SELECT id, name, (SELECT MAX(salary) FROM emp) AS max_s
+  FROM emp
+  ORDER BY id;
+id	name	max_s
+1	alice	120
+2	bob	120
+3	carol	120
+4	dan	120
+5	eve	120
+=== Scalar subquery in WHERE ===
+SELECT id, name
+  FROM emp
+  WHERE salary > (SELECT AVG(salary) FROM emp)
+  ORDER BY id;
+id	name
+1	alice
+4	dan
+=== IN (subquery) ===
+SELECT id, name
+  FROM emp
+  WHERE dept_id IN (SELECT id FROM dept WHERE name = 'eng')
+  ORDER BY id;
+id	name
+1	alice
+2	bob
+=== NOT IN (subquery) ===
+SELECT id, name
+  FROM emp
+  WHERE dept_id NOT IN (SELECT id FROM dept WHERE name = 'eng')
+  ORDER BY id;
+id	name
+3	carol
+4	dan
+5	eve
+=== EXISTS ===
+SELECT id, name
+  FROM emp e
+  WHERE EXISTS (SELECT 1 FROM dept d WHERE d.id = e.dept_id AND d.name = 'eng')
+  ORDER BY id;
+id	name
+1	alice
+2	bob
+=== NOT EXISTS ===
+SELECT id, name
+  FROM emp e
+  WHERE NOT EXISTS (SELECT 1 FROM dept d WHERE d.id = e.dept_id AND d.name = 'eng')
+  ORDER BY id;
+id	name
+3	carol
+4	dan
+5	eve
+=== Correlated scalar subquery in SELECT ===
+SELECT e.id, e.name,
+       (SELECT d.name FROM dept d WHERE d.id = e.dept_id) AS dept_name
+  FROM emp e
+  ORDER BY e.id;
+id	name	dept_name
+1	alice	eng
+2	bob	eng
+3	carol	sales
+4	dan	sales
+5	eve	ops
+=== Derived table in FROM ===
+SELECT t.dept_id, t.cnt
+  FROM (SELECT dept_id, COUNT(*) AS cnt FROM emp GROUP BY dept_id) AS t
+  ORDER BY t.dept_id;
+dept_id	cnt
+10	2
+20	2
+30	1
+=== = ANY (subquery) — supported ===
+SELECT id
+  FROM emp
+  WHERE salary = ANY (SELECT salary FROM emp WHERE dept_id = 10)
+  ORDER BY id;
+id
+1
+2
+=== <> ALL (subquery) — supported ===
+SELECT id
+  FROM emp
+  WHERE salary <> ALL (SELECT salary FROM emp WHERE dept_id = 30)
+  ORDER BY id;
+id
+1
+2
+3
+4
+=== KNOWN DIVERGENCE: > ANY (subquery) — unsupported (errno 1064) ===
+# Comparison operators (`<`, `>`, `<=`, `>=`) are not yet
+# implemented for ANY / ALL. `=` and `<>` work.
+SELECT id FROM emp WHERE salary > ANY (SELECT salary FROM emp WHERE dept_id = 30);
+ERROR 1064: SQL parse error: unsupported operator '>' for ANY(subquery)
+=== KNOWN DIVERGENCE: row-constructor IN — unsupported (errno 1064) ===
+# MySQL accepts `WHERE (col1, col2) IN ((v1, v2), ...)`. zeta
+# rejects the row constructor at parse. Substitute multiple
+# AND-joined equalities.
+SELECT id FROM emp WHERE (dept_id, name) IN ((10, 'alice'), (30, 'eve'));
+ERROR 1064: SQL parse error: unsupported expression: (dept_id, name)
+=== KNOWN DIVERGENCE: scalar subquery >1 row — errno 1105 ===
+# MySQL emits 1242 (ER_SUBQUERY_NO_1_ROW); zeta emits the
+# generic 1105. Behavior (rejection) matches; only the errno
+# differs.
+SELECT (SELECT id FROM emp) AS x FROM emp LIMIT 1;
+ERROR 1105: execution error: scalar subquery returned more than one row
+=== KNOWN DIVERGENCE: LATERAL with correlated subquery ===
+# Returns 0 rows instead of the expected row-per-outer. The
+# correlation binding doesn't fire through the LATERAL boundary.
+# `e.dept_id` evaluates to NULL inside the lateral SELECT, so
+# the `WHERE id = NULL` filter excludes every row. Asserted
+# explicitly so the divergence is impossible to miss in diffs.
+# Substitute with a correlated subquery in WHERE or SELECT.
+SELECT COUNT(*) AS c
+  FROM emp e
+  JOIN LATERAL (SELECT name FROM dept WHERE id = e.dept_id) d ON 1 = 1;
+c
+0
+=== Cleanup ===
+DROP TABLE emp;
+DROP TABLE dept;
