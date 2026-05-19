@@ -51,11 +51,16 @@ world
 SELECT REGEXP_SUBSTR('hello world', 'zz[a-z]+') AS r_miss;
 r_miss
 NULL
-=== KNOWN GAP: infix REGEXP / RLIKE — errno 1064 ===
-SELECT 'hello' REGEXP 'l+';
-ERROR 1064: SQL parse error: unsupported expression: 'hello' REGEXP 'l+'
-SELECT 'hello' RLIKE 'l+';
-ERROR 1064: SQL parse error: unsupported expression: 'hello' RLIKE 'l+'
+=== infix REGEXP / RLIKE — FIXED via zeta #1189 ===
+SELECT 'hello' REGEXP 'l+' AS m;
+m
+1
+SELECT 'hello' RLIKE 'l+'  AS r;
+r
+1
+SELECT 'xyz'   NOT REGEXP 'l+' AS nr;
+nr
+1
 === KNOWN GAP: CONVERT(str USING charset) — errno 1064 ===
 SELECT CONVERT('hello' USING utf8);
 ERROR 1064: SQL parse error: unsupported expression: CONVERT('hello' USING utf8)
