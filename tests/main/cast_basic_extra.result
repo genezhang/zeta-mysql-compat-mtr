@@ -1,0 +1,68 @@
+=== Integer targets — INTEGER / INT / BIGINT ===
+SELECT CAST('42' AS INTEGER) AS i, CAST('42' AS INT) AS i2, CAST('42' AS BIGINT) AS b;
+i	i2	b
+42	42	42
+=== Text targets — TEXT / VARCHAR(N) / CHAR / CHAR(N) ===
+SELECT CAST(42 AS TEXT) AS t, CAST(42 AS VARCHAR(20)) AS v;
+t	v
+42	42
+SELECT CAST(42 AS CHAR) AS c, CAST(42 AS CHAR(20)) AS cn;
+c	cn
+42	42
+=== DECIMAL target (precision/scale documented divergence) ===
+SELECT CAST('3.14' AS DECIMAL(10,2)) AS d;
+d
+3.14
+=== PG shorthand x::TYPE ===
+SELECT '42'::INT AS i;
+i
+42
+=== Date / Timestamp / Time targets ===
+SELECT CAST('2024-05-19' AS DATE) AS d;
+d
+2024-05-19
+SELECT CAST('2024-05-19 14:30:00' AS TIMESTAMP) AS ts;
+ts
+2024-05-19 14:30:00
+SELECT CAST('14:30:00' AS TIME) AS t;
+t
+14:30:00
+=== BOOLEAN target — integer + string forms ===
+SELECT CAST(1 AS BOOLEAN) AS b_int, CAST('true' AS BOOLEAN) AS b_str;
+b_int	b_str
+1	1
+=== NULL through CAST ===
+SELECT CAST(NULL AS INT) AS n_i, CAST(NULL AS TEXT) AS n_t;
+n_i	n_t
+NULL	NULL
+=== Negative integer string ===
+SELECT CAST('-42' AS INT) AS neg;
+neg
+-42
+=== Float-to-INT half-away-from-zero ===
+SELECT CAST(3.7 AS INT) AS pos, CAST(-3.7 AS INT) AS neg;
+pos	neg
+4	-4
+=== KNOWN DIVERGENCE: DECIMAL precision/scale NOT enforced ===
+# MySQL/PG round to scale; zeta returns the input value
+# unchanged.
+SELECT CAST('123.456789' AS DECIMAL(5,2)) AS d;
+d
+123.456789
+=== KNOWN GAP: CONVERT(x, SIGNED/UNSIGNED) — errno 1064 ===
+SELECT CONVERT('42', UNSIGNED);
+ERROR 1064: SQL parse error: unsupported expression: CONVERT('42', UNSIGNED)
+SELECT CONVERT('42', SIGNED);
+ERROR 1064: SQL parse error: unsupported expression: CONVERT('42', SIGNED)
+=== KNOWN DIVERGENCE: float overflow on CAST AS INT — errno 1105 ===
+SELECT CAST(1e20 AS INT);
+ERROR 1105: execution error: float out of range for INT4: 100000000000000000000
+=== KNOWN DIVERGENCE: invalid int literal — errno 1105 ===
+SELECT CAST('abc' AS INT);
+ERROR 1105: execution error: cannot cast 'abc' to INTEGER
+=== KNOWN GAP: CAST AS BYTEA — errno 1105 ===
+SELECT CAST('abc' AS BYTEA);
+ERROR 1105: execution error: unsupported CAST target type: BYTEA
+=== KNOWN DIVERGENCE: TRY_CAST behaves like CAST (errors on fail) ===
+SELECT TRY_CAST('abc' AS INT);
+ERROR 1105: execution error: cannot cast 'abc' to INTEGER

@@ -1,0 +1,124 @@
+# Independently authored CAST smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/
+# cast.test or type_conv.test; pins zeta's CAST behavior across
+# the type targets ORMs and analytics tools emit.
+#
+# Adaptation notes:
+#   # zeta-adapt: Integer targets — `CAST(x AS INTEGER)`,
+#     `INT`, `BIGINT` — all supported, equivalent for in-range
+#     values.
+#   # zeta-adapt: Text targets — `TEXT`, `VARCHAR(N)`, MySQL
+#     `CHAR`, `CHAR(N)` — all supported. No length enforcement
+#     on truncation (the value passes through unchanged).
+#   # zeta-adapt: `CAST(x AS DECIMAL(p, s))` — accepted at parse
+#     but precision/scale are NOT enforced; the value passes
+#     through unchanged. Documented divergence (MySQL/PG round
+#     to scale).
+#   # zeta-adapt: PG shorthand `x::TYPE` — supported (PG syntax
+#     extension).
+#   # zeta-adapt: `CAST` to DATE / TIMESTAMP / TIME — supported
+#     for parseable string inputs.
+#   # zeta-adapt: `CAST` to BOOLEAN — supported. Integer 0/1
+#     and string 'true'/'false' coerce as expected.
+#   # zeta-adapt: NULL propagates through CAST — returns NULL
+#     for the target type.
+#   # zeta-adapt: Float-to-INT — half-away-from-zero (3.7 → 4,
+#     -3.7 → -4). Matches MySQL.
+#   # zeta-adapt: KNOWN GAP — MySQL `CONVERT(x, SIGNED)` /
+#     `CONVERT(x, UNSIGNED)` errors 1064 "unsupported
+#     expression". Portable substitute: `CAST(x AS INT)` /
+#     `CAST(x AS BIGINT)`.
+#   # zeta-adapt: KNOWN DIVERGENCE — float overflow on CAST AS
+#     INT errors 1105 "float out of range" (MySQL clamps to
+#     INT_MAX with a warning). Portable substitute: clamp via
+#     LEAST/GREATEST before the cast.
+#   # zeta-adapt: KNOWN DIVERGENCE — invalid integer literal
+#     in `CAST('abc' AS INT)` errors 1105 (MySQL coerces to 0
+#     with a warning). Portable substitute: NULLIF + regex
+#     pre-check, or use a strict-mode-aware database layer.
+#   # zeta-adapt: KNOWN DIVERGENCE — `CAST(x AS DECIMAL(p,s))`
+#     does NOT enforce precision/scale; the value passes
+#     through unchanged. `'123.456789'` cast to DECIMAL(5,2)
+#     comes back as `123.456789`, not `123.46`. MySQL/PG both
+#     round to scale.
+#   # zeta-adapt: KNOWN GAP — `CAST(x AS BYTEA)` errors 1105
+#     "unsupported CAST target type: BYTEA". Portable
+#     substitute: store/process strings as TEXT until a true
+#     bytes column is needed.
+#   # zeta-adapt: KNOWN DIVERGENCE — `TRY_CAST` (SQL-standard
+#     fallible cast) behaves identically to plain CAST: errors
+#     on failure instead of returning NULL. Standard semantics
+#     would silently NULL the result.
+
+--echo === Integer targets — INTEGER / INT / BIGINT ===
+
+SELECT CAST('42' AS INTEGER) AS i, CAST('42' AS INT) AS i2, CAST('42' AS BIGINT) AS b;
+
+--echo === Text targets — TEXT / VARCHAR(N) / CHAR / CHAR(N) ===
+
+SELECT CAST(42 AS TEXT) AS t, CAST(42 AS VARCHAR(20)) AS v;
+SELECT CAST(42 AS CHAR) AS c, CAST(42 AS CHAR(20)) AS cn;
+
+--echo === DECIMAL target (precision/scale documented divergence) ===
+
+SELECT CAST('3.14' AS DECIMAL(10,2)) AS d;
+
+--echo === PG shorthand x::TYPE ===
+
+SELECT '42'::INT AS i;
+
+--echo === Date / Timestamp / Time targets ===
+
+SELECT CAST('2024-05-19' AS DATE) AS d;
+SELECT CAST('2024-05-19 14:30:00' AS TIMESTAMP) AS ts;
+SELECT CAST('14:30:00' AS TIME) AS t;
+
+--echo === BOOLEAN target — integer + string forms ===
+
+SELECT CAST(1 AS BOOLEAN) AS b_int, CAST('true' AS BOOLEAN) AS b_str;
+
+--echo === NULL through CAST ===
+
+SELECT CAST(NULL AS INT) AS n_i, CAST(NULL AS TEXT) AS n_t;
+
+--echo === Negative integer string ===
+
+SELECT CAST('-42' AS INT) AS neg;
+
+--echo === Float-to-INT half-away-from-zero ===
+
+SELECT CAST(3.7 AS INT) AS pos, CAST(-3.7 AS INT) AS neg;
+
+--echo === KNOWN DIVERGENCE: DECIMAL precision/scale NOT enforced ===
+--echo # MySQL/PG round to scale; zeta returns the input value
+--echo # unchanged.
+
+SELECT CAST('123.456789' AS DECIMAL(5,2)) AS d;
+
+--echo === KNOWN GAP: CONVERT(x, SIGNED/UNSIGNED) — errno 1064 ===
+
+--error 1064
+SELECT CONVERT('42', UNSIGNED);
+
+--error 1064
+SELECT CONVERT('42', SIGNED);
+
+--echo === KNOWN DIVERGENCE: float overflow on CAST AS INT — errno 1105 ===
+
+--error 1105
+SELECT CAST(1e20 AS INT);
+
+--echo === KNOWN DIVERGENCE: invalid int literal — errno 1105 ===
+
+--error 1105
+SELECT CAST('abc' AS INT);
+
+--echo === KNOWN GAP: CAST AS BYTEA — errno 1105 ===
+
+--error 1105
+SELECT CAST('abc' AS BYTEA);
+
+--echo === KNOWN DIVERGENCE: TRY_CAST behaves like CAST (errors on fail) ===
+
+--error 1105
+SELECT TRY_CAST('abc' AS INT);
