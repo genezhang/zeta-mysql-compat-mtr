@@ -26,12 +26,14 @@
 #   # zeta-adapt: CRC32 — supported (FIXED via zeta #1168).
 #     IEEE CRC32 of UTF-8 bytes returned as Int64 (preserves full
 #     u32 range). NULL → NULL. Pinned positively below.
-#   # zeta-adapt: KNOWN GAPS — the following MySQL numeric
-#     functions are still NOT implemented and raise errno 1105
-#     "unknown function":
-#       TRUNCATE, CONV.
-#     2 candidate slices remain — each needs bespoke implementation
-#     (decimal-aware truncate, base conversion).
+#   # zeta-adapt: TRUNCATE(X, D) — supported (FIXED via zeta #1169).
+#     Truncate X toward zero to D decimal places; D < 0 truncates
+#     to a multiple of 10^|D|. Decimal input stays Decimal; Float
+#     stays Float; integer + D >= 0 is identity. NULL → NULL.
+#     Pinned positively below.
+#   # zeta-adapt: KNOWN GAPS — only one MySQL numeric function
+#     still pinned: CONV (base conversion). One candidate slice
+#     remains.
 
 --echo === ABS / SIGN ===
 
@@ -93,10 +95,16 @@ SELECT DEGREES(3.141592653589793)        AS deg;
 SELECT RADIANS(180)                      AS rad;
 SELECT PI()                              AS pi;
 
---echo === KNOWN GAPS: TRUNCATE / CONV / CRC32 ===
+--echo === TRUNCATE — FIXED via zeta #1169 ===
+--echo # Truncate toward zero to D decimal places; D < 0 → 10^|D|
+--echo # multiple. Decimal stays Decimal; integer + D >= 0 is identity.
 
---error 1105
-SELECT TRUNCATE(3.567, 1);
+SELECT TRUNCATE(3.567, 1)                AS t;
+SELECT TRUNCATE(3.567, 2)                AS t;
+SELECT TRUNCATE(-3.567, 1)               AS t_neg;
+SELECT TRUNCATE(123.456, -2)             AS t_neg_d;
+
+--echo === KNOWN GAP: CONV ===
 
 --error 1105
 SELECT CONV(255, 10, 16);
