@@ -154,9 +154,12 @@ yes
 SELECT IF(NULL, 'yes', 'no') AS r;
 r
 no
-=== KNOWN DIVERGENCE: VERSION() — unknown function (errno 1105) ===
-SELECT VERSION();
-ERROR 1105: execution error: unknown function: VERSION
+=== VERSION() — FIXED via zeta #1129 ===
+# Returns the shim's advertised server version. Same value
+# the wire-level handshake's Server_version field carries.
+SELECT VERSION() AS v;
+v
+8.0.36-zeta
 === CAST(x AS SIGNED) — FIXED via zeta #1128 ===
 # Signed 64-bit cast; same range/rounding as BIGINT.
 SELECT CAST('123' AS SIGNED) AS r;

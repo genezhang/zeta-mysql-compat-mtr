@@ -30,8 +30,9 @@
 #   # zeta-adapt: IF(cond, x, y) — supported (FIXED via zeta #1127). 3-arg
 #     conditional with MySQL truthiness (NULL → false branch; non-zero
 #     numeric / non-empty string → true; '0' → false). Pinned below.
-#   # zeta-adapt: KNOWN DIVERGENCE — VERSION() is NOT supported
-#     (errno 1105 "unknown function: VERSION"). MySQL standard.
+#   # zeta-adapt: VERSION() — supported (FIXED via zeta #1129). Returns
+#     the same `8.0.36-zeta` string the shim's handshake advertises.
+#     Pinned below.
 #   # zeta-adapt: CAST(x AS SIGNED) — supported (FIXED via zeta #1128).
 #     Signed 64-bit cast; same range/rounding as BIGINT/INT8. Pinned below.
 #   # zeta-adapt: CAST(x AS UNSIGNED) — supported (FIXED via zeta #1128).
@@ -143,10 +144,11 @@ SELECT IF(5, 'yes', 'no') AS r;
 # NULL cond → false branch.
 SELECT IF(NULL, 'yes', 'no') AS r;
 
---echo === KNOWN DIVERGENCE: VERSION() — unknown function (errno 1105) ===
+--echo === VERSION() — FIXED via zeta #1129 ===
+--echo # Returns the shim's advertised server version. Same value
+--echo # the wire-level handshake's Server_version field carries.
 
---error 1105
-SELECT VERSION();
+SELECT VERSION() AS v;
 
 --echo === CAST(x AS SIGNED) — FIXED via zeta #1128 ===
 --echo # Signed 64-bit cast; same range/rounding as BIGINT.
