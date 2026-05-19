@@ -22,10 +22,11 @@
 #     parent, but error code is 1105 rather than MySQL's 1452 / 1451.
 #     NULL child values bypass the FK check (MySQL behavior). Pinned
 #     below.
-#   # zeta-adapt: KNOWN DIVERGENCE — UPDATE that sets a NOT NULL
-#     column to NULL is silently accepted (the row ends up with
-#     a NULL value in the NOT NULL column). MySQL errors with 1048.
-#     Documented + asserted below; alignment is tracked as a follow-up.
+#   # zeta-adapt: UPDATE writing NULL to a NOT NULL column — FIXED
+#     via zeta #1132. Now rejected with the same `null value in
+#     column "X" of relation "T" violates not-null constraint` message
+#     INSERT uses. Errno is still 1105 (vs MySQL's 1048) — behavior
+#     is now correct, only the errno differs. Pinned below.
 #   # zeta-adapt: KNOWN DIVERGENCE — ALTER TABLE ADD CONSTRAINT CHECK
 #     is rejected at parse with errno 1064 ("unsupported ALTER TABLE
 #     ADD CONSTRAINT type"). MySQL supports it. Not exercised here.
@@ -88,13 +89,18 @@ INSERT INTO c_nn VALUES (1, NULL);
 --error 1105
 INSERT INTO c_nn (id) VALUES (2);
 
---echo === KNOWN DIVERGENCE: NOT NULL on UPDATE — zeta silently ===
---echo # accepts a NULL update. MySQL errors with 1048. The row ends
---echo # up with a NULL value in the NOT NULL column. Asserted
---echo # explicitly so the divergence is impossible to miss.
+--echo === NOT NULL on UPDATE — FIXED via zeta #1132 ===
+--echo # zeta now rejects UPDATE that writes NULL to a NOT NULL
+--echo # column; the row is unchanged. Errno is 1105 (vs MySQL's
+--echo # 1048) — behavior is correct, only the errno differs.
 
 INSERT INTO c_nn VALUES (10, 'alice');
+--error 1105
 UPDATE c_nn SET name = NULL WHERE id = 10;
+# Row state unchanged.
+SELECT id, name FROM c_nn WHERE id = 10;
+# UPDATE writing non-NULL still works.
+UPDATE c_nn SET name = 'alice2' WHERE id = 10;
 SELECT id, name FROM c_nn WHERE id = 10;
 
 --echo === CHECK — violation rejected ===

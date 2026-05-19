@@ -43,15 +43,20 @@ ERROR 1105: execution error: null value in column "name" of relation "test.publi
 === NOT NULL on INSERT — missing column is rejected ===
 INSERT INTO c_nn (id) VALUES (2);
 ERROR 1105: execution error: null value in column "name" of relation "test.public.c_nn" violates not-null constraint
-=== KNOWN DIVERGENCE: NOT NULL on UPDATE — zeta silently ===
-# accepts a NULL update. MySQL errors with 1048. The row ends
-# up with a NULL value in the NOT NULL column. Asserted
-# explicitly so the divergence is impossible to miss.
+=== NOT NULL on UPDATE — FIXED via zeta #1132 ===
+# zeta now rejects UPDATE that writes NULL to a NOT NULL
+# column; the row is unchanged. Errno is 1105 (vs MySQL's
+# 1048) — behavior is correct, only the errno differs.
 INSERT INTO c_nn VALUES (10, 'alice');
 UPDATE c_nn SET name = NULL WHERE id = 10;
+ERROR 1105: execution error: null value in column "name" of relation "test.public.c_nn" violates not-null constraint
 SELECT id, name FROM c_nn WHERE id = 10;
 id	name
-10	NULL
+10	alice
+UPDATE c_nn SET name = 'alice2' WHERE id = 10;
+SELECT id, name FROM c_nn WHERE id = 10;
+id	name
+10	alice2
 === CHECK — violation rejected ===
 # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 3819.
 DROP TABLE IF EXISTS c_chk;
