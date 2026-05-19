@@ -23,12 +23,15 @@
 #       DEGREES, RADIANS, PI(). All return Float64; NULL on NULL.
 #       LOG2/LOG10 of zero/negative raise execution error.
 #     Pinned positively below.
+#   # zeta-adapt: CRC32 — supported (FIXED via zeta #1168).
+#     IEEE CRC32 of UTF-8 bytes returned as Int64 (preserves full
+#     u32 range). NULL → NULL. Pinned positively below.
 #   # zeta-adapt: KNOWN GAPS — the following MySQL numeric
 #     functions are still NOT implemented and raise errno 1105
 #     "unknown function":
-#       TRUNCATE, CONV, CRC32.
-#     3 candidate slices remain — each needs bespoke implementation
-#     (decimal-aware truncate, base conversion, IEEE checksum).
+#       TRUNCATE, CONV.
+#     2 candidate slices remain — each needs bespoke implementation
+#     (decimal-aware truncate, base conversion).
 
 --echo === ABS / SIGN ===
 
@@ -98,5 +101,10 @@ SELECT TRUNCATE(3.567, 1);
 --error 1105
 SELECT CONV(255, 10, 16);
 
---error 1105
-SELECT CRC32('test');
+--echo === CRC32 — FIXED via zeta #1168 ===
+--echo # IEEE CRC32; values cross-checked against MySQL.
+
+SELECT CRC32('test')                     AS c;
+SELECT CRC32('MySQL')                    AS c2;
+SELECT CRC32('')                         AS c_empty;
+SELECT CRC32(CAST(NULL AS CHAR))         AS c_null;
