@@ -77,12 +77,11 @@ id	n	lead_neg	lag_pos
 1	10	NULL	NULL
 2	20	10	10
 3	30	20	20
-=== KNOWN DIVERGENCE: nested window functions evaluate to NULL (PG: error) ===
+=== Nested window function calls — errors 1064 (was silent NULL) ===
 SELECT id, SUM(ROW_NUMBER() OVER ()) OVER () AS nested FROM wf ORDER BY id;
-id	nested
-1	NULL
-2	NULL
-3	NULL
+ERROR 1064: SQL parse error: window function calls cannot be nested
+SELECT SUM(ROW_NUMBER() OVER ()) AS agg_of_win FROM wf;
+ERROR 1064: SQL parse error: aggregate function `SUM` cannot contain window function calls
 === Window function in WHERE — correctly errors 1105 ===
 SELECT id FROM wf WHERE ROW_NUMBER() OVER () = 1;
 ERROR 1105: execution error: unsupported expression: WindowFunction { name: "ROW_NUMBER", args: [], partition_by: [], order_by: [], frame: None }
