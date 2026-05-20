@@ -1,0 +1,150 @@
+# Independently authored ALTER COLUMN TYPE edge smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/alter_table.test or PG regress;
+# complements alter_table_basic / alter_table_basic_extra
+# (which cover SET DEFAULT / DROP DEFAULT / SET NOT NULL /
+# DROP NOT NULL / TYPE INT→BIGINT widen / SET DATA TYPE) by
+# pinning the EDGE behavior NOT covered there: narrow-with-
+# overflow-data, incompatible-type INT→TEXT, USING-clause
+# gap, ALTER-on-PK rejection, ALTER-on-indexed-col
+# rejection, ALTER-on-FK rejection, MySQL MODIFY / CHANGE.
+#
+# Big-picture finding: zeta correctly rejects ALTER COLUMN
+# TYPE on protected columns (PK, indexed, FK) with clear
+# error messages pointing at the underlying constraint.
+# The MySQL MODIFY COLUMN and CHANGE COLUMN spellings both
+# work; CHANGE COLUMN handles the rename-and-retype combined
+# operation. Two notable issues: (a) narrowing to a type
+# whose range doesn't fit existing values is SILENTLY
+# accepted — `ALTER COLUMN n INT → SMALLINT` on a column
+# containing 99999 succeeds and the value stays at 99999
+# (no truncation, no error); subsequent INSERTs of values
+# outside SMALLINT range also succeed. (b) Changing INT
+# → TEXT is silently accepted with no conversion error.
+# The PG USING clause errors 1105 with a helpful rewrite
+# hint pointing at a separate UPDATE.
+#
+# Adaptation notes:
+#   # zeta-adapt: ALTER COLUMN TYPE widen (INT → BIGINT)
+#     — works; existing data preserved, new larger values
+#     accepted.
+#   # zeta-adapt: MySQL MODIFY COLUMN — supported.
+#   # zeta-adapt: MySQL CHANGE COLUMN <old> <new> <type>
+#     — supported (rename + retype combined).
+#   # zeta-adapt: ALTER COLUMN TYPE on PRIMARY KEY column
+#     errors 1105 "key encoding would change; re-create
+#     the table instead". Defensive: changing PK encoding
+#     would invalidate all existing index entries.
+#   # zeta-adapt: ALTER COLUMN TYPE on indexed column
+#     errors 1105 "index <name> uses it; drop the index
+#     first". Drop, retype, recreate.
+#   # zeta-adapt: ALTER COLUMN TYPE on FOREIGN KEY column
+#     errors 1105 (same reason — FK creates an underlying
+#     index). Drop the FK constraint first.
+#   # zeta-adapt: KNOWN GAP — `ALTER COLUMN TYPE <new>
+#     USING <expr>` (PG explicit conversion expression)
+#     errors 1105 "USING clause in ALTER COLUMN TYPE is
+#     not yet supported; omit it and use a separate UPDATE
+#     to convert existing values if needed".
+#   # zeta-adapt: KNOWN BUG — Narrowing the column type to
+#     one whose range doesn't fit existing values is
+#     SILENTLY accepted with NO truncation and NO error.
+#     `ALTER COLUMN n TYPE SMALLINT` on a column with 99999
+#     succeeds and keeps 99999; subsequent INSERTs above
+#     SMALLINT range also succeed (the type metadata
+#     changes but the storage/validation doesn't enforce
+#     the new range). Range-incompatible data should be
+#     rejected at ALTER time.
+#   # zeta-adapt: KNOWN BUG — `ALTER COLUMN TYPE TEXT` on
+#     an INT column is silently accepted; the column
+#     metadata changes to TEXT and subsequent string
+#     INSERTs succeed. Existing int values stay as their
+#     int representation. PG/MySQL would either error or
+#     auto-coerce via a USING-equivalent.
+
+--echo === ALTER COLUMN TYPE widen INT → BIGINT ===
+
+DROP TABLE IF EXISTS act;
+CREATE TABLE act (id INT, n INT);
+INSERT INTO act VALUES (1, 10), (2, 20);
+ALTER TABLE act ALTER COLUMN n TYPE BIGINT;
+INSERT INTO act VALUES (3, 9223372036854775807);
+SELECT id, n FROM act ORDER BY id;
+
+--echo === MySQL MODIFY COLUMN ===
+
+DROP TABLE IF EXISTS amod;
+CREATE TABLE amod (id INT, n INT);
+INSERT INTO amod VALUES (1, 10);
+ALTER TABLE amod MODIFY COLUMN n BIGINT;
+SELECT id, n FROM amod;
+
+--echo === MySQL CHANGE COLUMN (rename + retype) ===
+
+ALTER TABLE amod CHANGE COLUMN n m BIGINT;
+SELECT id, m FROM amod;
+
+--echo === ALTER COLUMN TYPE on PRIMARY KEY column — errno 1105 ===
+
+DROP TABLE IF EXISTS acpk;
+CREATE TABLE acpk (id INT PRIMARY KEY, n INT);
+INSERT INTO acpk VALUES (1, 10);
+--error 1105
+ALTER TABLE acpk ALTER COLUMN id TYPE BIGINT;
+
+--echo === ALTER COLUMN TYPE on indexed column — errno 1105 ===
+
+DROP TABLE IF EXISTS aci2;
+CREATE TABLE aci2 (id INT PRIMARY KEY, n INT);
+CREATE INDEX aci2_n ON aci2 (n);
+INSERT INTO aci2 VALUES (1, 10);
+--error 1105
+ALTER TABLE aci2 ALTER COLUMN n TYPE BIGINT;
+
+--echo === ALTER COLUMN TYPE on FOREIGN KEY column — errno 1105 ===
+
+DROP TABLE IF EXISTS acfk_p;
+DROP TABLE IF EXISTS acfk_c;
+CREATE TABLE acfk_p (id INT PRIMARY KEY);
+CREATE TABLE acfk_c (id INT PRIMARY KEY, pid INT, FOREIGN KEY (pid) REFERENCES acfk_p(id));
+--error 1105
+ALTER TABLE acfk_c ALTER COLUMN pid TYPE BIGINT;
+
+--echo === KNOWN GAP: ALTER COLUMN TYPE USING <expr> (PG) — errno 1105 with hint ===
+
+DROP TABLE IF EXISTS acu;
+CREATE TABLE acu (id INT, t TEXT);
+INSERT INTO acu VALUES (1, '100');
+--error 1105
+ALTER TABLE acu ALTER COLUMN t TYPE INT USING t::INT;
+
+--echo === KNOWN BUG: narrow with overflow data silently accepted ===
+--echo # ALTER INT → SMALLINT on a column containing 99999 succeeds;
+--echo # value stays at 99999 (no truncation); subsequent inserts of
+--echo # values exceeding SMALLINT range also succeed.
+
+DROP TABLE IF EXISTS acn;
+CREATE TABLE acn (id INT, n INT);
+INSERT INTO acn VALUES (1, 99999);
+ALTER TABLE acn ALTER COLUMN n TYPE SMALLINT;
+INSERT INTO acn VALUES (2, 99999);
+SELECT id, n FROM acn ORDER BY id;
+
+--echo === KNOWN BUG: INT → TEXT silently accepted ===
+
+DROP TABLE IF EXISTS aci;
+CREATE TABLE aci (id INT, n INT);
+INSERT INTO aci VALUES (1, 10);
+ALTER TABLE aci ALTER COLUMN n TYPE TEXT;
+INSERT INTO aci VALUES (2, 'hello');
+SELECT id, n FROM aci ORDER BY id;
+
+DROP TABLE act;
+DROP TABLE amod;
+DROP TABLE acpk;
+DROP TABLE aci2;
+DROP TABLE acfk_c;
+DROP TABLE acfk_p;
+DROP TABLE acu;
+DROP TABLE acn;
+DROP TABLE aci;
