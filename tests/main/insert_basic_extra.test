@@ -1,0 +1,102 @@
+# Independently authored INSERT-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/insert.test or insert_select.test; pins zeta's
+# INSERT surface NOT held by insert_basic (single + multi
+# VALUES + DEFAULT + ON DUPLICATE KEY UPDATE + INSERT IGNORE
+# + INSERT SET + INSERT SELECT).
+#
+# Adaptation notes:
+#   # zeta-adapt: INSERT … ON CONFLICT DO NOTHING (PG) —
+#     supported over the MySQL wire. A conflicting INSERT
+#     leaves the existing row unchanged and does not error.
+#   # zeta-adapt: INSERT … SELECT from JOIN — supported.
+#   # zeta-adapt: INSERT with mixed default + explicit
+#     columns — supported. Unmentioned columns get their
+#     DEFAULT value.
+#   # zeta-adapt: INSERT IGNORE with multi-row VALUES —
+#     supported. Skipped rows (PK conflict) are silently
+#     dropped; valid rows persist.
+#   # zeta-adapt: KNOWN GAP — INSERT … ON CONFLICT (col)
+#     DO UPDATE SET col = EXCLUDED.col errors 1064 via the
+#     MySQL wire ("Expected: SET, found: ("). The PG wire
+#     accepts the syntax — this is a MySQL-wire-only gap.
+#     Portable substitute on the MySQL wire: ON DUPLICATE KEY
+#     UPDATE col = VALUES(col).
+#   # zeta-adapt: KNOWN GAP — INSERT … DEFAULT VALUES (PG)
+#     parses but does NOT actually insert a row. INSERT
+#     completes with 0 rows affected. Portable substitute:
+#     INSERT INTO t (id) VALUES (DEFAULT) explicitly naming
+#     a column.
+#   # zeta-adapt: KNOWN DIVERGENCE — INSERT … RETURNING (PG)
+#     is accepted at parse and the INSERT applies, but the
+#     MySQL wire path silently drops the RETURNING rowset
+#     (same divergence as UPDATE/DELETE RETURNING).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ic;
+CREATE TABLE ic (id INT PRIMARY KEY, n INT);
+INSERT INTO ic VALUES (1, 10);
+
+--echo === INSERT ... ON CONFLICT DO NOTHING (PG) ===
+
+INSERT INTO ic VALUES (1, 99) ON CONFLICT DO NOTHING;
+SELECT id, n FROM ic ORDER BY id;
+
+--echo === INSERT ... SELECT from JOIN ===
+
+DROP TABLE IF EXISTS isj_a; DROP TABLE IF EXISTS isj_b; DROP TABLE IF EXISTS isj_dst;
+CREATE TABLE isj_a (id INT PRIMARY KEY, name VARCHAR(10));
+CREATE TABLE isj_b (id INT PRIMARY KEY, val INT);
+CREATE TABLE isj_dst (id INT PRIMARY KEY, name VARCHAR(10), val INT);
+INSERT INTO isj_a VALUES (1, 'a'), (2, 'b');
+INSERT INTO isj_b VALUES (1, 100), (2, 200);
+INSERT INTO isj_dst SELECT a.id, a.name, b.val
+  FROM isj_a a JOIN isj_b b ON a.id = b.id;
+SELECT id, name, val FROM isj_dst ORDER BY id;
+
+--echo === INSERT with mixed default + explicit columns ===
+
+DROP TABLE IF EXISTS imd;
+CREATE TABLE imd (id INT PRIMARY KEY, n INT DEFAULT 100, s TEXT DEFAULT 'x');
+INSERT INTO imd (id, s) VALUES (1, 'hello');
+SELECT id, n, s FROM imd;
+
+--echo === INSERT IGNORE — skip conflicting row, keep valid ===
+
+DROP TABLE IF EXISTS ig;
+CREATE TABLE ig (id INT PRIMARY KEY, n INT);
+INSERT INTO ig VALUES (1, 10);
+INSERT IGNORE INTO ig VALUES (1, 999), (2, 20);
+SELECT id, n FROM ig ORDER BY id;
+
+--echo === INSERT ... RETURNING — wire-side silent drop, post-SELECT verifies ===
+
+DROP TABLE IF EXISTS ir;
+CREATE TABLE ir (id INT PRIMARY KEY, n INT);
+INSERT INTO ir VALUES (1, 10) RETURNING id, n;
+SELECT id, n FROM ir;
+
+--echo === KNOWN GAP: INSERT ... ON CONFLICT (col) DO UPDATE — errno 1064 ===
+--echo # Works via PG wire / psql; fails through the MySQL wire
+--echo # shim. Substitute on MySQL wire: ON DUPLICATE KEY UPDATE
+--echo # col = VALUES(col).
+
+--error 1064
+INSERT INTO ic VALUES (1, 200) ON CONFLICT (id) DO UPDATE SET n = EXCLUDED.n;
+
+--echo === KNOWN GAP: INSERT ... DEFAULT VALUES — silently inserts 0 rows ===
+
+DROP TABLE IF EXISTS dv;
+CREATE TABLE dv (id SERIAL PRIMARY KEY, n INT DEFAULT 42);
+INSERT INTO dv DEFAULT VALUES;
+SELECT COUNT(*) AS row_count FROM dv;
+
+--echo === Cleanup ===
+
+DROP TABLE ic;
+DROP TABLE isj_a; DROP TABLE isj_b; DROP TABLE isj_dst;
+DROP TABLE imd;
+DROP TABLE ig;
+DROP TABLE ir;
+DROP TABLE dv;

@@ -1,0 +1,65 @@
+=== Setup ===
+DROP TABLE IF EXISTS ic;
+CREATE TABLE ic (id INT PRIMARY KEY, n INT);
+INSERT INTO ic VALUES (1, 10);
+=== INSERT ... ON CONFLICT DO NOTHING (PG) ===
+INSERT INTO ic VALUES (1, 99) ON CONFLICT DO NOTHING;
+SELECT id, n FROM ic ORDER BY id;
+id	n
+1	10
+=== INSERT ... SELECT from JOIN ===
+DROP TABLE IF EXISTS isj_a; DROP TABLE IF EXISTS isj_b; DROP TABLE IF EXISTS isj_dst;
+CREATE TABLE isj_a (id INT PRIMARY KEY, name VARCHAR(10));
+CREATE TABLE isj_b (id INT PRIMARY KEY, val INT);
+CREATE TABLE isj_dst (id INT PRIMARY KEY, name VARCHAR(10), val INT);
+INSERT INTO isj_a VALUES (1, 'a'), (2, 'b');
+INSERT INTO isj_b VALUES (1, 100), (2, 200);
+INSERT INTO isj_dst SELECT a.id, a.name, b.val
+  FROM isj_a a JOIN isj_b b ON a.id = b.id;
+SELECT id, name, val FROM isj_dst ORDER BY id;
+id	name	val
+1	a	100
+2	b	200
+=== INSERT with mixed default + explicit columns ===
+DROP TABLE IF EXISTS imd;
+CREATE TABLE imd (id INT PRIMARY KEY, n INT DEFAULT 100, s TEXT DEFAULT 'x');
+INSERT INTO imd (id, s) VALUES (1, 'hello');
+SELECT id, n, s FROM imd;
+id	n	s
+1	100	hello
+=== INSERT IGNORE — skip conflicting row, keep valid ===
+DROP TABLE IF EXISTS ig;
+CREATE TABLE ig (id INT PRIMARY KEY, n INT);
+INSERT INTO ig VALUES (1, 10);
+INSERT IGNORE INTO ig VALUES (1, 999), (2, 20);
+SELECT id, n FROM ig ORDER BY id;
+id	n
+1	10
+2	20
+=== INSERT ... RETURNING — wire-side silent drop, post-SELECT verifies ===
+DROP TABLE IF EXISTS ir;
+CREATE TABLE ir (id INT PRIMARY KEY, n INT);
+INSERT INTO ir VALUES (1, 10) RETURNING id, n;
+SELECT id, n FROM ir;
+id	n
+1	10
+=== KNOWN GAP: INSERT ... ON CONFLICT (col) DO UPDATE — errno 1064 ===
+# Works via PG wire / psql; fails through the MySQL wire
+# shim. Substitute on MySQL wire: ON DUPLICATE KEY UPDATE
+# col = VALUES(col).
+INSERT INTO ic VALUES (1, 200) ON CONFLICT (id) DO UPDATE SET n = EXCLUDED.n;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET, found: ( at Line: 1, Column: 59
+=== KNOWN GAP: INSERT ... DEFAULT VALUES — silently inserts 0 rows ===
+DROP TABLE IF EXISTS dv;
+CREATE TABLE dv (id SERIAL PRIMARY KEY, n INT DEFAULT 42);
+INSERT INTO dv DEFAULT VALUES;
+SELECT COUNT(*) AS row_count FROM dv;
+row_count
+0
+=== Cleanup ===
+DROP TABLE ic;
+DROP TABLE isj_a; DROP TABLE isj_b; DROP TABLE isj_dst;
+DROP TABLE imd;
+DROP TABLE ig;
+DROP TABLE ir;
+DROP TABLE dv;
