@@ -44,11 +44,11 @@
 #     concatenation supported.
 #   # zeta-adapt: ORD(s) — returns leading byte value for
 #     single/multi-char input.
-#   # zeta-adapt: KNOWN DIVERGENCE — QUOTE(NULL) returns
-#     NULL where MySQL returns the literal 4-character
-#     string 'NULL'. ORMs using QUOTE to build SQL
-#     fragments will see NULL collapse instead of being
-#     stringified.
+#   # zeta-adapt: QUOTE(NULL) returns the literal 4-char
+#     string 'NULL' (matches MySQL). Tabular output is
+#     ambiguous — both real NULL and the string 'NULL'
+#     display as "NULL". Disambiguated below via LENGTH
+#     and IS NULL.
 #   # zeta-adapt: KNOWN GAP — FORMAT(n, decimals, 'locale')
 #     (the 3-arg locale-aware form) errors 1105 "FORMAT
 #     requires 2 arguments". The 2-arg form is supported.
@@ -118,9 +118,9 @@ SELECT ORD('A') AS single, ORD('AB') AS multi, ORD('') AS empty, ORD(NULL) AS nl
 SELECT QUOTE('don''t') AS sq;
 SELECT QUOTE(123) AS num;
 
---echo === KNOWN DIVERGENCE: QUOTE(NULL) → NULL, MySQL → 'NULL' string ===
+--echo === QUOTE(NULL) returns literal 'NULL' string (matches MySQL) ===
 
-SELECT QUOTE(NULL) AS qn;
+SELECT QUOTE(NULL) AS qn, LENGTH(QUOTE(NULL)) AS qn_len, QUOTE(NULL) IS NULL AS is_nl;
 
 --echo === KNOWN GAP: FORMAT(n, dec, 'locale') — errno 1105 ===
 
