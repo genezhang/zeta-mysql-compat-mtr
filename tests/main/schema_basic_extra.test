@@ -1,0 +1,158 @@
+# Independently authored SCHEMA smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test (MySQL conflates SCHEMA = DATABASE — this is
+# PG surface). Pins zeta's CREATE/DROP SCHEMA and
+# schema-qualified DDL/DML (no prior compat coverage).
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE SCHEMA <name> — supported.
+#   # zeta-adapt: CREATE SCHEMA IF NOT EXISTS — supported,
+#     second CREATE is a silent no-op.
+#   # zeta-adapt: DROP SCHEMA <name> — supported, errors
+#     1105 "is not empty" if the schema contains tables and
+#     CASCADE was not specified.
+#   # zeta-adapt: DROP SCHEMA IF EXISTS — no-op on missing.
+#   # zeta-adapt: DROP SCHEMA <name> CASCADE — supported;
+#     drops dependent tables transitively.
+#   # zeta-adapt: DROP SCHEMA on missing without IF EXISTS
+#     errors 1105 "schema … does not exist".
+#   # zeta-adapt: CREATE TABLE <schema>.<table> — supported.
+#   # zeta-adapt: Schema-qualified INSERT / SELECT / UPDATE
+#     / DELETE on the TABLE form (`<schema>.<table>`) —
+#     supported.
+#   # zeta-adapt: Cross-schema FOREIGN KEY (child in one
+#     schema referencing parent in another) — supported and
+#     enforced (errno 1105 "foreign key violation" on
+#     orphan child INSERT).
+#   # zeta-adapt: DROP TABLE IF EXISTS <schema>.<table> on
+#     missing — no-op.
+#   # zeta-adapt: KNOWN GAP — Schema-qualified COLUMN
+#     reference `<schema>.<table>.<col>` in WHERE / UPDATE
+#     SET / DELETE WHERE errors 1054 "column not found".
+#     Substitute: use the bare `<table>.<col>` or alias
+#     form. Inside DML the table name is already implicit.
+#   # zeta-adapt: KNOWN GAP — SET search_path TO <schema>
+#     is accepted but has no effect: subsequent unqualified
+#     table references still resolve only in `public`,
+#     erroring 1146 "table not found". Substitute: always
+#     qualify with the schema name.
+#   # zeta-adapt: KNOWN GAP — `pg_catalog.pg_namespace`
+#     errors 1146 "table not found"; not shimmed. To list
+#     schemas use SHOW SCHEMAS (which actually returns
+#     DATABASES, see below).
+#   # zeta-adapt: KNOWN DIVERGENCE — `SHOW SCHEMAS`,
+#     `SHOW DATABASES`, and `information_schema.schemata`
+#     all return the set of DATABASES (e.g. `test`, `zeta`),
+#     not the set of user-created PG-style schemas. The
+#     two namespaces are kept separate in zeta, but the
+#     introspection surface only exposes one. Created
+#     schemas (like `s1`) are not listed.
+
+--echo === CREATE SCHEMA + CREATE TABLE in schema + DML round-trip ===
+
+DROP SCHEMA IF EXISTS s1 CASCADE;
+CREATE SCHEMA s1;
+CREATE TABLE s1.t (id INT PRIMARY KEY, n INT);
+INSERT INTO s1.t VALUES (1, 10), (2, 20);
+SELECT id, n FROM s1.t ORDER BY id;
+UPDATE s1.t SET n = 99 WHERE id = 1;
+DELETE FROM s1.t WHERE id = 2;
+SELECT id, n FROM s1.t;
+DROP TABLE s1.t;
+DROP SCHEMA s1;
+
+--echo === DROP SCHEMA on non-empty (no CASCADE) — errno 1105 ===
+
+DROP SCHEMA IF EXISTS sx;
+CREATE SCHEMA sx;
+CREATE TABLE sx.t (id INT);
+--error 1105
+DROP SCHEMA sx;
+DROP SCHEMA sx CASCADE;
+
+--echo === DROP SCHEMA missing without IF EXISTS — errno 1105 ===
+
+--error 1105
+DROP SCHEMA no_such_schema;
+
+--echo === DROP SCHEMA IF EXISTS on missing — no-op ===
+
+DROP SCHEMA IF EXISTS no_such_schema;
+
+--echo === CREATE SCHEMA IF NOT EXISTS — second CREATE is no-op ===
+
+DROP SCHEMA IF EXISTS sy;
+CREATE SCHEMA IF NOT EXISTS sy;
+CREATE SCHEMA IF NOT EXISTS sy;
+DROP SCHEMA sy;
+
+--echo === DROP TABLE IF EXISTS on missing schema-qualified table — no-op ===
+
+DROP SCHEMA IF EXISTS sm CASCADE;
+CREATE SCHEMA sm;
+DROP TABLE IF EXISTS sm.no_such;
+DROP SCHEMA sm;
+
+--echo === DROP SCHEMA CASCADE empties + drops the schema ===
+
+DROP SCHEMA IF EXISTS s3 CASCADE;
+CREATE SCHEMA s3;
+CREATE TABLE s3.x (id INT PRIMARY KEY);
+INSERT INTO s3.x VALUES (1), (2);
+SELECT id FROM s3.x ORDER BY id;
+DROP SCHEMA s3 CASCADE;
+
+--echo === Cross-schema FOREIGN KEY — enforced ===
+
+DROP SCHEMA IF EXISTS sa CASCADE;
+DROP SCHEMA IF EXISTS sb CASCADE;
+CREATE SCHEMA sa;
+CREATE SCHEMA sb;
+CREATE TABLE sa.parent (id INT PRIMARY KEY);
+CREATE TABLE sb.child (id INT PRIMARY KEY, pid INT REFERENCES sa.parent(id));
+INSERT INTO sa.parent VALUES (1);
+INSERT INTO sb.child VALUES (10, 1);
+SELECT pid FROM sb.child;
+--error 1105
+INSERT INTO sb.child VALUES (20, 99);
+DROP SCHEMA sb CASCADE;
+DROP SCHEMA sa CASCADE;
+
+--echo === KNOWN GAP: schema-qualified column ref — errno 1054 ===
+--echo # `<schema>.<table>.<col>` is rejected; the bare
+--echo # `<table>.<col>` works inside the same DML.
+
+DROP SCHEMA IF EXISTS sd CASCADE;
+CREATE SCHEMA sd;
+CREATE TABLE sd.t (id INT PRIMARY KEY, n INT);
+INSERT INTO sd.t VALUES (1, 10), (2, 20);
+--error 1054
+SELECT id FROM sd.t WHERE sd.t.n > 15;
+DROP SCHEMA sd CASCADE;
+
+--echo === KNOWN GAP: SET search_path has no effect — errno 1146 ===
+--echo # The unqualified SELECT FROM t still resolves only in
+--echo # `public`. Substitute: always qualify the schema.
+
+DROP SCHEMA IF EXISTS sp CASCADE;
+CREATE SCHEMA sp;
+CREATE TABLE sp.t (id INT PRIMARY KEY);
+INSERT INTO sp.t VALUES (1);
+SET search_path TO sp, public;
+--error 1146
+SELECT id FROM t;
+SET search_path TO public;
+DROP SCHEMA sp CASCADE;
+
+--echo === KNOWN GAP: pg_catalog.pg_namespace — errno 1146 ===
+
+--error 1146
+SELECT nspname FROM pg_catalog.pg_namespace;
+
+--echo === KNOWN DIVERGENCE: SHOW SCHEMAS returns DATABASES ===
+--echo # zeta's introspection surface lists databases under
+--echo # the SHOW SCHEMAS / SHOW DATABASES / information_schema
+--echo # .schemata names rather than the PG-style user-created
+--echo # schemas (`s1`, `sa`, etc. are not visible here).
+
+SELECT schema_name FROM information_schema.schemata ORDER BY schema_name;
