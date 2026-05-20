@@ -1,0 +1,74 @@
+=== Setup ===
+DROP TABLE IF EXISTS up;
+CREATE TABLE up (id INT PRIMARY KEY, n INT);
+INSERT INTO up VALUES (1, 10), (2, 20), (3, 30);
+=== UPDATE WHERE id IN (subquery) ===
+UPDATE up SET n = 0 WHERE id IN (SELECT id FROM up WHERE n < 25);
+SELECT id, n FROM up ORDER BY id;
+id	n
+1	0
+2	0
+3	30
+=== UPDATE WHERE EXISTS (correlated subquery) ===
+DROP TABLE IF EXISTS up2; CREATE TABLE up2 (id INT PRIMARY KEY, n INT);
+INSERT INTO up2 VALUES (1, 100), (2, 200);
+DROP TABLE IF EXISTS upx; CREATE TABLE upx (rid INT);
+INSERT INTO upx VALUES (1);
+UPDATE up2 SET n = -1 WHERE EXISTS (SELECT 1 FROM upx WHERE rid = up2.id);
+SELECT id, n FROM up2 ORDER BY id;
+id	n
+1	-1
+2	200
+=== UPDATE ... FROM <other> (PG cross-table) ===
+DROP TABLE IF EXISTS upf; CREATE TABLE upf (id INT PRIMARY KEY, n INT);
+DROP TABLE IF EXISTS upo; CREATE TABLE upo (id INT PRIMARY KEY, val INT);
+INSERT INTO upf VALUES (1, 0), (2, 0);
+INSERT INTO upo VALUES (1, 100), (2, 200);
+UPDATE upf SET n = upo.val FROM upo WHERE upf.id = upo.id;
+SELECT id, n FROM upf ORDER BY id;
+id	n
+1	100
+2	200
+=== UPDATE ... RETURNING (PG) — accepted, no wire-side rows ===
+# DIVERGENCE: zeta accepts RETURNING at parse and the
+# underlying UPDATE applies, but the MySQL wire path
+# does NOT propagate the RETURNING rows back to the
+# client (the row set is silently dropped). Through
+# the PG wire / psql, RETURNING works as expected.
+# Verified by the next SELECT showing the n=101/201
+# post-update state.
+UPDATE upf SET n = n + 1 RETURNING id, n;
+SELECT id, n FROM upf ORDER BY id;
+id	n
+1	101
+2	201
+=== UPDATE SET col = CASE WHEN ... ===
+UPDATE upf SET n = CASE WHEN id = 1 THEN 999 ELSE n END;
+SELECT id, n FROM upf ORDER BY id;
+id	n
+1	999
+2	201
+=== UPDATE SET col = NULL ===
+UPDATE upf SET n = NULL WHERE id = 2;
+SELECT id, n FROM upf ORDER BY id;
+id	n
+1	999
+2	NULL
+=== UPDATE with no WHERE — every row ===
+UPDATE upf SET n = 42;
+SELECT id, n FROM upf ORDER BY id;
+id	n
+1	42
+2	42
+=== KNOWN GAP: UPDATE ... ORDER BY ... LIMIT N — errno 1064 ===
+UPDATE upf SET n = 0 WHERE id > 0 ORDER BY id DESC LIMIT 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ORDER at Line: 1, Column: 35
+=== KNOWN GAP: UPDATE SET col = (correlated subquery) — errno 1105 ===
+UPDATE upf SET n = (SELECT MAX(val) FROM upo WHERE upo.id = upf.id);
+ERROR 1105: execution error: unsupported expression: ScalarSubquery { subquery: SelectStmt { distinct: false, distinct_on: [], projections: [SelectItem { expr: Function { name: "MAX", args: [Column("val")], distinct: false, filter: None, within_group: None, agg_order_by: None }, alias: None }], from: [Table { name: "upo", alias: None }], where_clause: Some(BinaryOp { left: QualifiedColumn("upo", "id"), op: Eq, right: QualifiedColumn("upf", "id") }), group_by: [], grouping_sets: [], having: None, order_by: [], limit: None, offset: None, limit_with_ties: false, ctes: [], for_update: false } }
+=== Cleanup ===
+DROP TABLE up;
+DROP TABLE up2;
+DROP TABLE upx;
+DROP TABLE upf;
+DROP TABLE upo;
