@@ -1,0 +1,120 @@
+=== INT4RANGE column + bracket literal + display ===
+# Display uses Debug formatter (see KNOWN DIVERGENCE).
+DROP TABLE IF EXISTS r1;
+CREATE TABLE r1 (id INT PRIMARY KEY, r INT4RANGE);
+INSERT INTO r1 VALUES (1, '[1,10)'), (2, '(5,15]'), (3, 'empty');
+SELECT id, r FROM r1 ORDER BY id;
+id	r
+1	Range { subtype: Int32, lower: Some(Int32(1)), upper: Some(Int32(10)), lower_inc: true, upper_inc: false, empty: false }
+2	Range { subtype: Int32, lower: Some(Int32(6)), upper: Some(Int32(16)), lower_inc: true, upper_inc: false, empty: false }
+3	Range { subtype: Int32, lower: None, upper: None, lower_inc: false, upper_inc: false, empty: true }
+=== LOWER / UPPER ===
+SELECT LOWER(r) AS lo, UPPER(r) AS up FROM r1 WHERE id = 1;
+lo	up
+1	10
+=== ISEMPTY ===
+SELECT ISEMPTY(r) AS not_empty FROM r1 WHERE id = 1;
+not_empty
+0
+SELECT ISEMPTY('empty'::INT4RANGE) AS r;
+r
+1
+=== @> contains element ===
+SELECT id FROM r1 WHERE r @> 7 ORDER BY id;
+id
+1
+2
+SELECT '[1,10)'::INT4RANGE @> 5 AS r;
+r
+1
+=== @> contains range, && overlap ===
+SELECT '[1,10)'::INT4RANGE @> '[2,8)'::INT4RANGE AS contains;
+contains
+1
+SELECT '[1,10)'::INT4RANGE && '[5,15)'::INT4RANGE AS overlap;
+overlap
+1
+=== << strictly-left-of ===
+SELECT '[1,5)'::INT4RANGE << '[6,10)'::INT4RANGE AS strict_left;
+strict_left
+1
+=== Range equality and < ordering ===
+SELECT '[1,10)'::INT4RANGE = '[1,10)'::INT4RANGE AS eq;
+eq
+1
+SELECT '[1,5)'::INT4RANGE < '[1,10)'::INT4RANGE AS lt;
+lt
+1
+=== LOWER_INC / UPPER_INC / LOWER_INF / UPPER_INF ===
+SELECT LOWER_INC('[1,10)'::INT4RANGE) AS li, UPPER_INC('[1,10)'::INT4RANGE) AS ui;
+li	ui
+1	0
+SELECT LOWER_INF('(,10)'::INT4RANGE) AS li, UPPER_INF('[1,)'::INT4RANGE) AS ui;
+li	ui
+1	1
+=== Inclusivity normalization for discrete (INT4) subtype ===
+# PG canonicalizes INT4 ranges so the upper bound is
+# always exclusive: `[1,10]` becomes `[1,11)`, and
+# `(1,10)` becomes `[2,10)`.
+SELECT '[1,10]'::INT4RANGE AS inc_inc;
+inc_inc
+Range { subtype: Int32, lower: Some(Int32(1)), upper: Some(Int32(11)), lower_inc: true, upper_inc: false, empty: false }
+SELECT '(1,10)'::INT4RANGE AS exc_exc;
+exc_exc
+Range { subtype: Int32, lower: Some(Int32(2)), upper: Some(Int32(10)), lower_inc: true, upper_inc: false, empty: false }
+DROP TABLE r1;
+=== Other range subtypes ===
+DROP TABLE IF EXISTS r2;
+CREATE TABLE r2 (id INT PRIMARY KEY, r INT8RANGE);
+INSERT INTO r2 VALUES (1, '[100,200)');
+SELECT id, r FROM r2;
+id	r
+1	Range { subtype: Int64, lower: Some(Int64(100)), upper: Some(Int64(200)), lower_inc: true, upper_inc: false, empty: false }
+DROP TABLE r2;
+DROP TABLE IF EXISTS r3;
+CREATE TABLE r3 (id INT PRIMARY KEY, r NUMRANGE);
+INSERT INTO r3 VALUES (1, '[1.5,3.5)');
+SELECT id, r FROM r3;
+id	r
+1	Range { subtype: Numeric, lower: Some(Decimal(1.5)), upper: Some(Decimal(3.5)), lower_inc: true, upper_inc: false, empty: false }
+DROP TABLE r3;
+DROP TABLE IF EXISTS r4;
+CREATE TABLE r4 (id INT PRIMARY KEY, r DATERANGE);
+INSERT INTO r4 VALUES (1, '[2024-01-01,2025-01-01)');
+SELECT id, r FROM r4;
+id	r
+1	Range { subtype: Date, lower: Some(Date(19723)), upper: Some(Date(20089)), lower_inc: true, upper_inc: false, empty: false }
+DROP TABLE r4;
+DROP TABLE IF EXISTS r5;
+CREATE TABLE r5 (id INT PRIMARY KEY, r TSRANGE);
+INSERT INTO r5 VALUES (1, '[2024-01-01 00:00:00,2024-02-01 00:00:00)');
+SELECT id, r FROM r5;
+id	r
+1	Range { subtype: Timestamp, lower: Some(Timestamp(1704067200000000)), upper: Some(Timestamp(1706745600000000)), lower_inc: true, upper_inc: false, empty: false }
+DROP TABLE r5;
+=== KNOWN GAP: * (intersection) — errno 1105 ===
+SELECT '[1,5)'::INT4RANGE * '[3,10)'::INT4RANGE AS intersect;
+ERROR 1105: execution error: arithmetic op requires numbers
+=== KNOWN GAP: + (union) — errno 1105 ===
+SELECT '[1,5)'::INT4RANGE + '[3,10)'::INT4RANGE AS union_;
+ERROR 1105: execution error: arithmetic op requires numbers
+=== KNOWN GAP: -|- (adjacency) — errno 1064 ===
+SELECT '[1,5)'::INT4RANGE -|- '[5,10)'::INT4RANGE AS adj;
+ERROR 1064: SQL parse error: unsupported binary operator: -|-
+=== KNOWN GAP: type-named constructor INT4RANGE(lo, hi) — errno 1105 ===
+# Substitute: '[lo,hi)'::INT4RANGE.
+SELECT INT4RANGE(1, 10) AS r;
+ERROR 1105: execution error: unknown function: INT4RANGE
+=== KNOWN GAP: NUMRANGE(lo, hi) — errno 1105 ===
+SELECT NUMRANGE(1.5, 3.5) AS r;
+ERROR 1105: execution error: unknown function: NUMRANGE
+=== KNOWN GAP: RANGE_AGG — errno 1105 ===
+SELECT RANGE_AGG(r) FROM (VALUES ('[1,5)'::INT4RANGE)) AS t(r);
+ERROR 1105: execution error: unknown function: RANGE_AGG
+=== KNOWN GAP: TSTZRANGE column type — errno 1064 ===
+# Substitute: TSRANGE.
+CREATE TABLE r_tstz_gap (id INT PRIMARY KEY, r TSTZRANGE);
+ERROR 1064: SQL parse error: unsupported data type: tstzrange
+=== KNOWN GAP: <range>::TEXT cast — errno 1105 ===
+SELECT '[1,10)'::INT4RANGE::TEXT AS r;
+ERROR 1105: execution error: cannot cast to TEXT
