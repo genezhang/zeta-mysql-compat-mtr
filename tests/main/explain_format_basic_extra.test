@@ -1,0 +1,144 @@
+# Independently authored EXPLAIN-format smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/explain_*.test or PG's regress; pins the
+# variants NOT covered by explain_basic_extra: parenthesized
+# PG-style options, MySQL FORMAT= variants, DESCRIBE
+# variants, and EXPLAIN ANALYZE on DML.
+#
+# Big-picture finding: zeta's EXPLAIN parser accepts the
+# PG-style parenthesized-options syntax and the MySQL
+# FORMAT= syntax permissively — almost every flag combo
+# parses, but only a handful actually change the output:
+# (a) EXPLAIN ANALYZE (top-level keyword) does run the query
+# and adds Execution Time + Rows Returned lines; (b) every
+# OTHER option, including (ANALYZE, BUFFERS) in parens,
+# COSTS OFF, BUFFERS, SETTINGS, FORMAT YAML, FORMAT XML,
+# FORMAT TREE, and even a bogus (FORMAT JUNK), is silently
+# discarded — the planner emits the standard text plan
+# unchanged. Two real gaps: the top-level MySQL `FORMAT=
+# <name>` syntax rejects anything other than JSON/TREE
+# (TRADITIONAL is 1064), and EXPLAIN ANALYZE on
+# INSERT/UPDATE/DELETE errors 1105. DESCRIBE/DESC <table>
+# both work and produce MySQL-shape column info. DESCRIBE
+# <SELECT> (MySQL alias for EXPLAIN SELECT) returns an
+# empty response — no error, no plan.
+#
+# Adaptation notes:
+#   # zeta-adapt: DESCRIBE <table> / DESC <table> — both
+#     supported; produce the MySQL Field/Type/Null/Key/
+#     Default/Extra columnar shape.
+#   # zeta-adapt: EXPLAIN (FORMAT YAML/XML/JUNK) — parsed,
+#     output is the standard text plan tree. The format
+#     directive is a silent no-op once it parses.
+#   # zeta-adapt: EXPLAIN (ANALYZE, BUFFERS) — parsed but
+#     ANALYZE is NOT honored inside the parens form
+#     (Execution Time lines are absent). Only the top-level
+#     `EXPLAIN ANALYZE` form actually runs the query.
+#   # zeta-adapt: EXPLAIN (COSTS OFF) / (BUFFERS) /
+#     (SETTINGS) — parsed, output unchanged from plain
+#     EXPLAIN. Costs are always shown.
+#   # zeta-adapt: EXPLAIN FORMAT=TREE (MySQL) — parsed,
+#     silent no-op.
+#   # zeta-adapt: KNOWN DIVERGENCE — `EXPLAIN ANALYZE` (top-
+#     level) is functional but its output includes
+#     wall-clock `Execution Time:` lines that vary per run,
+#     so it cannot be pinned byte-for-byte. Covered in
+#     zeta-server integration tests.
+#   # zeta-adapt: KNOWN DIVERGENCE — DESCRIBE <SELECT>
+#     (MySQL alias for EXPLAIN SELECT) returns an EMPTY
+#     response: no error, no plan tree. The MySQL contract
+#     is that this should produce the EXPLAIN-equivalent
+#     output.
+#   # zeta-adapt: KNOWN DIVERGENCE — bogus FORMAT names
+#     inside the parens form (e.g. `(FORMAT JUNK)`) are
+#     accepted without error, but rejected outside parens
+#     (`FORMAT=JUNK` errors 1064). The two syntaxes have
+#     different validation strictness.
+#   # zeta-adapt: KNOWN GAP — `EXPLAIN FORMAT=TRADITIONAL`
+#     (MySQL default) errors 1064 "Expected: fileformat,
+#     found: TRADITIONAL". Only JSON/TREE are accepted in
+#     the unparenthesized FORMAT= form.
+#   # zeta-adapt: KNOWN GAP — `EXPLAIN ANALYZE` on
+#     INSERT/UPDATE/DELETE errors 1105 "EXPLAIN ANALYZE is
+#     not supported for DML/DDL statements". Plain
+#     `EXPLAIN <dml>` does work and emits the single-line
+#     summary.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS et;
+CREATE TABLE et (id INT PRIMARY KEY, n INT);
+INSERT INTO et VALUES (1,10),(2,20),(3,30);
+
+--echo === DESC <table> — MySQL shorthand for DESCRIBE ===
+
+DESC et;
+
+--echo === DESCRIBE <table> — full spelling ===
+
+DESCRIBE et;
+
+--echo === EXPLAIN (FORMAT YAML) — parses, output is plain text plan ===
+
+EXPLAIN (FORMAT YAML) SELECT * FROM et;
+
+--echo === EXPLAIN (FORMAT XML) — parses, output is plain text plan ===
+
+EXPLAIN (FORMAT XML) SELECT * FROM et;
+
+--echo === EXPLAIN (ANALYZE, BUFFERS) — parses, but ANALYZE NOT honored ===
+
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM et;
+
+--echo === EXPLAIN (COSTS OFF) — parses, costs still shown ===
+
+EXPLAIN (COSTS OFF) SELECT * FROM et;
+
+--echo === EXPLAIN (BUFFERS) — parses, no buffer info added ===
+
+EXPLAIN (BUFFERS) SELECT * FROM et;
+
+--echo === EXPLAIN (SETTINGS) — parses, no settings shown ===
+
+EXPLAIN (SETTINGS) SELECT * FROM et;
+
+--echo === EXPLAIN FORMAT=TREE (MySQL) — parses, plain text plan ===
+
+EXPLAIN FORMAT=TREE SELECT * FROM et;
+
+--echo === KNOWN DIVERGENCE: (FORMAT JUNK) accepted even though FORMAT=JUNK rejected ===
+
+EXPLAIN (FORMAT JUNK) SELECT * FROM et;
+
+--echo === KNOWN DIVERGENCE: DESCRIBE SELECT returns empty (no error, no plan) ===
+
+DESCRIBE SELECT * FROM et;
+
+--echo === KNOWN GAP: EXPLAIN FORMAT=TRADITIONAL — errno 1064 ===
+
+--error 1064
+EXPLAIN FORMAT=TRADITIONAL SELECT * FROM et;
+
+--echo === KNOWN GAP: EXPLAIN FORMAT=JUNK (no parens) — errno 1064 ===
+
+--error 1064
+EXPLAIN FORMAT=JUNK SELECT * FROM et;
+
+--echo === KNOWN GAP: EXPLAIN ANALYZE INSERT — errno 1105 ===
+
+--error 1105
+EXPLAIN ANALYZE INSERT INTO et VALUES (99, 99);
+
+--echo === KNOWN GAP: EXPLAIN ANALYZE UPDATE — errno 1105 ===
+
+--error 1105
+EXPLAIN ANALYZE UPDATE et SET n = n+1;
+
+--echo === KNOWN GAP: EXPLAIN ANALYZE DELETE — errno 1105 ===
+
+--error 1105
+EXPLAIN ANALYZE DELETE FROM et WHERE n = 99;
+
+--echo === Cleanup ===
+
+DROP TABLE et;
