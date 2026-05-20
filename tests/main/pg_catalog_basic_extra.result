@@ -1,0 +1,80 @@
+=== Setup ===
+DROP TABLE IF EXISTS pct;
+CREATE TABLE pct (id INT PRIMARY KEY, name TEXT NOT NULL, age INT DEFAULT 0);
+CREATE INDEX ix_pct_name ON pct(name);
+=== SHOW DATABASES ===
+SHOW DATABASES;
+Database
+test
+zeta
+=== SHOW TABLES (current database) ===
+SHOW TABLES;
+Tables_in_test
+pct
+=== SHOW COLUMNS FROM <t> (MySQL form) ===
+SHOW COLUMNS FROM pct;
+Field	Type	Null	Key	Default	Extra
+id	int	NO	PRI	NULL	
+name	longtext	NO	MUL	NULL	
+age	int	YES		0	
+=== DESCRIBE <t> (alias of SHOW COLUMNS) ===
+DESCRIBE pct;
+Field	Type	Null	Key	Default	Extra
+id	int	NO	PRI	NULL	
+name	longtext	NO	MUL	NULL	
+age	int	YES		0	
+=== information_schema.tables ===
+SELECT table_schema, table_name
+  FROM information_schema.tables
+  WHERE table_name = 'pct'
+  ORDER BY table_schema, table_name;
+TABLE_SCHEMA	TABLE_NAME
+test	pct
+=== information_schema.columns ===
+SELECT column_name, data_type, is_nullable, column_default
+  FROM information_schema.columns
+  WHERE table_name = 'pct'
+  ORDER BY ordinal_position;
+COLUMN_NAME	DATA_TYPE	IS_NULLABLE	COLUMN_DEFAULT
+id	int	NO	NULL
+name	text	NO	NULL
+age	int	YES	0
+=== information_schema.schemata (returns DATABASES, not user schemas) ===
+SELECT schema_name FROM information_schema.schemata ORDER BY schema_name;
+SCHEMA_NAME
+test
+zeta
+=== information_schema.table_constraints ===
+SELECT constraint_name, constraint_type
+  FROM information_schema.table_constraints
+  WHERE table_name = 'pct';
+CONSTRAINT_NAME	CONSTRAINT_TYPE
+PRIMARY	PRIMARY KEY
+=== information_schema.engines (MySQL-only ORM shim) ===
+SELECT engine, support FROM information_schema.engines;
+ENGINE	SUPPORT
+InnoDB	DEFAULT
+=== Cleanup setup table before catalog probes ===
+DROP INDEX ix_pct_name;
+DROP TABLE pct;
+=== KNOWN GAP: pg_catalog.pg_class via MySQL wire — errno 1146 ===
+SELECT relname FROM pg_catalog.pg_class;
+ERROR 1146: table not found: pg_catalog.pg_class
+=== KNOWN GAP: pg_catalog.pg_attribute — errno 1146 ===
+SELECT attname FROM pg_catalog.pg_attribute;
+ERROR 1146: table not found: pg_catalog.pg_attribute
+=== KNOWN GAP: pg_catalog.pg_index — errno 1146 ===
+SELECT indrelid FROM pg_catalog.pg_index;
+ERROR 1146: table not found: pg_catalog.pg_index
+=== KNOWN GAP: pg_catalog.pg_constraint — errno 1146 ===
+SELECT conname FROM pg_catalog.pg_constraint;
+ERROR 1146: table not found: pg_catalog.pg_constraint
+=== KNOWN GAP: pg_catalog.pg_type — errno 1146 ===
+SELECT typname FROM pg_catalog.pg_type;
+ERROR 1146: table not found: pg_catalog.pg_type
+=== KNOWN GAP: pg_catalog.pg_proc — errno 1146 ===
+SELECT proname FROM pg_catalog.pg_proc;
+ERROR 1146: table not found: pg_catalog.pg_proc
+=== KNOWN GAP: pg_catalog.pg_namespace — errno 1146 ===
+SELECT nspname FROM pg_catalog.pg_namespace;
+ERROR 1146: table not found: pg_catalog.pg_namespace
