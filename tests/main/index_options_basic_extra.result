@@ -1,0 +1,116 @@
+=== CREATE INDEX … USING HNSW on VECTOR column ===
+DROP TABLE IF EXISTS iv;
+CREATE TABLE iv (id INT PRIMARY KEY, e VECTOR(3));
+CREATE INDEX iv_hnsw ON iv USING HNSW (e);
+SHOW INDEX FROM iv;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+iv	0	PRIMARY	1	id	BTREE
+iv	1	iv_hnsw	1	e	HNSW
+=== KNOWN DIVERGENCE: USING GIN reports as FULLTEXT in SHOW INDEX ===
+DROP TABLE IF EXISTS ij;
+CREATE TABLE ij (id INT PRIMARY KEY, j JSONB);
+CREATE INDEX ij_gin ON ij USING GIN (j);
+SHOW INDEX FROM ij;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+ij	0	PRIMARY	1	id	BTREE
+ij	1	ij_gin	1	j	FULLTEXT
+=== KNOWN DIVERGENCE: USING FTS reports as BTREE in SHOW INDEX ===
+DROP TABLE IF EXISTS ift;
+CREATE TABLE ift (id INT PRIMARY KEY, t TEXT);
+CREATE INDEX ift_fts ON ift USING FTS (t);
+SHOW INDEX FROM ift;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+ift	0	PRIMARY	1	id	BTREE
+ift	1	ift_fts	1	t	BTREE
+=== USING BRIN — silently coerced to BTREE ===
+DROP TABLE IF EXISTS ibrin;
+CREATE TABLE ibrin (id INT PRIMARY KEY, a INT);
+CREATE INDEX ibrin_a ON ibrin USING BRIN (a);
+SHOW INDEX FROM ibrin;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+ibrin	0	PRIMARY	1	id	BTREE
+ibrin	1	ibrin_a	1	a	BTREE
+=== CREATE INDEX CONCURRENTLY (PG) — supported ===
+DROP TABLE IF EXISTS icc;
+CREATE TABLE icc (id INT PRIMARY KEY, a INT);
+CREATE INDEX CONCURRENTLY icc_a ON icc (a);
+SHOW INDEX FROM icc;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+icc	0	PRIMARY	1	id	BTREE
+icc	1	icc_a	1	a	BTREE
+=== Multi-col index with mixed ASC/DESC ===
+DROP TABLE IF EXISTS imc;
+CREATE TABLE imc (id INT PRIMARY KEY, a INT, b INT);
+CREATE INDEX imc_ab ON imc (a ASC, b DESC);
+SHOW INDEX FROM imc;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+imc	0	PRIMARY	1	id	BTREE
+imc	1	imc_ab	1	a	BTREE
+imc	1	imc_ab	2	b	BTREE
+=== DROP INDEX without ON <table> (PG syntax) ===
+DROP TABLE IF EXISTS idn;
+CREATE TABLE idn (id INT PRIMARY KEY, a INT);
+CREATE INDEX idn_a ON idn (a);
+DROP INDEX idn_a;
+SHOW INDEX FROM idn;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+idn	0	PRIMARY	1	id	BTREE
+=== ALTER TABLE … DROP INDEX (MySQL spelling) ===
+DROP TABLE IF EXISTS idr;
+CREATE TABLE idr (id INT PRIMARY KEY, a INT);
+CREATE INDEX idr_a ON idr (a);
+ALTER TABLE idr DROP INDEX idr_a;
+SHOW INDEX FROM idr;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+idr	0	PRIMARY	1	id	BTREE
+=== Duplicate index name → errno 1061 ===
+DROP TABLE IF EXISTS idup;
+CREATE TABLE idup (id INT PRIMARY KEY, a INT);
+CREATE INDEX idup_a ON idup (a);
+CREATE INDEX idup_a ON idup (a);
+ERROR 1061: schema mismatch for table 108: index 'idup_a' already exists
+=== KNOWN BUG: CREATE INDEX IF NOT EXISTS does NOT suppress 1061 ===
+CREATE INDEX IF NOT EXISTS idup_a ON idup (a);
+ERROR 1061: schema mismatch for table 108: index 'idup_a' already exists
+=== KNOWN BUG: INCLUDE (col) parses but covering col missing from SHOW INDEX ===
+DROP TABLE IF EXISTS iinc;
+CREATE TABLE iinc (id INT PRIMARY KEY, a INT, b INT);
+CREATE INDEX iinc_a ON iinc (a) INCLUDE (b);
+SHOW INDEX FROM iinc;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+iinc	0	PRIMARY	1	id	BTREE
+iinc	1	iinc_a	1	a	BTREE
+=== KNOWN BUG: Expression index silently no-op ===
+DROP TABLE IF EXISTS iex;
+CREATE TABLE iex (id INT PRIMARY KEY, t TEXT);
+CREATE INDEX iex_lower ON iex (LOWER(t));
+SHOW INDEX FROM iex;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+iex	0	PRIMARY	1	id	BTREE
+=== KNOWN BUG: ALTER TABLE ADD INDEX silently no-op ===
+DROP TABLE IF EXISTS ialt;
+CREATE TABLE ialt (id INT PRIMARY KEY, a INT);
+ALTER TABLE ialt ADD INDEX ialt_a (a);
+# SHOW INDEX confirms ONLY PRIMARY remains — the ADD INDEX did nothing:
+SHOW INDEX FROM ialt;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+ialt	0	PRIMARY	1	id	BTREE
+=== KNOWN GAP: CREATE FULLTEXT INDEX (MySQL spelling) — errno 1064 ===
+DROP TABLE IF EXISTS iff;
+CREATE TABLE iff (id INT PRIMARY KEY, t TEXT);
+CREATE FULLTEXT INDEX iff_ft ON iff (t);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FULLTEXT at Line: 1, Column: 8
+=== Cleanup ===
+DROP TABLE iv;
+DROP TABLE ij;
+DROP TABLE ift;
+DROP TABLE ibrin;
+DROP TABLE icc;
+DROP TABLE imc;
+DROP TABLE idn;
+DROP TABLE idr;
+DROP TABLE idup;
+DROP TABLE iinc;
+DROP TABLE iex;
+DROP TABLE ialt;
+DROP TABLE iff;

@@ -1,0 +1,196 @@
+# Independently authored index-option smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/index_*.test or PG regress; complements
+# index_basic_extra by pinning the index-type / DDL-shape /
+# alter / introspection surface NOT covered there:
+# USING GIN/HNSW/FTS/BRIN, CREATE FULLTEXT, INCLUDE,
+# CREATE CONCURRENTLY, expression indexes, ALTER TABLE
+# ADD/DROP INDEX, mixed-direction multi-col, DROP without
+# ON, IF NOT EXISTS.
+#
+# Big-picture finding: zeta has a permissive index-DDL
+# parser that accepts most PG and MySQL index syntaxes,
+# but several common options are silently dropped:
+# (a) CREATE INDEX … INCLUDE (col) parses but the included
+# column never appears in SHOW INDEX — covering-index
+# behavior is lost. (b) Expression indexes (CREATE INDEX
+# ON t (LOWER(c))) parse silently but no actual index is
+# created (SHOW INDEX shows only the implicit PRIMARY).
+# (c) ALTER TABLE ADD INDEX (MySQL inline) accepts the
+# statement but creates NO index — confirmed by SHOW INDEX
+# (only PRIMARY survives). This is a notable functional
+# bug because ALTER ADD INDEX is the most common MySQL
+# migration tool spelling. (d) CREATE INDEX IF NOT EXISTS
+# does NOT actually suppress the duplicate-index error
+# (1061); the IF NOT EXISTS keyword is silently ignored.
+#
+# Two SHOW-INDEX type-reporting divergences: a GIN index
+# is reported as `FULLTEXT` and a USING FTS index is
+# reported as `BTREE`. ORMs that introspect SHOW INDEX to
+# decide which operators to plan will see the wrong types.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE INDEX … USING HNSW (col) — works
+#     for VECTOR columns. SHOW INDEX reports HNSW.
+#   # zeta-adapt: CREATE INDEX … USING GIN (col) — works
+#     for JSONB columns. (Divergence below: shows as
+#     FULLTEXT in SHOW INDEX.)
+#   # zeta-adapt: CREATE INDEX … USING FTS (col) — works
+#     for TEXT columns. (Divergence below: shows as BTREE.)
+#   # zeta-adapt: CREATE INDEX … USING BRIN (col) — parses;
+#     silently coerced to BTREE.
+#   # zeta-adapt: CREATE INDEX CONCURRENTLY <name> ON … —
+#     supported (the PG CONCURRENTLY keyword is accepted;
+#     zeta's index build is already non-blocking).
+#   # zeta-adapt: CREATE INDEX … (a ASC, b DESC) (multi-
+#     col mixed directions) — supported.
+#   # zeta-adapt: DROP INDEX <name>; (PG, no ON clause) —
+#     supported.
+#   # zeta-adapt: ALTER TABLE … DROP INDEX <name> (MySQL
+#     spelling) — supported.
+#   # zeta-adapt: CREATE INDEX with duplicate name errors
+#     1061 "index already exists".
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW INDEX reports
+#     USING GIN as Index_type='FULLTEXT'. ORMs that read
+#     the type column to decide GIN-operator availability
+#     will get the wrong answer.
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW INDEX reports
+#     USING FTS as Index_type='BTREE'. The text-search
+#     operator `@@` still works against the underlying
+#     index, but the introspection type is wrong.
+#   # zeta-adapt: KNOWN BUG — CREATE INDEX … INCLUDE (col)
+#     parses but the included column does NOT appear in
+#     SHOW INDEX output. Covering-index queries will not
+#     benefit from the projection.
+#   # zeta-adapt: KNOWN BUG — expression indexes (e.g.
+#     `CREATE INDEX ix ON t (LOWER(c))`) parse silently
+#     but no actual index is created; SHOW INDEX shows
+#     only the implicit PRIMARY. Queries against the
+#     expression still work via SeqScan.
+#   # zeta-adapt: KNOWN BUG — `ALTER TABLE … ADD INDEX
+#     <name> (col)` (MySQL inline form) silently
+#     succeeds but the index is NOT created. SHOW INDEX
+#     confirms only PRIMARY survives. Substitute via
+#     standalone `CREATE INDEX <name> ON <tbl>(col)`.
+#   # zeta-adapt: KNOWN BUG — `CREATE INDEX IF NOT EXISTS
+#     <name>` errors 1061 on duplicate; the IF NOT EXISTS
+#     clause is silently ignored.
+#   # zeta-adapt: KNOWN GAP — `CREATE FULLTEXT INDEX
+#     <name> ON …` (MySQL spelling) errors 1064 at parse.
+#     Substitute via `CREATE INDEX … USING FTS`.
+
+--echo === CREATE INDEX … USING HNSW on VECTOR column ===
+
+DROP TABLE IF EXISTS iv;
+CREATE TABLE iv (id INT PRIMARY KEY, e VECTOR(3));
+CREATE INDEX iv_hnsw ON iv USING HNSW (e);
+SHOW INDEX FROM iv;
+
+--echo === KNOWN DIVERGENCE: USING GIN reports as FULLTEXT in SHOW INDEX ===
+
+DROP TABLE IF EXISTS ij;
+CREATE TABLE ij (id INT PRIMARY KEY, j JSONB);
+CREATE INDEX ij_gin ON ij USING GIN (j);
+SHOW INDEX FROM ij;
+
+--echo === KNOWN DIVERGENCE: USING FTS reports as BTREE in SHOW INDEX ===
+
+DROP TABLE IF EXISTS ift;
+CREATE TABLE ift (id INT PRIMARY KEY, t TEXT);
+CREATE INDEX ift_fts ON ift USING FTS (t);
+SHOW INDEX FROM ift;
+
+--echo === USING BRIN — silently coerced to BTREE ===
+
+DROP TABLE IF EXISTS ibrin;
+CREATE TABLE ibrin (id INT PRIMARY KEY, a INT);
+CREATE INDEX ibrin_a ON ibrin USING BRIN (a);
+SHOW INDEX FROM ibrin;
+
+--echo === CREATE INDEX CONCURRENTLY (PG) — supported ===
+
+DROP TABLE IF EXISTS icc;
+CREATE TABLE icc (id INT PRIMARY KEY, a INT);
+CREATE INDEX CONCURRENTLY icc_a ON icc (a);
+SHOW INDEX FROM icc;
+
+--echo === Multi-col index with mixed ASC/DESC ===
+
+DROP TABLE IF EXISTS imc;
+CREATE TABLE imc (id INT PRIMARY KEY, a INT, b INT);
+CREATE INDEX imc_ab ON imc (a ASC, b DESC);
+SHOW INDEX FROM imc;
+
+--echo === DROP INDEX without ON <table> (PG syntax) ===
+
+DROP TABLE IF EXISTS idn;
+CREATE TABLE idn (id INT PRIMARY KEY, a INT);
+CREATE INDEX idn_a ON idn (a);
+DROP INDEX idn_a;
+SHOW INDEX FROM idn;
+
+--echo === ALTER TABLE … DROP INDEX (MySQL spelling) ===
+
+DROP TABLE IF EXISTS idr;
+CREATE TABLE idr (id INT PRIMARY KEY, a INT);
+CREATE INDEX idr_a ON idr (a);
+ALTER TABLE idr DROP INDEX idr_a;
+SHOW INDEX FROM idr;
+
+--echo === Duplicate index name → errno 1061 ===
+
+DROP TABLE IF EXISTS idup;
+CREATE TABLE idup (id INT PRIMARY KEY, a INT);
+CREATE INDEX idup_a ON idup (a);
+--error 1061
+CREATE INDEX idup_a ON idup (a);
+
+--echo === KNOWN BUG: CREATE INDEX IF NOT EXISTS does NOT suppress 1061 ===
+
+--error 1061
+CREATE INDEX IF NOT EXISTS idup_a ON idup (a);
+
+--echo === KNOWN BUG: INCLUDE (col) parses but covering col missing from SHOW INDEX ===
+
+DROP TABLE IF EXISTS iinc;
+CREATE TABLE iinc (id INT PRIMARY KEY, a INT, b INT);
+CREATE INDEX iinc_a ON iinc (a) INCLUDE (b);
+SHOW INDEX FROM iinc;
+
+--echo === KNOWN BUG: Expression index silently no-op ===
+
+DROP TABLE IF EXISTS iex;
+CREATE TABLE iex (id INT PRIMARY KEY, t TEXT);
+CREATE INDEX iex_lower ON iex (LOWER(t));
+SHOW INDEX FROM iex;
+
+--echo === KNOWN BUG: ALTER TABLE ADD INDEX silently no-op ===
+
+DROP TABLE IF EXISTS ialt;
+CREATE TABLE ialt (id INT PRIMARY KEY, a INT);
+ALTER TABLE ialt ADD INDEX ialt_a (a);
+--echo # SHOW INDEX confirms ONLY PRIMARY remains — the ADD INDEX did nothing:
+SHOW INDEX FROM ialt;
+
+--echo === KNOWN GAP: CREATE FULLTEXT INDEX (MySQL spelling) — errno 1064 ===
+
+DROP TABLE IF EXISTS iff;
+CREATE TABLE iff (id INT PRIMARY KEY, t TEXT);
+--error 1064
+CREATE FULLTEXT INDEX iff_ft ON iff (t);
+
+--echo === Cleanup ===
+
+DROP TABLE iv;
+DROP TABLE ij;
+DROP TABLE ift;
+DROP TABLE ibrin;
+DROP TABLE icc;
+DROP TABLE imc;
+DROP TABLE idn;
+DROP TABLE idr;
+DROP TABLE idup;
+DROP TABLE iinc;
+DROP TABLE iex;
+DROP TABLE ialt;
+DROP TABLE iff;
