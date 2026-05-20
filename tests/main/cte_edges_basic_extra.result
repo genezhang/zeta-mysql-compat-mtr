@@ -1,0 +1,56 @@
+=== Setup ===
+DROP TABLE IF EXISTS ct;
+CREATE TABLE ct (id INT);
+INSERT INTO ct VALUES (1), (2), (3);
+=== Forward reference (B uses A defined first) ===
+WITH a AS (SELECT 1 AS x), b AS (SELECT x + 1 AS y FROM a) SELECT y FROM b;
+y
+2
+=== Backward reference (A uses B defined later) — errno 1146 ===
+WITH a AS (SELECT y - 1 AS x FROM b), b AS (SELECT 10 AS y) SELECT * FROM a;
+ERROR 1146: table not found: b
+=== CTE shadowing outer table ===
+WITH ct AS (SELECT 100 AS id) SELECT id FROM ct;
+id
+100
+=== CTE referenced multiple times ===
+WITH cnt AS (SELECT COUNT(*) AS c FROM ct) SELECT cnt.c AS first, cnt.c AS second FROM cnt;
+first	second
+3	3
+=== CTE self-join (FROM cnt a, cnt b) ===
+WITH cnt AS (SELECT 5 AS x) SELECT a.x AS ax, b.x AS bx FROM cnt a, cnt b;
+ax	bx
+5	5
+=== CTE with empty body — errno 1064 ===
+WITH x AS () SELECT 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: ) at Line: 1, Column: 12
+=== KNOWN DIVERGENCE: CTE column-list mismatch silently uses first alias ===
+# `WITH c(a, b)` declares 2 cols but SELECT returns 1; zeta
+# silently uses 'a' for the single returned column. PG/MySQL
+# error 'WITH query has N columns available but M specified'.
+WITH c(a, b) AS (SELECT 1) SELECT * FROM c;
+a
+1
+=== KNOWN DIVERGENCE: data-modifying WITH errors 1064 ===
+DROP TABLE IF EXISTS cti;
+CREATE TABLE cti (id INT, n INT);
+WITH src AS (SELECT 1 AS id, 10 AS n) INSERT INTO cti SELECT * FROM src;
+ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+WITH src AS (SELECT 1 AS id) DELETE FROM cti WHERE id IN (SELECT id FROM src);
+ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+WITH src AS (SELECT 1 AS id) UPDATE cti SET n=99 WHERE id IN (SELECT id FROM src);
+ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+=== KNOWN DIVERGENCE: duplicate CTE name silently uses last ===
+# PG/MySQL error 'WITH query name X specified more than once';
+# zeta returns row from the second definition (x=2).
+WITH a AS (SELECT 1 AS x), a AS (SELECT 2 AS x) SELECT * FROM a;
+x
+2
+=== KNOWN DIVERGENCE: WITH RECURSIVE without UNION silently returns anchor ===
+# PG/MySQL error 'recursive query has no UNION'; zeta returns
+# the single anchor row.
+WITH RECURSIVE r AS (SELECT 1 AS n) SELECT * FROM r;
+n
+1
+DROP TABLE ct;
+DROP TABLE cti;

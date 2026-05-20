@@ -1,0 +1,124 @@
+# Independently authored CTE edge-case smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/cte.test or PG regress; complements
+# with_cte_basic / with_cte_basic_extra / recursive_cte_
+# basic_extra (which cover basic WITH, RECURSIVE, MATERIALIZED
+# hint, ORDER BY in CTE, infinite-recursion-with-LIMIT) by
+# pinning the EDGE behavior NOT covered there: forward and
+# backward references, CTE shadowing, column-list mismatch,
+# data-modifying WITH, duplicate CTE names, RECURSIVE
+# without UNION, and CTE self-join.
+#
+# Big-picture finding: zeta handles standard CTE shapes
+# correctly: forward references in the WITH chain work,
+# backward references reject with 1146 (CTE not yet
+# visible), and shadowing of an outer table by a same-
+# named CTE inside the WITH scope works as expected.
+# Four notable divergences: (a) CTE column-list mismatch
+# (`WITH c(a, b) AS (SELECT 1)`) silently uses the first
+# alias instead of erroring; (b) data-modifying WITH
+# clauses (`WITH ... INSERT/UPDATE/DELETE`) error 1064
+# "only SELECT supported"; (c) duplicate CTE names
+# silently use the LAST definition where PG/MySQL reject;
+# (d) WITH RECURSIVE without a UNION ALL anchor+recursive
+# pair silently returns just the anchor where PG/MySQL
+# error "recursive query has no UNION".
+#
+# Adaptation notes:
+#   # zeta-adapt: Forward references in WITH chain — works
+#     (B can reference A as long as A is declared first).
+#   # zeta-adapt: Backward references error 1146 "table
+#     not found" (correct: CTE A cannot reference B
+#     defined later).
+#   # zeta-adapt: CTE shadowing — `WITH t AS (...) SELECT
+#     * FROM t` resolves to the CTE, not to a regular
+#     table with the same name.
+#   # zeta-adapt: CTE referenced multiple times — works.
+#     The planner re-inlines per reference (so the body
+#     runs once per use site; not memoized).
+#   # zeta-adapt: CTE self-join `FROM cnt a, cnt b` works.
+#   # zeta-adapt: CTE with empty body `()` errors 1064 at
+#     parse (correct rejection).
+#   # zeta-adapt: KNOWN DIVERGENCE — CTE column-list
+#     mismatch `WITH c(a, b) AS (SELECT 1)` silently uses
+#     the first alias and ignores `b`. PG/MySQL error
+#     "WITH query 'c' has 1 columns available but 2
+#     columns specified".
+#   # zeta-adapt: KNOWN DIVERGENCE — data-modifying WITH
+#     (`WITH ... INSERT`/UPDATE/DELETE) errors 1064 "only
+#     SELECT supported". PG and MySQL 8+ both support
+#     these forms. Substitute via plain DML referencing a
+#     derived subquery.
+#   # zeta-adapt: KNOWN DIVERGENCE — duplicate CTE name
+#     `WITH a AS (...), a AS (...)` silently uses the
+#     LAST definition. PG/MySQL error "WITH query name
+#     'a' specified more than once".
+#   # zeta-adapt: KNOWN DIVERGENCE — `WITH RECURSIVE r AS
+#     (SELECT 1)` (no UNION) silently returns just the
+#     anchor row. PG/MySQL error "recursive query has no
+#     UNION".
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ct;
+CREATE TABLE ct (id INT);
+INSERT INTO ct VALUES (1), (2), (3);
+
+--echo === Forward reference (B uses A defined first) ===
+
+WITH a AS (SELECT 1 AS x), b AS (SELECT x + 1 AS y FROM a) SELECT y FROM b;
+
+--echo === Backward reference (A uses B defined later) — errno 1146 ===
+
+--error 1146
+WITH a AS (SELECT y - 1 AS x FROM b), b AS (SELECT 10 AS y) SELECT * FROM a;
+
+--echo === CTE shadowing outer table ===
+
+WITH ct AS (SELECT 100 AS id) SELECT id FROM ct;
+
+--echo === CTE referenced multiple times ===
+
+WITH cnt AS (SELECT COUNT(*) AS c FROM ct) SELECT cnt.c AS first, cnt.c AS second FROM cnt;
+
+--echo === CTE self-join (FROM cnt a, cnt b) ===
+
+WITH cnt AS (SELECT 5 AS x) SELECT a.x AS ax, b.x AS bx FROM cnt a, cnt b;
+
+--echo === CTE with empty body — errno 1064 ===
+
+--error 1064
+WITH x AS () SELECT 1;
+
+--echo === KNOWN DIVERGENCE: CTE column-list mismatch silently uses first alias ===
+--echo # `WITH c(a, b)` declares 2 cols but SELECT returns 1; zeta
+--echo # silently uses 'a' for the single returned column. PG/MySQL
+--echo # error 'WITH query has N columns available but M specified'.
+
+WITH c(a, b) AS (SELECT 1) SELECT * FROM c;
+
+--echo === KNOWN DIVERGENCE: data-modifying WITH errors 1064 ===
+
+DROP TABLE IF EXISTS cti;
+CREATE TABLE cti (id INT, n INT);
+--error 1064
+WITH src AS (SELECT 1 AS id, 10 AS n) INSERT INTO cti SELECT * FROM src;
+--error 1064
+WITH src AS (SELECT 1 AS id) DELETE FROM cti WHERE id IN (SELECT id FROM src);
+--error 1064
+WITH src AS (SELECT 1 AS id) UPDATE cti SET n=99 WHERE id IN (SELECT id FROM src);
+
+--echo === KNOWN DIVERGENCE: duplicate CTE name silently uses last ===
+--echo # PG/MySQL error 'WITH query name X specified more than once';
+--echo # zeta returns row from the second definition (x=2).
+
+WITH a AS (SELECT 1 AS x), a AS (SELECT 2 AS x) SELECT * FROM a;
+
+--echo === KNOWN DIVERGENCE: WITH RECURSIVE without UNION silently returns anchor ===
+--echo # PG/MySQL error 'recursive query has no UNION'; zeta returns
+--echo # the single anchor row.
+
+WITH RECURSIVE r AS (SELECT 1 AS n) SELECT * FROM r;
+
+DROP TABLE ct;
+DROP TABLE cti;
