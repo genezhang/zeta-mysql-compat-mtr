@@ -1,0 +1,166 @@
+# Independently authored JSONB-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/json*.test (MySQL has no JSONB or JSON_EACH
+# set-returning function); pins zeta's PG-flavored JSONB
+# surface NOT held by json_basic (which covers the MySQL-
+# named JSON_xxx functions plus -> / ->> / @> / ?).
+#
+# Adaptation notes:
+#   # zeta-adapt: JSONB_BUILD_OBJECT(k, v, ...) — supported.
+#   # zeta-adapt: JSONB_BUILD_ARRAY(...) — supported.
+#   # zeta-adapt: JSONB_TYPEOF — supported. Returns
+#     'object' / 'array' / 'number' / 'string' / 'null' /
+#     'boolean'.
+#   # zeta-adapt: JSONB_ARRAY_LENGTH — supported.
+#   # zeta-adapt: JSONB_EXTRACT_PATH(j, k1, k2, ...) —
+#     supported (variadic PG path form, returns JSONB).
+#   # zeta-adapt: JSONB_EXTRACT_PATH_TEXT — supported
+#     (returns TEXT, unquotes scalar string).
+#   # zeta-adapt: JSONB_PRETTY — supported (returns indented
+#     multi-line text).
+#   # zeta-adapt: JSONB_STRIP_NULLS — supported. Removes
+#     keys whose values are JSON null.
+#   # zeta-adapt: JSONB_AGG (with optional ORDER BY) —
+#     supported. Aggregates a column into a JSON array.
+#   # zeta-adapt: JSONB_EACH(j) — supported as a FROM-clause
+#     set-returning function. Output columns: key, value
+#     (value as JSONB).
+#   # zeta-adapt: JSONB_EACH_TEXT — supported. Same shape
+#     as JSONB_EACH but value column is TEXT (unquoted).
+#   # zeta-adapt: JSONB_OBJECT_KEYS — supported as a
+#     FROM-clause set-returning function.
+#   # zeta-adapt: `?&` (has all keys) and `?|` (has any
+#     key) operators — supported. RHS is a TEXT[] array.
+#   # zeta-adapt: JSONB_SET(target, path, value) with
+#     multi-segment path (e.g. `{a,b}`) — supported.
+#   # zeta-adapt: Nested containment `@>` (object inside
+#     object) — supported.
+#   # zeta-adapt: `-` delete-single-key operator
+#     (jsonb - 'key') — supported.
+#   # zeta-adapt: TO_JSONB(scalar) — supported. Wraps a
+#     scalar value as a JSONB value.
+#   # zeta-adapt: JSONB_OBJECT_AGG(k, v) (in addition to
+#     the MySQL-named alias JSON_OBJECTAGG) — supported.
+#   # zeta-adapt: `||` JSONB concatenation / merge —
+#     supported. Right side wins on key collisions.
+#   # zeta-adapt: KNOWN GAP — JSONB_ARRAY_ELEMENTS as a
+#     FROM-clause set-returning function errors 1105
+#     "unknown set-returning function". Substitute: use
+#     UNNEST(ARRAY[...]) for inline arrays, or pre-parse
+#     to a relational form. Companion JSONB_ARRAY_ELEMENTS_
+#     TEXT is also unimplemented (errors 1105 "unknown
+#     function").
+#   # zeta-adapt: KNOWN GAP — `jsonb - text[]` (delete a
+#     list of keys) errors 1105 "arithmetic op requires
+#     numbers". The single-key form `jsonb - 'k'` works.
+#     Substitute: chain single-key deletes.
+#   # zeta-adapt: KNOWN GAP — JSONB `@@` jsonpath predicate
+#     operator errors 1105 "@@ requires tsvector and
+#     tsquery operands"; the `@@` operator is currently
+#     bound only to FTS. Substitute: extract with
+#     JSONB_EXTRACT_PATH and compare.
+
+--echo === JSONB_BUILD_OBJECT / JSONB_BUILD_ARRAY ===
+
+SELECT JSONB_BUILD_OBJECT('a', 1, 'b', 'two') AS o;
+SELECT JSONB_BUILD_ARRAY(1, 'x', true) AS a;
+SELECT JSONB_BUILD_OBJECT('a', JSONB_BUILD_ARRAY(1, 2, 3)) AS nested;
+
+--echo === JSONB_TYPEOF — five kinds ===
+
+SELECT JSONB_TYPEOF('{"a":1}'::JSONB) AS t1,
+       JSONB_TYPEOF('[1,2]'::JSONB) AS t2,
+       JSONB_TYPEOF('42'::JSONB) AS t3,
+       JSONB_TYPEOF('"s"'::JSONB) AS t4,
+       JSONB_TYPEOF('null'::JSONB) AS t5;
+
+--echo === JSONB_ARRAY_LENGTH ===
+
+SELECT JSONB_ARRAY_LENGTH('[1,2,3,4]'::JSONB) AS n;
+
+--echo === JSONB_EXTRACT_PATH / JSONB_EXTRACT_PATH_TEXT (variadic PG path) ===
+
+SELECT JSONB_EXTRACT_PATH('{"a":{"b":1}}'::JSONB, 'a', 'b') AS r;
+SELECT JSONB_EXTRACT_PATH_TEXT('{"a":{"b":1}}'::JSONB, 'a', 'b') AS r;
+
+--echo === JSONB_STRIP_NULLS ===
+
+SELECT JSONB_STRIP_NULLS('{"a":1,"b":null,"c":3}'::JSONB) AS s;
+
+--echo === TO_JSONB(scalar) ===
+
+SELECT TO_JSONB(42) AS r1, TO_JSONB('hello'::TEXT) AS r2;
+
+--echo === JSONB_OBJECT_AGG (PG-named, sibling of JSON_OBJECTAGG) ===
+
+SELECT JSONB_OBJECT_AGG(k, v) AS o FROM (VALUES ('a', 1), ('b', 2)) AS t(k, v);
+
+--echo === JSONB_AGG across a table ===
+
+DROP TABLE IF EXISTS jb;
+CREATE TABLE jb (id INT PRIMARY KEY, data JSONB);
+INSERT INTO jb VALUES (1, '{"a":1}'), (2, '{"a":2,"b":"x"}'), (3, '{"a":3}');
+SELECT JSONB_AGG(data ORDER BY id) AS agg FROM jb;
+
+--echo === JSONB_EACH / JSONB_EACH_TEXT / JSONB_OBJECT_KEYS — FROM-clause SRFs ===
+
+SELECT id, k.key, k.value FROM jb, JSONB_EACH(data) AS k WHERE id = 2 ORDER BY k.key;
+SELECT id, k.key, k.value FROM jb, JSONB_EACH_TEXT(data) AS k WHERE id = 2 ORDER BY k.key;
+SELECT id, k FROM jb, JSONB_OBJECT_KEYS(data) AS k WHERE id = 2 ORDER BY k;
+
+--echo === ?& (has all keys) and ?| (has any key) ===
+
+SELECT data ?& ARRAY['a', 'b'] AS has_both FROM jb WHERE id = 2;
+SELECT data ?| ARRAY['a', 'b'] AS has_any FROM jb WHERE id = 1;
+
+--echo === JSONB_SET with multi-segment path ===
+
+SELECT JSONB_SET('{"a":1,"b":{"c":2}}'::JSONB, '{b,c}', '99'::JSONB) AS r;
+
+--echo === Nested @> containment (object inside object) ===
+
+SELECT '{"a":{"b":1}}'::JSONB @> '{"a":{}}'::JSONB AS r;
+
+--echo === jsonb - 'key' (delete single key) ===
+
+SELECT data - 'b' AS dropped FROM jb WHERE id = 2;
+
+--echo === jsonb || jsonb (merge; right-side wins on collision) ===
+
+SELECT data || '{"z":99}'::JSONB AS merged FROM jb WHERE id = 1;
+
+--echo === JSONB_PRETTY (indented multi-line text) ===
+
+SELECT JSONB_PRETTY('{"b":2,"a":1}'::JSONB) AS p;
+
+--echo === KNOWN GAP: JSONB_ARRAY_ELEMENTS as SRF — errno 1105 ===
+--echo # Not yet implemented as a set-returning function.
+--echo # Substitute: UNNEST(ARRAY[...]) for inline arrays.
+
+--error 1105
+SELECT v.* FROM JSONB_ARRAY_ELEMENTS('[1,2,3]'::JSONB) AS v;
+
+--echo === KNOWN GAP: JSONB_ARRAY_ELEMENTS_TEXT — errno 1105 ===
+
+--error 1105
+SELECT JSONB_ARRAY_ELEMENTS_TEXT('[1,2,3]'::JSONB);
+
+--echo === KNOWN GAP: jsonb - text[] (delete list of keys) — errno 1105 ===
+--echo # "arithmetic op requires numbers" — the planner takes
+--echo # the array path for `-` and misroutes. Single-key form
+--echo # `jsonb - 'k'` works (see above).
+
+--error 1105
+SELECT '{"a":1,"b":2,"c":3}'::JSONB - ARRAY['a', 'b'] AS r;
+
+--echo === KNOWN GAP: JSONB @@ jsonpath — errno 1105 (FTS-bound) ===
+--echo # `@@` is currently dispatched only to the FTS
+--echo # tsvector/tsquery operator. JSONPath predicates are
+--echo # not yet supported.
+
+--error 1105
+SELECT '{"a":1}'::JSONB @@ '$.a == 1' AS r;
+
+--echo === Cleanup ===
+
+DROP TABLE jb;

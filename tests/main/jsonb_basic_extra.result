@@ -1,0 +1,113 @@
+=== JSONB_BUILD_OBJECT / JSONB_BUILD_ARRAY ===
+SELECT JSONB_BUILD_OBJECT('a', 1, 'b', 'two') AS o;
+o
+{"a":1,"b":"two"}
+SELECT JSONB_BUILD_ARRAY(1, 'x', true) AS a;
+a
+[1,"x",true]
+SELECT JSONB_BUILD_OBJECT('a', JSONB_BUILD_ARRAY(1, 2, 3)) AS nested;
+nested
+{"a":[1,2,3]}
+=== JSONB_TYPEOF — five kinds ===
+SELECT JSONB_TYPEOF('{"a":1}'::JSONB) AS t1,
+       JSONB_TYPEOF('[1,2]'::JSONB) AS t2,
+       JSONB_TYPEOF('42'::JSONB) AS t3,
+       JSONB_TYPEOF('"s"'::JSONB) AS t4,
+       JSONB_TYPEOF('null'::JSONB) AS t5;
+t1	t2	t3	t4	t5
+object	array	number	string	null
+=== JSONB_ARRAY_LENGTH ===
+SELECT JSONB_ARRAY_LENGTH('[1,2,3,4]'::JSONB) AS n;
+n
+4
+=== JSONB_EXTRACT_PATH / JSONB_EXTRACT_PATH_TEXT (variadic PG path) ===
+SELECT JSONB_EXTRACT_PATH('{"a":{"b":1}}'::JSONB, 'a', 'b') AS r;
+r
+1
+SELECT JSONB_EXTRACT_PATH_TEXT('{"a":{"b":1}}'::JSONB, 'a', 'b') AS r;
+r
+1
+=== JSONB_STRIP_NULLS ===
+SELECT JSONB_STRIP_NULLS('{"a":1,"b":null,"c":3}'::JSONB) AS s;
+s
+{"a":1,"c":3}
+=== TO_JSONB(scalar) ===
+SELECT TO_JSONB(42) AS r1, TO_JSONB('hello'::TEXT) AS r2;
+r1	r2
+42	"hello"
+=== JSONB_OBJECT_AGG (PG-named, sibling of JSON_OBJECTAGG) ===
+SELECT JSONB_OBJECT_AGG(k, v) AS o FROM (VALUES ('a', 1), ('b', 2)) AS t(k, v);
+o
+{"a":1,"b":2}
+=== JSONB_AGG across a table ===
+DROP TABLE IF EXISTS jb;
+CREATE TABLE jb (id INT PRIMARY KEY, data JSONB);
+INSERT INTO jb VALUES (1, '{"a":1}'), (2, '{"a":2,"b":"x"}'), (3, '{"a":3}');
+SELECT JSONB_AGG(data ORDER BY id) AS agg FROM jb;
+agg
+[{"a":1},{"a":2,"b":"x"},{"a":3}]
+=== JSONB_EACH / JSONB_EACH_TEXT / JSONB_OBJECT_KEYS — FROM-clause SRFs ===
+SELECT id, k.key, k.value FROM jb, JSONB_EACH(data) AS k WHERE id = 2 ORDER BY k.key;
+id	key	value
+2	a	2
+2	b	"x"
+SELECT id, k.key, k.value FROM jb, JSONB_EACH_TEXT(data) AS k WHERE id = 2 ORDER BY k.key;
+id	key	value
+2	a	2
+2	b	x
+SELECT id, k FROM jb, JSONB_OBJECT_KEYS(data) AS k WHERE id = 2 ORDER BY k;
+id	k
+2	a
+2	b
+=== ?& (has all keys) and ?| (has any key) ===
+SELECT data ?& ARRAY['a', 'b'] AS has_both FROM jb WHERE id = 2;
+has_both
+1
+SELECT data ?| ARRAY['a', 'b'] AS has_any FROM jb WHERE id = 1;
+has_any
+1
+=== JSONB_SET with multi-segment path ===
+SELECT JSONB_SET('{"a":1,"b":{"c":2}}'::JSONB, '{b,c}', '99'::JSONB) AS r;
+r
+{"a":1,"b":{"c":99}}
+=== Nested @> containment (object inside object) ===
+SELECT '{"a":{"b":1}}'::JSONB @> '{"a":{}}'::JSONB AS r;
+r
+1
+=== jsonb - 'key' (delete single key) ===
+SELECT data - 'b' AS dropped FROM jb WHERE id = 2;
+dropped
+{"a":2}
+=== jsonb || jsonb (merge; right-side wins on collision) ===
+SELECT data || '{"z":99}'::JSONB AS merged FROM jb WHERE id = 1;
+merged
+{"a":1,"z":99}
+=== JSONB_PRETTY (indented multi-line text) ===
+SELECT JSONB_PRETTY('{"b":2,"a":1}'::JSONB) AS p;
+p
+{
+    "a": 1,
+    "b": 2
+}
+=== KNOWN GAP: JSONB_ARRAY_ELEMENTS as SRF — errno 1105 ===
+# Not yet implemented as a set-returning function.
+# Substitute: UNNEST(ARRAY[...]) for inline arrays.
+SELECT v.* FROM JSONB_ARRAY_ELEMENTS('[1,2,3]'::JSONB) AS v;
+ERROR 1105: plan error: unknown set-returning function: JSONB_ARRAY_ELEMENTS
+=== KNOWN GAP: JSONB_ARRAY_ELEMENTS_TEXT — errno 1105 ===
+SELECT JSONB_ARRAY_ELEMENTS_TEXT('[1,2,3]'::JSONB);
+ERROR 1105: execution error: unknown function: JSONB_ARRAY_ELEMENTS_TEXT
+=== KNOWN GAP: jsonb - text[] (delete list of keys) — errno 1105 ===
+# "arithmetic op requires numbers" — the planner takes
+# the array path for `-` and misroutes. Single-key form
+# `jsonb - 'k'` works (see above).
+SELECT '{"a":1,"b":2,"c":3}'::JSONB - ARRAY['a', 'b'] AS r;
+ERROR 1105: execution error: arithmetic op requires numbers
+=== KNOWN GAP: JSONB @@ jsonpath — errno 1105 (FTS-bound) ===
+# `@@` is currently dispatched only to the FTS
+# tsvector/tsquery operator. JSONPath predicates are
+# not yet supported.
+SELECT '{"a":1}'::JSONB @@ '$.a == 1' AS r;
+ERROR 1105: execution error: @@ requires tsvector and tsquery operands
+=== Cleanup ===
+DROP TABLE jb;
