@@ -1,0 +1,148 @@
+# Independently authored auth/role smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/grant.test or role.test; pins zeta's auth/
+# role/grant surface as seen from the MySQL wire (no prior
+# compat coverage).
+#
+# Big-picture finding: zeta runs in trust-auth mode in the
+# default development setup, so most auth statements are
+# silent no-ops at the parse layer (no underlying ACL
+# enforcement). What gets pinned here is which spellings
+# parse and which fail outright — a useful map for ORMs
+# that try to issue setup DDL on first connect.
+#
+# Adaptation notes:
+#   # zeta-adapt: GRANT ALL ON test.* TO <role> — parsed,
+#     silent no-op.
+#   # zeta-adapt: GRANT USAGE ON SCHEMA <s> TO <role> —
+#     parsed, silent no-op.
+#   # zeta-adapt: REVOKE ALL ON test.* FROM <role> —
+#     parsed, silent no-op.
+#   # zeta-adapt: SET ROLE <role> — parsed, silent no-op.
+#   # zeta-adapt: SHOW GRANTS — parsed, empty result.
+#   # zeta-adapt: SHOW GRANTS FOR 'u'@'h' — parsed, empty
+#     result (the user@host form is accepted in this SHOW
+#     context even though it errors elsewhere).
+#   # zeta-adapt: SET PASSWORD = '<pw>' — parsed, silent
+#     no-op.
+#   # zeta-adapt: SET PASSWORD FOR 'u'@'h' = '<pw>' —
+#     parsed, silent no-op.
+#   # zeta-adapt: KNOWN GAP — CREATE ROLE / CREATE ROLE
+#     WITH LOGIN errors 1064 "unsupported statement". No
+#     CREATE ROLE path even though zeta has implicit
+#     trust-auth roles.
+#   # zeta-adapt: KNOWN GAP — DROP ROLE / DROP ROLE IF
+#     EXISTS errors 1064 "unsupported DROP ROLE statement".
+#   # zeta-adapt: KNOWN GAP — MySQL `CREATE USER 'u'@'h'
+#     IDENTIFIED BY 'pw'` errors 1064 "Expected: another
+#     option, EOF, ... found: '%'" — the parser doesn't
+#     accept the user@host literal anywhere except in SHOW
+#     GRANTS FOR.
+#   # zeta-adapt: KNOWN GAP — PG `CREATE USER u` errors
+#     1064 "unsupported statement".
+#   # zeta-adapt: KNOWN GAP — MySQL `DROP USER 'u'@'h'`
+#     errors 1064 "Expected: end of statement, found: @".
+#   # zeta-adapt: KNOWN GAP — PG `DROP USER u` errors 1064
+#     "unsupported DROP USER statement".
+#   # zeta-adapt: KNOWN GAP — `RESET ROLE` errors 1064
+#     "unsupported statement".
+#   # zeta-adapt: KNOWN GAP — `ALTER USER u IDENTIFIED BY
+#     '<pw>'` errors 1064 "Expected: end of statement,
+#     found: IDENTIFIED".
+#   # zeta-adapt: KNOWN GAP — `ALTER ROLE r WITH PASSWORD
+#     '<pw>'` errors 1064 "unsupported statement".
+#   # zeta-adapt: KNOWN GAP — `FLUSH PRIVILEGES` errors
+#     1064 "Unsupported statement FLUSH" — zeta has no
+#     FLUSH surface at all.
+
+--echo === GRANT ALL ON test.* TO <role> — silent no-op ===
+
+GRANT ALL ON test.* TO u2;
+
+--echo === GRANT USAGE ON SCHEMA — silent no-op ===
+
+GRANT USAGE ON SCHEMA public TO r1;
+
+--echo === REVOKE ALL ON test.* FROM <role> — silent no-op ===
+
+REVOKE ALL ON test.* FROM u2;
+
+--echo === SET ROLE <role> — silent no-op ===
+
+SET ROLE r1;
+
+--echo === SHOW GRANTS — empty result ===
+
+SHOW GRANTS;
+
+--echo === SHOW GRANTS FOR 'u'@'h' — accepted, empty result ===
+
+SHOW GRANTS FOR 'u2'@'localhost';
+
+--echo === SET PASSWORD = '...' — silent no-op ===
+
+SET PASSWORD = 'newpw';
+
+--echo === SET PASSWORD FOR 'u'@'h' = '...' — silent no-op ===
+
+SET PASSWORD FOR 'u1'@'%' = 'newpw';
+
+--echo === KNOWN GAP: CREATE ROLE — errno 1064 ===
+
+--error 1064
+CREATE ROLE r1;
+
+--echo === KNOWN GAP: CREATE ROLE WITH LOGIN — errno 1064 ===
+
+--error 1064
+CREATE ROLE r2 WITH LOGIN;
+
+--echo === KNOWN GAP: DROP ROLE — errno 1064 ===
+
+--error 1064
+DROP ROLE r1;
+
+--echo === KNOWN GAP: DROP ROLE IF EXISTS — errno 1064 ===
+
+--error 1064
+DROP ROLE IF EXISTS no_such;
+
+--echo === KNOWN GAP: MySQL CREATE USER 'u'@'h' — errno 1064 ===
+
+--error 1064
+CREATE USER 'u1'@'%' IDENTIFIED BY 'pw';
+
+--echo === KNOWN GAP: PG CREATE USER u — errno 1064 ===
+
+--error 1064
+CREATE USER u1;
+
+--echo === KNOWN GAP: MySQL DROP USER 'u'@'h' — errno 1064 ===
+
+--error 1064
+DROP USER 'u1'@'%';
+
+--echo === KNOWN GAP: PG DROP USER u — errno 1064 ===
+
+--error 1064
+DROP USER u1;
+
+--echo === KNOWN GAP: RESET ROLE — errno 1064 ===
+
+--error 1064
+RESET ROLE;
+
+--echo === KNOWN GAP: ALTER USER u IDENTIFIED BY '...' — errno 1064 ===
+
+--error 1064
+ALTER USER u1 IDENTIFIED BY 'newpw';
+
+--echo === KNOWN GAP: ALTER ROLE r WITH PASSWORD '...' — errno 1064 ===
+
+--error 1064
+ALTER ROLE r1 WITH PASSWORD 'newpw';
+
+--echo === KNOWN GAP: FLUSH PRIVILEGES — errno 1064 ===
+
+--error 1064
+FLUSH PRIVILEGES;
