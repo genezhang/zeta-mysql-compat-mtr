@@ -1,0 +1,108 @@
+# Independently authored CREATE FUNCTION / DROP FUNCTION
+# smoke test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/sp.test (MySQL uses
+# CREATE FUNCTION ... BEGIN ... END with `DELIMITER` to
+# protect inner `;`s, which the MTR runner can't drive);
+# pins zeta's CREATE/DROP FUNCTION catalog surface and the
+# big invocation gap (no prior compat coverage).
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE FUNCTION <name>(args) RETURNS <type>
+#     AS $body$ ... $body$ LANGUAGE SQL — the CREATE itself
+#     parses and writes to the function catalog without
+#     error.
+#   # zeta-adapt: CREATE OR REPLACE FUNCTION — supported
+#     (the second CREATE replaces the catalog entry).
+#   # zeta-adapt: CREATE FUNCTION ... RETURNS TABLE(col1
+#     type, col2 type) — accepted at parse / catalog.
+#   # zeta-adapt: DROP FUNCTION <name> on an existing
+#     function — supported.
+#   # zeta-adapt: DROP FUNCTION IF EXISTS on missing — silent
+#     no-op.
+#   # zeta-adapt: DROP FUNCTION (without IF EXISTS) on
+#     missing — errors 1105 "function ... does not exist".
+#   # zeta-adapt: KNOWN GAP — SQL-language user functions
+#     are CATALOGUED but NOT DISPATCHED: calling the function
+#     errors 1105 "unknown function: <name>" even though the
+#     CREATE succeeded. This is true via BOTH the MySQL wire
+#     AND the PG wire — the dispatcher does not look up
+#     catalog-registered functions when resolving a SELECT
+#     call. Substitute: inline the body as a CTE or wrap
+#     the SELECT in a derived table.
+#   # zeta-adapt: KNOWN GAP — DROP FUNCTION with a SIGNATURE
+#     `DROP FUNCTION f(INT)` is rejected by the catalog as
+#     equivalent to dropping the whole name, AND second
+#     CREATE of the same name with a different signature
+#     errors 1105 "function ... already exists". So
+#     overloading by argument signature is NOT supported.
+#     Each function name occupies one catalog slot.
+#   # zeta-adapt: KNOWN GAP — CREATE PROCEDURE / CALL errors
+#     1064 "unsupported statement: sqlparser::ast::Statement".
+#     No procedure surface at all.
+#   # zeta-adapt: KNOWN LIMITATION (MTR-runner level, not a
+#     zeta bug) — CREATE FUNCTION ... RETURNS trigger AS
+#     $$ BEGIN ... ; ... ; END $$ LANGUAGE plpgsql is NOT
+#     testable through the MTR runner: any `;` inside the
+#     dollar-quoted body is interpreted by the mysql client
+#     as a statement terminator, splitting the CREATE
+#     FUNCTION mid-body. Single-statement function bodies
+#     work; multi-statement plpgsql bodies need a different
+#     harness (e.g. psql or libpq) to drive.
+
+--echo === CREATE FUNCTION (SQL) — parses + catalogs silently ===
+
+DROP FUNCTION IF EXISTS sqlfn;
+CREATE FUNCTION sqlfn(x INT) RETURNS INT AS $body$ SELECT x + 1 $body$ LANGUAGE SQL;
+
+--echo === KNOWN GAP: invocation of user function — errno 1105 ===
+--echo # The CREATE just above succeeded, but the SELECT
+--echo # below errors "unknown function" — user functions
+--echo # are catalogued but not dispatched.
+
+--error 1105
+SELECT sqlfn(5) AS r;
+
+--echo === DROP FUNCTION (catalog cleanup works) ===
+
+DROP FUNCTION sqlfn;
+
+--echo === DROP FUNCTION IF EXISTS on missing — no-op ===
+
+DROP FUNCTION IF EXISTS no_such_fn;
+
+--echo === DROP FUNCTION on missing — errno 1105 ===
+
+--error 1105
+DROP FUNCTION no_such_fn;
+
+--echo === CREATE OR REPLACE FUNCTION — second CREATE replaces ===
+
+DROP FUNCTION IF EXISTS bump;
+CREATE OR REPLACE FUNCTION bump(x INT) RETURNS INT AS $body$ SELECT x + 1 $body$ LANGUAGE SQL;
+CREATE OR REPLACE FUNCTION bump(x INT) RETURNS INT AS $body$ SELECT x + 10 $body$ LANGUAGE SQL;
+DROP FUNCTION bump;
+
+--echo === CREATE FUNCTION RETURNS TABLE(...) — accepted at catalog ===
+
+DROP FUNCTION IF EXISTS srf;
+CREATE FUNCTION srf() RETURNS TABLE(x INT, y INT) AS $body$ SELECT 1, 2 $body$ LANGUAGE SQL;
+DROP FUNCTION srf;
+
+--echo === KNOWN GAP: overloading by argument signature — errno 1105 ===
+--echo # Each function name occupies one catalog slot.
+
+DROP FUNCTION IF EXISTS multi;
+CREATE FUNCTION multi(a INT) RETURNS INT AS $body$ SELECT a + 1 $body$ LANGUAGE SQL;
+--error 1105
+CREATE FUNCTION multi(a INT, b INT) RETURNS INT AS $body$ SELECT a + b $body$ LANGUAGE SQL;
+DROP FUNCTION multi;
+
+--echo === KNOWN GAP: CREATE PROCEDURE — errno 1064 ===
+
+--error 1064
+CREATE PROCEDURE pr1() AS $body$ SELECT 1 $body$ LANGUAGE SQL;
+
+--echo === KNOWN GAP: CALL stmt — errno 1064 (procedure surface absent) ===
+
+--error 1064
+CALL no_proc();
