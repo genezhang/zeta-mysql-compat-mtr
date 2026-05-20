@@ -1,0 +1,65 @@
+=== Setup ===
+DROP TABLE IF EXISTS sa;
+DROP TABLE IF EXISTS sb;
+CREATE TABLE sa (id INT, name TEXT);
+CREATE TABLE sb (id INT, name TEXT);
+INSERT INTO sa VALUES (1, 'a'), (2, 'b'), (1, 'a');
+INSERT INTO sb VALUES (2, 'b'), (3, 'c'), (3, 'c');
+=== INTERSECT ALL — multi-set min count ===
+SELECT id FROM sa INTERSECT ALL SELECT id FROM sb ORDER BY id;
+id
+2
+=== EXCEPT ALL — left count minus right count ===
+SELECT id FROM sa EXCEPT ALL SELECT id FROM sb ORDER BY id;
+id
+1
+1
+=== MINUS — Oracle alias for EXCEPT ===
+SELECT id FROM sa MINUS SELECT id FROM sb ORDER BY id;
+id
+1
+=== Mismatched column count errors 1105 ===
+SELECT id, name FROM sa UNION SELECT id FROM sb;
+ERROR 1105: execution error: set operation column count mismatch: left has 2, right has 1
+=== Mismatched column count (asymmetric) ===
+SELECT id FROM sa UNION SELECT id, name FROM sb;
+ERROR 1105: execution error: set operation column count mismatch: left has 1, right has 2
+=== LIMIT after a set op scopes to the unified result ===
+SELECT id FROM sa UNION SELECT id FROM sb ORDER BY id LIMIT 3;
+id
+1
+2
+3
+=== NULL columns in set ops — UNION dedups NULLs ===
+SELECT NULL AS v UNION SELECT NULL;
+v
+NULL
+SELECT 1 AS v UNION ALL SELECT NULL UNION ALL SELECT NULL ORDER BY v;
+v
+1
+NULL
+NULL
+=== ORDER BY positional ===
+SELECT id, name FROM sa UNION SELECT id, name FROM sb ORDER BY 2;
+id	name
+1	a
+2	b
+3	c
+SELECT id, name FROM sa UNION SELECT id, name FROM sb ORDER BY 1 DESC;
+id	name
+3	c
+2	b
+1	a
+=== KNOWN DIVERGENCE: ORDER BY unknown column silently ignored ===
+# Result columns are only `id`; `ORDER BY name` should error,
+# but zeta returns rows in default order with no diagnostic.
+SELECT id FROM sa UNION SELECT id FROM sb ORDER BY name;
+id
+1
+2
+3
+=== KNOWN GAP: CORRESPONDING (SQL standard) — errno 1064 ===
+SELECT id, name FROM sa UNION CORRESPONDING SELECT name, id FROM sb;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: CORRESPONDING at Line: 1, Column: 31
+DROP TABLE sa;
+DROP TABLE sb;
