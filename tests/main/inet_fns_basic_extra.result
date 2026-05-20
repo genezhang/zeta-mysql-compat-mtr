@@ -71,16 +71,36 @@ bad
 SELECT IS_IPV6(NULL)          AS n;
 n
 NULL
-=== Arity errors ===
+=== IS_IPV4 / IS_IPV6 — non-string args yield 0 (no auto-cast) ===
+SELECT IS_IPV4(12345) AS int_arg, IS_IPV6(12345) AS int_arg_v6;
+int_arg	int_arg_v6
+0	0
+=== INET_ATON / INET_NTOA — lenient input (coerce + NULL on fail) ===
+SELECT INET_ATON(12345) AS bad_coerced;
+bad_coerced
+NULL
+SELECT INET_NTOA('3232235777') AS str_int;
+str_int
+192.168.1.1
+SELECT INET_NTOA('not a number') AS bad_str;
+bad_str
+NULL
+=== Arity errors — too-many-args rejected for all four ===
 SELECT INET_ATON();
 ERROR 1105: execution error: INET_ATON requires 1 argument
 SELECT INET_ATON('1.2.3.4', '5.6.7.8');
 ERROR 1105: execution error: INET_ATON requires 1 argument
 SELECT INET_NTOA();
 ERROR 1105: execution error: INET_NTOA requires 1 argument
+SELECT INET_NTOA(1, 2);
+ERROR 1105: execution error: INET_NTOA requires 1 argument
 SELECT IS_IPV4();
 ERROR 1105: execution error: IS_IPV4 requires 1 argument
+SELECT IS_IPV4('1.2.3.4', '5.6.7.8');
+ERROR 1105: execution error: IS_IPV4 requires 1 argument
 SELECT IS_IPV6();
+ERROR 1105: execution error: IS_IPV6 requires 1 argument
+SELECT IS_IPV6('::1', '::2');
 ERROR 1105: execution error: IS_IPV6 requires 1 argument
 === On TEXT column inside SELECT / WHERE ===
 DROP TABLE IF EXISTS hosts;

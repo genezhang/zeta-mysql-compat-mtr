@@ -9,22 +9,26 @@
 # string into a 32-bit unsigned integer (returned as a
 # positive BIGINT). INET_NTOA is the inverse and returns
 # NULL for negative inputs or values > u32::MAX. Both
-# NULL-propagate. Unparseable INET_ATON strings return
-# NULL (matches MySQL — does NOT error).
+# NULL-propagate and never error on unparseable / out-of-
+# range input (matches MySQL — lenient contract). Both
+# coerce non-native inputs to string and parse, so e.g.
+# INET_NTOA('3232235777') works.
 #
 # IS_IPV4 / IS_IPV6 are 1/0 boolean wrappers. NULL → NULL.
-# Non-string args return 0 (zeta does not auto-cast).
+# Non-string args return 0 (zeta does NOT auto-cast for
+# the IS_* family — unlike INET_ATON/NTOA above).
 #
 # Adaptation notes:
-#   # zeta-adapt: INET_ATON(str) → BIGINT (unsigned 32-bit
-#     dotted quad). Unparseable → NULL. NULL → NULL.
-#   # zeta-adapt: INET_NTOA(n) → TEXT. Negative or
-#     > u32::MAX → NULL.
+#   # zeta-adapt: INET_ATON(any) → BIGINT (unsigned 32-bit
+#     dotted quad) or NULL. Coerces non-string inputs.
+#   # zeta-adapt: INET_NTOA(any) → TEXT or NULL. Accepts
+#     integers AND numeric strings. Negative / > u32::MAX
+#     / unparseable → NULL.
 #   # zeta-adapt: Roundtrip INET_NTOA(INET_ATON(x)) = x for
 #     valid dotted-quad x.
 #   # zeta-adapt: IS_IPV4 / IS_IPV6 return Int (1/0); NULL
 #     propagates; non-string args yield 0.
-#   # zeta-adapt: Arity != 1 → errno 1105.
+#   # zeta-adapt: Arity != 1 → errno 1105 for all four.
 
 --echo === INET_ATON — basic dotted quad ===
 
@@ -69,7 +73,17 @@ SELECT IS_IPV6('192.168.1.1') AS v4;
 SELECT IS_IPV6('not-an-ip')   AS bad;
 SELECT IS_IPV6(NULL)          AS n;
 
---echo === Arity errors ===
+--echo === IS_IPV4 / IS_IPV6 — non-string args yield 0 (no auto-cast) ===
+
+SELECT IS_IPV4(12345) AS int_arg, IS_IPV6(12345) AS int_arg_v6;
+
+--echo === INET_ATON / INET_NTOA — lenient input (coerce + NULL on fail) ===
+
+SELECT INET_ATON(12345) AS bad_coerced;
+SELECT INET_NTOA('3232235777') AS str_int;
+SELECT INET_NTOA('not a number') AS bad_str;
+
+--echo === Arity errors — too-many-args rejected for all four ===
 
 --error 1105
 SELECT INET_ATON();
@@ -78,9 +92,15 @@ SELECT INET_ATON('1.2.3.4', '5.6.7.8');
 --error 1105
 SELECT INET_NTOA();
 --error 1105
+SELECT INET_NTOA(1, 2);
+--error 1105
 SELECT IS_IPV4();
 --error 1105
+SELECT IS_IPV4('1.2.3.4', '5.6.7.8');
+--error 1105
 SELECT IS_IPV6();
+--error 1105
+SELECT IS_IPV6('::1', '::2');
 
 --echo === On TEXT column inside SELECT / WHERE ===
 
