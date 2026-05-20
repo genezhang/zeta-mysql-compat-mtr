@@ -1,0 +1,111 @@
+=== Setup ===
+DROP TABLE IF EXISTS vt;
+CREATE TABLE vt (id INT PRIMARY KEY, x INT);
+INSERT INTO vt VALUES (1, 10), (2, 20), (3, 30);
+=== CREATE OR REPLACE VIEW — swaps definition ===
+CREATE OR REPLACE VIEW vw1 AS SELECT id FROM vt;
+SELECT id FROM vw1 ORDER BY id;
+id
+1
+2
+3
+CREATE OR REPLACE VIEW vw1 AS SELECT x AS val FROM vt;
+SELECT val FROM vw1 ORDER BY val;
+val
+10
+20
+30
+=== CREATE OR REPLACE creates when missing ===
+DROP VIEW IF EXISTS vnew;
+CREATE OR REPLACE VIEW vnew AS SELECT 1 AS one;
+SELECT one FROM vnew;
+one
+1
+=== KNOWN BUG: CREATE MATERIALIZED VIEW fails to resolve unqualified table via mysql_async ===
+# Direct mysql client finds vt fine; the runner's mysql_async
+# path goes through a code path that skips search_path and
+# errors 1146 'table not found: vt' (unqualified, no public.
+# prefix). Documented here; the MV path otherwise works
+# (verified via mysql cli: CREATE / SELECT / REFRESH all
+# function and the data is properly snapshotted).
+CREATE MATERIALIZED VIEW mvw AS SELECT id, x FROM vt;
+ERROR 1146: table not found: vt
+INSERT INTO vt VALUES (4, 40);
+=== View with ORDER BY + LIMIT in definition ===
+CREATE VIEW vord AS SELECT id FROM vt ORDER BY id DESC LIMIT 2;
+SELECT id FROM vord;
+id
+4
+3
+=== View with DISTINCT ===
+CREATE VIEW vdist AS SELECT DISTINCT x FROM vt;
+SELECT x FROM vdist ORDER BY x;
+x
+10
+20
+30
+40
+=== View with scalar subquery ===
+CREATE VIEW vsub AS SELECT id FROM vt WHERE x > (SELECT AVG(x) FROM vt);
+SELECT id FROM vsub ORDER BY id;
+id
+3
+4
+=== View with explicit column list ===
+CREATE VIEW vcols (a, b) AS SELECT id, x FROM vt;
+SELECT a, b FROM vcols ORDER BY a;
+a	b
+1	10
+2	20
+3	30
+4	40
+=== View on JOIN ===
+DROP TABLE IF EXISTS vj1;
+DROP TABLE IF EXISTS vj2;
+CREATE TABLE vj1 (id INT PRIMARY KEY);
+CREATE TABLE vj2 (id INT, label VARCHAR(20));
+INSERT INTO vj1 VALUES (1), (2);
+INSERT INTO vj2 VALUES (1, 'a'), (2, 'b');
+CREATE VIEW vjoin AS SELECT vj1.id, vj2.label FROM vj1 JOIN vj2 ON vj1.id = vj2.id;
+SELECT id, label FROM vjoin ORDER BY id;
+id	label
+1	a
+2	b
+=== DROP VIEW IF EXISTS on missing — silent no-op ===
+DROP VIEW IF EXISTS vnomissing;
+=== DROP VIEW on real table — errno 1051 ===
+DROP VIEW vt;
+ERROR 1051: execution error: view 'test.public.vt' does not exist
+=== information_schema.views — regular views visible ===
+SELECT table_name FROM information_schema.views WHERE table_name IN ('vw1','vord','vdist','vsub','vcols','vjoin','vnew') ORDER BY table_name;
+TABLE_NAME
+vcols
+vdist
+vjoin
+vnew
+vord
+vsub
+vw1
+=== KNOWN DIVERGENCE: MATERIALIZED VIEW absent from information_schema.views ===
+SELECT table_name FROM information_schema.views WHERE table_name = 'mvw';
+=== KNOWN DIVERGENCE: MATERIALIZED VIEW absent from information_schema.tables ===
+SELECT table_name FROM information_schema.tables WHERE table_name = 'mvw';
+=== KNOWN DIVERGENCE: SHOW CREATE VIEW returns empty (no header) ===
+SHOW CREATE VIEW vw1;
+=== KNOWN GAP: DROP MATERIALIZED VIEW — errno 1064 ===
+DROP MATERIALIZED VIEW mvw;
+ERROR 1064: SQL parse error: unsupported DROP MATERIALIZED VIEW statement
+=== KNOWN GAP: CREATE RECURSIVE VIEW (PG) — errno 1064 ===
+CREATE RECURSIVE VIEW vrec(n) AS VALUES (1) UNION ALL SELECT n + 1 FROM vrec WHERE n < 5;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: RECURSIVE at Line: 1, Column: 8
+=== Cleanup ===
+DROP VIEW vw1;
+DROP VIEW vnew;
+DROP VIEW vord;
+DROP VIEW vdist;
+DROP VIEW vsub;
+DROP VIEW vcols;
+DROP VIEW vjoin;
+DROP TABLE vt;
+DROP TABLE vj1;
+DROP TABLE vj2;
