@@ -1,0 +1,138 @@
+=== Setup ===
+DROP TABLE IF EXISTS wf;
+CREATE TABLE wf (id INT, v INT);
+INSERT INTO wf VALUES (1,10), (2,20), (3,30), (4,40), (5,50);
+=== ROWS BETWEEN N PRECEDING AND M FOLLOWING — sliding window ===
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS s_pf FROM wf ORDER BY id;
+id	v	s_pf
+1	10	30
+2	20	60
+3	30	90
+4	40	120
+5	50	90
+=== ROWS UNBOUNDED PRECEDING (shorthand → BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) ===
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS UNBOUNDED PRECEDING) AS s_unb FROM wf ORDER BY id;
+id	v	s_unb
+1	10	10
+2	20	30
+3	30	60
+4	40	100
+5	50	150
+=== ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING ===
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS s_fwd FROM wf ORDER BY id;
+id	v	s_fwd
+1	10	150
+2	20	140
+3	30	120
+4	40	90
+5	50	50
+=== ROWS shorthand `ROWS 2 PRECEDING` ===
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS 2 PRECEDING) AS s_short FROM wf ORDER BY id;
+id	v	s_short
+1	10	10
+2	20	30
+3	30	60
+4	40	90
+5	50	120
+=== ROWS BETWEEN N PRECEDING AND M PRECEDING — entirely backward ===
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING) AS s_back FROM wf ORDER BY id;
+id	v	s_back
+1	10	10
+2	20	10
+3	30	30
+4	40	60
+5	50	90
+=== ROWS BETWEEN N FOLLOWING AND M FOLLOWING — entirely forward ===
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 FOLLOWING AND 3 FOLLOWING) AS s_fwd_only FROM wf ORDER BY id;
+id	v	s_fwd_only
+1	10	90
+2	20	120
+3	30	90
+4	40	50
+5	50	50
+=== RANGE BETWEEN N PRECEDING AND M FOLLOWING — numeric ORDER BY ===
+SELECT id, v, SUM(v) OVER (ORDER BY id RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS r_pf FROM wf ORDER BY id;
+id	v	r_pf
+1	10	30
+2	20	60
+3	30	90
+4	40	120
+5	50	90
+=== PARTITION BY + frame — frame is scoped per partition ===
+SELECT id, v, SUM(v) OVER (PARTITION BY (id % 2) ORDER BY id ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS p_s FROM wf ORDER BY id;
+id	v	p_s
+1	10	10
+2	20	20
+3	30	40
+4	40	60
+5	50	80
+=== ROWS frame without ORDER BY — uses partition scan order ===
+SELECT id, v, SUM(v) OVER (ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS s_noorder FROM wf ORDER BY id;
+id	v	s_noorder
+1	10	30
+2	20	60
+3	30	90
+4	40	120
+5	50	90
+=== Default frame WITH ORDER BY — RANGE UNBOUNDED PRECEDING AND CURRENT ROW (running sum) ===
+SELECT id, v, SUM(v) OVER (ORDER BY id) AS s_default FROM wf ORDER BY id;
+id	v	s_default
+1	10	10
+2	20	30
+3	30	60
+4	40	100
+5	50	150
+=== Default frame WITHOUT ORDER BY — entire partition ===
+SELECT id, v, SUM(v) OVER () AS s_all FROM wf ORDER BY id;
+id	v	s_all
+1	10	150
+2	20	150
+3	30	150
+4	40	150
+5	50	150
+=== FIRST_VALUE / LAST_VALUE with explicit frame — bounded by frame ===
+SELECT id, v, FIRST_VALUE(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS fv, LAST_VALUE(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS lv FROM wf ORDER BY id;
+id	v	fv	lv
+1	10	10	20
+2	20	10	30
+3	30	20	40
+4	40	30	50
+5	50	40	50
+=== LAST_VALUE without explicit frame — current row's value (default frame ends at CURRENT ROW) ===
+SELECT id, v, LAST_VALUE(v) OVER (ORDER BY id) AS lv_default FROM wf ORDER BY id;
+id	v	lv_default
+1	10	10
+2	20	20
+3	30	30
+4	40	40
+5	50	50
+=== AVG / MIN / MAX / COUNT(*) with frame ===
+SELECT id, v, AVG(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS a, MIN(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS mn, MAX(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS mx, COUNT(*) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS c FROM wf ORDER BY id;
+id	v	a	mn	mx	c
+1	10	15	10	20	2
+2	20	20	10	30	3
+3	30	30	20	40	3
+4	40	40	30	50	3
+5	50	45	40	50	2
+=== Negative frame bound — errno 1064 (correct) ===
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN -1 PRECEDING AND CURRENT ROW) FROM wf;
+ERROR 1064: SQL parse error: frame bound must be a literal number
+=== KNOWN GAP: GROUPS frame mode — errno 1105 "not yet supported" ===
+SELECT id, SUM(v) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW) FROM wf;
+ERROR 1105: execution error: Groups frame mode is not yet supported, use ROWS or RANGE
+=== KNOWN GAP: EXCLUDE CURRENT ROW — errno 1064 at parse ===
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM wf;
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 1, Column: 94
+=== KNOWN BUG: inverted frame returns first row instead of empty ===
+# `BETWEEN 5 PRECEDING AND 10 PRECEDING` should be empty
+# (start row > end row → no rows in frame, SUM = NULL). zeta
+# normalizes the bounds via .min/.max and returns the first
+# row of the partition repeatedly.
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS s_empty FROM wf ORDER BY id;
+id	v	s_empty
+1	10	10
+2	20	10
+3	30	10
+4	40	10
+5	50	10
+DROP TABLE wf;
