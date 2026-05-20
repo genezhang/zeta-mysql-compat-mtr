@@ -1,0 +1,133 @@
+# Independently authored datatype-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/type.test or type_decimal.test; pins zeta's
+# datatype surface NOT held by datatype_basic (which covers
+# integer widths + FLOAT/DOUBLE + DECIMAL + VARCHAR/CHAR/TEXT
+# + VARCHAR length enforcement + DATE/TIMESTAMP/TIME + TINYINT(1)
+# BOOLEAN + JSON-as-JSONB + INT UNSIGNED + DATETIME + YEAR +
+# inline ENUM + SET-gap + BLOB family).
+#
+# Adaptation notes:
+#   # zeta-adapt: UUID column type — supported. UUID strings
+#     round-trip as text.
+#   # zeta-adapt: JSONB column + `->` (returns JSONB) and `->>`
+#     (returns TEXT) path operators — supported.
+#   # zeta-adapt: JSONB `?` operator (key exists) — supported.
+#   # zeta-adapt: ARRAY column types (TEXT[], INT[]) +
+#     ARRAY[...] literal — supported.
+#   # zeta-adapt: 1-based array indexing arr[1] (PG convention)
+#     — supported.
+#   # zeta-adapt: ARRAY_LENGTH(arr, dim) — supported (dim=1 for
+#     1-D arrays).
+#   # zeta-adapt: Array `@>` contains operator — supported.
+#   # zeta-adapt: INTERVAL column type — supported; rendered as
+#     `HH:MM:SS` form for interval values.
+#   # zeta-adapt: NUMERIC ≡ DECIMAL — both spellings accepted
+#     for fixed-precision decimal.
+#   # zeta-adapt: REAL vs DOUBLE PRECISION — both spellings
+#     accepted (Float32 vs Float64).
+#   # zeta-adapt: UNNEST(array) used as a FROM-clause set-
+#     returning function — supported.
+#   # zeta-adapt: generate_series(start, end) — supported as a
+#     FROM-clause set-returning function.
+#   # zeta-adapt: KNOWN DIVERGENCE — ARRAY column display over
+#     the MySQL wire uses Rust's Debug formatter
+#     (`Array { element_type: Text, elements: [String("red"),
+#     ...] }`) instead of PG's `{red,green}` or MySQL's
+#     stringified-JSON form. Visible to MySQL clients but
+#     non-portable; recommend storing arrays as JSONB strings
+#     for cross-database use.
+#   # zeta-adapt: KNOWN GAP — UNNEST used as a scalar
+#     expression (SELECT UNNEST(...) without FROM) errors
+#     1105 "unknown function: UNNEST". Substitute: use UNNEST
+#     in the FROM clause.
+#   # zeta-adapt: KNOWN DIVERGENCE — CHAR(N) does NOT pad
+#     stored values to N characters. `'ab'` in a CHAR(5)
+#     column stores as 2 characters (LENGTH = 2). PG/MySQL
+#     pad to N and trim trailing spaces.
+
+--echo === UUID column type ===
+
+DROP TABLE IF EXISTS dt_u;
+CREATE TABLE dt_u (id INT PRIMARY KEY, u UUID);
+INSERT INTO dt_u VALUES (1, '550e8400-e29b-41d4-a716-446655440000');
+SELECT id, u FROM dt_u;
+
+--echo === JSONB column + -> and ->> path operators ===
+
+DROP TABLE IF EXISTS dt_j;
+CREATE TABLE dt_j (id INT PRIMARY KEY, data JSONB);
+INSERT INTO dt_j VALUES (1, '{"name":"alice","age":30}');
+SELECT id, data -> 'name' AS name_jsonb, data -> 'age' AS age FROM dt_j;
+SELECT id, data ->> 'name' AS name_text FROM dt_j;
+
+--echo === JSONB ? exists operator ===
+
+SELECT '{"a":1}'::JSONB ? 'a' AS has_a, '{"a":1}'::JSONB ? 'b' AS has_b;
+
+--echo === ARRAY column + literal + indexing + ARRAY_LENGTH ===
+--echo # KNOWN DIVERGENCE: the array column display uses Rust's
+--echo # Debug formatter (zeta-internal), not PG's `{red,green}`.
+
+DROP TABLE IF EXISTS dt_a;
+CREATE TABLE dt_a (id INT PRIMARY KEY, tags TEXT[]);
+INSERT INTO dt_a VALUES (1, ARRAY['red', 'green']);
+SELECT id, tags[1] AS first, ARRAY_LENGTH(tags, 1) AS len FROM dt_a;
+
+--echo === Array @> contains operator ===
+
+SELECT ARRAY[1, 2, 3] @> ARRAY[1, 2] AS contains_subset,
+       ARRAY[1, 2, 3] @> ARRAY[9]   AS contains_missing;
+
+--echo === INTERVAL column ===
+
+DROP TABLE IF EXISTS dt_i;
+CREATE TABLE dt_i (id INT PRIMARY KEY, dur INTERVAL);
+INSERT INTO dt_i VALUES (1, INTERVAL '1 hour');
+SELECT id, dur FROM dt_i;
+
+--echo === NUMERIC ≡ DECIMAL (aliases) ===
+
+DROP TABLE IF EXISTS dt_n;
+CREATE TABLE dt_n (id INT PRIMARY KEY, n1 NUMERIC(10,2), n2 DECIMAL(10,2));
+INSERT INTO dt_n VALUES (1, 3.14, 2.71);
+SELECT id, n1, n2 FROM dt_n;
+
+--echo === REAL vs DOUBLE PRECISION ===
+
+DROP TABLE IF EXISTS dt_r;
+CREATE TABLE dt_r (id INT PRIMARY KEY, r REAL, d DOUBLE PRECISION);
+INSERT INTO dt_r VALUES (1, 3.14, 2.71828);
+SELECT id, r, d FROM dt_r;
+
+--echo === UNNEST in FROM clause ===
+
+SELECT v FROM UNNEST(ARRAY[10, 20, 30]) AS t(v) ORDER BY v;
+
+--echo === generate_series in FROM ===
+
+SELECT v FROM generate_series(1, 3) AS t(v) ORDER BY v;
+
+--echo === KNOWN GAP: UNNEST as scalar expression — errno 1105 ===
+
+--error 1105
+SELECT UNNEST(ARRAY[1, 2, 3]);
+
+--echo === KNOWN DIVERGENCE: CHAR(N) does NOT pad to N chars ===
+--echo # 'ab' stored in CHAR(5) stays 2 chars (zeta); PG/MySQL
+--echo # would pad to 5.
+
+DROP TABLE IF EXISTS dt_c;
+CREATE TABLE dt_c (id INT PRIMARY KEY, c CHAR(5));
+INSERT INTO dt_c VALUES (1, 'ab');
+SELECT id, c, LENGTH(c) AS len FROM dt_c;
+
+--echo === Cleanup ===
+
+DROP TABLE dt_u;
+DROP TABLE dt_j;
+DROP TABLE dt_a;
+DROP TABLE dt_i;
+DROP TABLE dt_n;
+DROP TABLE dt_r;
+DROP TABLE dt_c;
