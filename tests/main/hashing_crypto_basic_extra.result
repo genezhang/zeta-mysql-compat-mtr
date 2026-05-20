@@ -1,0 +1,66 @@
+=== SHA2 — extended digest sizes ===
+SELECT LENGTH(SHA2('hello', 224)) AS l224, LENGTH(SHA2('hello', 256)) AS l256;
+l224	l256
+56	64
+SELECT LENGTH(SHA2('hello', 384)) AS l384, LENGTH(SHA2('hello', 512)) AS l512;
+l384	l512
+96	128
+=== SHA2 fixed digests (deterministic) ===
+SELECT SHA2('hello', 384) AS h384;
+h384
+59e1748777448c69de6b800d7a33bbfb9ff1b463e44354c3553bcdb9c666fa90125a3c79f90397bdf5f6a13de828684f
+=== CRC32 edges ===
+SELECT CRC32('hello') AS basic;
+basic
+907060870
+SELECT CRC32('') AS empty, CRC32(NULL) AS nl;
+empty	nl
+0	NULL
+SELECT CRC32(123) AS num;
+num
+2286445522
+=== DIGEST (PG pgcrypto) ===
+SELECT HEX(DIGEST('hello', 'sha256')) AS d_256;
+d_256
+2CF24DBA5FB0A30E26E83B2AC5B9E29E1B161E5C1FA7425E73043362938B9824
+SELECT HEX(DIGEST('hello', 'md5')) AS d_md5;
+d_md5
+5D41402ABC4B2A76B9719D911017C592
+=== ENCRYPT / DECRYPT round-trip (3-arg, PG pgcrypto) ===
+SELECT DECRYPT(ENCRYPT('plain', 'key', 'aes'), 'key', 'aes') AS round_trip;
+round_trip
+plain
+=== HMAC — algorithm variants ===
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'md5'))) AS l_md5;
+l_md5
+32
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha1'))) AS l_sha1;
+l_sha1
+40
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha256'))) AS l_sha256;
+l_sha256
+64
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha512'))) AS l_sha512;
+l_sha512
+128
+=== KNOWN GAP: RANDOM_BYTES (MySQL) — errno 1105 ===
+SELECT RANDOM_BYTES(16);
+ERROR 1105: execution error: unknown function: RANDOM_BYTES
+=== KNOWN GAP: GEN_RANDOM_BYTES (PG pgcrypto) — errno 1105 ===
+SELECT GEN_RANDOM_BYTES(16);
+ERROR 1105: execution error: unknown function: GEN_RANDOM_BYTES
+=== KNOWN GAP: AES_ENCRYPT (MySQL) — errno 1105 ===
+SELECT AES_ENCRYPT('plain', 'key');
+ERROR 1105: execution error: unknown function: AES_ENCRYPT
+=== KNOWN GAP: COMPRESS (MySQL) — errno 1105 ===
+SELECT COMPRESS('hello');
+ERROR 1105: execution error: unknown function: COMPRESS
+=== KNOWN GAP: PASSWORD (legacy MySQL) — errno 1105 ===
+SELECT PASSWORD('secret');
+ERROR 1105: execution error: unknown function: PASSWORD
+=== KNOWN GAP: ENCRYPT 2-arg MySQL form — errno 1105 ===
+SELECT ENCRYPT('plain', 'key');
+ERROR 1105: execution error: encrypt() requires 3 arguments (data, key, cipher)
+=== KNOWN GAP: HMAC 2-arg form — errno 1105 ===
+SELECT HMAC('hello', 'key');
+ERROR 1105: execution error: hmac() requires 3 arguments (data, key, algorithm)
