@@ -43,9 +43,9 @@
 #   # zeta-adapt: NVL — Oracle 2-arg alias, equivalent
 #     to IFNULL / COALESCE-2.
 #   # zeta-adapt: NVL2 (Oracle 3-arg) — returns 2nd arg
-#     when expr IS NOT NULL, 3rd when IS NULL. Short-
-#     circuits the not-taken branch. Equivalent to
-#     `CASE WHEN expr IS NOT NULL THEN x ELSE y END`.
+#     when expr IS NOT NULL, 3rd when expr IS NULL.
+#     Short-circuits the not-taken branch. Equivalent
+#     to `CASE WHEN expr IS NOT NULL THEN x ELSE y END`.
 #     Added in zeta PR #1221.
 
 --echo === COALESCE all-NULL → NULL ===
