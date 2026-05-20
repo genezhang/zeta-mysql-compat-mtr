@@ -1,0 +1,103 @@
+# Independently authored JOIN-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/join.test or outer_join.test; pins zeta's JOIN
+# surface NOT held by join_basic (which covers INNER/LEFT/RIGHT/
+# FULL OUTER/CROSS/COMMA/USING/NATURAL/multi-chain/anti-join/
+# self-join/composite-ON/STRAIGHT_JOIN/bare-INNER-as-CROSS).
+#
+# Adaptation notes:
+#   # zeta-adapt: LEFT JOIN with WHERE on right-side column —
+#     the classic NULL-filter trap. `WHERE jc.x > 150` filters
+#     out the LEFT-preserved row whose jc.x is NULL because
+#     `NULL > 150` is NULL. Behavior matches SQL standard.
+#   # zeta-adapt: LEFT JOIN with ON-side predicate — moving
+#     the filter into ON preserves the LEFT-side row (jc.x
+#     becomes NULL for the unmatched).
+#   # zeta-adapt: JOIN with non-equality ON (a.id < b.id) —
+#     supported. Used for triangle joins / interval matching.
+#   # zeta-adapt: USING (col1, col2) — multi-column USING is
+#     supported. Returns the common columns once (NOT once
+#     per side; matches MySQL behavior).
+#   # zeta-adapt: LEFT JOIN with grouped subquery on right —
+#     supported. Aggregate over child rows surfaces as NULL
+#     for unmatched parents.
+#   # zeta-adapt: LEFT JOIN + COALESCE for default-value
+#     pattern — supported.
+#   # zeta-adapt: COUNT(*) over JOIN — supported. Returns the
+#     join's row count (post-predicate).
+#   # zeta-adapt: KNOWN DIVERGENCE — LATERAL (PG cross-apply)
+#     accepted at parse but the correlated subquery does NOT
+#     fire per row — the join returns 0 rows. Portable
+#     substitute: rewrite as a correlated WHERE-IN subquery
+#     or a standard JOIN.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS jp; DROP TABLE IF EXISTS jc;
+CREATE TABLE jp (id INT PRIMARY KEY, name VARCHAR(10));
+CREATE TABLE jc (id INT PRIMARY KEY, pid INT, x INT);
+INSERT INTO jp VALUES (1, 'a'), (2, 'b');
+INSERT INTO jc VALUES (10, 1, 100), (20, 1, 200);
+
+--echo === LEFT JOIN with WHERE on right — NULL filter trap ===
+--echo # `jp.id=2` had NO match, so jc.x is NULL on that row.
+--echo # `WHERE jc.x > 150` evaluates NULL > 150 → NULL → row
+--echo # filtered. Only the matched id=1 row with x=200 survives.
+
+SELECT jp.id, jc.x
+  FROM jp LEFT JOIN jc ON jp.id = jc.pid
+  WHERE jc.x > 150
+  ORDER BY jp.id;
+
+--echo === LEFT JOIN with ON-side predicate — preserves NULL row ===
+--echo # Moving the filter into ON keeps jp.id=2 with jc.x=NULL.
+
+SELECT jp.id, jc.x
+  FROM jp LEFT JOIN jc ON jp.id = jc.pid AND jc.x > 150
+  ORDER BY jp.id;
+
+--echo === JOIN with non-equality ON (a.id < b.id) ===
+
+SELECT jp.id, jc.id
+  FROM jp JOIN jc ON jp.id < jc.id
+  ORDER BY jp.id, jc.id;
+
+--echo === USING (col1, col2) — multi-column ===
+
+DROP TABLE IF EXISTS ja; DROP TABLE IF EXISTS jb;
+CREATE TABLE ja (x INT, y INT);
+CREATE TABLE jb (x INT, y INT, z INT);
+INSERT INTO ja VALUES (1, 10), (2, 20);
+INSERT INTO jb VALUES (1, 10, 100), (2, 20, 200), (3, 30, 300);
+SELECT * FROM ja JOIN jb USING (x, y) ORDER BY x;
+
+--echo === LEFT JOIN with grouped subquery on right ===
+--echo # COUNT per parent; NULL for parents with no children.
+
+SELECT jp.id, sub.cnt
+  FROM jp LEFT JOIN (SELECT pid, COUNT(*) AS cnt FROM jc GROUP BY pid) AS sub
+       ON jp.id = sub.pid
+  ORDER BY jp.id;
+
+--echo === LEFT JOIN + COALESCE for default-value pattern ===
+
+SELECT jp.id, COALESCE(jc.x, -1) AS x
+  FROM jp LEFT JOIN jc ON jp.id = jc.pid
+  ORDER BY jp.id, x;
+
+--echo === COUNT(*) over JOIN ===
+
+SELECT COUNT(*) AS c FROM jp INNER JOIN jc ON jp.id = jc.pid;
+
+--echo === KNOWN DIVERGENCE: LATERAL — accepted but returns 0 rows ===
+--echo # zeta accepts LATERAL syntax but doesn't propagate the
+--echo # outer-row correlation into the lateral subquery, so the
+--echo # join produces an empty result instead of N rows.
+--echo # Portable substitute: rewrite as correlated subquery.
+
+SELECT 1 FROM jp, LATERAL (SELECT x FROM jc WHERE jc.pid = jp.id) AS l;
+
+--echo === Cleanup ===
+
+DROP TABLE jp; DROP TABLE jc;
+DROP TABLE ja; DROP TABLE jb;
