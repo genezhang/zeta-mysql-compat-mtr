@@ -1,0 +1,181 @@
+# Independently authored temporal-arithmetic smoke test
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/time_*.test or func_time.test;
+# complements date_time_basic_extra by pinning the function-
+# form temporal arithmetic surface (DATE_ADD/SUB,
+# DATEDIFF/TIMESTAMPDIFF, DATE_PART, the MySQL
+# DAYOFWEEK/MONTHNAME/etc family, multi-component INTERVAL
+# literals, FROM_UNIXTIME/UNIX_TIMESTAMP) NOT covered there.
+#
+# Big-picture finding: zeta has a strong temporal function
+# surface covering both MySQL and PG conventions for the
+# common operations: DATE_ADD/DATE_SUB/DATEDIFF/
+# TIMESTAMPDIFF (MySQL), DATE_PART (PG alias for EXTRACT),
+# the MySQL day/month/week-name extraction family, and
+# multi-component INTERVAL literals all work. Two notable
+# divergences and a small handful of MySQL-only function
+# names that are missing.
+#
+# Adaptation notes:
+#   # zeta-adapt: DATE_ADD(date, INTERVAL n unit) — works.
+#     Returns TIMESTAMP regardless of input type (see
+#     divergence note below).
+#   # zeta-adapt: DATE_SUB(date, INTERVAL n unit) — works.
+#   # zeta-adapt: DATEDIFF(a, b) — returns integer days
+#     (a - b), MySQL semantics.
+#   # zeta-adapt: TIMESTAMPDIFF(unit, a, b) — works for
+#     DAY/HOUR/MONTH and others, MySQL semantics (b - a).
+#   # zeta-adapt: DATE_PART('field', expr) — PG alias for
+#     EXTRACT(field FROM expr). Works for year/month/etc.
+#   # zeta-adapt: DAYOFWEEK / DAYOFMONTH / DAYOFYEAR /
+#     WEEK / MONTHNAME / DAYNAME — all supported.
+#     DAYOFWEEK returns 1=Sunday (MySQL convention).
+#   # zeta-adapt: LAST_DAY(date) — works (returns DATE).
+#   # zeta-adapt: ADDDATE(date, n) / SUBDATE(date, n) —
+#     work; return DATE (not TIMESTAMP).
+#   # zeta-adapt: INTERVAL '1 year 2 months' multi-
+#     component PG-style — supported, renders as
+#     '1 year 2 mons'.
+#   # zeta-adapt: INTERVAL '1 day 12 hours' — collapses to
+#     a duration ('36:00:00') because the day and hour
+#     parts share a unit family.
+#   # zeta-adapt: INTERVAL 'h:m:s' HOUR_SECOND — supported,
+#     renders as HH:MM:SS.
+#   # zeta-adapt: INTERVAL + INTERVAL addition — supported,
+#     concatenates the components.
+#   # zeta-adapt: FROM_UNIXTIME(epoch_seconds) — works,
+#     returns TIMESTAMP.
+#   # zeta-adapt: UNIX_TIMESTAMP() — works, returns the
+#     current epoch seconds. (Not pinned in this test
+#     because the value is non-deterministic; covered via
+#     relational predicate.)
+#   # zeta-adapt: UNIX_TIMESTAMP(ts) — works with a
+#     TIMESTAMP argument.
+#   # zeta-adapt: CURDATE() — MySQL alias for CURRENT_DATE.
+#   # zeta-adapt: KNOWN DIVERGENCE — DATE_ADD on a DATE
+#     value with a DAY-or-coarser unit returns TIMESTAMP
+#     (with zero clock-time component '00:00:00') rather
+#     than a bare DATE. MySQL/standard returns DATE; PG
+#     returns DATE for date + interval-day too.
+#   # zeta-adapt: KNOWN DIVERGENCE — NOW / CURRENT_TIMESTAMP
+#     / CURTIME / SYSDATE return microsecond precision
+#     (e.g. '2026-05-20 06:20:50.130430'). MySQL defaults
+#     to second precision unless an explicit precision arg
+#     is supplied. Pinned via relational predicate only.
+#   # zeta-adapt: KNOWN GAP — ADDTIME(t, dur) / SUBTIME(t,
+#     dur) error 1105 "unknown function: ADDTIME". Substitute
+#     via TIMESTAMP + INTERVAL.
+#   # zeta-adapt: MAKETIME(h, m, s) — supported. Returns
+#     TIME.
+#   # zeta-adapt: MAKE_DATE(y, m, d) / MAKE_TIME(h, m, s) —
+#     PG spelling, both supported.
+#   # zeta-adapt: KNOWN GAP — MAKEDATE(year, dayofyear)
+#     (the MySQL day-of-year form) errors 1105 unknown.
+#     Substitute via MAKE_DATE(y, m, d) and compute the
+#     month/day from the day-of-year yourself.
+#   # zeta-adapt: KNOWN GAP — INTERVAL n MICROSECOND /
+#     NANOSECOND / QUARTER / DECADE / CENTURY / MILLENNIUM
+#     all error 1064 "unsupported interval field". Only
+#     YEAR/MONTH/WEEK/DAY/HOUR/MINUTE/SECOND are accepted.
+
+--echo === MySQL DATE_ADD / DATE_SUB ===
+
+SELECT DATE_ADD(DATE '2024-01-01', INTERVAL 7 DAY) AS d_plus_7;
+SELECT DATE_SUB(DATE '2024-01-08', INTERVAL 7 DAY) AS d_minus_7;
+
+--echo === MySQL DATEDIFF / TIMESTAMPDIFF ===
+
+SELECT DATEDIFF(DATE '2024-05-19', DATE '2024-05-10') AS dd;
+SELECT TIMESTAMPDIFF(DAY,   DATE '2024-05-10', DATE '2024-05-19') AS d_unit;
+SELECT TIMESTAMPDIFF(HOUR,  TIMESTAMP '2024-05-19 10:00:00', TIMESTAMP '2024-05-19 14:00:00') AS h_unit;
+SELECT TIMESTAMPDIFF(MONTH, DATE '2024-01-15', DATE '2024-05-19') AS m_unit;
+
+--echo === PG DATE_PART (alias for EXTRACT) ===
+
+SELECT DATE_PART('year', DATE '2024-05-19') AS y;
+SELECT DATE_PART('month', TIMESTAMP '2024-05-19 14:30:45') AS m;
+
+--echo === MySQL day/month name family ===
+
+SELECT DAYOFWEEK(DATE '2024-05-19') AS dow, DAYOFMONTH(DATE '2024-05-19') AS dom, DAYOFYEAR(DATE '2024-05-19') AS doy;
+SELECT WEEK(DATE '2024-05-19') AS wk;
+SELECT MONTHNAME(DATE '2024-05-19') AS mn, DAYNAME(DATE '2024-05-19') AS dn;
+
+--echo === LAST_DAY of month ===
+
+SELECT LAST_DAY(DATE '2024-02-15') AS feb_end;
+
+--echo === ADDDATE / SUBDATE — integer-day form ===
+
+SELECT ADDDATE(DATE '2024-01-01', 7) AS plus;
+SELECT SUBDATE(DATE '2024-01-08', 7) AS minus;
+
+--echo === Multi-component INTERVAL ===
+
+SELECT INTERVAL '1 year 2 months' AS yr_mo;
+SELECT INTERVAL '1 day 12 hours' AS day_hr;
+SELECT INTERVAL '1:30:45' HOUR_SECOND;
+
+--echo === INTERVAL addition ===
+
+SELECT INTERVAL 1 YEAR + INTERVAL 2 MONTH AS yr_plus_mo;
+
+--echo === FROM_UNIXTIME / UNIX_TIMESTAMP ===
+
+SELECT FROM_UNIXTIME(1700000000) AS from_ts;
+SELECT UNIX_TIMESTAMP(TIMESTAMP '2023-11-14 22:13:20') AS to_epoch;
+
+--echo === CURDATE() — same-call equality (deterministic by day) ===
+
+SELECT CURDATE() = CURDATE() AS same_day;
+
+--echo === NOW() / CURRENT_TIMESTAMP — relational only (non-deterministic) ===
+
+SELECT NOW() > TIMESTAMP '2020-01-01 00:00:00' AS in_future;
+
+--echo === KNOWN DIVERGENCE: DATE_ADD on DATE returns TIMESTAMP, not DATE ===
+
+SELECT DATE_ADD(DATE '2024-01-01', INTERVAL 1 DAY) AS d_returns_ts;
+
+--echo === KNOWN GAP: ADDTIME — errno 1105 ===
+
+--error 1105
+SELECT ADDTIME(TIME '10:00:00', TIME '01:30:00');
+
+--echo === KNOWN GAP: SUBTIME — errno 1105 ===
+
+--error 1105
+SELECT SUBTIME(TIME '14:30:00', TIME '01:30:00');
+
+--echo === MAKETIME (MySQL) — works ===
+
+SELECT MAKETIME(14, 30, 45) AS t;
+
+--echo === MAKE_DATE / MAKE_TIME (PG spelling) — work ===
+
+SELECT MAKE_DATE(2024, 5, 19) AS d, MAKE_TIME(14, 30, 45) AS t;
+
+--echo === KNOWN GAP: MAKEDATE (MySQL spelling) — errno 1105 ===
+
+--error 1105
+SELECT MAKEDATE(2024, 140);
+
+--echo === KNOWN GAP: INTERVAL n MICROSECOND — errno 1064 ===
+
+--error 1064
+SELECT INTERVAL 1 MICROSECOND;
+
+--echo === KNOWN GAP: INTERVAL n QUARTER — errno 1064 ===
+
+--error 1064
+SELECT INTERVAL 1 QUARTER;
+
+--echo === KNOWN GAP: INTERVAL n DECADE — errno 1064 ===
+
+--error 1064
+SELECT INTERVAL 1 DECADE;
+
+--echo === KNOWN GAP: INTERVAL n CENTURY — errno 1064 ===
+
+--error 1064
+SELECT INTERVAL 1 CENTURY;
