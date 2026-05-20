@@ -1,0 +1,138 @@
+# Independently authored temporary-table smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test (no prior compat coverage for TEMP/TEMPORARY
+# tables); pins zeta's TEMPORARY TABLE surface.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE TEMPORARY TABLE — supported (PG +
+#     MySQL spelling).
+#   # zeta-adapt: CREATE TEMP TABLE — supported (PG-style
+#     short form).
+#   # zeta-adapt: CREATE TEMPORARY TABLE IF NOT EXISTS —
+#     supported; second CREATE is a silent no-op.
+#   # zeta-adapt: Primary key + unique constraints on TEMP
+#     tables — enforced (errno 1062 on duplicate).
+#   # zeta-adapt: CREATE INDEX on a TEMP table — supported.
+#   # zeta-adapt: TEMP tables created inside BEGIN…COMMIT
+#     persist after COMMIT (visible in the same connection).
+#   # zeta-adapt: DROP TABLE on a TEMP table — supported.
+#   # zeta-adapt: ON COMMIT DROP (PG temp-table option) —
+#     parsed and accepted.
+#   # zeta-adapt: KNOWN GAP — CREATE TABLE … AS SELECT
+#     (CTAS) errors 1146 "table not found" naming the SOURCE
+#     table — even though SELECT from that table works. The
+#     issue is general (not TEMP-specific): the CTAS planner
+#     does not resolve the source. Inline-VALUES form like
+#     `CREATE TABLE x AS SELECT 1 AS a, 2 AS b` succeeds.
+#     Portable substitute: CREATE TABLE … (columns) +
+#     INSERT INTO … SELECT.
+#   # zeta-adapt: KNOWN GAP — TEMP table CANNOT shadow a
+#     regular table of the same name in the same schema:
+#     CREATE TEMPORARY TABLE errors 1050 "table already
+#     exists". PG/MySQL both support shadowing (the temp
+#     table lives in a session-private namespace). Workaround:
+#     pick a distinct name.
+#   # zeta-adapt: KNOWN GAP — DROP TEMPORARY TABLE syntax
+#     (MySQL-only) errors 1064. The parser does not accept
+#     TEMPORARY after DROP. Substitute: plain DROP TABLE.
+
+--echo === CREATE TEMPORARY TABLE + INSERT + SELECT + DROP ===
+
+DROP TABLE IF EXISTS tt;
+CREATE TEMPORARY TABLE tt (id INT PRIMARY KEY, n INT);
+INSERT INTO tt VALUES (1, 10), (2, 20);
+SELECT id, n FROM tt ORDER BY id;
+DROP TABLE tt;
+
+--echo === CREATE TEMP TABLE (PG short form) ===
+
+DROP TABLE IF EXISTS tt2;
+CREATE TEMP TABLE tt2 (id INT PRIMARY KEY);
+INSERT INTO tt2 VALUES (1);
+SELECT id FROM tt2;
+DROP TABLE tt2;
+
+--echo === CREATE TEMPORARY TABLE IF NOT EXISTS — second is no-op ===
+
+DROP TABLE IF EXISTS tt_ine;
+CREATE TEMPORARY TABLE IF NOT EXISTS tt_ine (id INT);
+CREATE TEMPORARY TABLE IF NOT EXISTS tt_ine (id INT);
+DROP TABLE tt_ine;
+
+--echo === Primary key enforced on TEMP table ===
+
+DROP TABLE IF EXISTS tt_pk;
+CREATE TEMPORARY TABLE tt_pk (id INT PRIMARY KEY, n INT);
+INSERT INTO tt_pk VALUES (1, 10);
+--error 1062
+INSERT INTO tt_pk VALUES (1, 99);
+SELECT id, n FROM tt_pk;
+DROP TABLE tt_pk;
+
+--echo === UNIQUE constraint enforced on TEMP table ===
+
+DROP TABLE IF EXISTS tt_unique;
+CREATE TEMPORARY TABLE tt_unique (id INT, name TEXT, UNIQUE(name));
+INSERT INTO tt_unique VALUES (1, 'a');
+--error 1062
+INSERT INTO tt_unique VALUES (2, 'a');
+DROP TABLE tt_unique;
+
+--echo === CREATE INDEX on TEMP table ===
+
+DROP TABLE IF EXISTS tt_idx;
+CREATE TEMPORARY TABLE tt_idx (id INT, n INT);
+INSERT INTO tt_idx VALUES (1, 10), (2, 20);
+CREATE INDEX ix_tt ON tt_idx(n);
+SELECT id FROM tt_idx WHERE n = 20;
+DROP TABLE tt_idx;
+
+--echo === TEMP table created inside BEGIN/COMMIT persists after COMMIT ===
+
+DROP TABLE IF EXISTS tt_tx;
+BEGIN;
+CREATE TEMPORARY TABLE tt_tx (id INT PRIMARY KEY);
+INSERT INTO tt_tx VALUES (1);
+SELECT id FROM tt_tx;
+COMMIT;
+SELECT id FROM tt_tx;
+DROP TABLE tt_tx;
+
+--echo === ON COMMIT DROP option — parsed and accepted ===
+
+DROP TABLE IF EXISTS tt_oc;
+CREATE TEMPORARY TABLE tt_oc (id INT) ON COMMIT DROP;
+INSERT INTO tt_oc VALUES (1);
+DROP TABLE tt_oc;
+
+--echo === KNOWN GAP: CREATE TABLE … AS SELECT (CTAS) — errno 1146 ===
+--echo # CTAS planner fails to resolve the source table even
+--echo # though plain SELECT from it works. Substitute:
+--echo # CREATE TABLE … (columns) + INSERT … SELECT.
+
+DROP TABLE IF EXISTS ctas_src;
+DROP TABLE IF EXISTS ctas_dst;
+CREATE TABLE ctas_src (id INT PRIMARY KEY);
+INSERT INTO ctas_src VALUES (1), (2);
+--error 1146
+CREATE TABLE ctas_dst AS SELECT * FROM ctas_src;
+DROP TABLE ctas_src;
+
+--echo === KNOWN GAP: TEMP table cannot shadow regular table — errno 1050 ===
+--echo # zeta requires distinct names. PG/MySQL allow a temp
+--echo # table to shadow a regular one of the same name.
+
+DROP TABLE IF EXISTS shadow_t;
+CREATE TABLE shadow_t (id INT, kind TEXT);
+--error 1050
+CREATE TEMPORARY TABLE shadow_t (id INT, kind TEXT);
+DROP TABLE shadow_t;
+
+--echo === KNOWN GAP: DROP TEMPORARY TABLE syntax — errno 1064 ===
+--echo # MySQL-only spelling not parsed. Substitute: DROP TABLE.
+
+DROP TABLE IF EXISTS tt_drop;
+CREATE TEMPORARY TABLE tt_drop (id INT);
+--error 1064
+DROP TEMPORARY TABLE tt_drop;
+DROP TABLE tt_drop;
