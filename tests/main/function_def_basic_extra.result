@@ -1,0 +1,38 @@
+=== CREATE FUNCTION (SQL) — parses + catalogs silently ===
+DROP FUNCTION IF EXISTS sqlfn;
+CREATE FUNCTION sqlfn(x INT) RETURNS INT AS $body$ SELECT x + 1 $body$ LANGUAGE SQL;
+=== KNOWN GAP: invocation of user function — errno 1105 ===
+# The CREATE just above succeeded, but the SELECT
+# below errors "unknown function" — user functions
+# are catalogued but not dispatched.
+SELECT sqlfn(5) AS r;
+ERROR 1105: execution error: unknown function: sqlfn
+=== DROP FUNCTION (catalog cleanup works) ===
+DROP FUNCTION sqlfn;
+=== DROP FUNCTION IF EXISTS on missing — no-op ===
+DROP FUNCTION IF EXISTS no_such_fn;
+=== DROP FUNCTION on missing — errno 1105 ===
+DROP FUNCTION no_such_fn;
+ERROR 1105: execution error: function "no_such_fn" does not exist
+=== CREATE OR REPLACE FUNCTION — second CREATE replaces ===
+DROP FUNCTION IF EXISTS bump;
+CREATE OR REPLACE FUNCTION bump(x INT) RETURNS INT AS $body$ SELECT x + 1 $body$ LANGUAGE SQL;
+CREATE OR REPLACE FUNCTION bump(x INT) RETURNS INT AS $body$ SELECT x + 10 $body$ LANGUAGE SQL;
+DROP FUNCTION bump;
+=== CREATE FUNCTION RETURNS TABLE(...) — accepted at catalog ===
+DROP FUNCTION IF EXISTS srf;
+CREATE FUNCTION srf() RETURNS TABLE(x INT, y INT) AS $body$ SELECT 1, 2 $body$ LANGUAGE SQL;
+DROP FUNCTION srf;
+=== KNOWN GAP: overloading by argument signature — errno 1105 ===
+# Each function name occupies one catalog slot.
+DROP FUNCTION IF EXISTS multi;
+CREATE FUNCTION multi(a INT) RETURNS INT AS $body$ SELECT a + 1 $body$ LANGUAGE SQL;
+CREATE FUNCTION multi(a INT, b INT) RETURNS INT AS $body$ SELECT a + b $body$ LANGUAGE SQL;
+ERROR 1105: execution error: function "multi" already exists
+DROP FUNCTION multi;
+=== KNOWN GAP: CREATE PROCEDURE — errno 1064 ===
+CREATE PROCEDURE pr1() AS $body$ SELECT 1 $body$ LANGUAGE SQL;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: $body$ SELECT 1 $body$ at Line: 1, Column: 27
+=== KNOWN GAP: CALL stmt — errno 1064 (procedure surface absent) ===
+CALL no_proc();
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
