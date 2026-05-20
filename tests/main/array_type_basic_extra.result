@@ -69,15 +69,14 @@ r
 SELECT ARRAY_TO_STRING(ARRAY[1, 2, 3], ',') AS s;
 s
 1,2,3
-=== KNOWN GAP: ARRAY_PREPEND — errno 1105 ===
-# Substitute: ARRAY[elem] || arr.
+=== ARRAY_PREPEND — supported (push to front) ===
 SELECT ARRAY_PREPEND(0, ARRAY[1, 2, 3]) AS r;
-ERROR 1105: execution error: unknown function: ARRAY_PREPEND
-=== KNOWN GAP: ARRAY_REPLACE — errno 1105 ===
-# Substitute: ARRAY(SELECT CASE WHEN x = old THEN new
-# ELSE x END FROM UNNEST(arr) AS t(x)).
+r
+Array { element_type: Int64, elements: [Int64(0), Int64(1), Int64(2), Int64(3)] }
+=== ARRAY_REPLACE — supported (substitute every match) ===
 SELECT ARRAY_REPLACE(ARRAY[1, 2, 3], 2, 9) AS r;
-ERROR 1105: execution error: unknown function: ARRAY_REPLACE
+r
+Array { element_type: Int64, elements: [Int64(1), Int64(9), Int64(3)] }
 === CARDINALITY — supported (returns 0 for empty, NULL for NULL) ===
 SELECT CARDINALITY(ARRAY[1, 2, 3]) AS r;
 r
@@ -85,11 +84,13 @@ r
 SELECT CARDINALITY(ARRAY[]::INT[]) AS empty;
 empty
 0
-=== KNOWN GAP: ARRAY_UPPER / ARRAY_LOWER — errno 1105 ===
-SELECT ARRAY_UPPER(ARRAY[1, 2, 3], 1) AS r;
-ERROR 1105: execution error: unknown function: ARRAY_UPPER
-SELECT ARRAY_LOWER(ARRAY[1, 2, 3], 1) AS r;
-ERROR 1105: execution error: unknown function: ARRAY_LOWER
+=== ARRAY_UPPER / ARRAY_LOWER — supported (1-based; empty → NULL) ===
+SELECT ARRAY_UPPER(ARRAY[1, 2, 3], 1) AS u;
+u
+3
+SELECT ARRAY_LOWER(ARRAY[1, 2, 3], 1) AS l;
+l
+1
 === KNOWN GAP: array slicing (arr)[a:b] — errno 1064 ===
 # Substitute: ARRAY(SELECT x FROM UNNEST(arr) WITH
 # ORDINALITY t(x, i) WHERE i BETWEEN a AND b).
