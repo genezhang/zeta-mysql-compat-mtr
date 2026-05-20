@@ -1,0 +1,180 @@
+# Independently authored RECURSIVE-CTE-extra smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/cte_recursive.test; orthogonal to
+# with_cte_basic_extra (which covers MATERIALIZED hint,
+# CTE-from-CTE, ORDER BY in CTE, UNION DISTINCT, multi-col
+# alias, aggregate CTE, infinite-bounded-by-LIMIT). Pins
+# tree traversals, multi-CTE composition, recursion bound
+# patterns, and the gaps around mutual recursion / SEARCH /
+# cycle detection.
+#
+# Adaptation notes:
+#   # zeta-adapt: RECURSIVE tree traversal with JOIN + depth
+#     counter — supported.
+#   # zeta-adapt: Two independent RECURSIVE CTEs in one
+#     WITH — supported.
+#   # zeta-adapt: Recursion bounded by `WHERE c.depth < N`
+#     in the recursive arm — supported.
+#   # zeta-adapt: RECURSIVE inside a derived table — supported.
+#   # zeta-adapt: RECURSIVE result used in EXISTS — supported.
+#   # zeta-adapt: RECURSIVE CTE referenced twice in main
+#     query — supported.
+#   # zeta-adapt: RECURSIVE Fibonacci-style (multi-column
+#     state carry) — supported.
+#   # zeta-adapt: KNOWN GAP — `= ANY(<path>)` inside the
+#     recursive arm (PG cycle-detection idiom) errors 1064
+#     "unsupported right operand for ANY: <ident>". So the
+#     standard PG path-array cycle guard does not work in
+#     zeta. Substitute: bound recursion with a depth counter.
+#   # zeta-adapt: KNOWN GAP — `WITH RECURSIVE … SEARCH
+#     DEPTH FIRST BY id SET seq` (PG 14+) errors 1064
+#     "Expected: SELECT, VALUES, or a subquery in the
+#     query body, found: SEARCH". No SEARCH clause surface.
+#   # zeta-adapt: KNOWN GAP — Mutual recursion (CTE `odd`
+#     referencing CTE `even` and vice versa) errors 1146
+#     "table not found: even" — the planner resolves CTE
+#     names in declaration order without forward
+#     visibility.
+#   # zeta-adapt: KNOWN GAP — RECURSIVE with INTERSECT
+#     errors 1105 "recursive CTE requires UNION or UNION
+#     ALL" (matches PG's restriction; pinned positively as
+#     the correct error).
+#   # zeta-adapt: KNOWN DIVERGENCE — aggregate in the
+#     recursive arm is accepted at plan time and then runs
+#     until the 1000-iteration recursion-depth limit, where
+#     it errors 1105 "exceeded maximum recursion depth".
+#     PG forbids the aggregate at PARSE time. zeta's lazy
+#     check means a buggy query can chew CPU for a while
+#     before erroring.
+
+--echo === Tree traversal with JOIN + depth counter ===
+
+DROP TABLE IF EXISTS emp;
+CREATE TABLE emp (id INT PRIMARY KEY, mgr INT, name TEXT);
+INSERT INTO emp VALUES
+  (1, NULL, 'CEO'), (2, 1, 'VP-A'), (3, 1, 'VP-B'),
+  (4, 2, 'M-A1'), (5, 2, 'M-A2'), (6, 4, 'E-A1a');
+
+WITH RECURSIVE chain(id, name, depth) AS (
+  SELECT id, name, 0 FROM emp WHERE id = 1
+  UNION ALL
+  SELECT e.id, e.name, c.depth + 1
+    FROM emp e JOIN chain c ON e.mgr = c.id
+)
+SELECT id, name, depth FROM chain ORDER BY id;
+
+--echo === Recursion bounded by WHERE depth < N in recursive arm ===
+
+WITH RECURSIVE depth_chain(id, name, depth) AS (
+  SELECT id, name, 0 FROM emp WHERE id = 1
+  UNION ALL
+  SELECT e.id, e.name, c.depth + 1
+    FROM emp e JOIN depth_chain c ON e.mgr = c.id
+    WHERE c.depth < 2
+)
+SELECT id, name FROM depth_chain ORDER BY id;
+
+DROP TABLE emp;
+
+--echo === Two independent RECURSIVE CTEs in one WITH ===
+
+WITH RECURSIVE a(n) AS (
+  SELECT 1 UNION ALL SELECT n + 1 FROM a WHERE n < 3
+),
+b(n) AS (
+  SELECT 10 UNION ALL SELECT n + 1 FROM b WHERE n < 12
+)
+SELECT n FROM (SELECT n FROM a UNION ALL SELECT n FROM b) AS t ORDER BY n;
+
+--echo === RECURSIVE inside derived table ===
+
+SELECT n FROM (
+  WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r WHERE n < 3)
+  SELECT n FROM r
+) AS t ORDER BY n;
+
+--echo === RECURSIVE result used in EXISTS ===
+
+WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r WHERE n < 3)
+SELECT EXISTS (SELECT 1 FROM r WHERE n = 2) AS exists_match;
+
+--echo === RECURSIVE CTE referenced twice in main query ===
+
+WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r WHERE n < 3)
+SELECT a.n AS a_n, b.n AS b_n FROM r a CROSS JOIN r b WHERE a.n = 1 ORDER BY b_n;
+
+--echo === Fibonacci (multi-column state carry) ===
+
+WITH RECURSIVE fib(i, a, b) AS (
+  SELECT 1, 0, 1
+  UNION ALL
+  SELECT i + 1, b, a + b FROM fib WHERE i < 8
+)
+SELECT i, a FROM fib ORDER BY i;
+
+--echo === KNOWN GAP: = ANY(<array path>) cycle guard — errno 1064 ===
+--echo # Substitute: bound recursion with a depth counter.
+
+DROP TABLE IF EXISTS cyc;
+CREATE TABLE cyc (id INT, next INT);
+INSERT INTO cyc VALUES (1, 2), (2, 3), (3, 1);
+--error 1064
+WITH RECURSIVE c(id, next, path) AS (
+  SELECT id, next, ARRAY[id] FROM cyc WHERE id = 1
+  UNION ALL
+  SELECT c2.id, c2.next, path || c2.id
+    FROM cyc c2 JOIN c ON c2.id = c.next WHERE NOT c2.id = ANY(path)
+)
+SELECT id FROM c;
+DROP TABLE cyc;
+
+--echo === KNOWN GAP: SEARCH DEPTH FIRST modifier — errno 1064 ===
+
+DROP TABLE IF EXISTS emp2;
+CREATE TABLE emp2 (id INT PRIMARY KEY, mgr INT, name TEXT);
+INSERT INTO emp2 VALUES (1, NULL, 'CEO'), (2, 1, 'VP-A');
+--error 1064
+WITH RECURSIVE chain(id, name) AS (
+  SELECT id, name FROM emp2 WHERE id = 1
+  UNION ALL
+  SELECT e.id, e.name FROM emp2 e JOIN chain c ON e.mgr = c.id
+) SEARCH DEPTH FIRST BY id SET seq
+SELECT id, name FROM chain;
+DROP TABLE emp2;
+
+--echo === KNOWN GAP: mutual recursion forward reference — errno 1146 ===
+--echo # CTE `odd` references CTE `even` which is declared
+--echo # AFTER `odd`. Planner resolves names in declaration
+--echo # order without forward visibility.
+
+--error 1146
+WITH RECURSIVE odd(n) AS (
+  SELECT 1 UNION ALL SELECT n + 1 FROM even WHERE n < 6
+),
+even(n) AS (
+  SELECT 2 UNION ALL SELECT n + 1 FROM odd WHERE n < 6
+)
+SELECT n FROM odd ORDER BY n;
+
+--echo === KNOWN GAP: RECURSIVE INTERSECT — errno 1105 ===
+--echo # PG also forbids; pinned as the correct error.
+
+--error 1105
+WITH RECURSIVE r(n) AS (
+  SELECT 1
+  INTERSECT
+  SELECT n + 1 FROM r WHERE n < 5
+)
+SELECT n FROM r;
+
+--echo === KNOWN DIVERGENCE: aggregate in recursive arm — errno 1105 at runtime ===
+--echo # PG rejects at parse time. zeta accepts and runs to
+--echo # the 1000-iteration recursion-depth limit, then errors.
+
+--error 1105
+WITH RECURSIVE bad(n) AS (
+  SELECT 1
+  UNION ALL
+  SELECT MAX(n) + 1 FROM bad WHERE n < 5
+)
+SELECT n FROM bad;
