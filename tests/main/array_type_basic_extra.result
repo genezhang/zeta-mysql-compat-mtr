@@ -1,0 +1,101 @@
+=== ARRAY_APPEND, ARRAY_CAT, || (concat) ===
+SELECT ARRAY_LENGTH(ARRAY_APPEND(ARRAY[1, 2, 3], 4), 1) AS len_app;
+len_app
+4
+SELECT ARRAY_LENGTH(ARRAY_CAT(ARRAY[1, 2], ARRAY[3, 4]), 1) AS len_cat;
+len_cat
+4
+SELECT ARRAY_LENGTH(ARRAY[1, 2] || ARRAY[3, 4], 1) AS len_pipe;
+len_pipe
+4
+=== ARRAY_REMOVE — removes ALL occurrences ===
+SELECT ARRAY_LENGTH(ARRAY_REMOVE(ARRAY[1, 2, 3, 2], 2), 1) AS r;
+r
+2
+=== ARRAY_POSITION (1-based PG semantics) ===
+SELECT ARRAY_POSITION(ARRAY['a', 'b', 'c', 'b'], 'b') AS r;
+r
+2
+=== = ANY (array) ===
+SELECT 2 = ANY(ARRAY[1, 2, 3]) AS r1, 9 = ANY(ARRAY[1, 2, 3]) AS r2;
+r1	r2
+1	0
+=== = ALL (array) ===
+SELECT 2 = ALL(ARRAY[2, 2, 2]) AS r1, 2 = ALL(ARRAY[2, 2, 9]) AS r2;
+r1	r2
+1	0
+=== NULL handling inside ANY (3VL) ===
+# 1 IS a member -> TRUE; 9 might match NULL -> NULL.
+SELECT 1 = ANY(ARRAY[1, NULL, 3]) AS yes, 9 = ANY(ARRAY[1, NULL, 3]) AS unknown;
+yes	unknown
+1	NULL
+SELECT NULL = ANY(ARRAY[1, 2, 3]) AS nl;
+nl
+NULL
+=== @>, <@, && (contains / contained-by / overlap) ===
+SELECT ARRAY[1, 2, 3] @> ARRAY[2] AS contains,
+       ARRAY[1, 2, 3] <@ ARRAY[1, 2, 3, 4] AS contained_by;
+contains	contained_by
+1	1
+SELECT ARRAY[1, 2, 3] && ARRAY[3, 4, 5] AS overlap,
+       ARRAY[1, 2, 3] && ARRAY[9, 8, 7] AS no_overlap;
+overlap	no_overlap
+1	0
+=== ARRAY_AGG with ORDER BY (via GROUP BY) ===
+# ARRAY_AGG output is rendered using zeta's Debug
+# formatter (the same divergence pinned in
+# datatype_basic_extra for ARRAY column display).
+DROP TABLE IF EXISTS aa;
+CREATE TABLE aa (g INT, x INT);
+INSERT INTO aa VALUES (1, 3), (1, 1), (1, 2);
+SELECT g, ARRAY_AGG(x ORDER BY x) AS r FROM aa GROUP BY g;
+g	r
+1	Array { element_type: Int32, elements: [Int32(1), Int32(2), Int32(3)] }
+DROP TABLE aa;
+=== ARRAY equality (= / <>) ===
+SELECT ARRAY[1, 2, 3] = ARRAY[1, 2, 3] AS eq,
+       ARRAY[1, 2, 3] = ARRAY[1, 2, 9] AS neq;
+eq	neq
+1	0
+=== Empty array — ARRAY_LENGTH returns NULL (PG semantics) ===
+SELECT ARRAY_LENGTH(ARRAY[]::INT[], 1) AS empty_len;
+empty_len
+NULL
+=== NULL inside ARRAY literal — preserved + counted ===
+SELECT ARRAY_LENGTH(ARRAY[1, 2, NULL, 4], 1) AS r;
+r
+4
+=== ARRAY_TO_STRING(arr, sep) ===
+SELECT ARRAY_TO_STRING(ARRAY[1, 2, 3], ',') AS s;
+s
+1,2,3
+=== KNOWN GAP: ARRAY_PREPEND — errno 1105 ===
+# Substitute: ARRAY[elem] || arr.
+SELECT ARRAY_PREPEND(0, ARRAY[1, 2, 3]) AS r;
+ERROR 1105: execution error: unknown function: ARRAY_PREPEND
+=== KNOWN GAP: ARRAY_REPLACE — errno 1105 ===
+# Substitute: ARRAY(SELECT CASE WHEN x = old THEN new
+# ELSE x END FROM UNNEST(arr) AS t(x)).
+SELECT ARRAY_REPLACE(ARRAY[1, 2, 3], 2, 9) AS r;
+ERROR 1105: execution error: unknown function: ARRAY_REPLACE
+=== KNOWN GAP: CARDINALITY — errno 1105 ===
+# Substitute: ARRAY_LENGTH(arr, 1).
+SELECT CARDINALITY(ARRAY[1, 2, 3]) AS r;
+ERROR 1105: execution error: unknown function: CARDINALITY
+=== KNOWN GAP: ARRAY_UPPER / ARRAY_LOWER — errno 1105 ===
+SELECT ARRAY_UPPER(ARRAY[1, 2, 3], 1) AS r;
+ERROR 1105: execution error: unknown function: ARRAY_UPPER
+SELECT ARRAY_LOWER(ARRAY[1, 2, 3], 1) AS r;
+ERROR 1105: execution error: unknown function: ARRAY_LOWER
+=== KNOWN GAP: array slicing (arr)[a:b] — errno 1064 ===
+# Substitute: ARRAY(SELECT x FROM UNNEST(arr) WITH
+# ORDINALITY t(x, i) WHERE i BETWEEN a AND b).
+SELECT (ARRAY[1, 2, 3, 4])[2:3] AS r;
+ERROR 1064: SQL parse error: unsupported compound field access: [2:3]
+=== KNOWN DIVERGENCE: array <, <=, >, >= always return 0 ===
+# PG returns lexicographic comparison; zeta returns 0.
+# = and <> work correctly (see above).
+SELECT ARRAY[1, 2] < ARRAY[1, 3]  AS lt_zeta,
+       ARRAY[1, 2] < ARRAY[1, 2, 3] AS lt_prefix_zeta;
+lt_zeta	lt_prefix_zeta
+0	0

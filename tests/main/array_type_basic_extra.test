@@ -1,0 +1,164 @@
+# Independently authored ARRAY operations smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test (MySQL has no first-class ARRAY type — this is
+# PG surface). Orthogonal to datatype_basic_extra (which
+# already pins ARRAY column, ARRAY[...] literal, arr[i]
+# indexing, ARRAY_LENGTH, @> contains, UNNEST-in-FROM, and
+# the UNNEST-as-scalar gap).
+#
+# Adaptation notes:
+#   # zeta-adapt: ARRAY_APPEND(arr, elem) — supported.
+#   # zeta-adapt: ARRAY_CAT(a, b) — supported. Same as `a || b`.
+#   # zeta-adapt: `||` array concatenation — supported.
+#   # zeta-adapt: ARRAY_REMOVE(arr, v) — supported (removes
+#     all occurrences of v).
+#   # zeta-adapt: ARRAY_POSITION(arr, v) — supported, 1-based
+#     PG semantics. Returns the position of the first match.
+#   # zeta-adapt: `v = ANY(arr)` — supported.
+#   # zeta-adapt: `v = ALL(arr)` — supported.
+#   # zeta-adapt: NULL handling in ANY: `1 = ANY(ARRAY[1, NULL, 3])`
+#     returns 1 (true), `9 = ANY(ARRAY[1, NULL, 3])` returns NULL
+#     (could match the NULL slot — proper 3VL).
+#   # zeta-adapt: `NULL = ANY(arr)` returns NULL.
+#   # zeta-adapt: `@>` (contains), `<@` (contained-by),
+#     `&&` (overlap) — all supported.
+#   # zeta-adapt: ARRAY_AGG(col ORDER BY …) — supported via
+#     GROUP BY; output rendered with Debug formatter (same
+#     divergence as ARRAY column display, already pinned in
+#     datatype_basic_extra).
+#   # zeta-adapt: KNOWN GAP — ARRAY_LENGTH(ARRAY_AGG(...), 1)
+#     returns NULL even though ARRAY_AGG built a valid array.
+#     ARRAY_LENGTH apparently can't introspect the
+#     aggregate-result array type. Substitute: COUNT(*) over
+#     the aggregated rows, or compute outside the aggregation.
+#   # zeta-adapt: ARRAY equality — supported (element-wise).
+#   # zeta-adapt: Empty array `ARRAY[]::INT[]` — supported.
+#     ARRAY_LENGTH on empty array returns NULL (PG semantics).
+#   # zeta-adapt: NULL inside an ARRAY literal — preserved.
+#     ARRAY_LENGTH counts NULL slots.
+#   # zeta-adapt: ARRAY_TO_STRING(arr, sep) — supported.
+#   # zeta-adapt: PG-string ARRAY literal `'{1,2,3}'::INT[]` —
+#     supported.
+#   # zeta-adapt: KNOWN GAP — ARRAY_PREPEND(elem, arr) errors
+#     1105 "unknown function". Substitute: `ARRAY[elem] || arr`.
+#   # zeta-adapt: KNOWN GAP — ARRAY_REPLACE(arr, old, new)
+#     errors 1105 "unknown function". Substitute:
+#     `ARRAY(SELECT CASE WHEN x = old THEN new ELSE x END
+#     FROM UNNEST(arr) AS t(x))`.
+#   # zeta-adapt: KNOWN GAP — CARDINALITY(arr) errors 1105
+#     "unknown function". Substitute: ARRAY_LENGTH(arr, 1).
+#   # zeta-adapt: KNOWN GAP — ARRAY_UPPER(arr, dim) and
+#     ARRAY_LOWER(arr, dim) both error 1105 "unknown function".
+#     1-D arrays in zeta are effectively 1..ARRAY_LENGTH(arr, 1)
+#     so UPPER = LENGTH and LOWER = 1.
+#   # zeta-adapt: KNOWN GAP — array slicing `(arr)[a:b]` errors
+#     1064 "unsupported compound field access". Substitute:
+#     ARRAY(SELECT x FROM UNNEST(arr) WITH ORDINALITY t(x, i)
+#     WHERE i BETWEEN a AND b).
+#   # zeta-adapt: KNOWN DIVERGENCE — array `<`, `<=`, `>`, `>=`
+#     comparison always returns 0 instead of doing lexicographic
+#     compare (`ARRAY[1,2] < ARRAY[1,3]` returns 0; PG returns
+#     TRUE). `=` and `<>` work correctly.
+
+--echo === ARRAY_APPEND, ARRAY_CAT, || (concat) ===
+
+SELECT ARRAY_LENGTH(ARRAY_APPEND(ARRAY[1, 2, 3], 4), 1) AS len_app;
+SELECT ARRAY_LENGTH(ARRAY_CAT(ARRAY[1, 2], ARRAY[3, 4]), 1) AS len_cat;
+SELECT ARRAY_LENGTH(ARRAY[1, 2] || ARRAY[3, 4], 1) AS len_pipe;
+
+--echo === ARRAY_REMOVE — removes ALL occurrences ===
+
+SELECT ARRAY_LENGTH(ARRAY_REMOVE(ARRAY[1, 2, 3, 2], 2), 1) AS r;
+
+--echo === ARRAY_POSITION (1-based PG semantics) ===
+
+SELECT ARRAY_POSITION(ARRAY['a', 'b', 'c', 'b'], 'b') AS r;
+
+--echo === = ANY (array) ===
+
+SELECT 2 = ANY(ARRAY[1, 2, 3]) AS r1, 9 = ANY(ARRAY[1, 2, 3]) AS r2;
+
+--echo === = ALL (array) ===
+
+SELECT 2 = ALL(ARRAY[2, 2, 2]) AS r1, 2 = ALL(ARRAY[2, 2, 9]) AS r2;
+
+--echo === NULL handling inside ANY (3VL) ===
+--echo # 1 IS a member -> TRUE; 9 might match NULL -> NULL.
+
+SELECT 1 = ANY(ARRAY[1, NULL, 3]) AS yes, 9 = ANY(ARRAY[1, NULL, 3]) AS unknown;
+SELECT NULL = ANY(ARRAY[1, 2, 3]) AS nl;
+
+--echo === @>, <@, && (contains / contained-by / overlap) ===
+
+SELECT ARRAY[1, 2, 3] @> ARRAY[2] AS contains,
+       ARRAY[1, 2, 3] <@ ARRAY[1, 2, 3, 4] AS contained_by;
+SELECT ARRAY[1, 2, 3] && ARRAY[3, 4, 5] AS overlap,
+       ARRAY[1, 2, 3] && ARRAY[9, 8, 7] AS no_overlap;
+
+--echo === ARRAY_AGG with ORDER BY (via GROUP BY) ===
+--echo # ARRAY_AGG output is rendered using zeta's Debug
+--echo # formatter (the same divergence pinned in
+--echo # datatype_basic_extra for ARRAY column display).
+
+DROP TABLE IF EXISTS aa;
+CREATE TABLE aa (g INT, x INT);
+INSERT INTO aa VALUES (1, 3), (1, 1), (1, 2);
+SELECT g, ARRAY_AGG(x ORDER BY x) AS r FROM aa GROUP BY g;
+DROP TABLE aa;
+
+--echo === ARRAY equality (= / <>) ===
+
+SELECT ARRAY[1, 2, 3] = ARRAY[1, 2, 3] AS eq,
+       ARRAY[1, 2, 3] = ARRAY[1, 2, 9] AS neq;
+
+--echo === Empty array — ARRAY_LENGTH returns NULL (PG semantics) ===
+
+SELECT ARRAY_LENGTH(ARRAY[]::INT[], 1) AS empty_len;
+
+--echo === NULL inside ARRAY literal — preserved + counted ===
+
+SELECT ARRAY_LENGTH(ARRAY[1, 2, NULL, 4], 1) AS r;
+
+--echo === ARRAY_TO_STRING(arr, sep) ===
+
+SELECT ARRAY_TO_STRING(ARRAY[1, 2, 3], ',') AS s;
+
+--echo === KNOWN GAP: ARRAY_PREPEND — errno 1105 ===
+--echo # Substitute: ARRAY[elem] || arr.
+
+--error 1105
+SELECT ARRAY_PREPEND(0, ARRAY[1, 2, 3]) AS r;
+
+--echo === KNOWN GAP: ARRAY_REPLACE — errno 1105 ===
+--echo # Substitute: ARRAY(SELECT CASE WHEN x = old THEN new
+--echo # ELSE x END FROM UNNEST(arr) AS t(x)).
+
+--error 1105
+SELECT ARRAY_REPLACE(ARRAY[1, 2, 3], 2, 9) AS r;
+
+--echo === KNOWN GAP: CARDINALITY — errno 1105 ===
+--echo # Substitute: ARRAY_LENGTH(arr, 1).
+
+--error 1105
+SELECT CARDINALITY(ARRAY[1, 2, 3]) AS r;
+
+--echo === KNOWN GAP: ARRAY_UPPER / ARRAY_LOWER — errno 1105 ===
+
+--error 1105
+SELECT ARRAY_UPPER(ARRAY[1, 2, 3], 1) AS r;
+--error 1105
+SELECT ARRAY_LOWER(ARRAY[1, 2, 3], 1) AS r;
+
+--echo === KNOWN GAP: array slicing (arr)[a:b] — errno 1064 ===
+--echo # Substitute: ARRAY(SELECT x FROM UNNEST(arr) WITH
+--echo # ORDINALITY t(x, i) WHERE i BETWEEN a AND b).
+
+--error 1064
+SELECT (ARRAY[1, 2, 3, 4])[2:3] AS r;
+
+--echo === KNOWN DIVERGENCE: array <, <=, >, >= always return 0 ===
+--echo # PG returns lexicographic comparison; zeta returns 0.
+--echo # = and <> work correctly (see above).
+
+SELECT ARRAY[1, 2] < ARRAY[1, 3]  AS lt_zeta,
+       ARRAY[1, 2] < ARRAY[1, 2, 3] AS lt_prefix_zeta;
