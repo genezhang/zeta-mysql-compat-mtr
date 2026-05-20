@@ -1,0 +1,93 @@
+# Independently authored YEARWEEK smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_time.test or PG regress. YEARWEEK was
+# missing in zeta before zeta PR #1227 (errored "unknown
+# function"); this slice locks in the new behavior.
+#
+# Big-picture finding: YEARWEEK(date) returns a 6-digit
+# YYYYWW integer = ISO year * 100 + ISO week. zeta uses
+# ISO 8601 numbering throughout (Monday-start, week 1 =
+# first week with 4+ days in the year), consistent with
+# its existing WEEK / WEEKOFYEAR functions. The optional
+# `mode` arg is validated (0..=7) but the ISO numbering is
+# always used — DIVERGENCE from MySQL for modes 0, 2, 4, 6
+# which use Sunday-start numbering. Mode 3 / 7 match.
+#
+# NULL in either arg propagates. TIMESTAMP / parseable
+# string accepted. Arity != 1 or 2 → 1105.
+#
+# Adaptation notes:
+#   # zeta-adapt: YEARWEEK returns YYYYWW = iso_year*100
+#     + iso_week. Range: rough YYYY01..YYYY53.
+#   # zeta-adapt: Optional mode arg accepted 0..=7;
+#     validated but always falls back to ISO 8601 numbering.
+#     DIVERGENCE from MySQL for modes other than 3 / 7
+#     (Sunday-start modes are not supported).
+#   # zeta-adapt: TIMESTAMP input strips time-of-day.
+#   # zeta-adapt: NULL in either arg → NULL.
+#   # zeta-adapt: Mode outside 0..=7 → errno 1105.
+#   # zeta-adapt: Arity != 1 or 2 → errno 1105.
+#   # zeta-adapt: Unparseable string → errno 1105.
+
+--echo === YEARWEEK basic — ISO week 21 of 2026 ===
+
+SELECT YEARWEEK(DATE '2026-05-19') AS week_21_2026;
+
+--echo === YEARWEEK at year boundaries ===
+
+SELECT YEARWEEK(DATE '2024-01-01') AS mon_jan1_2024;
+SELECT YEARWEEK(DATE '2026-01-01') AS thu_jan1_2026;
+SELECT YEARWEEK(DATE '2026-12-31') AS thu_dec31_2026_w53;
+
+--echo === ISO year shift (iso_year != calendar year) ===
+--echo # 2024-12-30 Mon → ISO week 1 of 2025 (forward shift)
+--echo # 2023-01-01 Sun → ISO week 52 of 2022 (backward shift)
+--echo # 2021-01-01 Fri → ISO week 53 of 2020 (53-week year + shift)
+
+SELECT YEARWEEK(DATE '2024-12-30') AS forward_shift_to_2025;
+SELECT YEARWEEK(DATE '2023-01-01') AS backward_shift_to_2022;
+SELECT YEARWEEK(DATE '2021-01-01') AS backward_shift_53w_year;
+
+--echo === Optional mode arg — accepted 0..=7, ISO numbering used ===
+
+SELECT YEARWEEK(DATE '2026-05-19', 0) AS m0;
+SELECT YEARWEEK(DATE '2026-05-19', 3) AS m3;
+SELECT YEARWEEK(DATE '2026-05-19', 7) AS m7;
+
+--echo === TIMESTAMP and string inputs ===
+
+SELECT YEARWEEK(TIMESTAMP '2026-05-19 14:00:00') AS ts;
+SELECT YEARWEEK('2026-05-19') AS str;
+
+--echo === NULL propagation in either arg ===
+
+SELECT YEARWEEK(NULL) AS n_date;
+SELECT YEARWEEK(DATE '2026-05-19', NULL) AS n_mode;
+
+--echo === Mode out of range — errno 1105 ===
+
+--error 1105
+SELECT YEARWEEK(DATE '2026-05-19', 8);
+--error 1105
+SELECT YEARWEEK(DATE '2026-05-19', -1);
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT YEARWEEK();
+--error 1105
+SELECT YEARWEEK(DATE '2026-05-19', 0, 1);
+
+--echo === Unparseable string errors 1105 ===
+
+--error 1105
+SELECT YEARWEEK('not a date');
+
+--echo === On DATE column inside SELECT / GROUP BY ===
+
+DROP TABLE IF EXISTS yw;
+CREATE TABLE yw (id INT, d DATE);
+INSERT INTO yw VALUES (1, DATE '2026-01-05'), (2, DATE '2026-01-12'), (3, DATE '2026-05-19'), (4, DATE '2026-12-31');
+SELECT id, YEARWEEK(d) AS yw FROM yw ORDER BY id;
+SELECT YEARWEEK(d) AS yw, COUNT(*) AS c FROM yw GROUP BY YEARWEEK(d) ORDER BY yw;
+DROP TABLE yw;
