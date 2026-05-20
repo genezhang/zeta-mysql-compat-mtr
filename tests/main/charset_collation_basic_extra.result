@@ -1,0 +1,70 @@
+=== SHOW CHARACTER SET — single utf8mb4 row ===
+SHOW CHARACTER SET;
+Charset	Description	Default collation	Maxlen
+utf8mb4	UTF-8 Unicode	utf8mb4_general_ci	4
+=== SHOW COLLATION — single utf8mb4_general_ci row ===
+SHOW COLLATION;
+Collation	Charset	Id	Default	Compiled	Sortlen
+utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
+=== SET NAMES 'utf8mb4' — silent no-op ===
+SET NAMES 'utf8mb4';
+=== SET NAMES with COLLATE clause — silent no-op ===
+SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci';
+=== SET CHARACTER SET — silent no-op ===
+SET CHARACTER SET utf8mb4;
+=== Column-level CHARACTER SET / COLLATE — parses, silent no-op ===
+DROP TABLE IF EXISTS cst;
+CREATE TABLE cst (c TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci);
+INSERT INTO cst VALUES ('hello');
+SELECT c FROM cst;
+c
+hello
+=== Table-level CHARACTER SET / COLLATE — parses, silent no-op ===
+DROP TABLE IF EXISTS cst2;
+CREATE TABLE cst2 (c TEXT) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+INSERT INTO cst2 VALUES ('world');
+SELECT c FROM cst2;
+c
+world
+=== CHARSET() and COLLATION() return engine defaults ===
+SELECT CHARSET('hello') AS cs, COLLATION('hello') AS coll;
+cs	coll
+utf8mb4	utf8mb4_general_ci
+=== KNOWN DIVERGENCE: SHOW CHARACTER SET LIKE ignored — always one row ===
+SHOW CHARACTER SET LIKE 'latin%';
+Charset	Description	Default collation	Maxlen
+utf8mb4	UTF-8 Unicode	utf8mb4_general_ci	4
+=== KNOWN DIVERGENCE: SHOW COLLATION LIKE ignored — always one row ===
+SHOW COLLATION LIKE 'latin%';
+Collation	Charset	Id	Default	Compiled	Sortlen
+utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
+=== KNOWN DIVERGENCE: SET NAMES accepts any charset string ===
+SET NAMES 'latin1';
+=== KNOWN DIVERGENCE: SHOW CREATE TABLE strips column CHARSET/COLLATE ===
+SHOW CREATE TABLE cst;
+Table	Create Table
+cst	CREATE TABLE `cst` (
+  `c` longtext,
+  PRIMARY KEY (`_rowid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+=== KNOWN DIVERGENCE: SHOW CREATE TABLE strips table-level CHARSET/COLLATE ===
+SHOW CREATE TABLE cst2;
+Table	Create Table
+cst2	CREATE TABLE `cst2` (
+  `c` longtext,
+  PRIMARY KEY (`_rowid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+DROP TABLE cst;
+DROP TABLE cst2;
+=== KNOWN GAP: CONVERT(x USING <charset>) — errno 1064 ===
+SELECT CONVERT('abc' USING utf8mb4);
+ERROR 1064: SQL parse error: unsupported expression: CONVERT('abc' USING utf8mb4)
+=== KNOWN GAP: CAST AS CHAR CHARACTER SET — errno 1064 ===
+SELECT CAST('abc' AS CHAR CHARACTER SET utf8mb4);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: CHARACTER at Line: 1, Column: 27
+=== KNOWN GAP: introducer literal _utf8mb4'...' — errno 1064 ===
+SELECT _utf8mb4'hello';
+ERROR 1064: SQL parse error: unsupported expression: _utf8mb4 'hello'
+=== KNOWN GAP: COLLATE expression operator — errno 1064 ===
+SELECT 'hello' COLLATE utf8mb4_unicode_ci;
+ERROR 1064: SQL parse error: unsupported expression: 'hello' COLLATE utf8mb4_unicode_ci
