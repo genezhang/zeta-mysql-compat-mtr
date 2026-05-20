@@ -24,9 +24,12 @@
 #     MySQL on TIME range).
 #   # zeta-adapt: ADDTIME/SUBTIME(TIMESTAMP, TIME) —
 #     TIMESTAMP result; crosses day boundaries.
-#   # zeta-adapt: String arg accepted — TIME-shaped string
-#     resolves to TIME result; TIMESTAMP-shaped string to
-#     TIMESTAMP.
+#   # zeta-adapt: String first arg accepted; always returns
+#     TIMESTAMP (so the declared column type stays consistent
+#     across rows regardless of which shape the string had).
+#     A TIME-shaped string is interpreted as µs-of-day on
+#     epoch day 0 (1970-01-01). To get a TIME result, pass a
+#     TIME literal explicitly.
 #   # zeta-adapt: NULL → NULL.
 #   # zeta-adapt: Arity != 2 → errno 1105.
 #   # zeta-adapt: Bad-string offset → errno 1105 with

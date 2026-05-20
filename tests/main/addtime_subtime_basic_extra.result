@@ -26,7 +26,7 @@ rollback
 === String inputs accepted (TIME shape and TIMESTAMP shape) ===
 SELECT ADDTIME('10:00:00', '02:30:00')              AS str_time;
 str_time
-12:30:00
+1970-01-01 12:30:00
 SELECT ADDTIME('2026-05-19 10:00:00', '02:30:00')   AS str_ts;
 str_ts
 2026-05-19 12:30:00
