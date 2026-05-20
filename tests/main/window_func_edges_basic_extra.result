@@ -1,0 +1,81 @@
+=== Setup ===
+DROP TABLE IF EXISTS wf;
+CREATE TABLE wf (id INT PRIMARY KEY, n INT);
+INSERT INTO wf VALUES (1, 10), (2, 20), (3, 30);
+=== LAG/LEAD offset > partition size — NULL or default ===
+SELECT id, LAG(n, 5) OVER (ORDER BY id) AS lag5 FROM wf ORDER BY id;
+id	lag5
+1	NULL
+2	NULL
+3	NULL
+SELECT id, LAG(n, 5, -1) OVER (ORDER BY id) AS lag5_def FROM wf ORDER BY id;
+id	lag5_def
+1	-1
+2	-1
+3	-1
+SELECT id, LEAD(n, 5, -1) OVER (ORDER BY id) AS lead5_def FROM wf ORDER BY id;
+id	lead5_def
+1	-1
+2	-1
+3	-1
+=== LAG offset = 0 — identity ===
+SELECT id, LAG(n, 0) OVER (ORDER BY id) AS lag0 FROM wf ORDER BY id;
+id	lag0
+1	10
+2	20
+3	30
+=== NTILE(N) with N > row count — 1 row per bucket ===
+SELECT id, NTILE(10) OVER (ORDER BY id) AS nt10 FROM wf ORDER BY id;
+id	nt10
+1	1
+2	2
+3	3
+=== NTH_VALUE with explicit ROWS frame ===
+SELECT id, NTH_VALUE(n, 2) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS nth2 FROM wf ORDER BY id;
+id	nth2
+1	20
+2	20
+3	20
+=== ROW_NUMBER without ORDER BY — scan order ===
+SELECT id, ROW_NUMBER() OVER () AS rn FROM wf ORDER BY id;
+id	rn
+1	1
+2	2
+3	3
+=== ROW_NUMBER with PARTITION BY but no ORDER BY ===
+SELECT id, ROW_NUMBER() OVER (PARTITION BY id % 2) AS rn FROM wf ORDER BY id;
+id	rn
+1	1
+2	1
+3	2
+=== KNOWN BUG: FILTER clause on aggregate window — silently IGNORED ===
+# Cumulative SUM should include only rows where n > 15:
+# row 1 (n=10): filter rejects → NULL or 0; row 2 (n=20): 20; row 3 (n=30): 50.
+# zeta returns the UNFILTERED cumulative sum instead.
+SELECT id, n, SUM(n) FILTER (WHERE n > 15) OVER (ORDER BY id) AS s_filt FROM wf ORDER BY id;
+id	n	s_filt
+1	10	10
+2	20	30
+3	30	60
+=== KNOWN DIVERGENCE: NTILE(0) returns 1 per row (MySQL would error) ===
+SELECT id, NTILE(0) OVER (ORDER BY id) AS n0 FROM wf ORDER BY id;
+id	n0
+1	1
+2	1
+3	1
+=== KNOWN DIVERGENCE: LAG(n, -1) returns NULL (PG/MySQL: ≡ LEAD(n, 1)) ===
+SELECT id, LAG(n, -1) OVER (ORDER BY id) AS lag_neg FROM wf ORDER BY id;
+id	lag_neg
+1	NULL
+2	NULL
+3	NULL
+=== KNOWN DIVERGENCE: nested window functions evaluate to NULL (PG: error) ===
+SELECT id, SUM(ROW_NUMBER() OVER ()) OVER () AS nested FROM wf ORDER BY id;
+id	nested
+1	NULL
+2	NULL
+3	NULL
+=== Window function in WHERE — correctly errors 1105 ===
+SELECT id FROM wf WHERE ROW_NUMBER() OVER () = 1;
+ERROR 1105: execution error: unsupported expression: WindowFunction { name: "ROW_NUMBER", args: [], partition_by: [], order_by: [], frame: None }
+DROP TABLE wf;
