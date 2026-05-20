@@ -1,0 +1,99 @@
+=== BYTEA column + hex literal ===
+DROP TABLE IF EXISTS b1;
+CREATE TABLE b1 (id INT PRIMARY KEY, data BYTEA);
+INSERT INTO b1 VALUES (1, '\xDEADBEEF'), (2, '\x00FF');
+SELECT id, data FROM b1 ORDER BY id;
+id	data
+1	\xDEADBEEF
+2	\x00FF
+=== LENGTH / OCTET_LENGTH (see divergence: counts escape-string chars) ===
+SELECT id, LENGTH(data) AS l, OCTET_LENGTH(data) AS o FROM b1 ORDER BY id;
+id	l	o
+1	10	10
+2	6	6
+=== Equality and ORDER BY ===
+SELECT id FROM b1 WHERE data = '\xDEADBEEF';
+id
+1
+SELECT id, data FROM b1 ORDER BY data, id;
+id	data
+2	\x00FF
+1	\xDEADBEEF
+=== || concatenation ===
+SELECT '\xAB' || '\xCD' AS r;
+r
+\xAB\xCD
+=== SUBSTRING — operates on escape-encoded chars (divergence) ===
+# `\xDEADBEEF` is 10 chars: `\`,`x`,`D`,`E`,`A`,`D`,`B`,`E`,`E`,`F`.
+# FROM 2 FOR 2 extracts chars 2-3 → 'xD'.
+SELECT SUBSTRING(data FROM 2 FOR 2) AS r FROM b1 WHERE id = 1;
+r
+xD
+DROP TABLE b1;
+=== BLOB (MySQL alias for BYTEA) ===
+DROP TABLE IF EXISTS bl;
+CREATE TABLE bl (id INT PRIMARY KEY, data BLOB);
+INSERT INTO bl VALUES (1, '\xCAFEBABE');
+SELECT id, data FROM bl;
+id	data
+1	\xCAFEBABE
+DROP TABLE bl;
+=== TINYBLOB / MEDIUMBLOB / LONGBLOB — all accepted ===
+DROP TABLE IF EXISTS tb;
+CREATE TABLE tb (id INT PRIMARY KEY, t TINYBLOB);
+INSERT INTO tb VALUES (1, '\xAA');
+SELECT id, t FROM tb;
+id	t
+1	\xAA
+DROP TABLE tb;
+DROP TABLE IF EXISTS mb;
+CREATE TABLE mb (id INT PRIMARY KEY, t MEDIUMBLOB);
+INSERT INTO mb VALUES (1, '\xBB');
+SELECT id, t FROM mb;
+id	t
+1	\xBB
+DROP TABLE mb;
+DROP TABLE IF EXISTS lb;
+CREATE TABLE lb (id INT PRIMARY KEY, t LONGBLOB);
+INSERT INTO lb VALUES (1, '\xCC');
+SELECT id, t FROM lb;
+id	t
+1	\xCC
+DROP TABLE lb;
+=== E-string literal E'\\x00' ===
+DROP TABLE IF EXISTS be;
+CREATE TABLE be (id INT PRIMARY KEY, data BYTEA);
+INSERT INTO be VALUES (1, E'\\x00');
+SELECT id, data FROM be;
+id	data
+1	\x00
+DROP TABLE be;
+=== KNOWN GAP: ::BYTEA cast — errno 1105 ===
+SELECT '\xAB'::BYTEA AS r;
+ERROR 1105: execution error: unsupported CAST target type: BYTEA
+=== KNOWN GAP: CAST(x AS BYTEA) — errno 1105 ===
+SELECT CAST('\xAB' AS BYTEA) AS r;
+ERROR 1105: execution error: unsupported CAST target type: BYTEA
+=== KNOWN GAP: ENCODE — errno 1105 ===
+# The default BYTEA display is already `\xHEX`;
+# strip the leading `\\x` for the hex string.
+SELECT ENCODE('\xDEADBEEF', 'hex') AS r;
+ERROR 1105: execution error: unknown function: ENCODE
+=== KNOWN GAP: DECODE — errno 1105 ===
+# Substitute: write the `\xHEX` literal directly.
+SELECT DECODE('deadbeef', 'hex') AS r;
+ERROR 1105: execution error: unknown function: DECODE
+=== KNOWN GAP: GET_BYTE — errno 1105 ===
+DROP TABLE IF EXISTS gb;
+CREATE TABLE gb (id INT PRIMARY KEY, data BYTEA);
+INSERT INTO gb VALUES (1, '\xDEADBEEF');
+SELECT GET_BYTE(data, 0) AS r FROM gb;
+ERROR 1105: execution error: unknown function: GET_BYTE
+DROP TABLE gb;
+=== KNOWN GAP: VARBINARY(n) column type — errno 1064 ===
+# Substitute: BYTEA (no length parameter).
+CREATE TABLE vb_gap (id INT PRIMARY KEY, data VARBINARY(16));
+ERROR 1064: SQL parse error: unsupported data type: VARBINARY(16)
+=== KNOWN GAP: BINARY(n) column type — errno 1064 ===
+CREATE TABLE bi_gap (id INT PRIMARY KEY, data BINARY(4));
+ERROR 1064: SQL parse error: unsupported data type: BINARY(4)
