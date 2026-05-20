@@ -1,0 +1,124 @@
+# Independently authored standalone VALUES edge smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/values.test or PG
+# regress; complements insert_basic / insert_basic_extra
+# (which cover VALUES inside INSERT) by pinning the
+# STANDALONE VALUES surface (PG / Spark feature, MySQL 8+
+# also supports via `VALUES ROW(...)`): bare query,
+# derived table, set-op, ORDER BY / LIMIT / OFFSET,
+# CROSS JOIN, IN subquery, arithmetic / function calls,
+# arity validation, and the CTE-with-VALUES gap.
+#
+# Big-picture finding: zeta accepts standalone VALUES as
+# a query form with auto-generated `column1`, `column2`,
+# ... headers. Most clause combinations (ORDER BY,
+# LIMIT, OFFSET, UNION / UNION ALL, derived-table alias,
+# IN subquery, CROSS JOIN) compose cleanly. Column-count
+# mismatch and empty VALUES are correctly rejected.
+#
+# One notable gap: VALUES inside a CTE
+# (`WITH t(...) AS (VALUES ...)`) errors 1064 "only
+# SELECT supported" — PG and Spark both accept this form,
+# and it's a common shape for inline test fixtures.
+#
+# Adaptation notes:
+#   # zeta-adapt: Standalone VALUES — accepted as a
+#     query; column headers default to `column1`,
+#     `column2`, etc.
+#   # zeta-adapt: VALUES with NULL — NULL accepted in
+#     any cell; column type inferred from first non-NULL.
+#   # zeta-adapt: VALUES + ORDER BY / LIMIT / OFFSET —
+#     work the same as on a SELECT.
+#   # zeta-adapt: VALUES UNION / UNION ALL — works.
+#   # zeta-adapt: VALUES as derived table with column
+#     aliases — `(VALUES (1), (2)) AS t(col)` works.
+#   # zeta-adapt: VALUES as derived table without
+#     aliases — works; default `column1` etc. carry
+#     through.
+#   # zeta-adapt: VALUES in IN — `WHERE x IN (VALUES ...)`
+#     works as a row-set subquery.
+#   # zeta-adapt: CROSS JOIN of two VALUES — works
+#     (Cartesian product as expected).
+#   # zeta-adapt: VALUES with arithmetic / function calls
+#     in cells — works.
+#   # zeta-adapt: VALUES column-count mismatch — errors
+#     1064 "VALUES rows must all have the same number of
+#     columns".
+#   # zeta-adapt: Empty VALUES `VALUES ()` — errors 1064
+#     at parse.
+#   # zeta-adapt: KNOWN GAP — VALUES inside a CTE
+#     (`WITH t(c) AS (VALUES (1), (2)) SELECT ...`)
+#     errors 1064 "only SELECT supported". PG and Spark
+#     accept; common shape for inline fixtures.
+#     Substitute via `WITH t(c) AS (SELECT 1 UNION ALL
+#     SELECT 2)`.
+
+--echo === Standalone VALUES — single row, single col ===
+
+VALUES (42);
+
+--echo === Standalone VALUES — multi-row, multi-col ===
+
+VALUES (1, 'a'), (2, 'b'), (3, 'c');
+
+--echo === VALUES with NULL — NULL accepted in any cell ===
+
+VALUES (1, NULL), (NULL, 'a');
+
+--echo === VALUES + ORDER BY ===
+
+VALUES (3), (1), (2) ORDER BY column1;
+
+--echo === VALUES + LIMIT / OFFSET ===
+
+VALUES (1), (2), (3), (4), (5) LIMIT 2 OFFSET 1;
+
+--echo === VALUES UNION (dedup) ===
+
+VALUES (1), (2) UNION VALUES (2), (3);
+
+--echo === VALUES UNION ALL — duplicates preserved ===
+
+VALUES (1) UNION ALL VALUES (1);
+
+--echo === VALUES as derived table with column aliases ===
+
+SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS t(id, name) WHERE id > 1;
+
+--echo === VALUES as derived table without aliases — default `column1` ===
+
+SELECT * FROM (VALUES (1), (2)) ORDER BY column1;
+
+--echo === VALUES in IN — row-set subquery ===
+
+SELECT * FROM (VALUES (1), (2), (3)) AS t(id) WHERE id IN (VALUES (1), (3));
+
+--echo === CROSS JOIN of two VALUES — Cartesian product ===
+
+SELECT a.x, b.y FROM (VALUES (1), (2)) AS a(x) CROSS JOIN (VALUES (10), (20)) AS b(y);
+
+--echo === VALUES with arithmetic ===
+
+VALUES (1+1), (2*3), (10-5);
+
+--echo === VALUES with function calls ===
+
+VALUES (UPPER('hello')), (LOWER('WORLD'));
+
+--echo === VALUES column-count mismatch — errno 1064 ===
+
+--error 1064
+VALUES (1, 'a'), (2);
+
+--echo === Empty VALUES — errno 1064 at parse ===
+
+--error 1064
+VALUES ();
+
+--echo === KNOWN GAP: VALUES inside CTE — errno 1064 ===
+--echo # PG and Spark accept `WITH t(c) AS (VALUES ...)`;
+--echo # zeta errors. Substitute via `WITH t(c) AS
+--echo # (SELECT 1 UNION ALL SELECT 2)`.
+
+--error 1064
+WITH t(id, name) AS (VALUES (1, 'a'), (2, 'b')) SELECT * FROM t ORDER BY id;
