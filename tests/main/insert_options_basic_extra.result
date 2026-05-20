@@ -1,0 +1,45 @@
+=== Setup ===
+DROP TABLE IF EXISTS ins;
+CREATE TABLE ins (id INT PRIMARY KEY, name VARCHAR(20), n INT);
+INSERT INTO ins VALUES (1, 'a', 10);
+=== ON CONFLICT DO NOTHING (no col spec) — skips conflicting row ===
+INSERT INTO ins VALUES (1, 'x', 99) ON CONFLICT DO NOTHING;
+SELECT id, name, n FROM ins ORDER BY id;
+id	name	n
+1	a	10
+=== ON CONFLICT (col) DO NOTHING — same with explicit col ===
+INSERT INTO ins VALUES (1, 'y', 88) ON CONFLICT (id) DO NOTHING;
+SELECT id, name, n FROM ins ORDER BY id;
+id	name	n
+1	a	10
+=== ON CONFLICT (bad_col) DO NOTHING — errno 1054 ===
+INSERT INTO ins VALUES (2, 'z', 77) ON CONFLICT (no_such_col) DO NOTHING;
+ERROR 1054: column not found: no_such_col
+=== REPLACE INTO (MySQL atomic-replace) ===
+REPLACE INTO ins VALUES (1, 'replaced', 100);
+SELECT id, name, n FROM ins ORDER BY id;
+id	name	n
+1	replaced	100
+=== INSERT SET col = val (MySQL alt syntax) ===
+INSERT INTO ins SET id = 5, name = 'set_form', n = 50;
+SELECT id, name, n FROM ins WHERE id = 5;
+id	name	n
+5	set_form	50
+=== INSERT ... SELECT from another table ===
+DROP TABLE IF EXISTS ins2;
+CREATE TABLE ins2 (id INT, name VARCHAR(20));
+INSERT INTO ins2 SELECT id, name FROM ins;
+SELECT id, name FROM ins2 ORDER BY id;
+id	name
+1	replaced
+5	set_form
+=== INSERT RETURNING — column list ===
+DROP TABLE IF EXISTS r;
+CREATE TABLE r (id INT PRIMARY KEY, n INT);
+INSERT INTO r VALUES (1, 10) RETURNING id, n;
+=== KNOWN GAP: ON CONFLICT DO UPDATE SET — errno 1064 ===
+INSERT INTO ins VALUES (1, 'upd', 999) ON CONFLICT DO UPDATE SET name = EXCLUDED.name;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET, found: ( at Line: 1, Column: 62
+DROP TABLE ins;
+DROP TABLE ins2;
+DROP TABLE r;
