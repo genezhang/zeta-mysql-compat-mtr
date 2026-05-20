@@ -1,0 +1,91 @@
+=== Setup ===
+DROP TABLE IF EXISTS ce;
+CREATE TABLE ce (id INT PRIMARY KEY, n INT, s TEXT);
+INSERT INTO ce VALUES (1, 10, 'a'), (2, 20, 'b'), (3, NULL, 'c');
+=== Simple CASE: CASE expr WHEN v THEN r ... END ===
+SELECT id, CASE n WHEN 10 THEN 'ten' WHEN 20 THEN 'twenty' ELSE 'other' END AS w FROM ce ORDER BY id;
+id	w
+1	ten
+2	twenty
+3	other
+=== Searched CASE: CASE WHEN cond THEN r ... END ===
+SELECT id, CASE WHEN n IS NULL THEN 'null' WHEN n < 15 THEN 'small' ELSE 'big' END AS w FROM ce ORDER BY id;
+id	w
+1	small
+2	big
+3	null
+=== CASE in WHERE clause ===
+SELECT id FROM ce WHERE CASE WHEN n IS NULL THEN 0 ELSE n END > 10 ORDER BY id;
+id
+2
+=== CASE in ORDER BY (NULLs last) ===
+SELECT id, n FROM ce ORDER BY CASE WHEN n IS NULL THEN 1 ELSE 0 END, n;
+id	n
+1	10
+2	20
+3	NULL
+=== CASE in GROUP BY ===
+SELECT CASE WHEN n IS NULL THEN 'null' ELSE 'val' END AS grp, COUNT(*) AS c
+  FROM ce
+  GROUP BY CASE WHEN n IS NULL THEN 'null' ELSE 'val' END
+  ORDER BY grp;
+grp	c
+null	1
+val	2
+=== Nested CASE (CASE inside THEN of another CASE) ===
+SELECT id,
+       CASE WHEN n IS NOT NULL
+            THEN CASE WHEN n > 15 THEN 'big' ELSE 'small' END
+            ELSE 'null' END AS w
+  FROM ce ORDER BY id;
+id	w
+1	small
+2	big
+3	null
+=== CASE with explicit ELSE NULL ===
+SELECT id, CASE WHEN n = 10 THEN 'ten' ELSE NULL END AS w FROM ce ORDER BY id;
+id	w
+1	ten
+2	NULL
+3	NULL
+=== CASE without ELSE (unmatched -> NULL) ===
+SELECT id, CASE WHEN n = 10 THEN 'ten' END AS w FROM ce ORDER BY id;
+id	w
+1	ten
+2	NULL
+3	NULL
+=== Arithmetic inside CASE branches ===
+SELECT id, CASE WHEN n IS NULL THEN 0 ELSE n * 2 END AS d FROM ce ORDER BY id;
+id	d
+1	20
+2	40
+3	0
+=== SUM(CASE WHEN cond THEN 1 ELSE 0 END) — conditional aggregation ===
+SELECT SUM(CASE WHEN n > 10 THEN 1 ELSE 0 END) AS big FROM ce;
+big
+1
+=== Simple CASE NULL semantics — WHEN NULL does NOT match n IS NULL ===
+# SQL spec: equality to NULL is "unknown", so the
+# WHEN NULL branch is never taken. Row 3 (n IS NULL)
+# falls into ELSE.
+SELECT id, CASE n WHEN NULL THEN 'nl' WHEN 10 THEN 'ten' ELSE 'oth' END AS w FROM ce ORDER BY id;
+id	w
+1	ten
+2	oth
+3	oth
+=== KNOWN BUG: CASE WHEN <aggregate> ... END returns ELSE ===
+# `CASE WHEN COUNT(*) >= 1 THEN 1 ELSE 0 END` should
+# return 1 but returns 0 over the MySQL wire — the
+# aggregate inside the WHEN condition does not see
+# the aggregated value. Workaround: SUM(CASE WHEN cond
+# THEN 1 ELSE 0 END), or pre-compute via subquery.
+SELECT COUNT(*) AS cnt, CASE WHEN COUNT(*) >= 1 THEN 1 ELSE 0 END AS buggy_case FROM ce;
+cnt	buggy_case
+3	0
+=== KNOWN BUG: HAVING CASE WHEN <aggregate> ... yields no rows ===
+# Same root cause as above: the HAVING predicate
+# always evaluates to the ELSE branch, so no group
+# qualifies. Use the aggregate directly in HAVING.
+SELECT s, COUNT(*) AS c FROM ce GROUP BY s HAVING CASE WHEN COUNT(*) >= 1 THEN 1 ELSE 0 END = 1 ORDER BY s;
+=== Cleanup ===
+DROP TABLE ce;
