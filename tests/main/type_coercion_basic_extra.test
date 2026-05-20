@@ -1,0 +1,99 @@
+# Independently authored type-coercion smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/type_conversion.test or func_conv.test; pins
+# zeta's IMPLICIT-coercion behavior — separate from cast_basic
+# / cast_basic_extra which cover EXPLICIT CAST.
+#
+# Adaptation notes:
+#   # zeta-adapt: INT + DECIMAL → result is Decimal (precision
+#     preserved).
+#   # zeta-adapt: Decimal * Decimal — precision is the sum of
+#     input scales (1.23 * 1.5 → 1.845, scale 3).
+#   # zeta-adapt: INT + Float literal (2.5e0) → Float64.
+#   # zeta-adapt: INT overflow auto-promotes to Int64
+#     (i32::MAX + 1 = 2147483648 as Int64 rather than
+#     wrap/error).
+#   # zeta-adapt: CONCAT(string, int) — int auto-coerces to
+#     its string representation; PG-style `||` concat works
+#     identically.
+#   # zeta-adapt: KNOWN DIVERGENCE — string-vs-int comparison
+#     does NOT coerce. `'42' = 42` returns 0 (lexicographic
+#     comparison). MySQL coerces the string to numeric and
+#     returns 1. Portable substitute: explicit CAST on the
+#     string side: `CAST('42' AS INT) = 42`.
+#   # zeta-adapt: KNOWN DIVERGENCE — WHERE on int column with
+#     a string literal returns no rows even when numerically
+#     equal: `WHERE n = '42'` against a row holding n=42 is
+#     empty. Portable substitute: numeric literal or CAST.
+#   # zeta-adapt: KNOWN GAP — BOOL in arithmetic errors 1105
+#     "arithmetic op requires numbers". MySQL coerces TRUE→1
+#     and FALSE→0. Portable substitute: CAST(b AS INT) or
+#     CASE WHEN.
+#   # zeta-adapt: KNOWN DIVERGENCE — BIGINT overflow on +
+#     SILENTLY WRAPS to the negative bound (i64::MAX + 1 =
+#     i64::MIN). MySQL errors on overflow. Portable
+#     substitute: stay within BIGINT bounds, or promote to
+#     DECIMAL before arithmetic.
+#   # zeta-adapt: KNOWN DIVERGENCE — INT / INT division
+#     TRUNCATES to integer in zeta (`10 / 3` → 3). MySQL
+#     returns DECIMAL (`3.3333`). Portable substitute:
+#     `CAST(a AS DECIMAL) / b` for fractional result.
+
+--echo === INT + DECIMAL preserves precision ===
+
+SELECT 1 + 2.5 AS s, 1.5 + 2 AS s2;
+
+--echo === Decimal * Decimal — scale sums ===
+
+SELECT 1.23 * 1.5 AS p;
+
+--echo === Decimal + Decimal — precision preserved ===
+
+SELECT 1.234567 + 2.5 AS s;
+
+--echo === INT + Float literal → Float64 ===
+
+SELECT 1 + 2.5e0 AS s;
+
+--echo === INT overflow auto-promotes to Int64 ===
+--echo # i32::MAX + 1 = 2147483648 (Int64), NOT a wrap.
+
+SELECT 2147483647 + 1 AS no_wrap;
+
+--echo === CONCAT — string + int coerces ===
+
+SELECT 'a' || 42 AS pg_concat, CONCAT('a', 42) AS my_concat;
+
+--echo === Explicit CAST string-to-int works in compare ===
+
+SELECT CAST('42' AS INT) = 42 AS coerced;
+
+--echo === KNOWN DIVERGENCE: '42' = 42 returns 0 (no auto-coerce) ===
+
+SELECT '42' = 42 AS no_coerce, '42' < 100 AS no_coerce_lt;
+
+--echo === KNOWN DIVERGENCE: WHERE int_col = 'literal' — empty ===
+
+DROP TABLE IF EXISTS tc;
+CREATE TABLE tc (id INT PRIMARY KEY, n INT);
+INSERT INTO tc VALUES (1, 42);
+SELECT id FROM tc WHERE n = '42';
+
+--echo === KNOWN GAP: BOOL in arithmetic — errno 1105 ===
+
+--error 1105
+SELECT TRUE + 0;
+
+--echo === KNOWN DIVERGENCE: BIGINT overflow silently wraps ===
+--echo # i64::MAX + 1 wraps to i64::MIN (no overflow error).
+
+SELECT 9223372036854775807 + 1 AS wrap;
+
+--echo === KNOWN DIVERGENCE: INT / INT truncates to integer ===
+--echo # MySQL returns DECIMAL 3.3333; zeta returns 3.
+
+SELECT 10 / 3 AS trunc;
+
+--echo === Cleanup ===
+
+DROP TABLE tc;

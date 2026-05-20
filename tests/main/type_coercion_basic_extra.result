@@ -1,0 +1,53 @@
+=== INT + DECIMAL preserves precision ===
+SELECT 1 + 2.5 AS s, 1.5 + 2 AS s2;
+s	s2
+3.5	3.5
+=== Decimal * Decimal — scale sums ===
+SELECT 1.23 * 1.5 AS p;
+p
+1.845
+=== Decimal + Decimal — precision preserved ===
+SELECT 1.234567 + 2.5 AS s;
+s
+3.734567
+=== INT + Float literal → Float64 ===
+SELECT 1 + 2.5e0 AS s;
+s
+3.5
+=== INT overflow auto-promotes to Int64 ===
+# i32::MAX + 1 = 2147483648 (Int64), NOT a wrap.
+SELECT 2147483647 + 1 AS no_wrap;
+no_wrap
+2147483648
+=== CONCAT — string + int coerces ===
+SELECT 'a' || 42 AS pg_concat, CONCAT('a', 42) AS my_concat;
+pg_concat	my_concat
+a42	a42
+=== Explicit CAST string-to-int works in compare ===
+SELECT CAST('42' AS INT) = 42 AS coerced;
+coerced
+1
+=== KNOWN DIVERGENCE: '42' = 42 returns 0 (no auto-coerce) ===
+SELECT '42' = 42 AS no_coerce, '42' < 100 AS no_coerce_lt;
+no_coerce	no_coerce_lt
+0	0
+=== KNOWN DIVERGENCE: WHERE int_col = 'literal' — empty ===
+DROP TABLE IF EXISTS tc;
+CREATE TABLE tc (id INT PRIMARY KEY, n INT);
+INSERT INTO tc VALUES (1, 42);
+SELECT id FROM tc WHERE n = '42';
+=== KNOWN GAP: BOOL in arithmetic — errno 1105 ===
+SELECT TRUE + 0;
+ERROR 1105: execution error: arithmetic op requires numbers
+=== KNOWN DIVERGENCE: BIGINT overflow silently wraps ===
+# i64::MAX + 1 wraps to i64::MIN (no overflow error).
+SELECT 9223372036854775807 + 1 AS wrap;
+wrap
+-9223372036854775808
+=== KNOWN DIVERGENCE: INT / INT truncates to integer ===
+# MySQL returns DECIMAL 3.3333; zeta returns 3.
+SELECT 10 / 3 AS trunc;
+trunc
+3
+=== Cleanup ===
+DROP TABLE tc;
