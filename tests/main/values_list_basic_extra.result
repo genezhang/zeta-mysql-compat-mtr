@@ -19,19 +19,19 @@ column1
 1
 2
 3
-=== VALUES + LIMIT / OFFSET ===
-VALUES (1), (2), (3), (4), (5) LIMIT 2 OFFSET 1;
+=== VALUES + LIMIT / OFFSET — ORDER BY for deterministic output ===
+VALUES (1), (2), (3), (4), (5) ORDER BY column1 LIMIT 2 OFFSET 1;
 column1
 2
 3
-=== VALUES UNION (dedup) ===
-VALUES (1), (2) UNION VALUES (2), (3);
+=== VALUES UNION (dedup) — ORDER BY for deterministic output ===
+SELECT * FROM (VALUES (1), (2)) AS a UNION SELECT * FROM (VALUES (2), (3)) AS b ORDER BY column1;
 column1
 1
 2
 3
-=== VALUES UNION ALL — duplicates preserved ===
-VALUES (1) UNION ALL VALUES (1);
+=== VALUES UNION ALL — duplicates preserved; ORDER BY for deterministic output ===
+SELECT * FROM (VALUES (1)) AS a UNION ALL SELECT * FROM (VALUES (1)) AS b ORDER BY column1;
 column1
 1
 1
