@@ -1,0 +1,87 @@
+=== LPAD / RPAD truncate when length < input ===
+SELECT LPAD('abcdefg', 3, '0') AS trunc;
+trunc
+abc
+SELECT RPAD('abcdefg', 3, '0') AS trunc;
+trunc
+abc
+=== LPAD length 0 → empty ===
+SELECT LPAD('abc', 0, '0') AS empty, LENGTH(LPAD('abc', 0, '0')) AS l;
+empty	l
+	0
+=== LPAD NULL propagation (str / len / pad) ===
+SELECT LPAD(NULL, 5, '0') AS ns, LPAD('abc', NULL, '0') AS nl, LPAD('abc', 5, NULL) AS np;
+ns	nl	np
+NULL	NULL	NULL
+=== LPAD with empty pad string — input unchanged ===
+SELECT LPAD('abc', 5, '') AS ep;
+ep
+abc
+=== LPAD/RPAD multi-char pad cycles ===
+SELECT LPAD('x', 7, 'abc') AS l_cycle, RPAD('x', 7, 'abc') AS r_cycle;
+l_cycle	r_cycle
+abcabcx	xabcabc
+=== REPEAT — 0, NULL, big ===
+SELECT REPEAT('ab', 0) AS zero;
+zero
+
+SELECT REPEAT('ab', NULL) AS nl;
+nl
+NULL
+SELECT REPEAT(NULL, 3) AS ns;
+ns
+NULL
+SELECT LENGTH(REPEAT('a', 100)) AS big;
+big
+100
+=== SPACE — 0, negative, NULL ===
+SELECT LENGTH(SPACE(0)) AS l0, LENGTH(SPACE(-1)) AS lneg;
+l0	lneg
+0	0
+SELECT SPACE(NULL) AS nl;
+nl
+NULL
+=== REVERSE — empty, NULL, multi-byte UTF-8 ===
+SELECT REVERSE('') AS empty;
+empty
+
+SELECT REVERSE(NULL) AS nl;
+nl
+NULL
+SELECT REVERSE('héllo') AS unicode;
+unicode
+olléh
+=== INSERT — pos=0 returns original (1-based) ===
+SELECT INSERT('abc', 0, 1, 'X') AS pos0;
+pos0
+abc
+=== INSERT — pos beyond length returns original ===
+SELECT INSERT('abc', 100, 1, 'X') AS pos_overflow;
+pos_overflow
+abc
+=== INSERT — len overflow replaces to end of string ===
+SELECT INSERT('abc', 2, 100, 'X') AS len_overflow;
+len_overflow
+aX
+=== INSERT — negative len behaves like overflow (to end) ===
+SELECT INSERT('abc', 2, -1, 'X') AS neg_len;
+neg_len
+aX
+=== INSERT — NULL str propagates ===
+SELECT INSERT(NULL, 1, 1, 'X') AS nstr;
+nstr
+NULL
+=== STRCMP — NULL, empty, prefix ===
+SELECT STRCMP(NULL, 'a') AS lhs_null, STRCMP('a', NULL) AS rhs_null;
+lhs_null	rhs_null
+NULL	NULL
+SELECT STRCMP('', '') AS empty;
+empty
+0
+SELECT STRCMP('a', 'aa') AS prefix;
+prefix
+-1
+=== KNOWN DIVERGENCE: LPAD/RPAD negative length → '', MySQL → NULL ===
+SELECT LPAD('abc', -1, '0') AS l_neg, RPAD('abc', -1, '0') AS r_neg;
+l_neg	r_neg
+	
