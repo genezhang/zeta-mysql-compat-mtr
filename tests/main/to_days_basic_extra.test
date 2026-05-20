@@ -1,0 +1,92 @@
+# Independently authored TO_DAYS / FROM_DAYS smoke test
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/func_time.test or PG regress. Both
+# functions were missing in zeta before zeta PR #1226
+# (errored "unknown function"); this slice locks in the
+# new behavior.
+#
+# Big-picture finding: TO_DAYS(date) returns the integer
+# day count since 0000-00-00 (MySQL convention). The MySQL
+# epoch offset from zeta's internal Unix-epoch storage is
+# 719528 days, anchored by TO_DAYS('1970-01-01') = 719528.
+# FROM_DAYS(n) is the inverse. Both NULL-propagate. TO_DAYS
+# also accepts a TIMESTAMP (strips time-of-day) or a string
+# parseable as either DATE or TIMESTAMP.
+#
+# zeta is more permissive than MySQL on the low end:
+# FROM_DAYS(0) returns '0000-01-01' (MySQL would return
+# the zero date or NULL). Acceptable since zeta supports
+# year 0 / negative years already (see date_arith_edges).
+#
+# Adaptation notes:
+#   # zeta-adapt: TO_DAYS(date) returns days since
+#     0000-00-00; matches MySQL — TO_DAYS('1970-01-01') =
+#     719528 anchors the offset.
+#   # zeta-adapt: TO_DAYS accepts DATE, TIMESTAMP, or
+#     parseable string; TIMESTAMP strips time-of-day.
+#   # zeta-adapt: FROM_DAYS(n) returns DATE. Accepts
+#     integer.
+#   # zeta-adapt: Roundtrip identity: FROM_DAYS(TO_DAYS(d)) = d.
+#   # zeta-adapt: NULL propagation both ways.
+#   # zeta-adapt: Arity != 1 → errno 1105.
+#   # zeta-adapt: TO_DAYS on unparseable string → errno 1105
+#     "cannot parse".
+#   # zeta-adapt: KNOWN DIVERGENCE — FROM_DAYS(0) returns
+#     '0000-01-01' (year-0-day-zero). MySQL returns NULL or
+#     the zero date depending on SQL mode. zeta is more
+#     permissive on pre-year-1 dates (see also
+#     date_arith_edges_basic_extra).
+
+--echo === TO_DAYS — anchors at 1970-01-01 = 719528 ===
+
+SELECT TO_DAYS(DATE '1970-01-01') AS unix_epoch_day;
+SELECT TO_DAYS(DATE '0001-01-01') AS year_one;
+SELECT TO_DAYS(DATE '2026-05-19') AS modern;
+
+--echo === TO_DAYS — accepts TIMESTAMP (strips time-of-day) and string ===
+
+SELECT TO_DAYS(TIMESTAMP '2026-05-19 14:00:00') AS ts_strip;
+SELECT TO_DAYS('2026-05-19') AS str;
+
+--echo === FROM_DAYS — inverse ===
+
+SELECT FROM_DAYS(719528) AS unix_epoch;
+SELECT FROM_DAYS(740120) AS modern;
+
+--echo === Roundtrip identity TO/FROM ===
+
+SELECT FROM_DAYS(TO_DAYS(DATE '2026-05-19')) AS rt;
+
+--echo === NULL propagation both ways ===
+
+SELECT TO_DAYS(NULL) AS n_to;
+SELECT FROM_DAYS(NULL) AS n_from;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT TO_DAYS();
+--error 1105
+SELECT TO_DAYS(DATE '2026-05-19', DATE '2026-01-01');
+--error 1105
+SELECT FROM_DAYS();
+--error 1105
+SELECT FROM_DAYS(1, 2);
+
+--echo === TO_DAYS on unparseable string errors 1105 ===
+
+--error 1105
+SELECT TO_DAYS('not a date');
+
+--echo === KNOWN DIVERGENCE: FROM_DAYS(0) accepted (year-0 date) ===
+
+SELECT FROM_DAYS(0) AS pre_year_one;
+
+--echo === On DATE column inside SELECT / WHERE ===
+
+DROP TABLE IF EXISTS dd;
+CREATE TABLE dd (id INT, d DATE);
+INSERT INTO dd VALUES (1, DATE '2026-01-01'), (2, DATE '2026-05-19'), (3, DATE '2026-12-31');
+SELECT id, TO_DAYS(d) AS days FROM dd ORDER BY id;
+SELECT id FROM dd WHERE TO_DAYS(d) - TO_DAYS(DATE '2026-01-01') >= 100 ORDER BY id;
+DROP TABLE dd;
