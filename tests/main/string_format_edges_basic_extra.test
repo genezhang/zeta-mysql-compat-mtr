@@ -10,10 +10,12 @@
 # Big-picture finding: zeta has thorough surface for the
 # binary/hex/string-conversion family with sensible NULL
 # propagation and correct UNHEX odd-length rejection.
-# Two notable misses: FORMAT does not accept the 3-arg
-# locale form (errors 1105), and QUOTE(NULL) returns NULL
-# instead of the literal 4-char string 'NULL' that MySQL
-# emits — both common in ORM / reporting code.
+# Originally pinned FORMAT 3-arg locale form as a gap;
+# zeta PR #1204 closed it by accepting the locale arg
+# and silently ignoring its value (locale-specific
+# grouping is still issue #970). Output is the
+# default-locale string regardless of which locale name
+# was passed.
 #
 # CONV is fully supported with proper base-1..base-36
 # arithmetic, NULL propagation, and zero-base → NULL
@@ -49,9 +51,11 @@
 #     ambiguous — both real NULL and the string 'NULL'
 #     display as "NULL". Disambiguated below via LENGTH
 #     and IS NULL.
-#   # zeta-adapt: KNOWN GAP — FORMAT(n, decimals, 'locale')
-#     (the 3-arg locale-aware form) errors 1105 "FORMAT
-#     requires 2 arguments". The 2-arg form is supported.
+#   # zeta-adapt: FORMAT(n, decimals, 'locale') — 3-arg
+#     locale-aware form is accepted; the locale value is
+#     silently ignored (only the default ',' thousands /
+#     '.' decimal grouping is used, issue #970). Closed
+#     by zeta #1204.
 
 --echo === FORMAT base + padding + negative ===
 
@@ -122,7 +126,8 @@ SELECT QUOTE(123) AS num;
 
 SELECT QUOTE(NULL) AS qn, LENGTH(QUOTE(NULL)) AS qn_len, QUOTE(NULL) IS NULL AS is_nl;
 
---echo === KNOWN GAP: FORMAT(n, dec, 'locale') — errno 1105 ===
+--echo === FORMAT(n, dec, 'locale') — accepted, locale silently ignored ===
 
---error 1105
-SELECT FORMAT(1234.56, 2, 'de_DE');
+SELECT FORMAT(1234.56, 2, 'de_DE') AS de;
+SELECT FORMAT(1234.56, 2, 'en_US') AS us;
+SELECT FORMAT(1234.56, 2, NULL) AS nl;
