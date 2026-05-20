@@ -1,0 +1,89 @@
+# Independently authored TIMESTAMPADD smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/datetime_arith.test or PG regress;
+# complements datetime_format_basic / temporal_arithmetic_basic_extra
+# (which cover TIMESTAMPDIFF and DATE_ADD/DATE_SUB) by
+# pinning the MySQL TIMESTAMPADD(unit, n, target) surface
+# which was missing in zeta before zeta PR #1223.
+#
+# Big-picture finding: zeta TIMESTAMPADD returns TIMESTAMP
+# for all unit/input combinations (matching MySQL). All
+# nine units are accepted (MICROSECOND, SECOND, MINUTE,
+# HOUR, DAY, WEEK, MONTH, QUARTER, YEAR), case-insensitive.
+# Negative N works. Month-end and leap-day clamps match
+# `add_interval_to_timestamp` (same helper that backs
+# DATE_ADD), so Jan 31 + 1 MONTH → Feb 29 in a leap year
+# and Feb 29 + 1 YEAR → Feb 28. NULL in either arg
+# propagates. Unparseable string target errors 1105.
+#
+# Adaptation notes:
+#   # zeta-adapt: TIMESTAMPADD(unit, n, target) — all
+#     nine MySQL units accepted; returns TIMESTAMP.
+#   # zeta-adapt: TIMESTAMPADD(NULL, ...) / (..., NULL)
+#     propagates NULL.
+#   # zeta-adapt: Month-end / leap-day clamp — Jan 31 + 1
+#     MONTH → Feb 29 (leap) or Feb 28 (non-leap); Feb 29 +
+#     1 YEAR → Feb 28. Matches PG/MySQL.
+#   # zeta-adapt: Bad unit identifier — falls through the
+#     bare-unit recognizer and errors 1054 "column not
+#     found: <unit>" (the parser treats unrecognized
+#     identifiers as column refs in that position).
+#   # zeta-adapt: Unparseable string target — errors 1105.
+
+--echo === TIMESTAMPADD — sub-day units (MICROSECOND, SECOND, MINUTE, HOUR) ===
+
+SELECT TIMESTAMPADD(MICROSECOND, 500000, TIMESTAMP '2026-05-19 10:00:00') AS plus_us;
+SELECT TIMESTAMPADD(SECOND, 30,         TIMESTAMP '2026-05-19 10:00:00') AS plus_s;
+SELECT TIMESTAMPADD(MINUTE, 15,         TIMESTAMP '2026-05-19 10:00:00') AS plus_m;
+SELECT TIMESTAMPADD(HOUR, 5,            TIMESTAMP '2026-05-19 10:00:00') AS plus_h;
+
+--echo === TIMESTAMPADD — day / week ===
+
+SELECT TIMESTAMPADD(DAY, 10, DATE '2026-05-19')  AS plus_d;
+SELECT TIMESTAMPADD(WEEK, 2, DATE '2026-05-19')  AS plus_w;
+
+--echo === TIMESTAMPADD — month / quarter / year ===
+
+SELECT TIMESTAMPADD(MONTH, 3, DATE '2026-05-19')   AS plus_mo;
+SELECT TIMESTAMPADD(QUARTER, 1, DATE '2026-05-19') AS plus_q;
+SELECT TIMESTAMPADD(YEAR, 2, DATE '2026-05-19')    AS plus_y;
+
+--echo === TIMESTAMPADD — negative N (shifts backward) ===
+
+SELECT TIMESTAMPADD(DAY, -7, DATE '2026-05-19')   AS minus_d;
+SELECT TIMESTAMPADD(MONTH, -1, DATE '2026-05-19') AS minus_mo;
+
+--echo === TIMESTAMPADD — case-insensitive unit identifier ===
+
+SELECT TIMESTAMPADD(day, 1, DATE '2026-05-19') AS lower_unit;
+
+--echo === TIMESTAMPADD — NULL propagation ===
+
+SELECT TIMESTAMPADD(DAY, NULL, DATE '2026-05-19') AS n_in_n;
+SELECT TIMESTAMPADD(DAY, 5, NULL)                 AS n_in_target;
+
+--echo === TIMESTAMPADD — cross-year (DAY units) ===
+
+SELECT TIMESTAMPADD(DAY, 365, DATE '2026-05-19') AS plus_365d;
+
+--echo === TIMESTAMPADD — month-end clamp (Jan 31 + 1 MONTH → Feb 29 in leap year) ===
+
+SELECT TIMESTAMPADD(MONTH, 1, DATE '2024-01-31') AS jan31_plus_mo;
+
+--echo === TIMESTAMPADD — leap-day handling (Feb 29 + 1 YEAR → Feb 28) ===
+
+SELECT TIMESTAMPADD(YEAR, 1, DATE '2024-02-29') AS leap_plus_y;
+
+--echo === TIMESTAMPADD — on TIMESTAMP column inside SELECT and WHERE ===
+
+DROP TABLE IF EXISTS ts;
+CREATE TABLE ts (id INT, t TIMESTAMP);
+INSERT INTO ts VALUES (1, TIMESTAMP '2026-01-01 12:00:00'), (2, TIMESTAMP '2026-06-15 09:30:00');
+SELECT id, TIMESTAMPADD(MONTH, 6, t) AS plus_6m FROM ts ORDER BY id;
+SELECT id FROM ts WHERE TIMESTAMPADD(DAY, 30, t) > TIMESTAMP '2026-05-01' ORDER BY id;
+DROP TABLE ts;
+
+--echo === TIMESTAMPADD — unparseable string target errors 1105 ===
+
+--error 1105
+SELECT TIMESTAMPADD(DAY, 1, 'not a date');
