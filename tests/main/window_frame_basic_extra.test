@@ -1,0 +1,164 @@
+# Independently authored window-FRAME edge smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/window_frame.test or PG regress;
+# complements window_func_basic / window_func_edges by
+# pinning the FRAME-clause surface: ROWS / RANGE units,
+# UNBOUNDED / N PRECEDING / CURRENT ROW / N FOLLOWING /
+# UNBOUNDED FOLLOWING bound combinations, defaults, frames
+# entirely backward / forward, shorthand syntax, and the
+# GROUPS / EXCLUDE gaps.
+#
+# Big-picture finding: ROWS and RANGE frame modes work
+# across the standard bound combinations. Default frames
+# match SQL spec: with ORDER BY → RANGE UNBOUNDED PRECEDING
+# AND CURRENT ROW (running aggregate); without ORDER BY →
+# entire partition. Frames entirely before or after the
+# current row work. Negative bounds are rejected at parse.
+# GROUPS frame mode errors as not-yet-supported; EXCLUDE
+# clauses error at parse (sqlparser doesn't accept).
+#
+# One bug: an "inverted" frame like `ROWS BETWEEN 5
+# PRECEDING AND 10 PRECEDING` (start > end in row terms)
+# should produce an empty frame (SUM=NULL), but zeta's
+# bound resolver normalizes start/end via .min/.max and
+# treats it as the first row of the partition.
+#
+# Adaptation notes:
+#   # zeta-adapt: ROWS BETWEEN N PRECEDING AND M FOLLOWING
+#     — works; sliding window over rows by position.
+#   # zeta-adapt: ROWS UNBOUNDED PRECEDING (shorthand,
+#     equivalent to BETWEEN UNBOUNDED PRECEDING AND CURRENT
+#     ROW) — works.
+#   # zeta-adapt: ROWS BETWEEN CURRENT ROW AND UNBOUNDED
+#     FOLLOWING — works.
+#   # zeta-adapt: ROWS shorthand `ROWS 2 PRECEDING` —
+#     equivalent to `BETWEEN 2 PRECEDING AND CURRENT ROW`.
+#   # zeta-adapt: ROWS BETWEEN N PRECEDING AND M PRECEDING
+#     (entirely backward, N > M) — works; frame slides
+#     behind current row.
+#   # zeta-adapt: ROWS BETWEEN N FOLLOWING AND M FOLLOWING
+#     (entirely forward) — works.
+#   # zeta-adapt: RANGE BETWEEN N PRECEDING AND M FOLLOWING
+#     — works (with numeric ORDER BY).
+#   # zeta-adapt: PARTITION BY + frame — frame is scoped
+#     per partition (no cross-partition spillage).
+#   # zeta-adapt: ROWS frame without ORDER BY — accepted
+#     and operates on partition scan order.
+#   # zeta-adapt: default frame WITH ORDER BY — RANGE
+#     UNBOUNDED PRECEDING AND CURRENT ROW (running sum).
+#   # zeta-adapt: default frame WITHOUT ORDER BY — entire
+#     partition.
+#   # zeta-adapt: FIRST_VALUE / LAST_VALUE with explicit
+#     frame — bounded by the frame.
+#   # zeta-adapt: LAST_VALUE without explicit frame returns
+#     current row's value (PG semantics — default frame
+#     ends at CURRENT ROW).
+#   # zeta-adapt: AVG / MIN / MAX / COUNT(*) with frame —
+#     all supported.
+#   # zeta-adapt: Negative frame bound `-1 PRECEDING` —
+#     errors 1064 "frame bound must be a literal number"
+#     at parse. Correct (PG: "frame starting offset must
+#     not be negative").
+#   # zeta-adapt: KNOWN GAP — GROUPS frame mode errors
+#     1105 "Groups frame mode is not yet supported, use
+#     ROWS or RANGE". MySQL has no GROUPS; PG and Spark
+#     support it.
+#   # zeta-adapt: KNOWN GAP — EXCLUDE clauses (EXCLUDE
+#     CURRENT ROW / EXCLUDE GROUP / EXCLUDE TIES / EXCLUDE
+#     NO OTHERS) error 1064 at parse (sqlparser-rs
+#     doesn't accept the syntax). PG / Spark support;
+#     MySQL doesn't.
+#   # zeta-adapt: KNOWN BUG — inverted frame `BETWEEN 5
+#     PRECEDING AND 10 PRECEDING` (start row position >
+#     end row position) returns the first row of the
+#     partition repeatedly instead of producing an empty
+#     frame (SUM should be NULL). Root cause:
+#     resolve_frame_bounds normalizes via .min/.max
+#     rather than detecting the inversion.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS wf;
+CREATE TABLE wf (id INT, v INT);
+INSERT INTO wf VALUES (1,10), (2,20), (3,30), (4,40), (5,50);
+
+--echo === ROWS BETWEEN N PRECEDING AND M FOLLOWING — sliding window ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS s_pf FROM wf ORDER BY id;
+
+--echo === ROWS UNBOUNDED PRECEDING (shorthand → BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS UNBOUNDED PRECEDING) AS s_unb FROM wf ORDER BY id;
+
+--echo === ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS s_fwd FROM wf ORDER BY id;
+
+--echo === ROWS shorthand `ROWS 2 PRECEDING` ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS 2 PRECEDING) AS s_short FROM wf ORDER BY id;
+
+--echo === ROWS BETWEEN N PRECEDING AND M PRECEDING — entirely backward ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING) AS s_back FROM wf ORDER BY id;
+
+--echo === ROWS BETWEEN N FOLLOWING AND M FOLLOWING — entirely forward ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 FOLLOWING AND 3 FOLLOWING) AS s_fwd_only FROM wf ORDER BY id;
+
+--echo === RANGE BETWEEN N PRECEDING AND M FOLLOWING — numeric ORDER BY ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS r_pf FROM wf ORDER BY id;
+
+--echo === PARTITION BY + frame — frame is scoped per partition ===
+
+SELECT id, v, SUM(v) OVER (PARTITION BY (id % 2) ORDER BY id ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS p_s FROM wf ORDER BY id;
+
+--echo === ROWS frame without ORDER BY — uses partition scan order ===
+
+SELECT id, v, SUM(v) OVER (ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS s_noorder FROM wf ORDER BY id;
+
+--echo === Default frame WITH ORDER BY — RANGE UNBOUNDED PRECEDING AND CURRENT ROW (running sum) ===
+
+SELECT id, v, SUM(v) OVER (ORDER BY id) AS s_default FROM wf ORDER BY id;
+
+--echo === Default frame WITHOUT ORDER BY — entire partition ===
+
+SELECT id, v, SUM(v) OVER () AS s_all FROM wf ORDER BY id;
+
+--echo === FIRST_VALUE / LAST_VALUE with explicit frame — bounded by frame ===
+
+SELECT id, v, FIRST_VALUE(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS fv, LAST_VALUE(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS lv FROM wf ORDER BY id;
+
+--echo === LAST_VALUE without explicit frame — current row's value (default frame ends at CURRENT ROW) ===
+
+SELECT id, v, LAST_VALUE(v) OVER (ORDER BY id) AS lv_default FROM wf ORDER BY id;
+
+--echo === AVG / MIN / MAX / COUNT(*) with frame ===
+
+SELECT id, v, AVG(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS a, MIN(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS mn, MAX(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS mx, COUNT(*) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS c FROM wf ORDER BY id;
+
+--echo === Negative frame bound — errno 1064 (correct) ===
+
+--error 1064
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN -1 PRECEDING AND CURRENT ROW) FROM wf;
+
+--echo === KNOWN GAP: GROUPS frame mode — errno 1105 "not yet supported" ===
+
+--error 1105
+SELECT id, SUM(v) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW) FROM wf;
+
+--echo === KNOWN GAP: EXCLUDE CURRENT ROW — errno 1064 at parse ===
+
+--error 1064
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM wf;
+
+--echo === KNOWN BUG: inverted frame returns first row instead of empty ===
+--echo # `BETWEEN 5 PRECEDING AND 10 PRECEDING` should be empty
+--echo # (start row > end row → no rows in frame, SUM = NULL). zeta
+--echo # normalizes the bounds via .min/.max and returns the first
+--echo # row of the partition repeatedly.
+
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS s_empty FROM wf ORDER BY id;
+
+DROP TABLE wf;
