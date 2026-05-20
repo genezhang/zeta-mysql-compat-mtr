@@ -80,7 +80,18 @@ ERROR 1105: execution error: unknown function: jsonb_path_query
 === KNOWN GAP: JSON_TABLE (MySQL TVF) — errno 1064 ===
 SELECT * FROM JSON_TABLE('[1,2,3]', '$[*]' COLUMNS (x INT PATH '$')) AS t;
 ERROR 1064: SQL parse error: unsupported FROM clause (only table references, subqueries, and functions supported)
-=== KNOWN GAP: JSON_OBJECT_KEYS (without JSONB prefix) — errno 1105 ===
-SELECT JSON_OBJECT_KEYS('{"a":1,"b":2}'::JSONB);
-ERROR 1105: execution error: unknown function: JSON_OBJECT_KEYS
+=== JSON_OBJECT_KEYS as SRF — supported since zeta #1208 ===
+SELECT * FROM JSON_OBJECT_KEYS('{"a":1,"b":2}'::JSONB) AS t(k);
+k
+a
+b
+=== JSON_EACH / JSON_EACH_TEXT as SRFs — supported since zeta #1208 ===
+SELECT * FROM JSON_EACH('{"a":1,"b":2}'::JSONB) AS t(k, v);
+k	v
+a	1
+b	2
+SELECT * FROM JSON_EACH_TEXT('{"a":1,"b":2}'::JSONB) AS t(k, v);
+k	v
+a	1
+b	2
 DROP TABLE j;

@@ -54,9 +54,12 @@
 #     1064 "unsupported FROM clause". No lateral-table
 #     JSON-flatten path supported via MySQL syntax;
 #     substitute via JSONB_EACH (PG SRF).
-#   # zeta-adapt: KNOWN GAP — JSON_OBJECT_KEYS (without
-#     JSONB prefix) errors 1105 "unknown function". Use
-#     JSONB_OBJECT_KEYS.
+#   # zeta-adapt: JSON_OBJECT_KEYS / JSON_EACH /
+#     JSON_EACH_TEXT — supported as SRFs (alias for the
+#     JSONB_* canonical names) since zeta #1208. Use in
+#     FROM with `AS t(...)` column list. (Scalar-projection
+#     calls of any of these SRFs error in both spellings;
+#     SRFs are FROM-clause only.)
 
 --echo === Setup ===
 
@@ -133,9 +136,13 @@ SELECT jsonb_path_query('[1,2,3]', '$[*]');
 --error 1064
 SELECT * FROM JSON_TABLE('[1,2,3]', '$[*]' COLUMNS (x INT PATH '$')) AS t;
 
---echo === KNOWN GAP: JSON_OBJECT_KEYS (without JSONB prefix) — errno 1105 ===
+--echo === JSON_OBJECT_KEYS as SRF — supported since zeta #1208 ===
 
---error 1105
-SELECT JSON_OBJECT_KEYS('{"a":1,"b":2}'::JSONB);
+SELECT * FROM JSON_OBJECT_KEYS('{"a":1,"b":2}'::JSONB) AS t(k);
+
+--echo === JSON_EACH / JSON_EACH_TEXT as SRFs — supported since zeta #1208 ===
+
+SELECT * FROM JSON_EACH('{"a":1,"b":2}'::JSONB) AS t(k, v);
+SELECT * FROM JSON_EACH_TEXT('{"a":1,"b":2}'::JSONB) AS t(k, v);
 
 DROP TABLE j;
