@@ -1,0 +1,95 @@
+# Independently authored LOCK / SELECT-FOR-UPDATE smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/lock.test or pg row-locking
+# tests; pins zeta's explicit-lock surface (no prior compat
+# coverage).
+#
+# Adaptation notes:
+#   # zeta-adapt: SELECT … FOR UPDATE — supported. Returns
+#     the rows; lock acquisition is single-conn no-op in
+#     this test but the SQL parses + executes.
+#   # zeta-adapt: SELECT … FOR SHARE — supported.
+#   # zeta-adapt: SELECT … FOR UPDATE NOWAIT — supported.
+#   # zeta-adapt: SELECT … FOR UPDATE SKIP LOCKED — supported.
+#   # zeta-adapt: SELECT … FOR UPDATE OF <tbl> — supported
+#     (PG-style row-lock target).
+#   # zeta-adapt: SELECT … FOR UPDATE inside BEGIN…COMMIT —
+#     supported.
+#   # zeta-adapt: KNOWN GAP — PG-style explicit LOCK TABLE
+#     errors 1064 "Expected: an SQL statement, found: LOCK".
+#     No LOCK TABLE parser branch.
+#   # zeta-adapt: KNOWN GAP — MySQL LOCK TABLES … READ /
+#     WRITE errors 1064 same.
+#   # zeta-adapt: KNOWN GAP — UNLOCK TABLES errors 1064
+#     "Expected: an SQL statement, found: UNLOCK".
+#   # zeta-adapt: KNOWN GAP — MySQL inline `LOCK IN SHARE
+#     MODE` (trailing on SELECT) errors 1064 "Expected:
+#     end of statement, found: IN". The PG-spelled
+#     `FOR SHARE` works (see above).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS lt;
+CREATE TABLE lt (id INT PRIMARY KEY, n INT);
+INSERT INTO lt VALUES (1, 10), (2, 20);
+
+--echo === SELECT … FOR UPDATE ===
+
+SELECT id, n FROM lt ORDER BY id FOR UPDATE;
+
+--echo === SELECT … FOR SHARE ===
+
+SELECT id, n FROM lt ORDER BY id FOR SHARE;
+
+--echo === SELECT … FOR UPDATE NOWAIT ===
+
+SELECT id, n FROM lt ORDER BY id FOR UPDATE NOWAIT;
+
+--echo === SELECT … FOR UPDATE SKIP LOCKED ===
+
+SELECT id, n FROM lt ORDER BY id FOR UPDATE SKIP LOCKED;
+
+--echo === SELECT … FOR UPDATE OF <tbl> (PG-style target) ===
+
+SELECT id, n FROM lt ORDER BY id FOR UPDATE OF lt;
+
+--echo === SELECT … FOR UPDATE inside BEGIN/COMMIT ===
+
+BEGIN;
+SELECT id, n FROM lt ORDER BY id FOR UPDATE;
+COMMIT;
+
+--echo === KNOWN GAP: PG-style LOCK TABLE … IN SHARE MODE — errno 1064 ===
+
+--error 1064
+LOCK TABLE lt IN SHARE MODE;
+
+--echo === KNOWN GAP: PG-style LOCK TABLE … IN EXCLUSIVE MODE — errno 1064 ===
+
+--error 1064
+LOCK TABLE lt IN EXCLUSIVE MODE;
+
+--echo === KNOWN GAP: MySQL LOCK TABLES READ — errno 1064 ===
+
+--error 1064
+LOCK TABLES lt READ;
+
+--echo === KNOWN GAP: MySQL LOCK TABLES WRITE — errno 1064 ===
+
+--error 1064
+LOCK TABLES lt WRITE;
+
+--echo === KNOWN GAP: UNLOCK TABLES — errno 1064 ===
+
+--error 1064
+UNLOCK TABLES;
+
+--echo === KNOWN GAP: MySQL inline LOCK IN SHARE MODE — errno 1064 ===
+--echo # PG-spelled `FOR SHARE` works (see above).
+
+--error 1064
+SELECT * FROM lt LOCK IN SHARE MODE;
+
+--echo === Cleanup ===
+
+DROP TABLE lt;
