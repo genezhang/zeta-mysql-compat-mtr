@@ -73,9 +73,18 @@ ERROR 1064: SQL parse error: VALUES rows must all have the same number of column
 === Empty VALUES — errno 1064 at parse ===
 VALUES ();
 ERROR 1064: SQL parse error: sql parser error: Expected: an expression, found: ) at Line: 1, Column: 9
-=== KNOWN GAP: VALUES inside CTE — errno 1064 ===
-# PG and Spark accept `WITH t(c) AS (VALUES ...)`;
-# zeta errors. Substitute via `WITH t(c) AS
-# (SELECT 1 UNION ALL SELECT 2)`.
+=== VALUES inside CTE — fixed in zeta PR #1222 ===
 WITH t(id, name) AS (VALUES (1, 'a'), (2, 'b')) SELECT * FROM t ORDER BY id;
-ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+id	name
+1	a
+2	b
+=== VALUES inside CTE — filter and order ===
+WITH t(c) AS (VALUES (3), (1), (2)) SELECT c FROM t WHERE c >= 2 ORDER BY c;
+c
+2
+3
+=== VALUES inside CTE — multiple CTEs, mix VALUES + SELECT ===
+WITH a(x) AS (VALUES (1), (2)), b(y) AS (SELECT 10) SELECT a.x, b.y FROM a CROSS JOIN b ORDER BY a.x;
+x	y
+1	10
+2	10

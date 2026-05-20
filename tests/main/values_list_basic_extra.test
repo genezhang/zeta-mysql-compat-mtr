@@ -7,7 +7,7 @@
 # also supports via `VALUES ROW(...)`): bare query,
 # derived table, set-op, ORDER BY / LIMIT / OFFSET,
 # CROSS JOIN, IN subquery, arithmetic / function calls,
-# arity validation, and the CTE-with-VALUES gap.
+# arity validation, and VALUES inside a CTE body.
 #
 # Big-picture finding: zeta accepts standalone VALUES as
 # a query form with auto-generated `column1`, `column2`,
@@ -16,10 +16,6 @@
 # IN subquery, CROSS JOIN) compose cleanly. Column-count
 # mismatch and empty VALUES are correctly rejected.
 #
-# One notable gap: VALUES inside a CTE
-# (`WITH t(...) AS (VALUES ...)`) errors 1064 "only
-# SELECT supported" — PG and Spark both accept this form,
-# and it's a common shape for inline test fixtures.
 #
 # Adaptation notes:
 #   # zeta-adapt: Standalone VALUES — accepted as a
@@ -46,12 +42,10 @@
 #     columns".
 #   # zeta-adapt: Empty VALUES `VALUES ()` — errors 1064
 #     at parse.
-#   # zeta-adapt: KNOWN GAP — VALUES inside a CTE
-#     (`WITH t(c) AS (VALUES (1), (2)) SELECT ...`)
-#     errors 1064 "only SELECT supported". PG and Spark
-#     accept; common shape for inline fixtures.
-#     Substitute via `WITH t(c) AS (SELECT 1 UNION ALL
-#     SELECT 2)`.
+#   # zeta-adapt: VALUES inside a CTE
+#     (`WITH t(c) AS (VALUES (1), (2)) SELECT ...`) works
+#     after zeta PR #1222. PG and Spark accept this shape;
+#     common for inline test fixtures.
 
 --echo === Standalone VALUES — single row, single col ===
 
@@ -115,10 +109,14 @@ VALUES (1, 'a'), (2);
 --error 1064
 VALUES ();
 
---echo === KNOWN GAP: VALUES inside CTE — errno 1064 ===
---echo # PG and Spark accept `WITH t(c) AS (VALUES ...)`;
---echo # zeta errors. Substitute via `WITH t(c) AS
---echo # (SELECT 1 UNION ALL SELECT 2)`.
+--echo === VALUES inside CTE — fixed in zeta PR #1222 ===
 
---error 1064
 WITH t(id, name) AS (VALUES (1, 'a'), (2, 'b')) SELECT * FROM t ORDER BY id;
+
+--echo === VALUES inside CTE — filter and order ===
+
+WITH t(c) AS (VALUES (3), (1), (2)) SELECT c FROM t WHERE c >= 2 ORDER BY c;
+
+--echo === VALUES inside CTE — multiple CTEs, mix VALUES + SELECT ===
+
+WITH a(x) AS (VALUES (1), (2)), b(y) AS (SELECT 10) SELECT a.x, b.y FROM a CROSS JOIN b ORDER BY a.x;
