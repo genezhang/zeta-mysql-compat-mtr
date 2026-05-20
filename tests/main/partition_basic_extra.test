@@ -1,0 +1,177 @@
+# Independently authored partitioning smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/partition_*.test or PG's regress/create_table
+# tests; pins zeta's PARTITION BY surface from the MySQL
+# wire. No prior compat coverage.
+#
+# Big-picture finding: zeta accepts the *outer* form of
+# every MySQL partitioning method (RANGE / LIST / HASH /
+# KEY) as long as the partition specification is OMITTED.
+# Once accepted, the table behaves as a single-partition
+# heap — INSERTs land, SELECTs return rows, but the
+# partition info is completely dropped: SHOW CREATE TABLE
+# strips the PARTITION BY clause, and
+# information_schema.partitions returns an empty result.
+# Every PARTITION-spec body (VALUES LESS THAN / VALUES IN /
+# PARTITIONS N / RANGE COLUMNS / SUBPARTITION BY) errors
+# 1064 at parse. PG declarative partitioning fails the
+# same way: the parent CREATE TABLE PARTITION BY works (as
+# above), but `CREATE TABLE child PARTITION OF parent FOR
+# VALUES FROM (..) TO (..)` errors 1105 (no column
+# inheritance) and the columns-then-PARTITION OF form
+# errors 1064. ALTER TABLE ADD/DROP/ATTACH/DETACH/TRUNCATE/
+# EXCHANGE PARTITION all error 1064.
+#
+# Net: zeta has a parser pseudo-acceptance for
+# `PARTITION BY` that lets ORMs and migration tools quote
+# the keyword without crashing on table create — but the
+# tables are not actually partitioned. This is honest
+# behavior to pin: ORMs that emit `PARTITION BY` won't
+# error, but the data layout is single-heap regardless.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE TABLE … PARTITION BY RANGE (col) —
+#     parses (bare form only). PARTITION spec is silently
+#     dropped; table behaves as a single heap.
+#   # zeta-adapt: CREATE TABLE … PARTITION BY LIST (col) —
+#     same: bare form parses, no spec stored.
+#   # zeta-adapt: CREATE TABLE … PARTITION BY HASH (col) —
+#     same: bare form parses, no spec stored.
+#   # zeta-adapt: CREATE TABLE … PARTITION BY KEY (col) —
+#     same: MySQL's KEY method parses (bare form), no spec.
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW CREATE TABLE on a
+#     PARTITION BY table strips the entire PARTITION BY
+#     clause; round-tripping a dump loses the directive.
+#   # zeta-adapt: KNOWN DIVERGENCE —
+#     information_schema.partitions returns 0 rows for any
+#     table, partitioned or not — the catalog table is
+#     stub-empty.
+#   # zeta-adapt: KNOWN GAP — full MySQL partition spec
+#     `PARTITION p1 VALUES LESS THAN (10)` errors 1064 at
+#     parse. The runtime never sees a partition map.
+#   # zeta-adapt: KNOWN GAP — `PARTITION BY HASH (col)
+#     PARTITIONS 4` (HASH count suffix) errors 1064 at
+#     parse — only the bare form is accepted.
+#   # zeta-adapt: KNOWN GAP — `PARTITION BY RANGE COLUMNS
+#     (a, b)` (multi-column key) errors 1064 at parse.
+#   # zeta-adapt: KNOWN GAP — `... SUBPARTITION BY HASH
+#     (col)` errors 1064 at parse.
+#   # zeta-adapt: KNOWN GAP — PG declarative `CREATE TABLE
+#     child PARTITION OF parent FOR VALUES FROM/IN` errors:
+#     the bare form (no col list) errors 1105 "at least
+#     one column required" and the col-list form errors
+#     1064 because the parser doesn't accept PARTITION
+#     after the column list.
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE … ADD PARTITION
+#     errors 1064 (Expected: `)` after `ADD PARTITION (`).
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE … DROP PARTITION
+#     <name> errors 1064 (Expected: `(` after
+#     `DROP PARTITION`).
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE … ATTACH PARTITION
+#     errors 1064 (parser doesn't list ATTACH).
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE … DETACH /
+#     TRUNCATE / EXCHANGE PARTITION all error 1064 (same
+#     parser-not-listed reason).
+
+--echo === MySQL PARTITION BY RANGE (bare) — parses, data lands ===
+
+DROP TABLE IF EXISTS pr;
+CREATE TABLE pr (id INT, n INT) PARTITION BY RANGE (id);
+INSERT INTO pr VALUES (1, 100), (15, 200), (25, 300);
+SELECT id, n FROM pr ORDER BY id;
+
+--echo === MySQL PARTITION BY LIST (bare) — parses, data lands ===
+
+DROP TABLE IF EXISTS pl;
+CREATE TABLE pl (id INT) PARTITION BY LIST (id);
+INSERT INTO pl VALUES (1), (2);
+SELECT id FROM pl ORDER BY id;
+
+--echo === MySQL PARTITION BY HASH (bare) — parses, data lands ===
+
+DROP TABLE IF EXISTS ph;
+CREATE TABLE ph (id INT) PARTITION BY HASH (id);
+INSERT INTO ph VALUES (1), (2);
+SELECT id FROM ph ORDER BY id;
+
+--echo === MySQL PARTITION BY KEY (bare) — parses, data lands ===
+
+DROP TABLE IF EXISTS pk;
+CREATE TABLE pk (id INT) PARTITION BY KEY (id);
+INSERT INTO pk VALUES (1), (2);
+SELECT id FROM pk ORDER BY id;
+
+--echo === KNOWN DIVERGENCE: SHOW CREATE TABLE strips PARTITION BY clause ===
+
+SHOW CREATE TABLE pr;
+
+--echo === KNOWN DIVERGENCE: information_schema.partitions returns empty ===
+
+SELECT partition_name, table_name FROM information_schema.partitions WHERE table_name = 'pr';
+
+DROP TABLE pr;
+DROP TABLE pl;
+DROP TABLE ph;
+DROP TABLE pk;
+
+--echo === KNOWN GAP: PARTITION spec body — errno 1064 ===
+
+--error 1064
+CREATE TABLE prs (id INT) PARTITION BY RANGE (id) (PARTITION p1 VALUES LESS THAN (10));
+
+--echo === KNOWN GAP: PARTITIONS N suffix on HASH — errno 1064 ===
+
+--error 1064
+CREATE TABLE phn (id INT) PARTITION BY HASH (id) PARTITIONS 4;
+
+--echo === KNOWN GAP: PARTITION BY RANGE COLUMNS (multi-col) — errno 1064 ===
+
+--error 1064
+CREATE TABLE pmc (a INT, b INT) PARTITION BY RANGE COLUMNS (a, b);
+
+--echo === KNOWN GAP: SUBPARTITION BY HASH — errno 1064 ===
+
+--error 1064
+CREATE TABLE psub (id INT) PARTITION BY RANGE (id) SUBPARTITION BY HASH (id);
+
+--echo === KNOWN GAP: PG declarative CREATE TABLE … PARTITION OF — errno 1105 (no col inherit) ===
+
+DROP TABLE IF EXISTS pgpr;
+CREATE TABLE pgpr (id INT) PARTITION BY RANGE (id);
+--error 1105
+CREATE TABLE pgpr_p1 PARTITION OF pgpr FOR VALUES FROM (1) TO (10);
+DROP TABLE pgpr;
+
+--echo === KNOWN GAP: ALTER TABLE ADD PARTITION — errno 1064 ===
+
+DROP TABLE IF EXISTS pa;
+CREATE TABLE pa (id INT) PARTITION BY LIST (id);
+--error 1064
+ALTER TABLE pa ADD PARTITION (PARTITION p1 VALUES IN (1));
+
+--echo === KNOWN GAP: ALTER TABLE DROP PARTITION — errno 1064 ===
+
+--error 1064
+ALTER TABLE pa DROP PARTITION p1;
+
+--echo === KNOWN GAP: ALTER TABLE ATTACH PARTITION — errno 1064 ===
+
+--error 1064
+ALTER TABLE pa ATTACH PARTITION other FOR VALUES IN (1);
+
+--echo === KNOWN GAP: ALTER TABLE DETACH PARTITION — errno 1064 ===
+
+--error 1064
+ALTER TABLE pa DETACH PARTITION other;
+
+--echo === KNOWN GAP: ALTER TABLE TRUNCATE PARTITION — errno 1064 ===
+
+--error 1064
+ALTER TABLE pa TRUNCATE PARTITION p1;
+
+--echo === KNOWN GAP: ALTER TABLE EXCHANGE PARTITION — errno 1064 ===
+
+--error 1064
+ALTER TABLE pa EXCHANGE PARTITION p1 WITH TABLE pr;
+
+DROP TABLE pa;
