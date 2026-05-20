@@ -1,0 +1,80 @@
+=== DATE - DATE returns integer day count ===
+SELECT DATE '2024-05-19' - DATE '2024-05-10' AS day_diff;
+day_diff
+9
+=== TIMESTAMP - TIMESTAMP returns duration ===
+SELECT TIMESTAMP '2024-05-19 14:00:00' - TIMESTAMP '2024-05-19 10:00:00' AS hr_diff;
+hr_diff
+04:00:00
+=== DATE + DATE — errno 1105 (correct rejection) ===
+SELECT DATE '2024-01-01' + DATE '2024-02-01';
+ERROR 1105: execution error: arithmetic op requires numbers
+=== INTERVAL multiplication — both operand orderings ===
+SELECT INTERVAL '1 day' * 3 AS l, 3 * INTERVAL '1 day' AS r;
+l	r
+72:00:00	72:00:00
+=== INTERVAL +/- INTERVAL ===
+SELECT INTERVAL '1 day' + INTERVAL '2 hours' AS add;
+add
+26:00:00
+SELECT INTERVAL '1 day' - INTERVAL '2 hours' AS sub;
+sub
+22:00:00
+SELECT INTERVAL '1 hour' + INTERVAL '-30 minutes' AS neg_add;
+neg_add
+00:30:00
+=== Negative INTERVAL ===
+SELECT INTERVAL '-1 day' AS neg;
+neg
+-24:00:00
+SELECT DATE '2024-05-19' + INTERVAL '-3 days' AS d_plus_neg;
+d_plus_neg
+2024-05-16 00:00:00
+SELECT DATE '2024-05-19' - INTERVAL '-3 days' AS d_minus_neg;
+d_minus_neg
+2024-05-22 00:00:00
+=== INTERVAL comparison ===
+SELECT INTERVAL '1 hour' = INTERVAL '60 minutes' AS hr_eq;
+hr_eq
+1
+SELECT INTERVAL '1 day' = INTERVAL '24 hours' AS day_eq;
+day_eq
+1
+SELECT INTERVAL '-1 day' < INTERVAL '0 days' AS neg_lt;
+neg_lt
+1
+=== Year-month INTERVAL multiplication preserves structure ===
+SELECT INTERVAL '1 year' * 2 AS yr2;
+yr2
+2 years
+SELECT INTERVAL '1 year 6 months' * 2 AS yr1mo6x2;
+yr1mo6x2
+3 years
+=== DATE + INTERVAL across year/month boundaries ===
+SELECT DATE '2024-12-31' + INTERVAL '1 day' AS new_year;
+new_year
+2025-01-01 00:00:00
+SELECT DATE '2024-12-31' + INTERVAL '1 month' AS next_jan;
+next_jan
+2025-01-31 00:00:00
+=== Leap-day handling — clamps to last valid day ===
+SELECT DATE '2024-02-29' + INTERVAL '1 year' AS leap_to_nonleap;
+leap_to_nonleap
+2025-02-28 00:00:00
+SELECT DATE '2023-02-28' + INTERVAL '1 year' AS nonleap_to_leap;
+nonleap_to_leap
+2024-02-28 00:00:00
+=== KNOWN BUG: INTERVAL '1 day' / 2 returns 1 day (should be 12 hours) ===
+# Day-tier division loses fractional precision; hour-tier works.
+SELECT INTERVAL '1 day' / 2 AS bug_day_div, INTERVAL '4 hours' / 2 AS ok_hour_div;
+bug_day_div	ok_hour_div
+24:00:00	02:00:00
+=== KNOWN DIVERGENCE: date range allows year > 9999 and year < 1 ===
+# MySQL errors 1292 'incorrect datetime value' outside
+# 0001-01-01..9999-12-31; zeta accepts year 0 and 10000+.
+SELECT DATE '9999-12-31' + INTERVAL '1 day' AS over;
+over
+10000-01-01 00:00:00
+SELECT DATE '0001-01-01' - INTERVAL '1 day' AS under;
+under
+0000-12-31 00:00:00
