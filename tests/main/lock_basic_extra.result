@@ -1,0 +1,57 @@
+=== Setup ===
+DROP TABLE IF EXISTS lt;
+CREATE TABLE lt (id INT PRIMARY KEY, n INT);
+INSERT INTO lt VALUES (1, 10), (2, 20);
+=== SELECT … FOR UPDATE ===
+SELECT id, n FROM lt ORDER BY id FOR UPDATE;
+id	n
+1	10
+2	20
+=== SELECT … FOR SHARE ===
+SELECT id, n FROM lt ORDER BY id FOR SHARE;
+id	n
+1	10
+2	20
+=== SELECT … FOR UPDATE NOWAIT ===
+SELECT id, n FROM lt ORDER BY id FOR UPDATE NOWAIT;
+id	n
+1	10
+2	20
+=== SELECT … FOR UPDATE SKIP LOCKED ===
+SELECT id, n FROM lt ORDER BY id FOR UPDATE SKIP LOCKED;
+id	n
+1	10
+2	20
+=== SELECT … FOR UPDATE OF <tbl> (PG-style target) ===
+SELECT id, n FROM lt ORDER BY id FOR UPDATE OF lt;
+id	n
+1	10
+2	20
+=== SELECT … FOR UPDATE inside BEGIN/COMMIT ===
+BEGIN;
+SELECT id, n FROM lt ORDER BY id FOR UPDATE;
+id	n
+1	10
+2	20
+COMMIT;
+=== KNOWN GAP: PG-style LOCK TABLE … IN SHARE MODE — errno 1064 ===
+LOCK TABLE lt IN SHARE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== KNOWN GAP: PG-style LOCK TABLE … IN EXCLUSIVE MODE — errno 1064 ===
+LOCK TABLE lt IN EXCLUSIVE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== KNOWN GAP: MySQL LOCK TABLES READ — errno 1064 ===
+LOCK TABLES lt READ;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== KNOWN GAP: MySQL LOCK TABLES WRITE — errno 1064 ===
+LOCK TABLES lt WRITE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== KNOWN GAP: UNLOCK TABLES — errno 1064 ===
+UNLOCK TABLES;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: UNLOCK at Line: 1, Column: 1
+=== KNOWN GAP: MySQL inline LOCK IN SHARE MODE — errno 1064 ===
+# PG-spelled `FOR SHARE` works (see above).
+SELECT * FROM lt LOCK IN SHARE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: IN at Line: 1, Column: 23
+=== Cleanup ===
+DROP TABLE lt;
