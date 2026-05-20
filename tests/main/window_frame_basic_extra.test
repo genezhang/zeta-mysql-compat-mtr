@@ -17,11 +17,10 @@
 # GROUPS frame mode errors as not-yet-supported; EXCLUDE
 # clauses error at parse (sqlparser doesn't accept).
 #
-# One bug: an "inverted" frame like `ROWS BETWEEN 5
-# PRECEDING AND 10 PRECEDING` (start > end in row terms)
-# should produce an empty frame (SUM=NULL), but zeta's
-# bound resolver normalizes start/end via .min/.max and
-# treats it as the first row of the partition.
+# Inverted frames now produce empty (fixed in zeta PR
+# #1218). `ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING`
+# and the symmetric forward inversion both return
+# NULL/0 as appropriate per aggregate.
 #
 # Adaptation notes:
 #   # zeta-adapt: ROWS BETWEEN N PRECEDING AND M FOLLOWING
@@ -68,13 +67,12 @@
 #     NO OTHERS) error 1064 at parse (sqlparser-rs
 #     doesn't accept the syntax). PG / Spark support;
 #     MySQL doesn't.
-#   # zeta-adapt: KNOWN BUG — inverted frame `BETWEEN 5
-#     PRECEDING AND 10 PRECEDING` (start row position >
-#     end row position) returns the first row of the
-#     partition repeatedly instead of producing an empty
-#     frame (SUM should be NULL). Root cause:
-#     resolve_frame_bounds normalizes via .min/.max
-#     rather than detecting the inversion.
+#   # zeta-adapt: inverted frame produces empty result.
+#     `BETWEEN 5 PRECEDING AND 10 PRECEDING` and
+#     `BETWEEN 3 FOLLOWING AND 1 FOLLOWING` both yield
+#     NULL for SUM/MIN/MAX/AVG/FIRST/LAST/NTH_VALUE and
+#     0 for COUNT(*). Fixed in zeta PR #1218 — previously
+#     returned the first row of the partition repeatedly.
 
 --echo === Setup ===
 
@@ -153,12 +151,15 @@ SELECT id, SUM(v) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW) 
 --error 1064
 SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM wf;
 
---echo === KNOWN BUG: inverted frame returns first row instead of empty ===
---echo # `BETWEEN 5 PRECEDING AND 10 PRECEDING` should be empty
---echo # (start row > end row → no rows in frame, SUM = NULL). zeta
---echo # normalizes the bounds via .min/.max and returns the first
---echo # row of the partition repeatedly.
+--echo === Inverted frame produces empty — SUM/COUNT/FIRST/NTH ===
+--echo # `BETWEEN 5 PRECEDING AND 10 PRECEDING` (start row > end row)
+--echo # and `BETWEEN 3 FOLLOWING AND 1 FOLLOWING` are both empty.
+--echo # SUM/MIN/MAX/AVG/FIRST/LAST/NTH return NULL; COUNT returns 0.
 
 SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS s_empty FROM wf ORDER BY id;
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 3 FOLLOWING AND 1 FOLLOWING) AS s_fwd_inv FROM wf ORDER BY id;
+SELECT id, COUNT(*) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS c_empty FROM wf ORDER BY id;
+SELECT id, FIRST_VALUE(v) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS fv FROM wf ORDER BY id;
+SELECT id, NTH_VALUE(v, 1) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS nv FROM wf ORDER BY id;
 
 DROP TABLE wf;

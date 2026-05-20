@@ -123,16 +123,43 @@ ERROR 1105: execution error: Groups frame mode is not yet supported, use ROWS or
 === KNOWN GAP: EXCLUDE CURRENT ROW — errno 1064 at parse ===
 SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM wf;
 ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 1, Column: 94
-=== KNOWN BUG: inverted frame returns first row instead of empty ===
-# `BETWEEN 5 PRECEDING AND 10 PRECEDING` should be empty
-# (start row > end row → no rows in frame, SUM = NULL). zeta
-# normalizes the bounds via .min/.max and returns the first
-# row of the partition repeatedly.
+=== Inverted frame produces empty — SUM/COUNT/FIRST/NTH ===
+# `BETWEEN 5 PRECEDING AND 10 PRECEDING` (start row > end row)
+# and `BETWEEN 3 FOLLOWING AND 1 FOLLOWING` are both empty.
+# SUM/MIN/MAX/AVG/FIRST/LAST/NTH return NULL; COUNT returns 0.
 SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS s_empty FROM wf ORDER BY id;
 id	v	s_empty
-1	10	10
-2	20	10
-3	30	10
-4	40	10
-5	50	10
+1	10	NULL
+2	20	NULL
+3	30	NULL
+4	40	NULL
+5	50	NULL
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 3 FOLLOWING AND 1 FOLLOWING) AS s_fwd_inv FROM wf ORDER BY id;
+id	v	s_fwd_inv
+1	10	NULL
+2	20	NULL
+3	30	NULL
+4	40	NULL
+5	50	NULL
+SELECT id, COUNT(*) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS c_empty FROM wf ORDER BY id;
+id	c_empty
+1	0
+2	0
+3	0
+4	0
+5	0
+SELECT id, FIRST_VALUE(v) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS fv FROM wf ORDER BY id;
+id	fv
+1	NULL
+2	NULL
+3	NULL
+4	NULL
+5	NULL
+SELECT id, NTH_VALUE(v, 1) OVER (ORDER BY id ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING) AS nv FROM wf ORDER BY id;
+id	nv
+1	NULL
+2	NULL
+3	NULL
+4	NULL
+5	NULL
 DROP TABLE wf;
