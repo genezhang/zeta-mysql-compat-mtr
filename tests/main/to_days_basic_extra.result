@@ -1,0 +1,65 @@
+=== TO_DAYS — anchors at 1970-01-01 = 719528 ===
+SELECT TO_DAYS(DATE '1970-01-01') AS unix_epoch_day;
+unix_epoch_day
+719528
+SELECT TO_DAYS(DATE '0001-01-01') AS year_one;
+year_one
+366
+SELECT TO_DAYS(DATE '2026-05-19') AS modern;
+modern
+740120
+=== TO_DAYS — accepts TIMESTAMP (strips time-of-day) and string ===
+SELECT TO_DAYS(TIMESTAMP '2026-05-19 14:00:00') AS ts_strip;
+ts_strip
+740120
+SELECT TO_DAYS('2026-05-19') AS str;
+str
+740120
+=== FROM_DAYS — inverse ===
+SELECT FROM_DAYS(719528) AS unix_epoch;
+unix_epoch
+1970-01-01
+SELECT FROM_DAYS(740120) AS modern;
+modern
+2026-05-19
+=== Roundtrip identity TO/FROM ===
+SELECT FROM_DAYS(TO_DAYS(DATE '2026-05-19')) AS rt;
+rt
+2026-05-19
+=== NULL propagation both ways ===
+SELECT TO_DAYS(NULL) AS n_to;
+n_to
+NULL
+SELECT FROM_DAYS(NULL) AS n_from;
+n_from
+NULL
+=== Arity errors ===
+SELECT TO_DAYS();
+ERROR 1105: execution error: TO_DAYS requires 1 argument
+SELECT TO_DAYS(DATE '2026-05-19', DATE '2026-01-01');
+ERROR 1105: execution error: TO_DAYS requires 1 argument
+SELECT FROM_DAYS();
+ERROR 1105: execution error: FROM_DAYS requires 1 argument
+SELECT FROM_DAYS(1, 2);
+ERROR 1105: execution error: FROM_DAYS requires 1 argument
+=== TO_DAYS on unparseable string errors 1105 ===
+SELECT TO_DAYS('not a date');
+ERROR 1105: execution error: TO_DAYS: cannot parse "not a date" as a date or timestamp
+=== KNOWN DIVERGENCE: FROM_DAYS(0) accepted (year-0 date) ===
+SELECT FROM_DAYS(0) AS pre_year_one;
+pre_year_one
+0000-01-01
+=== On DATE column inside SELECT / WHERE ===
+DROP TABLE IF EXISTS dd;
+CREATE TABLE dd (id INT, d DATE);
+INSERT INTO dd VALUES (1, DATE '2026-01-01'), (2, DATE '2026-05-19'), (3, DATE '2026-12-31');
+SELECT id, TO_DAYS(d) AS days FROM dd ORDER BY id;
+id	days
+1	739982
+2	740120
+3	740346
+SELECT id FROM dd WHERE TO_DAYS(d) - TO_DAYS(DATE '2026-01-01') >= 100 ORDER BY id;
+id
+2
+3
+DROP TABLE dd;
