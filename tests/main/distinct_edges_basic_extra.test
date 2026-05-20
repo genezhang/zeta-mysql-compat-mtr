@@ -16,14 +16,9 @@
 # pinned). DISTINCT ON requires the leading ORDER BY
 # columns to match (otherwise errors 1105).
 #
-# Two notable issues: (a) `SELECT ALL` is treated as
-# `SELECT DISTINCT` instead of as a no-op (SQL standard:
-# ALL is the default and returns ALL rows including
-# duplicates). The result of `SELECT ALL a FROM t` should
-# be N rows (one per row in t), but zeta returns the
-# deduplicated row count. (b) DISTINCT with an ORDER BY
-# column NOT in the SELECT list is silently ignored
-# (already pinned more broadly in order_by_edges).
+# Notable: DISTINCT with an ORDER BY column NOT in the
+# SELECT list is silently ignored (already pinned more
+# broadly in order_by_edges).
 #
 # Adaptation notes:
 #   # zeta-adapt: SELECT DISTINCT on multiple columns —
@@ -43,12 +38,11 @@
 #     dedups, so DISTINCT-then-UNION is a no-op against
 #     it.
 #   # zeta-adapt: DISTINCT + LIMIT — works.
-#   # zeta-adapt: KNOWN BUG — `SELECT ALL <col>` is
-#     treated as `SELECT DISTINCT <col>`. SQL standard
-#     says ALL is the default and returns all rows
-#     including duplicates; zeta deduplicates. Verified
-#     against the same data: `SELECT a` returns 5 rows
-#     (with duplicates), `SELECT ALL a` returns only 3.
+#   # zeta-adapt: SELECT ALL <col> — works; ALL is the
+#     default and returns all rows including duplicates
+#     (no-op against the row set). Fixed in zeta PR
+#     #1210; pinned here to lock the SQL-standard
+#     behavior.
 #   # zeta-adapt: KNOWN GAP — `SELECT DISTINCT a COLLATE
 #     <name>` errors 1064 "unsupported expression: a
 #     COLLATE ..." (already pinned in
@@ -89,10 +83,7 @@ SELECT DISTINCT a FROM dt UNION SELECT DISTINCT a FROM dt ORDER BY a;
 
 SELECT DISTINCT a FROM dt ORDER BY a LIMIT 2;
 
---echo === KNOWN BUG: SELECT ALL is treated as SELECT DISTINCT ===
---echo # SQL standard: ALL is the default and returns all rows
---echo # including duplicates. zeta deduplicates. Compare with
---echo # the regular SELECT below which correctly shows duplicates.
+--echo === SELECT ALL — no-op, preserves duplicates (SQL standard) ===
 
 SELECT ALL a FROM dt ORDER BY a;
 SELECT a FROM dt ORDER BY a;

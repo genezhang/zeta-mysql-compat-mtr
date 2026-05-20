@@ -47,13 +47,12 @@ SELECT DISTINCT a FROM dt ORDER BY a LIMIT 2;
 a
 1
 2
-=== KNOWN BUG: SELECT ALL is treated as SELECT DISTINCT ===
-# SQL standard: ALL is the default and returns all rows
-# including duplicates. zeta deduplicates. Compare with
-# the regular SELECT below which correctly shows duplicates.
+=== SELECT ALL — no-op, preserves duplicates (SQL standard) ===
 SELECT ALL a FROM dt ORDER BY a;
 a
 1
+1
+2
 2
 NULL
 SELECT a FROM dt ORDER BY a;
