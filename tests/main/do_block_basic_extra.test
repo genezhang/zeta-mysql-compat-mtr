@@ -1,0 +1,85 @@
+# Independently authored DO-block smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test (MySQL has no DO block; this is PG surface).
+# Pins zeta's anonymous-block surface (no prior compat
+# coverage).
+#
+# Adaptation notes:
+#   # zeta-adapt: `DO $body$ ... $body$` (custom delim) —
+#     supported; single-statement body returns silently.
+#   # zeta-adapt: `DO $$ ... $$` (default delim) — supported.
+#   # zeta-adapt: `DO LANGUAGE plpgsql $body$ ... $body$` —
+#     supported.
+#   # zeta-adapt: `DO LANGUAGE sql $body$ ... $body$` —
+#     supported.
+#   # zeta-adapt: `DO $body$ BEGIN END $body$` — empty
+#     BEGIN…END accepted.
+#   # zeta-adapt: DO body is PARSED for SQL syntax —
+#     `DO $body$ INVALID SYNTAX $body$` errors 1064 at
+#     parse time.
+#   # zeta-adapt: KNOWN GAP — DO body that references a
+#     real table errors 1146 "table not found: public.<table>"
+#     — DO resolves table names against the `public` schema
+#     regardless of the connection's current database. Even
+#     schema-qualifying with `test.<table>` or
+#     `test.public.<table>` still errors. So DO blocks
+#     cannot currently INSERT/SELECT/UPDATE/DELETE against
+#     a real table on the MySQL wire. Substitute on MySQL
+#     wire: run the DML outside the DO block.
+#   # zeta-adapt: KNOWN GAP — `DO 'plain string'` (non-
+#     dollar-quoted body, PG's other form) errors 1064
+#     "DO block body must be dollar-quoted".
+#   # zeta-adapt: KNOWN LIMITATION (MTR-runner level, not
+#     a zeta bug) — DO blocks with multi-statement bodies
+#     containing `;` are NOT testable through the MTR
+#     runner. The mysql client splits on `;` inside the
+#     dollar-quoted body, fragmenting the DO mid-body.
+#     `DO $$ BEGIN x := 1; y := 2; END $$` requires psql
+#     or libpq to drive.
+
+--echo === DO with $body$ delim, single-statement body ===
+
+DO $body$ SELECT 1 $body$;
+
+--echo === DO with $$ default delim ===
+
+DO $$ SELECT 1 $$;
+
+--echo === DO with empty BEGIN..END ===
+
+DO $body$ BEGIN END $body$;
+DO $$ BEGIN END $$;
+
+--echo === DO LANGUAGE plpgsql / LANGUAGE sql ===
+
+DO LANGUAGE plpgsql $body$ BEGIN END $body$;
+DO LANGUAGE sql $body$ SELECT 1 $body$;
+
+--echo === KNOWN GAP: DO body invalid SQL — errno 1064 at parse ===
+
+--error 1064
+DO $body$ INVALID SYNTAX $body$;
+
+--echo === KNOWN GAP: DO body incomplete SELECT — errno 1064 ===
+
+--error 1064
+DO $body$ SELECT FROM $body$;
+
+--echo === KNOWN GAP: DO 'plain string' (non-dollar-quoted) — errno 1064 ===
+
+--error 1064
+DO 'not a dollar quoted string';
+
+--echo === KNOWN GAP: DO body referencing real table — errno 1146 ===
+--echo # DO resolves table names against `public` schema only,
+--echo # ignoring the connection's current database. Even
+--echo # `test.t` and `test.public.t` error.
+
+DROP TABLE IF EXISTS dot;
+CREATE TABLE dot (id INT PRIMARY KEY, n INT);
+INSERT INTO dot VALUES (1, 10);
+--error 1146
+DO $body$ SELECT * FROM dot $body$;
+--error 1146
+DO $body$ INSERT INTO dot VALUES (2, 20) $body$;
+DROP TABLE dot;
