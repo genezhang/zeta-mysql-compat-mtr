@@ -1,0 +1,71 @@
+=== UUID_TO_BIN — canonical (dashed) and dashless ===
+SELECT HEX(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000')) AS dashed;
+dashed
+123E4567E89B12D3A456426614174000
+SELECT HEX(UUID_TO_BIN('123e4567e89b12d3a456426614174000'))     AS dashless;
+dashless
+123E4567E89B12D3A456426614174000
+=== UUID_TO_BIN — swap_flag = 0 (default) vs 1 ===
+SELECT HEX(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 0)) AS no_swap;
+no_swap
+123E4567E89B12D3A456426614174000
+SELECT HEX(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 1)) AS swapped;
+swapped
+12D3E89B123E4567A456426614174000
+=== BIN_TO_UUID — inverse, both swap modes ===
+SELECT BIN_TO_UUID(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000'))    AS rt_no_swap;
+rt_no_swap
+123e4567-e89b-12d3-a456-426614174000
+SELECT BIN_TO_UUID(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 1), 1) AS rt_with_swap;
+rt_with_swap
+123e4567-e89b-12d3-a456-426614174000
+=== Mismatched swap — pins byte-order behavior ===
+SELECT BIN_TO_UUID(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 1)) AS encoded_swapped_decoded_plain;
+encoded_swapped_decoded_plain
+12d3e89b-123e-4567-a456-426614174000
+=== NULL propagation ===
+SELECT UUID_TO_BIN(NULL)              AS n_to;
+n_to
+NULL
+SELECT UUID_TO_BIN('uuid', NULL)      AS n_to_swap;
+n_to_swap
+NULL
+SELECT BIN_TO_UUID(NULL)              AS n_from;
+n_from
+NULL
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), NULL) AS n_from_swap;
+n_from_swap
+NULL
+=== Bad input — errno 1105 ===
+SELECT UUID_TO_BIN('not-a-uuid');
+ERROR 1105: execution error: UUID_TO_BIN: "not-a-uuid" is not a valid UUID (expected 32 hex digits)
+SELECT UUID_TO_BIN('123e4567-e89b-12d3-a456');
+ERROR 1105: execution error: UUID_TO_BIN: "123e4567-e89b-12d3-a456" is not a valid UUID (expected 32 hex digits)
+SELECT BIN_TO_UUID(UNHEX('AABB'));
+ERROR 1105: execution error: BIN_TO_UUID: input must be exactly 16 bytes (got 2)
+SELECT BIN_TO_UUID(UNHEX('00'));
+ERROR 1105: execution error: BIN_TO_UUID first argument must be a 16-byte binary
+=== Arity errors ===
+SELECT UUID_TO_BIN();
+ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+SELECT UUID_TO_BIN('x', 0, 1);
+ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+SELECT BIN_TO_UUID();
+ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), 0, 1);
+ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
+=== In SELECT against TEXT column + WHERE filter ===
+DROP TABLE IF EXISTS uuids;
+CREATE TABLE uuids (id INT, u TEXT);
+INSERT INTO uuids VALUES
+  (1, '123e4567-e89b-12d3-a456-426614174000'),
+  (2, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+SELECT id, HEX(UUID_TO_BIN(u)) AS packed FROM uuids ORDER BY id;
+id	packed
+1	123E4567E89B12D3A456426614174000
+2	AAAAAAAABBBBCCCCDDDDEEEEEEEEEEEE
+SELECT id FROM uuids WHERE BIN_TO_UUID(UUID_TO_BIN(u)) = u ORDER BY id;
+id
+1
+2
+DROP TABLE uuids;

@@ -1,0 +1,92 @@
+# Independently authored UUID_TO_BIN / BIN_TO_UUID smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/func_misc.test or PG
+# regress. Both functions were missing in zeta before
+# zeta PR #1230 (errored "unknown function"); this slice
+# locks in the new behavior.
+#
+# Big-picture finding: UUID_TO_BIN(uuid_str[, swap_flag])
+# parses canonical 8-4-4-4-12 hex UUID (with or without
+# dashes) into 16 bytes. swap_flag=1 swaps the time-low
+# (first 4 bytes) and time-hi-and-version (bytes 6-7)
+# groups so consecutive UUIDv1 generations sort by
+# time-prefix (better B-tree index locality). BIN_TO_UUID
+# is the inverse. NULL propagates. Bad UUID string or
+# wrong byte length → errno 1105 (zeta is stricter than
+# MySQL which can sometimes coerce — pinned as the
+# zeta-side behavior).
+#
+# The binary form is wrapped in HEX() throughout so the
+# output stays printable on the runner wire.
+#
+# Adaptation notes:
+#   # zeta-adapt: UUID_TO_BIN(str[, swap]) → 16-byte BINARY.
+#     Accepts dashed and dashless canonical forms.
+#     swap=1 reorders [time_low | time_mid | time_hi | rest]
+#     → [time_hi | time_mid | time_low | rest].
+#   # zeta-adapt: BIN_TO_UUID(bin[, swap]) → TEXT in
+#     canonical 8-4-4-4-12 dashed form. swap=1 undoes the
+#     UUID_TO_BIN swap.
+#   # zeta-adapt: NULL in any arg → NULL.
+#   # zeta-adapt: Bad UUID string / non-16-byte binary →
+#     errno 1105.
+#   # zeta-adapt: Arity != 1 or 2 → errno 1105 for both.
+
+--echo === UUID_TO_BIN — canonical (dashed) and dashless ===
+
+SELECT HEX(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000')) AS dashed;
+SELECT HEX(UUID_TO_BIN('123e4567e89b12d3a456426614174000'))     AS dashless;
+
+--echo === UUID_TO_BIN — swap_flag = 0 (default) vs 1 ===
+
+SELECT HEX(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 0)) AS no_swap;
+SELECT HEX(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 1)) AS swapped;
+
+--echo === BIN_TO_UUID — inverse, both swap modes ===
+
+SELECT BIN_TO_UUID(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000'))    AS rt_no_swap;
+SELECT BIN_TO_UUID(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 1), 1) AS rt_with_swap;
+
+--echo === Mismatched swap — pins byte-order behavior ===
+
+SELECT BIN_TO_UUID(UUID_TO_BIN('123e4567-e89b-12d3-a456-426614174000', 1)) AS encoded_swapped_decoded_plain;
+
+--echo === NULL propagation ===
+
+SELECT UUID_TO_BIN(NULL)              AS n_to;
+SELECT UUID_TO_BIN('uuid', NULL)      AS n_to_swap;
+SELECT BIN_TO_UUID(NULL)              AS n_from;
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), NULL) AS n_from_swap;
+
+--echo === Bad input — errno 1105 ===
+
+--error 1105
+SELECT UUID_TO_BIN('not-a-uuid');
+--error 1105
+SELECT UUID_TO_BIN('123e4567-e89b-12d3-a456');
+--error 1105
+SELECT BIN_TO_UUID(UNHEX('AABB'));
+--error 1105
+SELECT BIN_TO_UUID(UNHEX('00'));
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT UUID_TO_BIN();
+--error 1105
+SELECT UUID_TO_BIN('x', 0, 1);
+--error 1105
+SELECT BIN_TO_UUID();
+--error 1105
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), 0, 1);
+
+--echo === In SELECT against TEXT column + WHERE filter ===
+
+DROP TABLE IF EXISTS uuids;
+CREATE TABLE uuids (id INT, u TEXT);
+INSERT INTO uuids VALUES
+  (1, '123e4567-e89b-12d3-a456-426614174000'),
+  (2, 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+SELECT id, HEX(UUID_TO_BIN(u)) AS packed FROM uuids ORDER BY id;
+SELECT id FROM uuids WHERE BIN_TO_UUID(UUID_TO_BIN(u)) = u ORDER BY id;
+DROP TABLE uuids;
