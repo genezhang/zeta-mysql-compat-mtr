@@ -1,0 +1,157 @@
+# Independently authored DELETE option edge-case smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/delete.test or PG regress;
+# complements delete_basic / delete_basic_extra (which
+# cover DELETE WHERE / IN / JOIN-form / LIMIT-rejected /
+# ORDER-BY-rejected basics) by pinning the EDGE behavior
+# NOT covered there: DELETE USING (PG), DELETE RETURNING,
+# TRUNCATE variations (RESTART IDENTITY, CASCADE),
+# DELETE no-WHERE, NOT IN subquery, EXISTS subquery,
+# correlated subquery gap, multi-table DELETE gap.
+#
+# Big-picture finding: zeta supports both MySQL and PG
+# DELETE flavors well. DELETE USING (PG) works.
+# DELETE RETURNING returns the deleted rows. TRUNCATE
+# accepts both `TRUNCATE TABLE t` and `TRUNCATE t`, plus
+# PG modifiers RESTART IDENTITY (resets SERIAL) and
+# CASCADE (silently accepted). EXISTS subquery in DELETE
+# WHERE works. Two notable gaps: correlated scalar
+# subquery in DELETE WHERE errors 1105 "unsupported
+# expression: ScalarSubquery"; and the MySQL multi-table
+# DELETE syntax (`DELETE t1, t2 FROM ...`) errors 1064.
+#
+# Adaptation notes:
+#   # zeta-adapt: DELETE FROM t USING u WHERE t.id = u.fid
+#     (PG syntax) — works as the join-source DELETE form.
+#   # zeta-adapt: DELETE RETURNING (PG) — returns the
+#     deleted rows.
+#   # zeta-adapt: TRUNCATE TABLE t / TRUNCATE t — both
+#     spellings supported.
+#   # zeta-adapt: TRUNCATE ... RESTART IDENTITY — resets
+#     SERIAL column to 1.
+#   # zeta-adapt: TRUNCATE ... CASCADE — silently
+#     accepted (zeta doesn't have FK cascades; harmless).
+#   # zeta-adapt: DELETE with no WHERE — removes all
+#     rows.
+#   # zeta-adapt: DELETE WHERE col NOT IN (subquery
+#     without NULL) — works.
+#   # zeta-adapt: DELETE WHERE EXISTS (subquery) — works.
+#   # zeta-adapt: KNOWN GAP — DELETE WHERE col >
+#     (correlated scalar subquery referring to outer
+#     table) errors 1105 "unsupported expression:
+#     ScalarSubquery". Substitute via DELETE USING with
+#     an explicit join, or pre-compute the threshold
+#     into a temp table.
+#   # zeta-adapt: KNOWN GAP — MySQL `DELETE t1, t2 FROM
+#     t1 JOIN t2 ...` multi-table form errors 1064
+#     "DELETE with multiple target tables is not
+#     supported". Substitute via two separate DELETE
+#     statements.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS d1;
+DROP TABLE IF EXISTS d2;
+CREATE TABLE d1 (id INT PRIMARY KEY, n INT);
+CREATE TABLE d2 (fid INT);
+INSERT INTO d1 VALUES (1, 10), (2, 20), (3, 30), (4, 40);
+INSERT INTO d2 VALUES (1), (3);
+
+--echo === DELETE USING (PG) — removes matching rows ===
+
+DELETE FROM d1 USING d2 WHERE d1.id = d2.fid;
+SELECT id, n FROM d1 ORDER BY id;
+
+--echo === TRUNCATE TABLE — clears all rows ===
+
+DROP TABLE IF EXISTS tr;
+CREATE TABLE tr (id INT, n INT);
+INSERT INTO tr VALUES (1, 10), (2, 20);
+TRUNCATE TABLE tr;
+SELECT COUNT(*) FROM tr;
+
+--echo === TRUNCATE without TABLE keyword ===
+
+INSERT INTO tr VALUES (1, 10);
+TRUNCATE tr;
+SELECT COUNT(*) FROM tr;
+
+--echo === TRUNCATE RESTART IDENTITY (PG) — resets SERIAL ===
+
+DROP TABLE IF EXISTS trs;
+CREATE TABLE trs (id SERIAL PRIMARY KEY, n INT);
+INSERT INTO trs (n) VALUES (10), (20);
+TRUNCATE trs RESTART IDENTITY;
+INSERT INTO trs (n) VALUES (99);
+SELECT id, n FROM trs;
+
+--echo === TRUNCATE CASCADE — silently accepted ===
+
+DROP TABLE IF EXISTS tc;
+CREATE TABLE tc (id INT PRIMARY KEY);
+INSERT INTO tc VALUES (1);
+TRUNCATE TABLE tc CASCADE;
+SELECT COUNT(*) FROM tc;
+
+--echo === DELETE no WHERE — removes all rows ===
+
+DROP TABLE IF EXISTS da;
+CREATE TABLE da (id INT, n INT);
+INSERT INTO da VALUES (1, 10), (2, 20), (3, 30);
+DELETE FROM da;
+SELECT COUNT(*) FROM da;
+
+--echo === DELETE WHERE col NOT IN (subquery without NULL) ===
+
+DROP TABLE IF EXISTS dn;
+CREATE TABLE dn (id INT, n INT);
+INSERT INTO dn VALUES (1, 10), (2, 20), (3, 30);
+DELETE FROM dn WHERE id NOT IN (SELECT 1 UNION SELECT 2);
+SELECT id, n FROM dn ORDER BY id;
+
+--echo === DELETE WHERE EXISTS (subquery) ===
+
+DROP TABLE IF EXISTS de1;
+DROP TABLE IF EXISTS de2;
+CREATE TABLE de1 (id INT, n INT);
+CREATE TABLE de2 (id INT);
+INSERT INTO de1 VALUES (1, 10), (2, 20), (3, 30);
+INSERT INTO de2 VALUES (2);
+DELETE FROM de1 WHERE EXISTS (SELECT 1 FROM de2 WHERE de2.id = de1.id);
+SELECT id, n FROM de1 ORDER BY id;
+
+--echo === KNOWN GAP: DELETE with correlated scalar subquery — errno 1105 ===
+
+DROP TABLE IF EXISTS dc1;
+DROP TABLE IF EXISTS dc2;
+CREATE TABLE dc1 (id INT PRIMARY KEY, v INT);
+CREATE TABLE dc2 (id INT, threshold INT);
+INSERT INTO dc1 VALUES (1, 10), (2, 50);
+INSERT INTO dc2 VALUES (1, 5), (2, 20);
+--error 1105
+DELETE FROM dc1 WHERE v > (SELECT threshold FROM dc2 WHERE dc2.id = dc1.id);
+
+--echo === KNOWN GAP: multi-table DELETE (MySQL) — errno 1064 ===
+
+DROP TABLE IF EXISTS mt1;
+DROP TABLE IF EXISTS mt2;
+CREATE TABLE mt1 (id INT PRIMARY KEY);
+CREATE TABLE mt2 (id INT PRIMARY KEY);
+INSERT INTO mt1 VALUES (1), (2);
+INSERT INTO mt2 VALUES (1), (3);
+--error 1064
+DELETE mt1, mt2 FROM mt1 JOIN mt2 ON mt1.id = mt2.id;
+
+DROP TABLE d1;
+DROP TABLE d2;
+DROP TABLE tr;
+DROP TABLE trs;
+DROP TABLE tc;
+DROP TABLE da;
+DROP TABLE dn;
+DROP TABLE de1;
+DROP TABLE de2;
+DROP TABLE dc1;
+DROP TABLE dc2;
+DROP TABLE mt1;
+DROP TABLE mt2;

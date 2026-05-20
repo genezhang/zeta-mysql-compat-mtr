@@ -1,0 +1,104 @@
+=== Setup ===
+DROP TABLE IF EXISTS d1;
+DROP TABLE IF EXISTS d2;
+CREATE TABLE d1 (id INT PRIMARY KEY, n INT);
+CREATE TABLE d2 (fid INT);
+INSERT INTO d1 VALUES (1, 10), (2, 20), (3, 30), (4, 40);
+INSERT INTO d2 VALUES (1), (3);
+=== DELETE USING (PG) — removes matching rows ===
+DELETE FROM d1 USING d2 WHERE d1.id = d2.fid;
+SELECT id, n FROM d1 ORDER BY id;
+id	n
+2	20
+4	40
+=== TRUNCATE TABLE — clears all rows ===
+DROP TABLE IF EXISTS tr;
+CREATE TABLE tr (id INT, n INT);
+INSERT INTO tr VALUES (1, 10), (2, 20);
+TRUNCATE TABLE tr;
+SELECT COUNT(*) FROM tr;
+COUNT
+0
+=== TRUNCATE without TABLE keyword ===
+INSERT INTO tr VALUES (1, 10);
+TRUNCATE tr;
+SELECT COUNT(*) FROM tr;
+COUNT
+0
+=== TRUNCATE RESTART IDENTITY (PG) — resets SERIAL ===
+DROP TABLE IF EXISTS trs;
+CREATE TABLE trs (id SERIAL PRIMARY KEY, n INT);
+INSERT INTO trs (n) VALUES (10), (20);
+TRUNCATE trs RESTART IDENTITY;
+INSERT INTO trs (n) VALUES (99);
+SELECT id, n FROM trs;
+id	n
+1	99
+=== TRUNCATE CASCADE — silently accepted ===
+DROP TABLE IF EXISTS tc;
+CREATE TABLE tc (id INT PRIMARY KEY);
+INSERT INTO tc VALUES (1);
+TRUNCATE TABLE tc CASCADE;
+SELECT COUNT(*) FROM tc;
+COUNT
+0
+=== DELETE no WHERE — removes all rows ===
+DROP TABLE IF EXISTS da;
+CREATE TABLE da (id INT, n INT);
+INSERT INTO da VALUES (1, 10), (2, 20), (3, 30);
+DELETE FROM da;
+SELECT COUNT(*) FROM da;
+COUNT
+0
+=== DELETE WHERE col NOT IN (subquery without NULL) ===
+DROP TABLE IF EXISTS dn;
+CREATE TABLE dn (id INT, n INT);
+INSERT INTO dn VALUES (1, 10), (2, 20), (3, 30);
+DELETE FROM dn WHERE id NOT IN (SELECT 1 UNION SELECT 2);
+SELECT id, n FROM dn ORDER BY id;
+id	n
+1	10
+2	20
+=== DELETE WHERE EXISTS (subquery) ===
+DROP TABLE IF EXISTS de1;
+DROP TABLE IF EXISTS de2;
+CREATE TABLE de1 (id INT, n INT);
+CREATE TABLE de2 (id INT);
+INSERT INTO de1 VALUES (1, 10), (2, 20), (3, 30);
+INSERT INTO de2 VALUES (2);
+DELETE FROM de1 WHERE EXISTS (SELECT 1 FROM de2 WHERE de2.id = de1.id);
+SELECT id, n FROM de1 ORDER BY id;
+id	n
+1	10
+3	30
+=== KNOWN GAP: DELETE with correlated scalar subquery — errno 1105 ===
+DROP TABLE IF EXISTS dc1;
+DROP TABLE IF EXISTS dc2;
+CREATE TABLE dc1 (id INT PRIMARY KEY, v INT);
+CREATE TABLE dc2 (id INT, threshold INT);
+INSERT INTO dc1 VALUES (1, 10), (2, 50);
+INSERT INTO dc2 VALUES (1, 5), (2, 20);
+DELETE FROM dc1 WHERE v > (SELECT threshold FROM dc2 WHERE dc2.id = dc1.id);
+ERROR 1105: execution error: unsupported expression: ScalarSubquery { subquery: SelectStmt { distinct: false, distinct_on: [], projections: [SelectItem { expr: Column("threshold"), alias: None }], from: [Table { name: "test.public.dc2", alias: Some("dc2") }], where_clause: Some(BinaryOp { left: QualifiedColumn("dc2", "id"), op: Eq, right: QualifiedColumn("dc1", "id") }), group_by: [], grouping_sets: [], having: None, order_by: [], limit: None, offset: None, limit_with_ties: false, ctes: [], for_update: false } }
+=== KNOWN GAP: multi-table DELETE (MySQL) — errno 1064 ===
+DROP TABLE IF EXISTS mt1;
+DROP TABLE IF EXISTS mt2;
+CREATE TABLE mt1 (id INT PRIMARY KEY);
+CREATE TABLE mt2 (id INT PRIMARY KEY);
+INSERT INTO mt1 VALUES (1), (2);
+INSERT INTO mt2 VALUES (1), (3);
+DELETE mt1, mt2 FROM mt1 JOIN mt2 ON mt1.id = mt2.id;
+ERROR 1064: SQL parse error: DELETE with multiple target tables is not supported
+DROP TABLE d1;
+DROP TABLE d2;
+DROP TABLE tr;
+DROP TABLE trs;
+DROP TABLE tc;
+DROP TABLE da;
+DROP TABLE dn;
+DROP TABLE de1;
+DROP TABLE de2;
+DROP TABLE dc1;
+DROP TABLE dc2;
+DROP TABLE mt1;
+DROP TABLE mt2;
