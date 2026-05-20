@@ -1,0 +1,172 @@
+# Independently authored full-text-search smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/fulltext*.test (MySQL FTS uses a
+# different surface; zeta's FTS is the PG tsvector/tsquery
+# model exposed over the MySQL wire). No prior compat
+# coverage.
+#
+# Adaptation notes:
+#   # zeta-adapt: TSVECTOR column type — supported.
+#   # zeta-adapt: TSQUERY column type — supported.
+#   # zeta-adapt: TO_TSVECTOR(text) — supported; stems
+#     words and assigns positions.
+#   # zeta-adapt: TO_TSQUERY(text) — supported with `&`,
+#     `|`, `!` operators.
+#   # zeta-adapt: PLAINTO_TSQUERY(text) — supported;
+#     `'quick fox'` becomes `quick & fox`.
+#   # zeta-adapt: @@ operator (tsvector @@ tsquery) —
+#     supported.
+#   # zeta-adapt: TS_RANK(tsvector, tsquery) — supported;
+#     no-match returns 0.
+#   # zeta-adapt: tsquery `&` (AND) — supported.
+#   # zeta-adapt: tsquery `|` (OR) — supported.
+#   # zeta-adapt: tsquery `!` (NOT) — supported.
+#   # zeta-adapt: tsvector `||` concatenation — supported.
+#   # zeta-adapt: tsquery `||` concatenation — supported
+#     (AND-combines).
+#   # zeta-adapt: KNOWN DIVERGENCE — TSVECTOR / TSQUERY
+#     values render via zeta's Debug formatter
+#     (`Tsvector(TsvectorValue { terms: [...] })`,
+#     `Tsquery(And(Term("quick"), Term("fox")))`) instead
+#     of PG's compact form (`'fox':1 'quick':1`,
+#     `'fox' & 'quick'`). The literal input form via
+#     TO_TSVECTOR / TO_TSQUERY works; the display form
+#     does not round-trip via the wire.
+#   # zeta-adapt: KNOWN DIVERGENCE — LENGTH on a TSVECTOR
+#     returns the character count of the debug string form
+#     (~27 for a 4-term vector), not the term count. PG's
+#     LENGTH(tsvector) returns the term count.
+#   # zeta-adapt: KNOWN GAP — ::TSQUERY cast errors 1105
+#     "unsupported CAST target type: TSQUERY". Substitute:
+#     wrap with TO_TSQUERY(...).
+#   # zeta-adapt: KNOWN GAP — CREATE INDEX ... USING fts
+#     errors 1105 "cannot encode Tsvector as key type
+#     Tsvector". The FTS index path is registered but the
+#     key-encoder for TSVECTOR isn't wired. @@ scans still
+#     work as sequential filters.
+#   # zeta-adapt: KNOWN GAP — TS_RANK_CD, TS_HEADLINE,
+#     SETWEIGHT, NUMNODE all error 1105 "unknown function".
+#   # zeta-adapt: KNOWN GAP — tsquery `&&` (PG && treats it
+#     differently than tsquery_and_tsquery) errors 1105
+#     "&& requires range or array operands". Use the
+#     `tsquery1 || tsquery2` form (which AND-combines).
+#   # zeta-adapt: KNOWN GAP — `text @@ tsquery` (implicit
+#     text → tsvector cast on LHS) errors 1105 "@@ requires
+#     tsvector and tsquery operands". Wrap the TEXT in
+#     TO_TSVECTOR(...) explicitly.
+
+--echo === TO_TSVECTOR and TO_TSQUERY round-trips ===
+--echo # Display uses zeta's Debug formatter (divergence).
+
+SELECT TO_TSVECTOR('the quick brown fox jumps') AS r;
+SELECT TO_TSQUERY('quick & fox') AS r;
+SELECT PLAINTO_TSQUERY('quick fox') AS r;
+
+--echo === @@ operator (tsvector @@ tsquery) ===
+
+SELECT TO_TSVECTOR('the quick brown fox jumps') @@ TO_TSQUERY('quick & fox') AS match;
+SELECT TO_TSVECTOR('the quick brown fox jumps') @@ TO_TSQUERY('quick & lazy') AS no_match;
+
+--echo === TS_RANK ===
+--echo # Matches return a positive score; non-matches return 0.
+
+SELECT TS_RANK(TO_TSVECTOR('the quick brown fox jumps'), TO_TSQUERY('quick')) > 0 AS positive;
+SELECT TS_RANK(TO_TSVECTOR('quick fox'), TO_TSQUERY('jumps')) AS no_match;
+
+--echo === Setup table for query shapes ===
+
+DROP TABLE IF EXISTS fts1;
+CREATE TABLE fts1 (id INT PRIMARY KEY, body TEXT, body_tsv TSVECTOR);
+INSERT INTO fts1 VALUES
+  (1, 'the quick brown fox', TO_TSVECTOR('the quick brown fox')),
+  (2, 'the lazy dog', TO_TSVECTOR('the lazy dog')),
+  (3, 'fox and dog', TO_TSVECTOR('fox and dog'));
+
+--echo === tsquery & (AND) ===
+
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('fox & dog') ORDER BY id;
+
+--echo === tsquery | (OR) ===
+
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('fox | lazy') ORDER BY id;
+
+--echo === tsquery ! (NOT) ===
+
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('!fox') ORDER BY id;
+
+--echo === TS_RANK ORDER BY ===
+
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('fox')
+  ORDER BY TS_RANK(body_tsv, TO_TSQUERY('fox')) DESC, id;
+
+--echo === TSQUERY column type ===
+
+DROP TABLE IF EXISTS qq;
+CREATE TABLE qq (id INT PRIMARY KEY, q TSQUERY);
+INSERT INTO qq VALUES (1, TO_TSQUERY('quick & fox'));
+SELECT id, q FROM qq;
+DROP TABLE qq;
+
+--echo === tsvector || tsvector (concat) ===
+
+SELECT TO_TSVECTOR('quick') || TO_TSVECTOR('fox') AS r;
+
+--echo === tsquery || tsquery (AND-combines) ===
+
+SELECT TO_TSQUERY('a') || TO_TSQUERY('b') AS r;
+
+DROP TABLE fts1;
+
+--echo === KNOWN GAP: ::TSQUERY cast — errno 1105 ===
+--echo # Substitute: TO_TSQUERY(...).
+
+--error 1105
+SELECT 'quick & fox'::TSQUERY AS r;
+
+--echo === KNOWN GAP: CREATE INDEX USING fts on TSVECTOR — errno 1105 ===
+--echo # The FTS index path is registered but the key-encoder
+--echo # for TSVECTOR isn't wired. @@ scans still work as
+--echo # sequential filters.
+
+DROP TABLE IF EXISTS fts_t;
+CREATE TABLE fts_t (id INT PRIMARY KEY, body TEXT, tsv TSVECTOR);
+INSERT INTO fts_t VALUES (1, 'hello world', TO_TSVECTOR('hello world'));
+--error 1105
+CREATE INDEX ix_tsv ON fts_t USING fts(tsv);
+DROP TABLE fts_t;
+
+--echo === KNOWN GAP: TS_RANK_CD — errno 1105 ===
+
+--error 1105
+SELECT TS_RANK_CD(TO_TSVECTOR('the quick brown fox'), TO_TSQUERY('fox'));
+
+--echo === KNOWN GAP: TS_HEADLINE — errno 1105 ===
+
+--error 1105
+SELECT TS_HEADLINE('the quick brown fox', TO_TSQUERY('fox'));
+
+--echo === KNOWN GAP: SETWEIGHT — errno 1105 ===
+
+--error 1105
+SELECT SETWEIGHT(TO_TSVECTOR('quick fox'), 'A') AS r;
+
+--echo === KNOWN GAP: NUMNODE — errno 1105 ===
+
+--error 1105
+SELECT NUMNODE(TO_TSQUERY('quick & fox'));
+
+--echo === KNOWN GAP: tsquery && tsquery — errno 1105 ===
+--echo # Substitute: tsquery1 || tsquery2 (AND-combines).
+
+--error 1105
+SELECT TO_TSQUERY('a') && TO_TSQUERY('b') AS r;
+
+--echo === KNOWN GAP: text @@ tsquery (implicit text→tsv cast) — errno 1105 ===
+--echo # Wrap TEXT in TO_TSVECTOR(...) explicitly.
+
+DROP TABLE IF EXISTS plain_t;
+CREATE TABLE plain_t (id INT PRIMARY KEY, body TEXT);
+INSERT INTO plain_t VALUES (1, 'hello');
+--error 1105
+SELECT id FROM plain_t WHERE body @@ TO_TSQUERY('hello');
+DROP TABLE plain_t;
