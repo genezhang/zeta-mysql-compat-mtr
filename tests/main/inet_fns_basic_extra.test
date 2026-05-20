@@ -1,0 +1,113 @@
+# Independently authored INET_ATON / INET_NTOA / IS_IPV4 /
+# IS_IPV6 smoke test for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/t/func_misc.test
+# or PG regress. All four functions were missing in zeta
+# before zeta PR #1228 (errored "unknown function"); this
+# slice locks in the new behavior.
+#
+# Big-picture finding: INET_ATON packs a dotted-quad IPv4
+# string into a 32-bit unsigned integer (returned as a
+# positive BIGINT). INET_NTOA is the inverse and returns
+# NULL for negative inputs or values > u32::MAX. Both
+# NULL-propagate and never error on unparseable / out-of-
+# range input (matches MySQL — lenient contract). Both
+# coerce non-native inputs to string and parse, so e.g.
+# INET_NTOA('3232235777') works.
+#
+# IS_IPV4 / IS_IPV6 are 1/0 boolean wrappers. NULL → NULL.
+# Non-string args return 0 (zeta does NOT auto-cast for
+# the IS_* family — unlike INET_ATON/NTOA above).
+#
+# Adaptation notes:
+#   # zeta-adapt: INET_ATON(any) → BIGINT (unsigned 32-bit
+#     dotted quad) or NULL. Coerces non-string inputs.
+#   # zeta-adapt: INET_NTOA(any) → TEXT or NULL. Accepts
+#     integers AND numeric strings. Negative / > u32::MAX
+#     / unparseable → NULL.
+#   # zeta-adapt: Roundtrip INET_NTOA(INET_ATON(x)) = x for
+#     valid dotted-quad x.
+#   # zeta-adapt: IS_IPV4 / IS_IPV6 return Int (1/0); NULL
+#     propagates; non-string args yield 0.
+#   # zeta-adapt: Arity != 1 → errno 1105 for all four.
+
+--echo === INET_ATON — basic dotted quad ===
+
+SELECT INET_ATON('192.168.1.1') AS basic;
+SELECT INET_ATON('0.0.0.0')       AS lo;
+SELECT INET_ATON('255.255.255.255') AS hi;
+
+--echo === INET_ATON — unparseable → NULL; NULL → NULL ===
+
+SELECT INET_ATON('not-an-ip') AS bad;
+SELECT INET_ATON(NULL)        AS n;
+
+--echo === INET_NTOA — inverse ===
+
+SELECT INET_NTOA(3232235777) AS basic;
+SELECT INET_NTOA(0)          AS lo;
+SELECT INET_NTOA(4294967295) AS hi;
+
+--echo === INET_NTOA — negative / overflow / NULL → NULL ===
+
+SELECT INET_NTOA(-1)         AS neg;
+SELECT INET_NTOA(4294967296) AS over;
+SELECT INET_NTOA(NULL)       AS n;
+
+--echo === Roundtrip INET_NTOA(INET_ATON(x)) ===
+
+SELECT INET_NTOA(INET_ATON('172.16.5.4')) AS rt;
+
+--echo === IS_IPV4 — 1/0; NULL → NULL ===
+
+SELECT IS_IPV4('192.168.1.1') AS good;
+SELECT IS_IPV4('300.0.0.1')   AS bad_octet;
+SELECT IS_IPV4('::1')         AS v6;
+SELECT IS_IPV4('')            AS empty;
+SELECT IS_IPV4(NULL)          AS n;
+
+--echo === IS_IPV6 — 1/0; NULL → NULL ===
+
+SELECT IS_IPV6('::1')         AS lo;
+SELECT IS_IPV6('2001:db8::1') AS doc;
+SELECT IS_IPV6('192.168.1.1') AS v4;
+SELECT IS_IPV6('not-an-ip')   AS bad;
+SELECT IS_IPV6(NULL)          AS n;
+
+--echo === IS_IPV4 / IS_IPV6 — non-string args yield 0 (no auto-cast) ===
+
+SELECT IS_IPV4(12345) AS int_arg, IS_IPV6(12345) AS int_arg_v6;
+
+--echo === INET_ATON / INET_NTOA — lenient input (coerce + NULL on fail) ===
+
+SELECT INET_ATON(12345) AS bad_coerced;
+SELECT INET_NTOA('3232235777') AS str_int;
+SELECT INET_NTOA('not a number') AS bad_str;
+
+--echo === Arity errors — too-many-args rejected for all four ===
+
+--error 1105
+SELECT INET_ATON();
+--error 1105
+SELECT INET_ATON('1.2.3.4', '5.6.7.8');
+--error 1105
+SELECT INET_NTOA();
+--error 1105
+SELECT INET_NTOA(1, 2);
+--error 1105
+SELECT IS_IPV4();
+--error 1105
+SELECT IS_IPV4('1.2.3.4', '5.6.7.8');
+--error 1105
+SELECT IS_IPV6();
+--error 1105
+SELECT IS_IPV6('::1', '::2');
+
+--echo === On TEXT column inside SELECT / WHERE ===
+
+DROP TABLE IF EXISTS hosts;
+CREATE TABLE hosts (id INT, ip TEXT);
+INSERT INTO hosts VALUES (1, '10.0.0.1'), (2, '10.0.0.2'), (3, '2001:db8::1'), (4, 'invalid');
+SELECT id, IS_IPV4(ip) AS v4, IS_IPV6(ip) AS v6 FROM hosts ORDER BY id;
+SELECT id FROM hosts WHERE IS_IPV4(ip) = 1 ORDER BY id;
+SELECT id, INET_ATON(ip) AS packed FROM hosts WHERE IS_IPV4(ip) = 1 ORDER BY id;
+DROP TABLE hosts;
