@@ -1,0 +1,123 @@
+# Independently authored SQL pattern-matching edge smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/func_regexp.test or
+# string_func.test; complements string_compare_basic_extra
+# (LIKE ESCAPE) and string_func_basic (REGEXP_LIKE /
+# REGEXP_INSTR basics) by pinning the LIKE/REGEXP EDGE
+# behavior NOT covered there: NULL propagation, % / _
+# boundaries, multi-byte LIKE, REGEXP_REPLACE flags,
+# REGEXP_SUBSTR positional args, POSIX character classes,
+# and the SIMILAR TO gap.
+#
+# Big-picture finding: zeta handles LIKE NULL propagation
+# correctly across all positions (LHS, RHS, both, NOT) —
+# every NULL involvement yields NULL. LIKE matches UTF-8
+# code-points correctly so single-`_` matches one Unicode
+# character. REGEXP_LIKE accepts POSIX character classes
+# (`[[:digit:]]`, `[[:alpha:]]`, etc.) via the underlying
+# regex crate. Two notable divergences: (a) REGEXP_REPLACE
+# defaults to first-match-only (PG behavior) where MySQL
+# replaces ALL matches by default — use the 'g' flag for
+# MySQL-compatible behavior; (b) REGEXP_SUBSTR maxes out
+# at 3 args (string, pattern, pos) where MySQL accepts a
+# 4th `occurrence` argument. The PG SIMILAR TO operator
+# is missing entirely.
+#
+# Adaptation notes:
+#   # zeta-adapt: LIKE — NULL on any side propagates to
+#     NULL. NOT LIKE NULL → NULL.
+#   # zeta-adapt: LIKE '%' matches everything; LIKE ''
+#     matches only the empty string.
+#   # zeta-adapt: LIKE multi-byte — `_` matches one UTF-8
+#     code-point, so `'héllo' LIKE '_éllo'` is true.
+#   # zeta-adapt: REGEXP_REPLACE 4-arg with flags —
+#     'i' (case-insensitive), 'g' (global / replace all),
+#     etc. Comply with PG flag syntax.
+#   # zeta-adapt: REGEXP_SUBSTR 2-arg + 3-arg (with
+#     position) — works; returns the first match at or
+#     after position.
+#   # zeta-adapt: REGEXP_SUBSTR no-match — NULL.
+#   # zeta-adapt: REGEXP_INSTR with position arg — works;
+#     no-match → 0.
+#   # zeta-adapt: POSIX character classes — supported
+#     via the underlying `regex` crate: `[[:digit:]]`,
+#     `[[:alpha:]]`, `[[:upper:]]`, etc.
+#   # zeta-adapt: KNOWN DIVERGENCE — REGEXP_REPLACE
+#     defaults to FIRST-MATCH-ONLY in zeta (PG behavior)
+#     where MySQL default replaces ALL matches. Use the
+#     'g' flag explicitly for MySQL-compatible all-match
+#     semantics: `REGEXP_REPLACE(str, pat, repl, 'g')`.
+#   # zeta-adapt: KNOWN GAP — REGEXP_SUBSTR 4-arg
+#     (`occurrence` parameter) errors 1105 "requires 2
+#     or 3 arguments". Substitute via iterating matches
+#     application-side or a longer regex that captures
+#     the Nth occurrence.
+#   # zeta-adapt: KNOWN GAP — `<str> SIMILAR TO <pattern>`
+#     (PG-specific regex-flavored LIKE) errors 1064
+#     "unsupported expression". Substitute via
+#     REGEXP_LIKE with the same pattern (the regex syntax
+#     is mostly the same).
+
+--echo === LIKE NULL propagation ===
+
+SELECT 'abc' LIKE NULL AS lhs;
+SELECT NULL LIKE 'abc' AS rhs;
+SELECT NULL LIKE NULL AS both;
+SELECT 'abc' NOT LIKE NULL AS not_lhs;
+
+--echo === LIKE % and _ boundaries ===
+
+SELECT 'abc' LIKE '%' AS pct_any;
+SELECT 'abc' LIKE '' AS empty_nomatch;
+SELECT '' LIKE '' AS empty_empty;
+SELECT 'abc' LIKE '%abc' AS pct_prefix;
+SELECT 'abc' LIKE 'abc%' AS pct_suffix;
+SELECT 'a' LIKE '_' AS single_char;
+
+--echo === LIKE multi-byte UTF-8 — _ matches one code-point ===
+
+SELECT 'héllo' LIKE '_éllo' AS mb;
+SELECT 'café' LIKE 'caf%' AS mb_suf;
+SELECT 'café' LIKE '%é' AS mb_pre;
+
+--echo === REGEXP_REPLACE 2-arg — first-match-only (PG default) ===
+
+SELECT REGEXP_REPLACE('hello world hello', 'hello', 'X') AS no_flag;
+
+--echo === REGEXP_REPLACE 4-arg with 'g' (global) flag ===
+
+SELECT REGEXP_REPLACE('hello world hello', 'hello', 'X', 'g') AS gflag;
+SELECT REGEXP_REPLACE('aaa', 'a', 'b', 'g') AS reps_g;
+
+--echo === REGEXP_REPLACE 4-arg with 'i' (case-insensitive) ===
+
+SELECT REGEXP_REPLACE('Hello', 'hello', 'X', 'i') AS ci_first;
+
+--echo === REGEXP_SUBSTR with position arg ===
+
+SELECT REGEXP_SUBSTR('hello world', 'wor.*') AS first;
+SELECT REGEXP_SUBSTR('abcabcabc', 'abc', 4) AS pos;
+SELECT REGEXP_SUBSTR('foo123bar', '[0-9]+') AS digits;
+SELECT REGEXP_SUBSTR('hello', 'no_match') AS no_match;
+
+--echo === REGEXP_INSTR with position arg ===
+
+SELECT REGEXP_INSTR('abcabcabc', 'abc', 4) AS pos2;
+SELECT REGEXP_INSTR('abc', 'no') AS no_match;
+
+--echo === POSIX character classes in REGEXP_LIKE ===
+
+SELECT REGEXP_LIKE('abc123', '[[:digit:]]+') AS d;
+SELECT REGEXP_LIKE('abc', '[[:alpha:]]+') AS a;
+SELECT REGEXP_LIKE('abc', '[[:upper:]]+') AS u_no;
+SELECT REGEXP_LIKE('ABC', '[[:upper:]]+') AS u_yes;
+
+--echo === KNOWN GAP: REGEXP_SUBSTR 4-arg (occurrence) — errno 1105 ===
+
+--error 1105
+SELECT REGEXP_SUBSTR('abcabcabc', 'abc', 1, 2);
+
+--echo === KNOWN GAP: SIMILAR TO (PG) — errno 1064 ===
+
+--error 1064
+SELECT 'foo' SIMILAR TO 'fo+';
