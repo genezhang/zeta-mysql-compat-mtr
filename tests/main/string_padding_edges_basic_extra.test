@@ -1,0 +1,123 @@
+# Independently authored string-padding edge-case smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/func_str.test;
+# complements string_func_basic / string_func_extra /
+# string_func_basic_extra by pinning the EDGE-CASE
+# behavior of LPAD/RPAD/REPEAT/SPACE/REVERSE/INSERT/STRCMP
+# (NULL inputs, zero/negative lengths, empty pads,
+# truncation, overflow, multi-byte) NOT covered there.
+#
+# Big-picture finding: zeta's padding/repeat/reverse
+# functions are largely well-behaved at the edges, with
+# correct NULL propagation, sensible zero/empty handling,
+# and proper multi-byte awareness in REVERSE. One real
+# MySQL divergence: LPAD/RPAD with a negative target
+# length returns an empty string in zeta where MySQL
+# returns NULL. Otherwise the surfaces match MySQL
+# closely.
+#
+# Adaptation notes:
+#   # zeta-adapt: LPAD(str, n, pad) truncates when n <
+#     length(str) — returns the leftmost n characters.
+#     RPAD does the same. (Matches MySQL.)
+#   # zeta-adapt: LPAD/RPAD with NULL str / NULL length /
+#     NULL pad — all return NULL.
+#   # zeta-adapt: LPAD/RPAD with empty pad string '' —
+#     returns the input unchanged (can't pad with empty,
+#     so no padding happens, no error).
+#   # zeta-adapt: LPAD/RPAD with multi-char pad cycles
+#     correctly until the target length is reached.
+#     LPAD('x', 7, 'abc') → 'abcabcx'.
+#   # zeta-adapt: REPEAT(s, 0) → '', REPEAT(s, NULL) →
+#     NULL, REPEAT(NULL, n) → NULL. (Matches MySQL.)
+#   # zeta-adapt: SPACE(0) → '' (length 0), SPACE(-1) →
+#     '', SPACE(NULL) → NULL.
+#   # zeta-adapt: REVERSE('') → '', REVERSE(NULL) → NULL,
+#     REVERSE on multi-byte handles UTF-8 codepoints
+#     correctly ('héllo' → 'olléh').
+#   # zeta-adapt: INSERT is 1-based; INSERT(str, 0, …)
+#     and INSERT(str, > length, …) both return the
+#     original unchanged.
+#   # zeta-adapt: INSERT(str, pos, len_overflow, newstr)
+#     truncates the deletion at the end of the input —
+#     effectively "replace from pos to end of string".
+#   # zeta-adapt: INSERT(str, pos, NEGATIVE_len, newstr)
+#     behaves like INSERT(...,len_overflow,…) — replace
+#     to end of string.
+#   # zeta-adapt: INSERT(NULL, ...) → NULL.
+#   # zeta-adapt: STRCMP(NULL, ...) / STRCMP(..., NULL) →
+#     NULL. STRCMP('','') → 0. STRCMP('a','aa') → -1
+#     (shorter string sorts before longer prefix).
+#   # zeta-adapt: KNOWN DIVERGENCE — LPAD/RPAD with a
+#     negative target length returns an empty string in
+#     zeta where MySQL returns NULL. The argument count
+#     and other-arg semantics still apply normally.
+
+--echo === LPAD / RPAD truncate when length < input ===
+
+SELECT LPAD('abcdefg', 3, '0') AS trunc;
+SELECT RPAD('abcdefg', 3, '0') AS trunc;
+
+--echo === LPAD length 0 → empty ===
+
+SELECT LPAD('abc', 0, '0') AS empty, LENGTH(LPAD('abc', 0, '0')) AS l;
+
+--echo === LPAD NULL propagation (str / len / pad) ===
+
+SELECT LPAD(NULL, 5, '0') AS ns, LPAD('abc', NULL, '0') AS nl, LPAD('abc', 5, NULL) AS np;
+
+--echo === LPAD with empty pad string — input unchanged ===
+
+SELECT LPAD('abc', 5, '') AS ep;
+
+--echo === LPAD/RPAD multi-char pad cycles ===
+
+SELECT LPAD('x', 7, 'abc') AS l_cycle, RPAD('x', 7, 'abc') AS r_cycle;
+
+--echo === REPEAT — 0, NULL, big ===
+
+SELECT REPEAT('ab', 0) AS zero;
+SELECT REPEAT('ab', NULL) AS nl;
+SELECT REPEAT(NULL, 3) AS ns;
+SELECT LENGTH(REPEAT('a', 100)) AS big;
+
+--echo === SPACE — 0, negative, NULL ===
+
+SELECT LENGTH(SPACE(0)) AS l0, LENGTH(SPACE(-1)) AS lneg;
+SELECT SPACE(NULL) AS nl;
+
+--echo === REVERSE — empty, NULL, multi-byte UTF-8 ===
+
+SELECT REVERSE('') AS empty;
+SELECT REVERSE(NULL) AS nl;
+SELECT REVERSE('héllo') AS unicode;
+
+--echo === INSERT — pos=0 returns original (1-based) ===
+
+SELECT INSERT('abc', 0, 1, 'X') AS pos0;
+
+--echo === INSERT — pos beyond length returns original ===
+
+SELECT INSERT('abc', 100, 1, 'X') AS pos_overflow;
+
+--echo === INSERT — len overflow replaces to end of string ===
+
+SELECT INSERT('abc', 2, 100, 'X') AS len_overflow;
+
+--echo === INSERT — negative len behaves like overflow (to end) ===
+
+SELECT INSERT('abc', 2, -1, 'X') AS neg_len;
+
+--echo === INSERT — NULL str propagates ===
+
+SELECT INSERT(NULL, 1, 1, 'X') AS nstr;
+
+--echo === STRCMP — NULL, empty, prefix ===
+
+SELECT STRCMP(NULL, 'a') AS lhs_null, STRCMP('a', NULL) AS rhs_null;
+SELECT STRCMP('', '') AS empty;
+SELECT STRCMP('a', 'aa') AS prefix;
+
+--echo === KNOWN DIVERGENCE: LPAD/RPAD negative length → '', MySQL → NULL ===
+
+SELECT LPAD('abc', -1, '0') AS l_neg, RPAD('abc', -1, '0') AS r_neg;
