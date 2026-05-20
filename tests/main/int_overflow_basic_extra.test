@@ -37,11 +37,12 @@
 #     errno 1105 \"integer out of range for INT4\".
 #   # zeta-adapt: in-range arithmetic at the boundary —
 #     works: \`i64::MAX - 1 + 1\` = i64::MAX.
-#   # zeta-adapt: KNOWN GAP — \`CAST(-9223372036854775809
-#     AS BIGINT)\` silently clamps to i64::MIN. The literal
-#     exceeds i64::MIN so it's parsed as Decimal first, and
-#     Decimal → BIGINT cast doesn't bounds-check. Separate
-#     gap from arithmetic overflow.
+#   # zeta-adapt: \`CAST(-9223372036854775809 AS BIGINT)\` —
+#     errors \"decimal out of range for BIGINT\". Out-of-i64
+#     integer literals now parse as Decimal (zeta PR #1214),
+#     so the Decimal → BIGINT cast catches the overflow
+#     properly. Previously these silently clamped to i64::MIN
+#     via a lossy f64 conversion.
 
 --echo === Basic in-range arithmetic still works ===
 
@@ -107,11 +108,22 @@ SELECT CAST(1e20 AS BIGINT);
 --error 1105
 SELECT CAST(2147483648 AS INT);
 
---echo === KNOWN GAP: negative-direction CAST overflow silently clamps ===
---echo # `CAST(-9223372036854775809 AS BIGINT)` should error but
---echo # silently clamps to i64::MIN. The literal exceeds i64::MIN
---echo # so it's parsed as Decimal, and the Decimal→BIGINT cast
---echo # currently doesn't bounds-check. Separate gap from
---echo # add/sub/mul overflow (which now errors correctly).
+--echo === CAST negative-direction overflow — errors (Decimal cast bounds-checked) ===
+--echo # Out-of-i64 integer literals now parse as Decimal
+--echo # (zeta PR #1214), so the Decimal → BIGINT cast catches
+--echo # the overflow. Previously silently clamped to i64::MIN
+--echo # via a lossy f64 conversion.
 
-SELECT CAST(-9223372036854775809 AS BIGINT) AS clamped;
+--error 1105
+SELECT CAST(-9223372036854775809 AS BIGINT);
+
+--echo === CAST positive-direction overflow — same path ===
+
+--error 1105
+SELECT CAST(9223372036854775808 AS BIGINT);
+
+--echo === Out-of-i64 integer literals preserve precision via Decimal ===
+--echo # Previously these went through f64 and lost precision.
+
+SELECT 9223372036854775808 AS just_over_max;
+SELECT 9223372036854775808 + 1 AS exact_add;

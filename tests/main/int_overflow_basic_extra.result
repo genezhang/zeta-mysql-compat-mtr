@@ -46,12 +46,21 @@ ERROR 1105: execution error: float out of range for BIGINT: 10000000000000000000
 === CAST i64 literal > i32::MAX as INT — errno 1105 ===
 SELECT CAST(2147483648 AS INT);
 ERROR 1105: execution error: integer out of range for INT4: 2147483648
-=== KNOWN GAP: negative-direction CAST overflow silently clamps ===
-# `CAST(-9223372036854775809 AS BIGINT)` should error but
-# silently clamps to i64::MIN. The literal exceeds i64::MIN
-# so it's parsed as Decimal, and the Decimal→BIGINT cast
-# currently doesn't bounds-check. Separate gap from
-# add/sub/mul overflow (which now errors correctly).
-SELECT CAST(-9223372036854775809 AS BIGINT) AS clamped;
-clamped
--9223372036854775808
+=== CAST negative-direction overflow — errors (Decimal cast bounds-checked) ===
+# Out-of-i64 integer literals now parse as Decimal
+# (zeta PR #1214), so the Decimal → BIGINT cast catches
+# the overflow. Previously silently clamped to i64::MIN
+# via a lossy f64 conversion.
+SELECT CAST(-9223372036854775809 AS BIGINT);
+ERROR 1105: execution error: decimal out of range for BIGINT: -9223372036854775809
+=== CAST positive-direction overflow — same path ===
+SELECT CAST(9223372036854775808 AS BIGINT);
+ERROR 1105: execution error: decimal out of range for BIGINT: 9223372036854775808
+=== Out-of-i64 integer literals preserve precision via Decimal ===
+# Previously these went through f64 and lost precision.
+SELECT 9223372036854775808 AS just_over_max;
+just_over_max
+9223372036854775808
+SELECT 9223372036854775808 + 1 AS exact_add;
+exact_add
+9223372036854775809
