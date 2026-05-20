@@ -30,8 +30,11 @@
 #     zeta PR #1219) — serializes as TINYINT(1) over the
 #     wire so drivers see the same 1/0 bytes as before.
 #   # zeta-adapt: REGEXP / RLIKE in WHERE — works as a
-#     bare predicate (fixed in zeta PR #1219). Also
-#     usable with `= 1` for backward compat.
+#     bare predicate (fixed in zeta PR #1219). The pre-fix
+#     `= 1` workaround no longer works because zeta's
+#     Bool vs Int comparison resolves to FALSE (see
+#     boolean_edges_basic_extra `1 = TRUE` = 0); use the
+#     bare predicate instead.
 #   # zeta-adapt: PG ~ — case-sensitive regex match,
 #     returns Bool, accepted in WHERE.
 #   # zeta-adapt: PG ~* — case-insensitive regex match,
