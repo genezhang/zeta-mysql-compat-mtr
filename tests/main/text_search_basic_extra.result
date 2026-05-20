@@ -1,0 +1,108 @@
+=== TO_TSVECTOR and TO_TSQUERY round-trips ===
+# Display uses zeta's Debug formatter (divergence).
+SELECT TO_TSVECTOR('the quick brown fox jumps') AS r;
+r
+Tsvector(TsvectorValue { terms: [("quick", [2]), ("brown", [3]), ("fox", [4]), ("jump", [5])] })
+SELECT TO_TSQUERY('quick & fox') AS r;
+r
+Tsquery(And(Term("quick"), Term("fox")))
+SELECT PLAINTO_TSQUERY('quick fox') AS r;
+r
+Tsquery(And(Term("quick"), Term("fox")))
+=== @@ operator (tsvector @@ tsquery) ===
+SELECT TO_TSVECTOR('the quick brown fox jumps') @@ TO_TSQUERY('quick & fox') AS match;
+match
+1
+SELECT TO_TSVECTOR('the quick brown fox jumps') @@ TO_TSQUERY('quick & lazy') AS no_match;
+no_match
+0
+=== TS_RANK ===
+# Matches return a positive score; non-matches return 0.
+SELECT TS_RANK(TO_TSVECTOR('the quick brown fox jumps'), TO_TSQUERY('quick')) > 0 AS positive;
+positive
+1
+SELECT TS_RANK(TO_TSVECTOR('quick fox'), TO_TSQUERY('jumps')) AS no_match;
+no_match
+0
+=== Setup table for query shapes ===
+DROP TABLE IF EXISTS fts1;
+CREATE TABLE fts1 (id INT PRIMARY KEY, body TEXT, body_tsv TSVECTOR);
+INSERT INTO fts1 VALUES
+  (1, 'the quick brown fox', TO_TSVECTOR('the quick brown fox')),
+  (2, 'the lazy dog', TO_TSVECTOR('the lazy dog')),
+  (3, 'fox and dog', TO_TSVECTOR('fox and dog'));
+=== tsquery & (AND) ===
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('fox & dog') ORDER BY id;
+id
+3
+=== tsquery | (OR) ===
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('fox | lazy') ORDER BY id;
+id
+1
+2
+3
+=== tsquery ! (NOT) ===
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('!fox') ORDER BY id;
+id
+2
+=== TS_RANK ORDER BY ===
+SELECT id FROM fts1 WHERE body_tsv @@ TO_TSQUERY('fox')
+  ORDER BY TS_RANK(body_tsv, TO_TSQUERY('fox')) DESC, id;
+id
+3
+1
+=== TSQUERY column type ===
+DROP TABLE IF EXISTS qq;
+CREATE TABLE qq (id INT PRIMARY KEY, q TSQUERY);
+INSERT INTO qq VALUES (1, TO_TSQUERY('quick & fox'));
+SELECT id, q FROM qq;
+id	q
+1	Tsquery(And(Term("quick"), Term("fox")))
+DROP TABLE qq;
+=== tsvector || tsvector (concat) ===
+SELECT TO_TSVECTOR('quick') || TO_TSVECTOR('fox') AS r;
+r
+'quick':1'fox':1
+=== tsquery || tsquery (AND-combines) ===
+SELECT TO_TSQUERY('a') || TO_TSQUERY('b') AS r;
+r
+'a''b'
+DROP TABLE fts1;
+=== KNOWN GAP: ::TSQUERY cast — errno 1105 ===
+# Substitute: TO_TSQUERY(...).
+SELECT 'quick & fox'::TSQUERY AS r;
+ERROR 1105: execution error: unsupported CAST target type: TSQUERY
+=== KNOWN GAP: CREATE INDEX USING fts on TSVECTOR — errno 1105 ===
+# The FTS index path is registered but the key-encoder
+# for TSVECTOR isn't wired. @@ scans still work as
+# sequential filters.
+DROP TABLE IF EXISTS fts_t;
+CREATE TABLE fts_t (id INT PRIMARY KEY, body TEXT, tsv TSVECTOR);
+INSERT INTO fts_t VALUES (1, 'hello world', TO_TSVECTOR('hello world'));
+CREATE INDEX ix_tsv ON fts_t USING fts(tsv);
+ERROR 1105: internal error: cannot encode Tsvector(TsvectorValue { terms: [("hello", [1]), ("world", [2])] }) as key type Tsvector
+DROP TABLE fts_t;
+=== KNOWN GAP: TS_RANK_CD — errno 1105 ===
+SELECT TS_RANK_CD(TO_TSVECTOR('the quick brown fox'), TO_TSQUERY('fox'));
+ERROR 1105: execution error: unknown function: TS_RANK_CD
+=== KNOWN GAP: TS_HEADLINE — errno 1105 ===
+SELECT TS_HEADLINE('the quick brown fox', TO_TSQUERY('fox'));
+ERROR 1105: execution error: unknown function: TS_HEADLINE
+=== KNOWN GAP: SETWEIGHT — errno 1105 ===
+SELECT SETWEIGHT(TO_TSVECTOR('quick fox'), 'A') AS r;
+ERROR 1105: execution error: unknown function: SETWEIGHT
+=== KNOWN GAP: NUMNODE — errno 1105 ===
+SELECT NUMNODE(TO_TSQUERY('quick & fox'));
+ERROR 1105: execution error: unknown function: NUMNODE
+=== KNOWN GAP: tsquery && tsquery — errno 1105 ===
+# Substitute: tsquery1 || tsquery2 (AND-combines).
+SELECT TO_TSQUERY('a') && TO_TSQUERY('b') AS r;
+ERROR 1105: execution error: && requires range or array operands
+=== KNOWN GAP: text @@ tsquery (implicit text→tsv cast) — errno 1105 ===
+# Wrap TEXT in TO_TSVECTOR(...) explicitly.
+DROP TABLE IF EXISTS plain_t;
+CREATE TABLE plain_t (id INT PRIMARY KEY, body TEXT);
+INSERT INTO plain_t VALUES (1, 'hello');
+SELECT id FROM plain_t WHERE body @@ TO_TSQUERY('hello');
+ERROR 1105: execution error: @@ requires tsvector and tsquery operands
+DROP TABLE plain_t;
