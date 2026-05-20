@@ -1,0 +1,120 @@
+# Independently authored hashing & crypto smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/encryption.test or PG regress;
+# complements string_func_basic (MD5/SHA/SHA1/SHA2 base
+# coverage) by pinning the EXTENDED hashing and crypto
+# surface: SHA2 384/512, CRC32 edges, DIGEST (PG
+# pgcrypto), ENCRYPT/DECRYPT round-trip, HMAC variants,
+# and a bunch of legacy/MySQL-specific functions that
+# error 1105.
+#
+# Big-picture finding: zeta exposes the PG pgcrypto family
+# (DIGEST, ENCRYPT/DECRYPT with explicit cipher arg, HMAC
+# with explicit algorithm arg) — all 3-arg, no MySQL
+# 2-arg shortcuts. SHA2 supports the full 224/256/384/512
+# range. CRC32 returns u32 with correct empty/NULL handling.
+# Most of MySQL's legacy crypto family (AES_ENCRYPT,
+# COMPRESS, PASSWORD, RANDOM_BYTES) is absent and the
+# 2-arg ENCRYPT / HMAC shortcuts are not accepted —
+# everything requires the 3-arg PG-style form.
+#
+# Adaptation notes:
+#   # zeta-adapt: SHA2(str, n) — n ∈ {224, 256, 384, 512}.
+#     224 → 56 hex, 256 → 64, 384 → 96, 512 → 128. n=0
+#     defaults to 256 (MySQL semantics). Bad n → NULL.
+#   # zeta-adapt: CRC32(str) — returns u32 hash. CRC32('')
+#     → 0, CRC32(NULL) → NULL. Numeric input is
+#     stringified first.
+#   # zeta-adapt: DIGEST(data, algo) — PG pgcrypto.
+#     Returns Bytea; wrap in HEX() to see the hex digest.
+#   # zeta-adapt: ENCRYPT(data, key, cipher) — PG pgcrypto.
+#     Returns Bytea; round-trip with DECRYPT(..., key,
+#     cipher). 'aes' is the canonical cipher name.
+#   # zeta-adapt: HMAC(data, key, algorithm) — PG
+#     pgcrypto. Algorithm ∈ {md5, sha1, sha256, sha512,
+#     ...}. Returns Bytea; HEX() to see.
+#   # zeta-adapt: KNOWN GAP — RANDOM_BYTES(n) (MySQL) and
+#     GEN_RANDOM_BYTES(n) (PG pgcrypto) both error 1105
+#     "unknown function". No portable substitute exposed
+#     today.
+#   # zeta-adapt: KNOWN GAP — AES_ENCRYPT / AES_DECRYPT
+#     (MySQL) error 1105. Substitute via PG-style
+#     ENCRYPT(data, key, 'aes') / DECRYPT(..., 'aes').
+#   # zeta-adapt: KNOWN GAP — COMPRESS / UNCOMPRESS
+#     (MySQL) error 1105. No compression surface exposed
+#     to SQL.
+#   # zeta-adapt: KNOWN GAP — PASSWORD (legacy MySQL
+#     password-hash function) errors 1105. Substitute via
+#     SHA2 or the proper auth path.
+#   # zeta-adapt: KNOWN GAP — ENCRYPT(data, key) 2-arg
+#     MySQL form errors 1105 "requires 3 arguments
+#     (data, key, cipher)". Always pass the cipher name.
+#   # zeta-adapt: KNOWN GAP — HMAC(data, key) 2-arg form
+#     errors 1105 "requires 3 arguments (data, key,
+#     algorithm)". Always pass the algorithm.
+
+--echo === SHA2 — extended digest sizes ===
+
+SELECT LENGTH(SHA2('hello', 224)) AS l224, LENGTH(SHA2('hello', 256)) AS l256;
+SELECT LENGTH(SHA2('hello', 384)) AS l384, LENGTH(SHA2('hello', 512)) AS l512;
+
+--echo === SHA2 fixed digests (deterministic) ===
+
+SELECT SHA2('hello', 384) AS h384;
+
+--echo === CRC32 edges ===
+
+SELECT CRC32('hello') AS basic;
+SELECT CRC32('') AS empty, CRC32(NULL) AS nl;
+SELECT CRC32(123) AS num;
+
+--echo === DIGEST (PG pgcrypto) ===
+
+SELECT HEX(DIGEST('hello', 'sha256')) AS d_256;
+SELECT HEX(DIGEST('hello', 'md5')) AS d_md5;
+
+--echo === ENCRYPT / DECRYPT round-trip (3-arg, PG pgcrypto) ===
+
+SELECT DECRYPT(ENCRYPT('plain', 'key', 'aes'), 'key', 'aes') AS round_trip;
+
+--echo === HMAC — algorithm variants ===
+
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'md5'))) AS l_md5;
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha1'))) AS l_sha1;
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha256'))) AS l_sha256;
+SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha512'))) AS l_sha512;
+
+--echo === KNOWN GAP: RANDOM_BYTES (MySQL) — errno 1105 ===
+
+--error 1105
+SELECT RANDOM_BYTES(16);
+
+--echo === KNOWN GAP: GEN_RANDOM_BYTES (PG pgcrypto) — errno 1105 ===
+
+--error 1105
+SELECT GEN_RANDOM_BYTES(16);
+
+--echo === KNOWN GAP: AES_ENCRYPT (MySQL) — errno 1105 ===
+
+--error 1105
+SELECT AES_ENCRYPT('plain', 'key');
+
+--echo === KNOWN GAP: COMPRESS (MySQL) — errno 1105 ===
+
+--error 1105
+SELECT COMPRESS('hello');
+
+--echo === KNOWN GAP: PASSWORD (legacy MySQL) — errno 1105 ===
+
+--error 1105
+SELECT PASSWORD('secret');
+
+--echo === KNOWN GAP: ENCRYPT 2-arg MySQL form — errno 1105 ===
+
+--error 1105
+SELECT ENCRYPT('plain', 'key');
+
+--echo === KNOWN GAP: HMAC 2-arg form — errno 1105 ===
+
+--error 1105
+SELECT HMAC('hello', 'key');
