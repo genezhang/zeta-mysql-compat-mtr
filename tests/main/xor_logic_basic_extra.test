@@ -1,0 +1,126 @@
+# Independently authored XOR logical-operator edge smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/bool*.test or func_op.test;
+# complements boolean_logic_basic_extra (AND/OR/NOT 3VL
+# truth table) by pinning the XOR surface specifically:
+# truth table, NULL propagation, precedence vs AND/OR/NOT,
+# WHERE-clause use, and the integer-as-bool gap.
+#
+# Big-picture finding: zeta now supports XOR (fixed in
+# zeta PR #1211 — previously errored 1064 "unsupported
+# binary operator: XOR"). Three-valued semantics match
+# MySQL: returns 1 if exactly one operand is true, 0 if
+# both are equal-truthy, NULL if either operand is NULL.
+# Precedence sits between AND (tighter) and OR (looser),
+# matching MySQL and SQL-standard ordering.
+#
+# Notable gap (carried over from AND/OR): integer
+# operands in logical operators don't coerce to bool —
+# `1 XOR 0` returns NULL instead of MySQL's 1. Same
+# behavior as `1 AND 1 = NULL`. Substitute by comparing
+# explicitly: `(a > 0) XOR (b > 0)`.
+#
+# Notable divergence #1: `<=>` is the vector cosine-distance
+# operator in zeta (PG/pgvector convention), not MySQL's
+# NULL-safe equality. MySQL `a <=> b` substitute:
+# `a IS NOT DISTINCT FROM b`.
+#
+# Notable divergence #2: XOR precedence — zeta's parser
+# binds XOR tighter than AND (sqlparser default). MySQL
+# binds AND tighter than XOR. Concretely: `FALSE AND TRUE
+# XOR TRUE` parses as `FALSE AND (TRUE XOR TRUE)` = 0 in
+# zeta, but as `(FALSE AND TRUE) XOR TRUE` = 1 in MySQL.
+# Use explicit parentheses with mixed AND / XOR.
+#
+# Adaptation notes:
+#   # zeta-adapt: XOR truth table — TRUE XOR FALSE=1,
+#     TRUE XOR TRUE=0, FALSE XOR FALSE=0.
+#   # zeta-adapt: XOR + NULL — NULL XOR anything → NULL.
+#   # zeta-adapt: XOR with column predicates — works in
+#     SELECT list and WHERE clause.
+#   # zeta-adapt: XOR precedence — binds tighter than OR,
+#     looser than AND. `TRUE OR FALSE XOR TRUE` parses as
+#     `TRUE OR (FALSE XOR TRUE)` = 1.
+#     `TRUE AND FALSE XOR TRUE` parses as
+#     `(TRUE AND FALSE) XOR TRUE` = 1.
+#   # zeta-adapt: NOT XOR — NOT binds tightest;
+#     `NOT TRUE XOR TRUE` = `(NOT TRUE) XOR TRUE` = 1.
+#   # zeta-adapt: KNOWN GAP — integer XOR (`1 XOR 0`)
+#     returns NULL. Same shape as `1 AND 1 = NULL`. Use
+#     explicit boolean expressions instead.
+#   # zeta-adapt: KNOWN DIVERGENCE — `<=>` errors 1105
+#     "<=> requires vector operands". zeta repurposes
+#     this token for vector cosine distance (PG /
+#     pgvector). MySQL `a <=> b` ≡
+#     `a IS NOT DISTINCT FROM b`.
+
+--echo === XOR truth table ===
+
+SELECT TRUE XOR FALSE AS tf, TRUE XOR TRUE AS tt, FALSE XOR TRUE AS ft, FALSE XOR FALSE AS ff;
+
+--echo === XOR + NULL — three-valued logic ===
+
+SELECT NULL XOR TRUE AS nt, TRUE XOR NULL AS tn, NULL XOR NULL AS nn;
+
+--echo === XOR precedence vs OR — XOR binds tighter (matches MySQL) ===
+--echo # `TRUE OR FALSE XOR TRUE` binds as `TRUE OR (FALSE XOR TRUE)` = 1.
+--echo # `(TRUE OR FALSE) XOR TRUE` = 0. Differing results prove
+--echo # XOR binds tighter than OR.
+
+SELECT TRUE OR FALSE XOR TRUE AS or_xor;
+SELECT (TRUE OR FALSE) XOR TRUE AS or_xor_paren;
+
+--echo === XOR precedence vs AND — DIVERGENCE: zeta binds XOR tighter ===
+--echo # MySQL: AND > XOR; zeta (sqlparser): XOR > AND.
+--echo # `FALSE AND TRUE XOR TRUE` parses as `FALSE AND (TRUE XOR TRUE)` = 0
+--echo # in zeta vs `(FALSE AND TRUE) XOR TRUE` = 1 in MySQL.
+--echo # Use explicit parentheses with mixed AND / XOR.
+
+SELECT FALSE AND TRUE XOR TRUE AS and_xor_zeta;
+SELECT (FALSE AND TRUE) XOR TRUE AS and_xor_mysql_equiv;
+
+--echo === NOT XOR — NOT binds tightest ===
+
+SELECT NOT TRUE XOR TRUE AS not_xor, NOT FALSE XOR FALSE AS not_xor2;
+
+--echo === XOR with column predicates — SELECT list ===
+
+DROP TABLE IF EXISTS xt;
+CREATE TABLE xt (id INT, a INT, b INT);
+INSERT INTO xt VALUES (1,0,0),(2,0,1),(3,1,0),(4,1,1),(5,NULL,1),(6,NULL,NULL);
+SELECT id, (a > 0) XOR (b > 0) AS x FROM xt ORDER BY id;
+
+--echo === XOR in WHERE clause — only rows where exactly one predicate is true ===
+
+SELECT id FROM xt WHERE (a > 0) XOR (b > 0) ORDER BY id;
+
+--echo === XOR with boolean column ===
+
+DROP TABLE IF EXISTS bxt;
+CREATE TABLE bxt (id INT, p BOOLEAN, q BOOLEAN);
+INSERT INTO bxt VALUES (1, TRUE, TRUE), (2, TRUE, FALSE), (3, FALSE, TRUE), (4, FALSE, FALSE), (5, NULL, TRUE);
+SELECT id, p XOR q AS x FROM bxt ORDER BY id;
+
+--echo === Chained XOR — associative left-to-right ===
+
+SELECT TRUE XOR TRUE XOR TRUE AS triple_true, TRUE XOR FALSE XOR TRUE AS tft;
+
+--echo === KNOWN GAP: integer XOR — returns NULL (same as integer AND/OR) ===
+--echo # MySQL: `1 XOR 0` = 1, `1 XOR 1` = 0. zeta only
+--echo # coerces Bool, so integer operands fall through to
+--echo # NULL. Substitute with explicit predicate:
+--echo # `(a > 0) XOR (b > 0)`.
+
+SELECT 1 XOR 0 AS one_xor_zero, 5 XOR 0 AS five_xor_zero, 1 XOR 1 AS one_xor_one;
+
+--echo === KNOWN DIVERGENCE: `<=>` is vector cosine distance, not NULL-safe equality ===
+--echo # zeta repurposes the `<=>` token (PG / pgvector
+--echo # convention). For MySQL NULL-safe equal, use
+--echo # `a IS NOT DISTINCT FROM b`.
+
+--error 1105
+SELECT 1 <=> 1 AS nsl;
+SELECT 1 IS NOT DISTINCT FROM 1 AS sub1, NULL IS NOT DISTINCT FROM NULL AS sub2, 1 IS NOT DISTINCT FROM NULL AS sub3;
+
+DROP TABLE xt;
+DROP TABLE bxt;

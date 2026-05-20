@@ -1,0 +1,84 @@
+=== XOR truth table ===
+SELECT TRUE XOR FALSE AS tf, TRUE XOR TRUE AS tt, FALSE XOR TRUE AS ft, FALSE XOR FALSE AS ff;
+tf	tt	ft	ff
+1	0	1	0
+=== XOR + NULL — three-valued logic ===
+SELECT NULL XOR TRUE AS nt, TRUE XOR NULL AS tn, NULL XOR NULL AS nn;
+nt	tn	nn
+NULL	NULL	NULL
+=== XOR precedence vs OR — XOR binds tighter (matches MySQL) ===
+# `TRUE OR FALSE XOR TRUE` binds as `TRUE OR (FALSE XOR TRUE)` = 1.
+# `(TRUE OR FALSE) XOR TRUE` = 0. Differing results prove
+# XOR binds tighter than OR.
+SELECT TRUE OR FALSE XOR TRUE AS or_xor;
+or_xor
+1
+SELECT (TRUE OR FALSE) XOR TRUE AS or_xor_paren;
+or_xor_paren
+0
+=== XOR precedence vs AND — DIVERGENCE: zeta binds XOR tighter ===
+# MySQL: AND > XOR; zeta (sqlparser): XOR > AND.
+# `FALSE AND TRUE XOR TRUE` parses as `FALSE AND (TRUE XOR TRUE)` = 0
+# in zeta vs `(FALSE AND TRUE) XOR TRUE` = 1 in MySQL.
+# Use explicit parentheses with mixed AND / XOR.
+SELECT FALSE AND TRUE XOR TRUE AS and_xor_zeta;
+and_xor_zeta
+0
+SELECT (FALSE AND TRUE) XOR TRUE AS and_xor_mysql_equiv;
+and_xor_mysql_equiv
+1
+=== NOT XOR — NOT binds tightest ===
+SELECT NOT TRUE XOR TRUE AS not_xor, NOT FALSE XOR FALSE AS not_xor2;
+not_xor	not_xor2
+1	1
+=== XOR with column predicates — SELECT list ===
+DROP TABLE IF EXISTS xt;
+CREATE TABLE xt (id INT, a INT, b INT);
+INSERT INTO xt VALUES (1,0,0),(2,0,1),(3,1,0),(4,1,1),(5,NULL,1),(6,NULL,NULL);
+SELECT id, (a > 0) XOR (b > 0) AS x FROM xt ORDER BY id;
+id	x
+1	0
+2	1
+3	1
+4	0
+5	NULL
+6	NULL
+=== XOR in WHERE clause — only rows where exactly one predicate is true ===
+SELECT id FROM xt WHERE (a > 0) XOR (b > 0) ORDER BY id;
+id
+2
+3
+=== XOR with boolean column ===
+DROP TABLE IF EXISTS bxt;
+CREATE TABLE bxt (id INT, p BOOLEAN, q BOOLEAN);
+INSERT INTO bxt VALUES (1, TRUE, TRUE), (2, TRUE, FALSE), (3, FALSE, TRUE), (4, FALSE, FALSE), (5, NULL, TRUE);
+SELECT id, p XOR q AS x FROM bxt ORDER BY id;
+id	x
+1	0
+2	1
+3	1
+4	0
+5	NULL
+=== Chained XOR — associative left-to-right ===
+SELECT TRUE XOR TRUE XOR TRUE AS triple_true, TRUE XOR FALSE XOR TRUE AS tft;
+triple_true	tft
+1	0
+=== KNOWN GAP: integer XOR — returns NULL (same as integer AND/OR) ===
+# MySQL: `1 XOR 0` = 1, `1 XOR 1` = 0. zeta only
+# coerces Bool, so integer operands fall through to
+# NULL. Substitute with explicit predicate:
+# `(a > 0) XOR (b > 0)`.
+SELECT 1 XOR 0 AS one_xor_zero, 5 XOR 0 AS five_xor_zero, 1 XOR 1 AS one_xor_one;
+one_xor_zero	five_xor_zero	one_xor_one
+NULL	NULL	NULL
+=== KNOWN DIVERGENCE: `<=>` is vector cosine distance, not NULL-safe equality ===
+# zeta repurposes the `<=>` token (PG / pgvector
+# convention). For MySQL NULL-safe equal, use
+# `a IS NOT DISTINCT FROM b`.
+SELECT 1 <=> 1 AS nsl;
+ERROR 1105: execution error: <=> requires vector operands
+SELECT 1 IS NOT DISTINCT FROM 1 AS sub1, NULL IS NOT DISTINCT FROM NULL AS sub2, 1 IS NOT DISTINCT FROM NULL AS sub3;
+sub1	sub2	sub3
+1	1	0
+DROP TABLE xt;
+DROP TABLE bxt;
