@@ -69,10 +69,10 @@
 #     TIME.
 #   # zeta-adapt: MAKE_DATE(y, m, d) / MAKE_TIME(h, m, s) —
 #     PG spelling, both supported.
-#   # zeta-adapt: KNOWN GAP — MAKEDATE(year, dayofyear)
-#     (the MySQL day-of-year form) errors 1105 unknown.
-#     Substitute via MAKE_DATE(y, m, d) and compute the
-#     month/day from the day-of-year yourself.
+#   # zeta-adapt: MAKEDATE(year, dayofyear) — MySQL day-of-
+#     year form, supported. Jan 1 + (dayofyear - 1) days;
+#     large dayofyear rolls into the next year. NULL for
+#     dayofyear < 1. Closed by zeta #1203.
 #   # zeta-adapt: KNOWN GAP — INTERVAL n MICROSECOND /
 #     NANOSECOND / QUARTER / DECADE / CENTURY / MILLENNIUM
 #     all error 1064 "unsupported interval field". Only
@@ -155,10 +155,11 @@ SELECT MAKETIME(14, 30, 45) AS t;
 
 SELECT MAKE_DATE(2024, 5, 19) AS d, MAKE_TIME(14, 30, 45) AS t;
 
---echo === KNOWN GAP: MAKEDATE (MySQL spelling) — errno 1105 ===
+--echo === MAKEDATE (MySQL day-of-year form) — supported ===
 
---error 1105
-SELECT MAKEDATE(2024, 140);
+SELECT MAKEDATE(2024, 140) AS d;
+SELECT MAKEDATE(2024, 367) AS rollover;
+SELECT MAKEDATE(2024, 0) AS d_zero;
 
 --echo === KNOWN GAP: INTERVAL n MICROSECOND — errno 1064 ===
 
