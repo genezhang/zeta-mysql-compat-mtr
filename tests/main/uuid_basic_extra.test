@@ -1,0 +1,130 @@
+# Independently authored UUID smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t (MySQL's UUID() returns CHAR(36); zeta's
+# UUID is a first-class PG type). Pins zeta's UUID surface
+# beyond the row-roundtrip already covered in
+# datatype_basic_extra.
+#
+# Adaptation notes:
+#   # zeta-adapt: UUID column type — supported.
+#   # zeta-adapt: GEN_RANDOM_UUID() — supported (PG name);
+#     returns a fresh v4 UUID on each call.
+#   # zeta-adapt: UUID_GENERATE_V4() — supported (uuid-ossp
+#     alias for GEN_RANDOM_UUID).
+#   # zeta-adapt: ::UUID cast and CAST(text AS UUID) — both
+#     supported. Validates the 8-4-4-4-12 hex layout.
+#   # zeta-adapt: Invalid UUID format ('not-a-uuid') errors
+#     1105 "invalid UUID format ... (expected 8-4-4-4-12)".
+#   # zeta-adapt: LENGTH on a UUID returns 36 — i.e. the
+#     character count of the canonical hyphenated form
+#     (8+4+4+4+12 hex chars plus 4 hyphens). Same string-
+#     view pattern as BYTEA (see bytea_blob_basic_extra).
+#   # zeta-adapt: UUID PRIMARY KEY — supported; duplicate
+#     INSERT errors 1062.
+#   # zeta-adapt: UUID equality (=) and IS NULL — supported.
+#   # zeta-adapt: ORDER BY UUID — supported. Ordering is
+#     lexicographic over the canonical hyphenated string
+#     form, which matches byte-order for UUIDs.
+#   # zeta-adapt: GEN_RANDOM_UUID() returns distinct values
+#     across calls (verified via COUNT(DISTINCT) over five
+#     INSERTs).
+#   # zeta-adapt: KNOWN GAP — MySQL `UUID()` (no underscore)
+#     errors 1105 "unknown function: UUID". Substitute:
+#     GEN_RANDOM_UUID() or UUID_GENERATE_V4().
+#   # zeta-adapt: KNOWN GAP — `column DEFAULT GEN_RANDOM_UUID()`
+#     errors 1105 "invalid UUID character 'G' in
+#     'GEN_RANDOM_UUID()'" on INSERT — the DEFAULT expression
+#     is bound as a text literal rather than a function call,
+#     so zeta tries to parse the string `GEN_RANDOM_UUID()`
+#     as a UUID. Same root cause as the DEFAULT NEXTVAL gap
+#     pinned in sequence_basic_extra. Substitute: pass
+#     GEN_RANDOM_UUID() explicitly in each INSERT's VALUES
+#     list.
+
+--echo === GEN_RANDOM_UUID() returns a fresh UUID ===
+--echo # Each call returns a different value — we can't pin
+--echo # the exact value, so we just verify the result is a
+--echo # valid UUID by casting it through the type.
+
+SELECT GEN_RANDOM_UUID() IS NOT NULL AS not_null;
+SELECT LENGTH(GEN_RANDOM_UUID()) AS len;
+
+--echo === UUID_GENERATE_V4 (uuid-ossp alias) ===
+
+SELECT UUID_GENERATE_V4() IS NOT NULL AS not_null;
+SELECT LENGTH(UUID_GENERATE_V4()) AS len;
+
+--echo === ::UUID cast on valid string ===
+
+SELECT '550e8400-e29b-41d4-a716-446655440000'::UUID AS r;
+SELECT CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID) AS r;
+
+--echo === ::UUID cast on invalid string — errno 1105 ===
+
+--error 1105
+SELECT 'not-a-uuid'::UUID AS r;
+
+--echo === LENGTH(uuid) returns 36 (canonical hyphenated form chars) ===
+
+SELECT LENGTH('550e8400-e29b-41d4-a716-446655440000'::UUID) AS r;
+
+--echo === UUID PRIMARY KEY — duplicate errors 1062 ===
+
+DROP TABLE IF EXISTS u_pk;
+CREATE TABLE u_pk (id UUID PRIMARY KEY, n INT);
+INSERT INTO u_pk VALUES ('550e8400-e29b-41d4-a716-446655440000', 1);
+--error 1062
+INSERT INTO u_pk VALUES ('550e8400-e29b-41d4-a716-446655440000', 2);
+SELECT id, n FROM u_pk;
+DROP TABLE u_pk;
+
+--echo === ORDER BY UUID — lexicographic / byte order ===
+
+DROP TABLE IF EXISTS u_ord;
+CREATE TABLE u_ord (id INT, u UUID);
+INSERT INTO u_ord VALUES (1, '00000000-0000-0000-0000-000000000001'),
+                          (2, '00000000-0000-0000-0000-000000000003'),
+                          (3, '00000000-0000-0000-0000-000000000002');
+SELECT id, u FROM u_ord ORDER BY u;
+SELECT id FROM u_ord WHERE u = '00000000-0000-0000-0000-000000000003';
+DROP TABLE u_ord;
+
+--echo === UUID NULL handling ===
+
+DROP TABLE IF EXISTS u_null;
+CREATE TABLE u_null (id INT, u UUID);
+INSERT INTO u_null VALUES (1, NULL), (2, '00000000-0000-0000-0000-000000000001');
+SELECT id, u FROM u_null ORDER BY id;
+SELECT COUNT(*) AS null_count FROM u_null WHERE u IS NULL;
+DROP TABLE u_null;
+
+--echo === GEN_RANDOM_UUID() uniqueness across multiple INSERTs ===
+
+DROP TABLE IF EXISTS u_uniq;
+CREATE TABLE u_uniq (id INT PRIMARY KEY, u UUID);
+INSERT INTO u_uniq VALUES
+  (1, GEN_RANDOM_UUID()), (2, GEN_RANDOM_UUID()),
+  (3, GEN_RANDOM_UUID()), (4, GEN_RANDOM_UUID()),
+  (5, GEN_RANDOM_UUID());
+SELECT COUNT(DISTINCT u) AS distinct_count, COUNT(*) AS total FROM u_uniq;
+DROP TABLE u_uniq;
+
+--echo === KNOWN GAP: MySQL UUID() (no underscore) — errno 1105 ===
+--echo # Substitute: GEN_RANDOM_UUID() or UUID_GENERATE_V4().
+
+--error 1105
+SELECT UUID() AS r;
+
+--echo === KNOWN GAP: DEFAULT GEN_RANDOM_UUID() — errno 1105 ===
+--echo # The DEFAULT expression is bound as a text literal,
+--echo # so zeta tries to UUID-parse the string
+--echo # 'GEN_RANDOM_UUID()'. Same root cause as the
+--echo # DEFAULT NEXTVAL gap in sequence_basic_extra.
+--echo # Substitute: pass GEN_RANDOM_UUID() explicitly in
+--echo # each INSERT's VALUES list.
+
+DROP TABLE IF EXISTS u_dflt;
+CREATE TABLE u_dflt (id UUID DEFAULT GEN_RANDOM_UUID() PRIMARY KEY, n INT);
+--error 1105
+INSERT INTO u_dflt (n) VALUES (1);
+DROP TABLE u_dflt;
