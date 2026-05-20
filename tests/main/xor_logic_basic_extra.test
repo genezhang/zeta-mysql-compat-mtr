@@ -14,11 +14,10 @@
 # Precedence sits between AND (tighter) and OR (looser),
 # matching MySQL and SQL-standard ordering.
 #
-# Notable gap (carried over from AND/OR): integer
-# operands in logical operators don't coerce to bool —
-# `1 XOR 0` returns NULL instead of MySQL's 1. Same
-# behavior as `1 AND 1 = NULL`. Substitute by comparing
-# explicitly: `(a > 0) XOR (b > 0)`.
+# Notable: integer / float / decimal operands in logical
+# operators now coerce to bool with MySQL semantics
+# (zero → false, non-zero → true). Fixed in zeta PR
+# #1212 — previously these returned NULL.
 #
 # Notable divergence #1: `<=>` is the vector cosine-distance
 # operator in zeta (PG/pgvector convention), not MySQL's
@@ -45,9 +44,13 @@
 #     `(TRUE AND FALSE) XOR TRUE` = 1.
 #   # zeta-adapt: NOT XOR — NOT binds tightest;
 #     `NOT TRUE XOR TRUE` = `(NOT TRUE) XOR TRUE` = 1.
-#   # zeta-adapt: KNOWN GAP — integer XOR (`1 XOR 0`)
-#     returns NULL. Same shape as `1 AND 1 = NULL`. Use
-#     explicit boolean expressions instead.
+#   # zeta-adapt: integer / float / decimal XOR — works.
+#     Numeric operands coerce to bool (0 → false,
+#     non-zero → true). `1 XOR 0` = 1, `5 XOR 0` = 1,
+#     `1 XOR 1` = 0. Fixed in zeta PR #1212; pinned here
+#     to lock the MySQL semantics.
+#   # zeta-adapt: NOT on numeric — works. `NOT 0` = 1,
+#     `NOT 5` = 0, `NOT 0.0` = 1, `NOT NULL` = NULL.
 #   # zeta-adapt: KNOWN DIVERGENCE — `<=>` errors 1105
 #     "<=> requires vector operands". zeta repurposes
 #     this token for vector cosine distance (PG /
@@ -105,13 +108,21 @@ SELECT id, p XOR q AS x FROM bxt ORDER BY id;
 
 SELECT TRUE XOR TRUE XOR TRUE AS triple_true, TRUE XOR FALSE XOR TRUE AS tft;
 
---echo === KNOWN GAP: integer XOR — returns NULL (same as integer AND/OR) ===
---echo # MySQL: `1 XOR 0` = 1, `1 XOR 1` = 0. zeta only
---echo # coerces Bool, so integer operands fall through to
---echo # NULL. Substitute with explicit predicate:
---echo # `(a > 0) XOR (b > 0)`.
+--echo === Numeric XOR — coerces to bool (0 → false, non-zero → true) ===
 
 SELECT 1 XOR 0 AS one_xor_zero, 5 XOR 0 AS five_xor_zero, 1 XOR 1 AS one_xor_one;
+
+--echo === Numeric AND/OR — same coercion ===
+
+SELECT 1 AND 1 AS a, 5 AND 3 AS b, 0 AND 1 AS c, 1 OR 0 AS d, 0 OR 0 AS e;
+
+--echo === Float / decimal XOR coercion ===
+
+SELECT 1.5 AND 1.5 AS fa, 0.0 OR 1.5 AS fb, 0.0 XOR 1.5 AS fc;
+
+--echo === NOT on numeric — coerces ===
+
+SELECT NOT 0 AS k, NOT 1 AS l, NOT 5 AS m, NOT 0.0 AS n, NOT 1.5 AS o, NOT NULL AS p;
 
 --echo === KNOWN DIVERGENCE: `<=>` is vector cosine distance, not NULL-safe equality ===
 --echo # zeta repurposes the `<=>` token (PG / pgvector
