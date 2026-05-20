@@ -14,9 +14,11 @@
 # parseable as either DATE or TIMESTAMP.
 #
 # zeta is more permissive than MySQL on the low end:
-# FROM_DAYS(0) returns '0000-01-01' (MySQL would return
-# the zero date or NULL). Acceptable since zeta supports
-# year 0 / negative years already (see date_arith_edges).
+# FROM_DAYS(0) returns '0000-01-01' in zeta. In MySQL the
+# same call returns the zero date '0000-00-00' under default
+# SQL mode (or NULL when NO_ZERO_DATE is set). Acceptable
+# since zeta supports year 0 / negative years already (see
+# date_arith_edges_basic_extra).
 #
 # Adaptation notes:
 #   # zeta-adapt: TO_DAYS(date) returns days since
@@ -32,10 +34,10 @@
 #   # zeta-adapt: TO_DAYS on unparseable string → errno 1105
 #     "cannot parse".
 #   # zeta-adapt: KNOWN DIVERGENCE — FROM_DAYS(0) returns
-#     '0000-01-01' (year-0-day-zero). MySQL returns NULL or
-#     the zero date depending on SQL mode. zeta is more
-#     permissive on pre-year-1 dates (see also
-#     date_arith_edges_basic_extra).
+#     '0000-01-01' (year-0-day-zero). MySQL returns the zero
+#     date '0000-00-00' under default SQL mode (or NULL under
+#     NO_ZERO_DATE). zeta is more permissive on pre-year-1
+#     dates (see also date_arith_edges_basic_extra).
 
 --echo === TO_DAYS — anchors at 1970-01-01 = 719528 ===
 
