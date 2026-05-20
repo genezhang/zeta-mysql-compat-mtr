@@ -1,0 +1,81 @@
+# Independently authored SEC_TO_TIME / TIME_TO_SEC smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/func_time.test or PG regress.
+# Both functions were missing in zeta before zeta PR #1224
+# (errored "unknown function"); this slice locks in the
+# new behavior.
+#
+# Big-picture finding: SEC_TO_TIME(n) constructs a TIME
+# value from an integer second count; TIME_TO_SEC is the
+# inverse and also accepts a parseable HH:MM:SS string.
+# Both NULL-propagate. zeta's TIME storage is 0..86400
+# seconds (one day), so SEC_TO_TIME accepts the boundary
+# 86400 but rejects 86401 or negatives — MySQL allows up
+# to 838:59:59 (~3.02 million seconds), so the upper
+# bound is a DIVERGENCE.
+#
+# Adaptation notes:
+#   # zeta-adapt: SEC_TO_TIME(n) — n integer seconds; TIME
+#     return. Accepts 0..86400 inclusive; outside that
+#     errors 1105. (MySQL allows up to 3020399 = 838:59:59.)
+#   # zeta-adapt: TIME_TO_SEC(time) — TIME or parseable
+#     string; returns BIGINT seconds.
+#   # zeta-adapt: NULL propagation in both directions.
+#   # zeta-adapt: SEC_TO_TIME(arity != 1) → errno 1105.
+#   # zeta-adapt: TIME_TO_SEC(arity != 1) → errno 1105.
+#   # zeta-adapt: TIME_TO_SEC on unparseable string →
+#     errno 1105 with "cannot parse".
+
+--echo === SEC_TO_TIME — basic, zero, day boundary ===
+
+SELECT SEC_TO_TIME(3666) AS one_hr_one_min_six_sec;
+SELECT SEC_TO_TIME(0)    AS midnight;
+SELECT SEC_TO_TIME(86400) AS one_day_boundary;
+
+--echo === SEC_TO_TIME — NULL → NULL ===
+
+SELECT SEC_TO_TIME(NULL) AS n;
+
+--echo === SEC_TO_TIME — out of range (MySQL allows; zeta rejects) ===
+
+--error 1105
+SELECT SEC_TO_TIME(86401);
+--error 1105
+SELECT SEC_TO_TIME(-1);
+
+--echo === TIME_TO_SEC — TIME literal, string form, NULL ===
+
+SELECT TIME_TO_SEC(TIME '01:01:06') AS hms;
+SELECT TIME_TO_SEC(TIME '23:59:59') AS day_end;
+SELECT TIME_TO_SEC(TIME '00:00:00') AS zero;
+SELECT TIME_TO_SEC('01:00:00')      AS str_one_hr;
+SELECT TIME_TO_SEC(NULL)            AS n;
+
+--echo === TIME_TO_SEC — unparseable string errors 1105 ===
+
+--error 1105
+SELECT TIME_TO_SEC('not a time');
+
+--echo === Roundtrip: TIME_TO_SEC(SEC_TO_TIME(n)) = n ===
+
+SELECT TIME_TO_SEC(SEC_TO_TIME(3661)) AS rt;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT SEC_TO_TIME();
+--error 1105
+SELECT SEC_TO_TIME(1, 2);
+--error 1105
+SELECT TIME_TO_SEC();
+--error 1105
+SELECT TIME_TO_SEC(TIME '00:30:00', TIME '00:00:00');
+
+--echo === On TIME column inside SELECT / WHERE ===
+
+DROP TABLE IF EXISTS tt;
+CREATE TABLE tt (id INT, t TIME);
+INSERT INTO tt VALUES (1, TIME '00:00:30'), (2, TIME '01:00:00'), (3, TIME '02:30:00');
+SELECT id, TIME_TO_SEC(t) AS s FROM tt ORDER BY id;
+SELECT id FROM tt WHERE TIME_TO_SEC(t) > 3600 ORDER BY id;
+DROP TABLE tt;
