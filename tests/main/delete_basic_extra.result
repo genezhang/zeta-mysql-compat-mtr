@@ -1,0 +1,90 @@
+=== Setup ===
+DROP TABLE IF EXISTS dt; DROP TABLE IF EXISTS dx;
+CREATE TABLE dt (id INT PRIMARY KEY, n INT);
+CREATE TABLE dx (rid INT);
+INSERT INTO dt VALUES (1, 10), (2, 20), (3, 30);
+INSERT INTO dx VALUES (1), (3);
+=== DELETE FROM <t> USING <other> (PG cross-table) ===
+DELETE FROM dt USING dx WHERE dt.id = dx.rid;
+SELECT id, n FROM dt ORDER BY id;
+id	n
+2	20
+=== DELETE WHERE EXISTS (correlated subquery) ===
+DROP TABLE IF EXISTS de1; DROP TABLE IF EXISTS dex;
+CREATE TABLE de1 (id INT PRIMARY KEY, n INT);
+CREATE TABLE dex (rid INT);
+INSERT INTO de1 VALUES (1, 10), (2, 20), (3, 30);
+INSERT INTO dex VALUES (1), (3);
+DELETE FROM de1 WHERE EXISTS (SELECT 1 FROM dex WHERE rid = de1.id);
+SELECT id, n FROM de1 ORDER BY id;
+id	n
+2	20
+=== DELETE ... RETURNING (PG) — accepted, no wire-side rows ===
+# Same divergence as UPDATE RETURNING: the underlying
+# DELETE applies, but the MySQL wire path silently
+# drops the RETURNING rowset. Through PG wire / psql,
+# RETURNING works as expected. Verified via the
+# follow-up SELECT showing the post-delete state.
+DROP TABLE IF EXISTS dr;
+CREATE TABLE dr (id INT PRIMARY KEY, n INT);
+INSERT INTO dr VALUES (1, 10), (2, 20);
+DELETE FROM dr WHERE id = 1 RETURNING id, n;
+SELECT id, n FROM dr;
+id	n
+2	20
+=== TRUNCATE TABLE ===
+DROP TABLE IF EXISTS tr;
+CREATE TABLE tr (id INT PRIMARY KEY);
+INSERT INTO tr VALUES (1), (2);
+TRUNCATE TABLE tr;
+SELECT COUNT(*) AS c FROM tr;
+c
+0
+=== TRUNCATE TABLE ... RESTART IDENTITY ===
+DROP TABLE IF EXISTS tri;
+CREATE TABLE tri (id SERIAL PRIMARY KEY, name VARCHAR(10));
+INSERT INTO tri (name) VALUES ('a'), ('b');
+TRUNCATE TABLE tri RESTART IDENTITY;
+INSERT INTO tri (name) VALUES ('c');
+SELECT id, name FROM tri;
+id	name
+1	c
+=== DELETE FROM <t> AS <alias> ===
+DROP TABLE IF EXISTS da;
+CREATE TABLE da (id INT PRIMARY KEY, n INT);
+INSERT INTO da VALUES (1, 10), (2, 20);
+DELETE FROM da AS a WHERE a.id = 1;
+SELECT id, n FROM da;
+id	n
+2	20
+=== KNOWN GAP: WITH ... DELETE in CTE — errno 1064 ===
+DROP TABLE IF EXISTS dctp; DROP TABLE IF EXISTS dctc;
+CREATE TABLE dctp (id INT PRIMARY KEY);
+CREATE TABLE dctc (id INT PRIMARY KEY, pid INT);
+INSERT INTO dctp VALUES (1), (2);
+INSERT INTO dctc VALUES (10, 1), (20, 1), (30, 2);
+WITH del AS (DELETE FROM dctp WHERE id = 1 RETURNING id)
+DELETE FROM dctc WHERE pid IN (SELECT id FROM del);
+ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+=== TRUNCATE TABLE … CASCADE — empties parent + child ===
+DROP TABLE IF EXISTS tcc; DROP TABLE IF EXISTS tcp;
+CREATE TABLE tcp (id INT PRIMARY KEY);
+CREATE TABLE tcc (id INT PRIMARY KEY, pid INT, FOREIGN KEY (pid) REFERENCES tcp(id));
+INSERT INTO tcp VALUES (1);
+INSERT INTO tcc VALUES (10, 1);
+TRUNCATE TABLE tcp CASCADE;
+SELECT COUNT(*) AS p_count FROM tcp;
+p_count
+0
+SELECT COUNT(*) AS c_count FROM tcc;
+c_count
+0
+=== Cleanup ===
+DROP TABLE dt; DROP TABLE dx;
+DROP TABLE de1; DROP TABLE dex;
+DROP TABLE dr;
+DROP TABLE tr;
+DROP TABLE tri;
+DROP TABLE da;
+DROP TABLE dctc; DROP TABLE dctp;
+DROP TABLE tcc; DROP TABLE tcp;
