@@ -1,0 +1,114 @@
+=== FORMAT base + padding + negative ===
+SELECT FORMAT(1234567.89, 2) AS basic;
+basic
+1,234,567.89
+SELECT FORMAT(1234567.89, 0) AS no_dec;
+no_dec
+1,234,568
+SELECT FORMAT(1234.5, 4) AS pad_dec;
+pad_dec
+1,234.5000
+SELECT FORMAT(-1234.56, 2) AS neg;
+neg
+-1,234.56
+=== FORMAT NULL propagation ===
+SELECT FORMAT(NULL, 2) AS nl_n;
+nl_n
+NULL
+SELECT FORMAT(123, NULL) AS nl_d;
+nl_d
+NULL
+=== CONV base conversions ===
+SELECT CONV('FF', 16, 10) AS hex_dec;
+hex_dec
+255
+SELECT CONV(255, 10, 16) AS dec_hex;
+dec_hex
+FF
+SELECT CONV('1010', 2, 10) AS bin_dec;
+bin_dec
+10
+SELECT CONV(100, 10, 2) AS dec_bin;
+dec_bin
+1100100
+SELECT CONV('FF', 16, 2) AS hex_bin;
+hex_bin
+11111111
+SELECT CONV('z', 36, 10) AS base36;
+base36
+35
+=== CONV NULL propagation + zero base ===
+SELECT CONV(NULL, 16, 10) AS nl_n;
+nl_n
+NULL
+SELECT CONV('ff', NULL, 10) AS nl_f;
+nl_f
+NULL
+SELECT CONV('ff', 16, NULL) AS nl_t;
+nl_t
+NULL
+SELECT CONV(10, 0, 10) AS zero_base;
+zero_base
+NULL
+=== HEX integer and string forms ===
+SELECT HEX(255) AS int_hex, HEX(0) AS zero, HEX('abc') AS str_hex, HEX(NULL) AS nl;
+int_hex	zero	str_hex	nl
+FF	0	616263	NULL
+=== UNHEX edges ===
+SELECT UNHEX('616263') AS valid;
+valid
+abc
+SELECT UNHEX('') AS empty;
+empty
+
+SELECT UNHEX('1') AS odd_len;
+odd_len
+NULL
+SELECT UNHEX('XYZ') AS invalid;
+invalid
+NULL
+SELECT UNHEX(NULL) AS nl;
+nl
+NULL
+=== BIN / OCT negative — two's complement ===
+SELECT BIN(-1) AS bin_neg;
+bin_neg
+1111111111111111111111111111111111111111111111111111111111111111
+SELECT OCT(-8) AS oct_neg;
+oct_neg
+1777777777777777777770
+SELECT BIN(0) AS zero, OCT(0) AS zero2;
+zero	zero2
+0	0
+=== ASCII empty / multi-byte ===
+SELECT ASCII('') AS empty;
+empty
+0
+=== CHAR — single, multi-arg, NULL ===
+SELECT CHAR(65) AS a;
+a
+A
+SELECT CHAR(65, 66, 67) AS abc;
+abc
+ABC
+SELECT LENGTH(CHAR(0)) AS len_zero;
+len_zero
+1
+=== ORD on single vs multi-char ===
+SELECT ORD('A') AS single, ORD('AB') AS multi, ORD('') AS empty, ORD(NULL) AS nl;
+single	multi	empty	nl
+65	65	0	NULL
+=== QUOTE — escape single quote and backslash ===
+SELECT QUOTE('don''t') AS sq;
+sq
+'don\'t'
+SELECT QUOTE(123) AS num;
+num
+'123'
+=== KNOWN DIVERGENCE: QUOTE(NULL) → NULL, MySQL → 'NULL' string ===
+SELECT QUOTE(NULL) AS qn;
+qn
+NULL
+=== KNOWN GAP: FORMAT(n, dec, 'locale') — errno 1105 ===
+SELECT FORMAT(1234.56, 2, 'de_DE');
+ERROR 1105: execution error: FORMAT requires 2 arguments (number, decimals)
