@@ -39,17 +39,17 @@
 #   # zeta-adapt: ARRAY_TO_STRING(arr, sep) — supported.
 #   # zeta-adapt: PG-string ARRAY literal `'{1,2,3}'::INT[]` —
 #     supported.
-#   # zeta-adapt: KNOWN GAP — ARRAY_PREPEND(elem, arr) errors
-#     1105 "unknown function". Substitute: `ARRAY[elem] || arr`.
-#   # zeta-adapt: KNOWN GAP — ARRAY_REPLACE(arr, old, new)
-#     errors 1105 "unknown function". Substitute:
-#     `ARRAY(SELECT CASE WHEN x = old THEN new ELSE x END
-#     FROM UNNEST(arr) AS t(x))`.
+#   # zeta-adapt: ARRAY_PREPEND(elem, arr) — supported.
+#     Closed by zeta #1202.
+#   # zeta-adapt: ARRAY_REPLACE(arr, old, new) — supported.
+#     Substitutes every matching element. Closed by zeta #1202.
 #   # zeta-adapt: CARDINALITY(arr) — SQL-standard / PG name for
 #     total element count. Returns 0 for empty arrays (unlike
 #     ARRAY_LENGTH which returns NULL). Closed by zeta #1200.
-#   # zeta-adapt: KNOWN GAP — ARRAY_UPPER(arr, dim) and
-#     ARRAY_LOWER(arr, dim) both error 1105 "unknown function".
+#   # zeta-adapt: ARRAY_UPPER(arr, dim) / ARRAY_LOWER(arr, dim)
+#     — supported. PG 1-based indexing: for dim=1, upper = element
+#     count, lower = 1; other dims or empty arrays → NULL.
+#     Closed by zeta #1202.
 #     1-D arrays in zeta are effectively 1..ARRAY_LENGTH(arr, 1)
 #     so UPPER = LENGTH and LOWER = 1.
 #   # zeta-adapt: KNOWN GAP — array slicing `(arr)[a:b]` errors
@@ -124,17 +124,12 @@ SELECT ARRAY_LENGTH(ARRAY[1, 2, NULL, 4], 1) AS r;
 
 SELECT ARRAY_TO_STRING(ARRAY[1, 2, 3], ',') AS s;
 
---echo === KNOWN GAP: ARRAY_PREPEND — errno 1105 ===
---echo # Substitute: ARRAY[elem] || arr.
+--echo === ARRAY_PREPEND — supported (push to front) ===
 
---error 1105
 SELECT ARRAY_PREPEND(0, ARRAY[1, 2, 3]) AS r;
 
---echo === KNOWN GAP: ARRAY_REPLACE — errno 1105 ===
---echo # Substitute: ARRAY(SELECT CASE WHEN x = old THEN new
---echo # ELSE x END FROM UNNEST(arr) AS t(x)).
+--echo === ARRAY_REPLACE — supported (substitute every match) ===
 
---error 1105
 SELECT ARRAY_REPLACE(ARRAY[1, 2, 3], 2, 9) AS r;
 
 --echo === CARDINALITY — supported (returns 0 for empty, NULL for NULL) ===
@@ -142,12 +137,10 @@ SELECT ARRAY_REPLACE(ARRAY[1, 2, 3], 2, 9) AS r;
 SELECT CARDINALITY(ARRAY[1, 2, 3]) AS r;
 SELECT CARDINALITY(ARRAY[]::INT[]) AS empty;
 
---echo === KNOWN GAP: ARRAY_UPPER / ARRAY_LOWER — errno 1105 ===
+--echo === ARRAY_UPPER / ARRAY_LOWER — supported (1-based; empty → NULL) ===
 
---error 1105
-SELECT ARRAY_UPPER(ARRAY[1, 2, 3], 1) AS r;
---error 1105
-SELECT ARRAY_LOWER(ARRAY[1, 2, 3], 1) AS r;
+SELECT ARRAY_UPPER(ARRAY[1, 2, 3], 1) AS u;
+SELECT ARRAY_LOWER(ARRAY[1, 2, 3], 1) AS l;
 
 --echo === KNOWN GAP: array slicing (arr)[a:b] — errno 1064 ===
 --echo # Substitute: ARRAY(SELECT x FROM UNNEST(arr) WITH
