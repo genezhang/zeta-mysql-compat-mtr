@@ -1,0 +1,153 @@
+# Independently authored charset/collation smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/ctype_*.test files; pins zeta's
+# charset and collation surface from the MySQL wire (no
+# prior compat coverage other than the SHOW CHARACTER SET
+# basic check in variable_basic_extra). Connect-time
+# charset DDL is a frequent ORM path (JDBC sets
+# characterEncoding, mysqlclient sends SET NAMES).
+#
+# Big-picture finding: zeta supports a single UTF-8
+# charset (utf8mb4) with a single collation
+# (utf8mb4_general_ci). All charset/collation DDL is
+# accepted in syntax position but silently dropped — no
+# enforcement, no storage, no introspection of the
+# requested values. SHOW CHARACTER SET LIKE and SHOW
+# COLLATION LIKE ignore the LIKE filter and always return
+# the single utf8mb4 row. SET NAMES accepts any string
+# without validation. Column/table-level CHARACTER SET and
+# COLLATE clauses parse, but SHOW CREATE TABLE strips
+# them. The CHARSET() / COLLATION() functions work and
+# return the engine-wide defaults. Common Unicode
+# coercion forms — CONVERT(x USING ...), CAST AS CHAR
+# CHARACTER SET, _utf8mb4'lit' introducers, and the COLLATE
+# expression operator — all error with 1064.
+#
+# Adaptation notes:
+#   # zeta-adapt: SHOW CHARACTER SET — returns one row
+#     (utf8mb4 only).
+#   # zeta-adapt: SHOW COLLATION — returns one row
+#     (utf8mb4_general_ci only).
+#   # zeta-adapt: SET NAMES '<charset>' — silent no-op for
+#     any value.
+#   # zeta-adapt: SET NAMES '<charset>' COLLATE '<coll>' —
+#     silent no-op.
+#   # zeta-adapt: SET CHARACTER SET <charset> — silent
+#     no-op.
+#   # zeta-adapt: column-level CHARACTER SET / COLLATE in
+#     CREATE TABLE — parses, silent no-op.
+#   # zeta-adapt: table-level CHARACTER SET / COLLATE in
+#     CREATE TABLE — parses, silent no-op.
+#   # zeta-adapt: CHARSET(<expr>) — works, returns
+#     'utf8mb4' for any input.
+#   # zeta-adapt: COLLATION(<expr>) — works, returns
+#     'utf8mb4_general_ci' for any input.
+#   # zeta-adapt: @@character_set_client / _connection,
+#     @@collation_connection — return the engine-wide
+#     defaults; not actually settable.
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW CHARACTER SET
+#     LIKE '<pattern>' ignores the LIKE filter; always
+#     returns the single utf8mb4 row even for patterns
+#     that match no real charset (e.g. 'latin%').
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW COLLATION LIKE
+#     same: LIKE filter is ignored.
+#   # zeta-adapt: KNOWN DIVERGENCE — SET NAMES '<bogus>'
+#     accepts any string, including non-existent charsets
+#     like 'latin1' — no validation.
+#   # zeta-adapt: KNOWN DIVERGENCE — column-level and
+#     table-level CHARACTER SET / COLLATE clauses are
+#     stripped from SHOW CREATE TABLE output; round-trip
+#     dumps lose the spec.
+#   # zeta-adapt: KNOWN GAP — CONVERT(x USING utf8mb4)
+#     errors 1064 "unsupported expression: CONVERT(...
+#     USING ...)".
+#   # zeta-adapt: KNOWN GAP — CAST(x AS CHAR CHARACTER SET
+#     ...) errors 1064 (parser does not accept CHARACTER
+#     after CHAR in CAST).
+#   # zeta-adapt: KNOWN GAP — introducer literal
+#     _utf8mb4'string' errors 1064 "unsupported
+#     expression: _utf8mb4 '...'".
+#   # zeta-adapt: KNOWN GAP — COLLATE expression operator
+#     ('x' COLLATE c) errors 1064 "unsupported expression:
+#     '...' COLLATE ...".
+
+--echo === SHOW CHARACTER SET — single utf8mb4 row ===
+
+SHOW CHARACTER SET;
+
+--echo === SHOW COLLATION — single utf8mb4_general_ci row ===
+
+SHOW COLLATION;
+
+--echo === SET NAMES 'utf8mb4' — silent no-op ===
+
+SET NAMES 'utf8mb4';
+
+--echo === SET NAMES with COLLATE clause — silent no-op ===
+
+SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci';
+
+--echo === SET CHARACTER SET — silent no-op ===
+
+SET CHARACTER SET utf8mb4;
+
+--echo === Column-level CHARACTER SET / COLLATE — parses, silent no-op ===
+
+DROP TABLE IF EXISTS cst;
+CREATE TABLE cst (c TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci);
+INSERT INTO cst VALUES ('hello');
+SELECT c FROM cst;
+
+--echo === Table-level CHARACTER SET / COLLATE — parses, silent no-op ===
+
+DROP TABLE IF EXISTS cst2;
+CREATE TABLE cst2 (c TEXT) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+INSERT INTO cst2 VALUES ('world');
+SELECT c FROM cst2;
+
+--echo === CHARSET() and COLLATION() return engine defaults ===
+
+SELECT CHARSET('hello') AS cs, COLLATION('hello') AS coll;
+
+--echo === KNOWN DIVERGENCE: SHOW CHARACTER SET LIKE ignored — always one row ===
+
+SHOW CHARACTER SET LIKE 'latin%';
+
+--echo === KNOWN DIVERGENCE: SHOW COLLATION LIKE ignored — always one row ===
+
+SHOW COLLATION LIKE 'latin%';
+
+--echo === KNOWN DIVERGENCE: SET NAMES accepts any charset string ===
+
+SET NAMES 'latin1';
+
+--echo === KNOWN DIVERGENCE: SHOW CREATE TABLE strips column CHARSET/COLLATE ===
+
+SHOW CREATE TABLE cst;
+
+--echo === KNOWN DIVERGENCE: SHOW CREATE TABLE strips table-level CHARSET/COLLATE ===
+
+SHOW CREATE TABLE cst2;
+
+DROP TABLE cst;
+DROP TABLE cst2;
+
+--echo === KNOWN GAP: CONVERT(x USING <charset>) — errno 1064 ===
+
+--error 1064
+SELECT CONVERT('abc' USING utf8mb4);
+
+--echo === KNOWN GAP: CAST AS CHAR CHARACTER SET — errno 1064 ===
+
+--error 1064
+SELECT CAST('abc' AS CHAR CHARACTER SET utf8mb4);
+
+--echo === KNOWN GAP: introducer literal _utf8mb4'...' — errno 1064 ===
+
+--error 1064
+SELECT _utf8mb4'hello';
+
+--echo === KNOWN GAP: COLLATE expression operator — errno 1064 ===
+
+--error 1064
+SELECT 'hello' COLLATE utf8mb4_unicode_ci;
