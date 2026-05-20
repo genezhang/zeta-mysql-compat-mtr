@@ -1,0 +1,118 @@
+# Independently authored INSERT options edge smoke test
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/insert.test or PG regress;
+# complements insert_basic / insert_basic_extra (which
+# cover basic INSERT / multi-row / DEFAULT / ON DUPLICATE
+# KEY UPDATE / INSERT IGNORE) by pinning the EDGE
+# behavior NOT covered there: ON CONFLICT (PG) variants,
+# REPLACE INTO (MySQL), INSERT SET syntax, INSERT...
+# SELECT, INSERT RETURNING, INSERT DEFAULT VALUES gap,
+# ON CONFLICT DO UPDATE gap, ON CONFLICT ON CONSTRAINT
+# gap.
+#
+# Big-picture finding: zeta has a strong UPSERT surface
+# combining both MySQL and PG conventions. ON CONFLICT
+# DO NOTHING works with and without an explicit column-
+# specification. REPLACE INTO (MySQL atomic-replace)
+# works. INSERT SET col = val (MySQL alt syntax) works.
+# INSERT...SELECT subquery works. INSERT RETURNING (PG)
+# is supported in all forms (column list, *, expression
+# with alias). Three notable issues: (a) INSERT
+# DEFAULT VALUES SILENTLY does nothing — the table
+# stays empty with no error signal. (b) ON CONFLICT DO
+# UPDATE SET... errors 1064 with a parser error
+# "Expected: SET, found: (" — only DO NOTHING is
+# supported on the CONFLICT path. (c) ON CONFLICT ON
+# CONSTRAINT <name> errors 1064 with a helpful rewrite
+# hint pointing to the column-list form.
+#
+# Adaptation notes:
+#   # zeta-adapt: ON CONFLICT DO NOTHING (no col spec) —
+#     supported.
+#   # zeta-adapt: ON CONFLICT (col) DO NOTHING — supported.
+#   # zeta-adapt: ON CONFLICT (bad_col) DO NOTHING — errors
+#     1054 "column not found" (correct rejection).
+#   # zeta-adapt: REPLACE INTO (MySQL atomic-replace) —
+#     supported. Implemented as DELETE+INSERT under PK.
+#   # zeta-adapt: INSERT SET col = val (MySQL alt syntax)
+#     — supported.
+#   # zeta-adapt: INSERT...SELECT subquery from another
+#     table — supported.
+#   # zeta-adapt: INSERT RETURNING (PG) — supported in all
+#     forms (column list, `*`, expressions with aliases)
+#     when run via the mysql CLI. Through the runner's
+#     mysql_async prepared-statement path the RETURNING
+#     result-set is not surfaced (the INSERT executes
+#     successfully but no rows are read back); this test
+#     exercises the parse + execute path but doesn't pin
+#     the returned data.
+#   # zeta-adapt: INSERT DEFAULT VALUES — not pinned in
+#     this test because the runner's mysql_async path
+#     returns inconsistent row counts for the subsequent
+#     COUNT(*) check. Manual probe via mysql cli shows
+#     the row is NOT inserted (silent no-op); substitute
+#     via explicit `INSERT INTO t (col) VALUES (DEFAULT)`.
+#   # zeta-adapt: KNOWN GAP — `ON CONFLICT DO UPDATE
+#     SET ...` (PG upsert form) errors 1064 at parse.
+#     Only DO NOTHING is supported on the CONFLICT path.
+#     Substitute via MySQL `ON DUPLICATE KEY UPDATE`
+#     (already pinned in insert_basic).
+#   # zeta-adapt: KNOWN GAP — `ON CONFLICT ON CONSTRAINT
+#     <name>` (PG named-constraint form) errors 1064
+#     "ON CONFLICT ON CONSTRAINT is not supported; use
+#     column list instead". Verified via mysql cli; not
+#     pinned byte-for-byte here due to runner adjacent-
+#     error coalescing.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ins;
+CREATE TABLE ins (id INT PRIMARY KEY, name VARCHAR(20), n INT);
+INSERT INTO ins VALUES (1, 'a', 10);
+
+--echo === ON CONFLICT DO NOTHING (no col spec) — skips conflicting row ===
+
+INSERT INTO ins VALUES (1, 'x', 99) ON CONFLICT DO NOTHING;
+SELECT id, name, n FROM ins ORDER BY id;
+
+--echo === ON CONFLICT (col) DO NOTHING — same with explicit col ===
+
+INSERT INTO ins VALUES (1, 'y', 88) ON CONFLICT (id) DO NOTHING;
+SELECT id, name, n FROM ins ORDER BY id;
+
+--echo === ON CONFLICT (bad_col) DO NOTHING — errno 1054 ===
+
+--error 1054
+INSERT INTO ins VALUES (2, 'z', 77) ON CONFLICT (no_such_col) DO NOTHING;
+
+--echo === REPLACE INTO (MySQL atomic-replace) ===
+
+REPLACE INTO ins VALUES (1, 'replaced', 100);
+SELECT id, name, n FROM ins ORDER BY id;
+
+--echo === INSERT SET col = val (MySQL alt syntax) ===
+
+INSERT INTO ins SET id = 5, name = 'set_form', n = 50;
+SELECT id, name, n FROM ins WHERE id = 5;
+
+--echo === INSERT ... SELECT from another table ===
+
+DROP TABLE IF EXISTS ins2;
+CREATE TABLE ins2 (id INT, name VARCHAR(20));
+INSERT INTO ins2 SELECT id, name FROM ins;
+SELECT id, name FROM ins2 ORDER BY id;
+
+--echo === INSERT RETURNING — column list ===
+
+DROP TABLE IF EXISTS r;
+CREATE TABLE r (id INT PRIMARY KEY, n INT);
+INSERT INTO r VALUES (1, 10) RETURNING id, n;
+
+--echo === KNOWN GAP: ON CONFLICT DO UPDATE SET — errno 1064 ===
+
+--error 1064
+INSERT INTO ins VALUES (1, 'upd', 999) ON CONFLICT DO UPDATE SET name = EXCLUDED.name;
+
+DROP TABLE ins;
+DROP TABLE ins2;
+DROP TABLE r;
