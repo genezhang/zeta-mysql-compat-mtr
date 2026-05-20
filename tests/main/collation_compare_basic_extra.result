@@ -78,11 +78,12 @@ hello	HELLO
 SELECT UPPER(LOWER('Hello')) = UPPER('Hello') AS round_trip;
 round_trip
 1
-=== KNOWN BUG: col REGEXP pat infix operator — errno 1105 ===
+=== col REGEXP pat infix — Bool result, works in WHERE (zeta#1219) ===
 SELECT id, s FROM sc WHERE s REGEXP '^a' ORDER BY id;
-ERROR 1105: execution error: predicate did not evaluate to boolean
-=== Substitute via REGEXP_LIKE = 1 — works ===
-SELECT id, s FROM sc WHERE REGEXP_LIKE(s, '^a') = 1 ORDER BY id;
+id	s
+2	apple
+=== REGEXP_LIKE function — also Bool, works without `= 1` ===
+SELECT id, s FROM sc WHERE REGEXP_LIKE(s, '^a') ORDER BY id;
 id	s
 2	apple
 DROP TABLE sc;

@@ -19,11 +19,10 @@
 # portable substitute is LOWER(...) / UPPER(...) on both
 # sides.
 #
-# One real bug: the `col REGEXP pat` infix operator errors
-# 1105 "predicate did not evaluate to boolean" even when
-# the REGEXP_LIKE function (equivalent semantics) works
-# fine. The result type from REGEXP isn't surfaced as a
-# bool predicate, so WHERE/HAVING reject it.
+# REGEXP / RLIKE / REGEXP_LIKE now return Bool and work
+# as bare WHERE/HAVING predicates (fixed in zeta PR
+# #1219). Previously REGEXP_LIKE returned INT 0/1, which
+# the WHERE-predicate validator rejected.
 #
 # Adaptation notes:
 #   # zeta-adapt: All string equality / ordering / LIKE /
@@ -42,13 +41,10 @@
 #     multi-byte UTF-8 ('héllo' → 'HÉLLO').
 #   # zeta-adapt: LCASE / UCASE — MySQL aliases for
 #     LOWER / UPPER, both supported.
-#   # zeta-adapt: KNOWN BUG — `col REGEXP pat` infix
-#     operator errors 1105 "predicate did not evaluate to
-#     boolean" when used in WHERE/HAVING. REGEXP_LIKE
-#     function has the same issue in WHERE because it
-#     returns INT 0/1 not BOOL — workaround is
-#     `REGEXP_LIKE(col, pat) = 1`. The function is fine in
-#     SELECT projections (typed result tolerated there).
+#   # zeta-adapt: `col REGEXP pat` infix and the
+#     equivalent `REGEXP_LIKE(col, pat)` function both
+#     return Bool and work in bare WHERE/HAVING (fixed in
+#     zeta PR #1219).
 
 --echo === Setup ===
 
@@ -110,13 +106,12 @@ SELECT LCASE('HELLO') AS l, UCASE('hello') AS u;
 
 SELECT UPPER(LOWER('Hello')) = UPPER('Hello') AS round_trip;
 
---echo === KNOWN BUG: col REGEXP pat infix operator — errno 1105 ===
+--echo === col REGEXP pat infix — Bool result, works in WHERE (zeta#1219) ===
 
---error 1105
 SELECT id, s FROM sc WHERE s REGEXP '^a' ORDER BY id;
 
---echo === Substitute via REGEXP_LIKE = 1 — works ===
+--echo === REGEXP_LIKE function — also Bool, works without `= 1` ===
 
-SELECT id, s FROM sc WHERE REGEXP_LIKE(s, '^a') = 1 ORDER BY id;
+SELECT id, s FROM sc WHERE REGEXP_LIKE(s, '^a') ORDER BY id;
 
 DROP TABLE sc;

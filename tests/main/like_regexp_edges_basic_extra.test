@@ -10,17 +10,13 @@
 # leaks into WHERE clauses.
 #
 # Big-picture finding: all the infix pattern-matching
-# operators evaluate correctly for the truth value:
-# - LIKE returns Bool; ILIKE returns Bool; NOT LIKE /
-#   NOT ILIKE invert correctly.
-# - REGEXP / RLIKE evaluate the regex correctly, but
-#   return Int64 (0 / 1) rather than Bool. This makes
-#   them usable in projections and explicit comparisons,
-#   but they cannot be used as bare WHERE predicates
-#   (the executor rejects with \"predicate did not
-#   evaluate to boolean\").
-# - PG ~ / ~* / !~ / !~* operators all work and return
-#   Bool, so they ARE usable in WHERE without wrapping.
+# operators evaluate correctly and return Bool:
+# - LIKE / ILIKE / NOT LIKE / NOT ILIKE
+# - REGEXP / RLIKE / NOT REGEXP / NOT RLIKE (Bool since
+#   zeta PR #1219 — previously returned Int and couldn't
+#   be used bare in WHERE)
+# - PG ~ / ~* / !~ / !~*
+# All are usable as bare WHERE predicates.
 #
 # Adaptation notes:
 #   # zeta-adapt: ILIKE — case-insensitive LIKE, Bool
@@ -30,12 +26,15 @@
 #   # zeta-adapt: NULL on either side of LIKE / ILIKE
 #     yields NULL.
 #   # zeta-adapt: REGEXP / RLIKE — MySQL semantics,
-#     case-sensitive by default. Returns INT (0/1) for
-#     projection compatibility.
-#   # zeta-adapt: REGEXP / RLIKE in WHERE — errors 1105
-#     \"predicate did not evaluate to boolean\". Workaround:
-#     `WHERE s REGEXP 'pat' = 1`. PG ~ does NOT have this
-#     gap and can be used bare.
+#     case-sensitive by default. Returns Bool (since
+#     zeta PR #1219) — serializes as TINYINT(1) over the
+#     wire so drivers see the same 1/0 bytes as before.
+#   # zeta-adapt: REGEXP / RLIKE in WHERE — works as a
+#     bare predicate (fixed in zeta PR #1219). The pre-fix
+#     `= 1` workaround no longer works because zeta's
+#     Bool vs Int comparison resolves to FALSE (see
+#     boolean_edges_basic_extra `1 = TRUE` = 0); use the
+#     bare predicate instead.
 #   # zeta-adapt: PG ~ — case-sensitive regex match,
 #     returns Bool, accepted in WHERE.
 #   # zeta-adapt: PG ~* — case-insensitive regex match,
@@ -118,17 +117,10 @@ SELECT id FROM strs WHERE s NOT LIKE 'h%' ORDER BY id;
 
 SELECT id FROM strs WHERE s ~* '^h' ORDER BY id;
 
---echo === KNOWN GAP: REGEXP / RLIKE in WHERE — errno 1105 (Int result) ===
---echo # Both REGEXP and RLIKE return Int64 (0/1) for projection
---echo # compatibility, but the WHERE-predicate validator rejects
---echo # non-Bool. Workaround: wrap with `= 1`, or use the PG ~
---echo # form which returns Bool.
+--echo === REGEXP / RLIKE / NOT REGEXP in WHERE — Bool result accepted (zeta#1219) ===
 
---error 1105
 SELECT id FROM strs WHERE s REGEXP '^[Hh]' ORDER BY id;
-
---echo === REGEXP in WHERE workaround — explicit `= 1` ===
-
-SELECT id FROM strs WHERE s REGEXP '^[Hh]' = 1 ORDER BY id;
+SELECT id FROM strs WHERE s RLIKE 'o' ORDER BY id;
+SELECT id FROM strs WHERE s NOT REGEXP '^[Hh]' ORDER BY id;
 
 DROP TABLE strs;
