@@ -1,0 +1,102 @@
+=== Setup ===
+DROP TABLE IF EXISTS ot;
+CREATE TABLE ot (id INT, name VARCHAR(20));
+INSERT INTO ot VALUES (1, 'b'), (2, 'A'), (3, 'c'), (4, 'B');
+=== ORDER BY column not in SELECT list ===
+SELECT name FROM ot ORDER BY id;
+name
+b
+A
+c
+B
+=== ORDER BY CASE WHEN ===
+SELECT id, name FROM ot ORDER BY CASE WHEN id = 2 THEN 0 ELSE 1 END, id;
+id	name
+2	A
+1	b
+3	c
+4	B
+=== ORDER BY constants via UNION (no FROM in branches) ===
+SELECT 3 AS x UNION SELECT 1 UNION SELECT 2 ORDER BY x;
+x
+1
+2
+3
+=== ORDER BY in subquery — propagates to outer (zeta-specific) ===
+SELECT id FROM (SELECT id FROM ot ORDER BY id DESC) AS sub;
+id
+4
+3
+2
+1
+=== ORDER BY in INSERT...SELECT ===
+DROP TABLE IF EXISTS ot2;
+CREATE TABLE ot2 (id INT);
+INSERT INTO ot2 SELECT id FROM ot ORDER BY id;
+SELECT id FROM ot2 ORDER BY id;
+id
+1
+2
+3
+4
+=== ORDER BY DISTINCT ===
+SELECT DISTINCT name FROM ot ORDER BY name;
+name
+A
+B
+b
+c
+=== ORDER BY aggregate alias + LIMIT (Top-N) ===
+SELECT id, COUNT(*) AS c FROM ot GROUP BY id ORDER BY c DESC, id LIMIT 2;
+id	c
+1	1
+2	1
+=== Mixed ASC/DESC multi-col ===
+SELECT id, name FROM ot ORDER BY name DESC, id ASC;
+id	name
+3	c
+1	b
+4	B
+2	A
+=== ORDER BY in UNION — applies to whole ===
+SELECT id FROM ot WHERE id = 1 UNION SELECT id FROM ot WHERE id = 3 ORDER BY id DESC;
+id
+3
+1
+=== Multi-col ORDER BY with NULL keys — NULL sorts last (PG style) ===
+DROP TABLE IF EXISTS otn;
+CREATE TABLE otn (a INT, b INT);
+INSERT INTO otn VALUES (1, 100), (NULL, 50), (NULL, NULL), (2, 200);
+SELECT a, b FROM otn ORDER BY a, b;
+a	b
+1	100
+2	200
+NULL	50
+NULL	NULL
+=== KNOWN DIVERGENCE: ORDER BY 99 (out-of-range) silently ignored ===
+SELECT id, name FROM ot ORDER BY 99;
+id	name
+1	b
+2	A
+3	c
+4	B
+=== KNOWN DIVERGENCE: ORDER BY 0 silently ignored ===
+SELECT id, name FROM ot ORDER BY 0;
+id	name
+1	b
+2	A
+3	c
+4	B
+=== KNOWN DIVERGENCE: ORDER BY -1 silently ignored ===
+SELECT id, name FROM ot ORDER BY -1;
+id	name
+1	b
+2	A
+3	c
+4	B
+=== KNOWN GAP: ORDER BY col COLLATE name — errno 1064 ===
+SELECT name FROM ot ORDER BY name COLLATE utf8mb4_bin;
+ERROR 1064: SQL parse error: unsupported expression: name COLLATE utf8mb4_bin
+DROP TABLE ot;
+DROP TABLE ot2;
+DROP TABLE otn;
