@@ -93,9 +93,10 @@ CREATE TABLE nmain (id INT);
 INSERT INTO nmain VALUES (1), (2), (3), (4);
 SELECT id FROM nmain WHERE id NOT IN (SELECT x FROM nsi);
 ERROR 1105: execution error: IN/NOT IN subquery returned NULL values; filter out NULLs or use COALESCE in the subquery
-=== KNOWN GAP: NVL Oracle alias — errno 1105 unknown function ===
-SELECT NVL(NULL, 'fallback') AS use_fb;
-ERROR 1105: execution error: unknown function: NVL
+=== NVL Oracle alias — works (strict 2-arg, returns first non-NULL) ===
+SELECT NVL(NULL, 'fallback') AS use_fb, NVL('val', 'fallback') AS keep;
+use_fb	keep
+fallback	val
 === Cleanup ===
 DROP TABLE nw;
 DROP TABLE nd;

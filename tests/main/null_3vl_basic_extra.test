@@ -24,9 +24,9 @@
 # errors 1105 telling the user to filter NULLs or use
 # COALESCE. This is more defensive than standard but worth
 # pinning because ORM-generated NOT IN queries will surface
-# this error against a real engine. (b) The Oracle NVL
-# function is missing entirely (1105 "unknown function") —
-# only COALESCE / IFNULL / ISNULL are supported.
+# this error against a real engine. (Originally this slice
+# also pinned the Oracle NVL function as a hard gap; zeta
+# PR #1199 closed it by aliasing NVL to IFNULL.)
 #
 # Adaptation notes:
 #   # zeta-adapt: IS UNKNOWN / IS NOT UNKNOWN return the
@@ -65,9 +65,9 @@
 #     This is defensive, but ORM-generated NOT IN queries
 #     against a nullable column will surface as a hard
 #     error rather than a silent empty-result.
-#   # zeta-adapt: KNOWN GAP — `NVL(x, y)` (Oracle alias for
-#     COALESCE) errors 1105 "unknown function: NVL". Use
-#     COALESCE / IFNULL / ISNULL instead.
+#   # zeta-adapt: NVL(x, y) — Oracle-style strict 2-arg alias
+#     for COALESCE / IFNULL. Returns the first non-NULL.
+#     (Closed by zeta PR #1199.)
 
 --echo === IS UNKNOWN / IS NOT UNKNOWN ===
 
@@ -165,10 +165,9 @@ INSERT INTO nmain VALUES (1), (2), (3), (4);
 --error 1105
 SELECT id FROM nmain WHERE id NOT IN (SELECT x FROM nsi);
 
---echo === KNOWN GAP: NVL Oracle alias — errno 1105 unknown function ===
+--echo === NVL Oracle alias — works (strict 2-arg, returns first non-NULL) ===
 
---error 1105
-SELECT NVL(NULL, 'fallback') AS use_fb;
+SELECT NVL(NULL, 'fallback') AS use_fb, NVL('val', 'fallback') AS keep;
 
 --echo === Cleanup ===
 
