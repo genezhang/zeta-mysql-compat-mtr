@@ -1,0 +1,50 @@
+=== Setup ===
+DROP TABLE IF EXISTS vt;
+CREATE TABLE vt (id INT PRIMARY KEY, n INT);
+INSERT INTO vt VALUES (1, 10), (2, 20);
+=== VACUUM (no args) — silent no-op ===
+VACUUM;
+=== VACUUM <table> — silent no-op ===
+VACUUM vt;
+=== VACUUM ANALYZE (no table) — silent no-op ===
+VACUUM ANALYZE;
+=== VACUUM FULL <table> — silent no-op ===
+VACUUM FULL vt;
+=== ANALYZE (no table) — silent no-op ===
+ANALYZE;
+=== ANALYZE <table> ===
+ANALYZE vt;
+=== ANALYZE TABLE <table> (MySQL spelling) ===
+ANALYZE TABLE vt;
+=== KNOWN GAP: VACUUM ANALYZE <table> combined — errno 1064 ===
+# Substitute: VACUUM <t>; ANALYZE <t>;
+VACUUM ANALYZE vt;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: vt at Line: 1, Column: 16
+=== KNOWN GAP: VACUUM (option, …) <table> (parens form) — errno 1064 ===
+VACUUM (VERBOSE) vt;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ( at Line: 1, Column: 8
+=== KNOWN GAP: REINDEX TABLE — errno 1064 ===
+# No REINDEX parser branch. Substitute: DROP + re-CREATE
+# INDEX, or let the LSM compactor handle it.
+REINDEX TABLE vt;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+=== KNOWN GAP: REINDEX INDEX — errno 1064 ===
+REINDEX INDEX no_such;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+=== KNOWN GAP: REINDEX DATABASE — errno 1064 ===
+REINDEX DATABASE test;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+=== KNOWN GAP: MySQL CHECKSUM TABLE — errno 1064 ===
+CHECKSUM TABLE vt;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: CHECKSUM at Line: 1, Column: 1
+=== KNOWN GAP: MySQL OPTIMIZE TABLE — errno 1064 ===
+OPTIMIZE TABLE vt;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: OPTIMIZE at Line: 1, Column: 1
+=== KNOWN GAP: MySQL REPAIR TABLE — errno 1064 ===
+REPAIR TABLE vt;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REPAIR at Line: 1, Column: 1
+=== KNOWN GAP: MySQL CHECK TABLE — errno 1064 ===
+CHECK TABLE vt;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: CHECK at Line: 1, Column: 1
+=== Cleanup ===
+DROP TABLE vt;
