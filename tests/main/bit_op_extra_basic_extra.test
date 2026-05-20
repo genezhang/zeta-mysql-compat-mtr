@@ -47,8 +47,9 @@
 #     errors 1105 "unknown function: BIT_XOR". BIT_AND and
 #     BIT_OR work; for XOR aggregate, fold manually via a
 #     correlated subquery or app-side reduction.
-#   # zeta-adapt: KNOWN GAP — TO_HEX / FROM_HEX aliases
-#     for HEX/UNHEX error 1105 "unknown function".
+#   # zeta-adapt: TO_HEX is the PG alias for HEX, supported
+#     since zeta #1205. FROM_HEX is still missing — substitute
+#     via UNHEX (MySQL spelling).
 
 --echo === Setup ===
 
@@ -99,9 +100,8 @@ SELECT 6 ^ 3;
 --error 1105
 SELECT BIT_XOR(b) FROM bt;
 
---echo === KNOWN GAP: TO_HEX alias — errno 1105 ===
+--echo === TO_HEX alias for HEX — supported since zeta #1205 ===
 
---error 1105
-SELECT TO_HEX(255);
+SELECT TO_HEX(255) AS th;
 
 DROP TABLE bt;
