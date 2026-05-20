@@ -1,0 +1,134 @@
+# Independently authored MySQL string-function edge
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/func_str.test or PG
+# regress. The basic happy-path surface for these
+# functions is already pinned in string_func_basic
+# (LOCATE, INSERT, ELT, FIELD, SPACE, QUOTE, SOUNDEX,
+# ASCII) and string_format_edges_basic_extra (CONV
+# basics + NULLs + base 36 / base 0, CHAR + CHAR(0),
+# QUOTE numeric + QUOTE(NULL) with IS NULL / LENGTH).
+# This file narrows in on EDGE behavior not exercised
+# by those: multibyte ASCII, CHR (which neither test
+# touches), CONV negative-as-unsigned-64 and unparseable,
+# LOCATE with explicit start-pos (positive + clamp),
+# INSERT pos=0 / pos>len / len=0 boundary, INSTR-vs-
+# LOCATE-vs-POSITION equivalence, ELT N=0/NULL/OOR and
+# arity errors, FIELD case-sensitivity + NULL target +
+# arity errors, MID alias, and QUOTE with embedded
+# single quote.
+#
+# Big-picture finding: zeta implements the surface, with
+# one notable DIVERGENCE from MySQL on multibyte ASCII:
+# zeta returns the Unicode CODEPOINT (`ASCII('é')` =
+# 233) where MySQL returns the FIRST UTF-8 BYTE (195).
+# Everything else (LOCATE start-pos, INSERT clamps, ELT
+# NULL semantics, FIELD case sensitivity) matches.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN DIVERGENCE — ASCII on multibyte
+#     returns the Unicode codepoint (233 for 'é'); MySQL
+#     returns the first UTF-8 byte (195). Both return the
+#     leading char's value for ASCII input, so basic tests
+#     don't surface this.
+#   # zeta-adapt: CHR(n) — accepts any Unicode codepoint;
+#     CHR(8364) → '€'. NULL propagates.
+#   # zeta-adapt: CONV — negative input treated as unsigned
+#     64-bit (`CONV(-1, 10, 16)` → 'FFFFFFFFFFFFFFFF');
+#     unparseable input returns '0' (vs NULL elsewhere).
+#   # zeta-adapt: LOCATE(needle, haystack, start) — searches
+#     from `start`; returns 0 if start = 0 or start > len.
+#     Empty needle → 1.
+#   # zeta-adapt: INSERT(str, pos, len, new) — pos=0 or
+#     pos > length leaves str unchanged. len=0 is a pure
+#     insert (text at pos+1 shifts right).
+#   # zeta-adapt: POSITION(needle IN haystack) — same shape
+#     as LOCATE / INSTR (1-based; 0 on miss).
+#   # zeta-adapt: ELT(N, ...) — N=0 / N=NULL / N out of
+#     range → NULL. Arity <2 errors 1105.
+#   # zeta-adapt: FIELD(target, ...) — case-sensitive lookup;
+#     0 on miss; NULL target → 0. Arity <2 errors 1105.
+#   # zeta-adapt: QUOTE — single quotes backslash-escaped
+#     (`QUOTE('it''s')` → `'it\'s'`, length 7).
+
+--echo === ASCII — multibyte returns codepoint (DIVERGES from MySQL UTF-8 byte) ===
+
+SELECT ASCII('Hello') AS leading_h, ASCII('é') AS multibyte_codepoint;
+
+--echo === CHR — single Unicode codepoint; NULL propagates ===
+
+SELECT CHR(65) AS a_upper, CHR(8364) AS euro;
+SELECT CHR(NULL) AS n;
+
+--echo === CHAR — variadic codepoints; arity 0 errors 1105 ===
+
+SELECT CHAR(72, 105) AS hi;
+
+--error 1105
+SELECT CHAR();
+
+--echo === CONV — base conversion (negative is unsigned 64-bit) ===
+
+SELECT CONV(255, 10, 16) AS hex_ff, CONV('ff', 16, 10) AS dec_255, CONV(10, 10, 2) AS bin_10;
+SELECT CONV(-1, 10, 16) AS unsigned_neg;
+SELECT CONV('xyz', 16, 10) AS bad_input;
+
+--echo === SOUNDEX — phonetic encoding ===
+
+SELECT SOUNDEX('Robert') AS r, SOUNDEX('Smith') AS s, SOUNDEX('') AS empty;
+SELECT SOUNDEX(NULL) AS n;
+
+--echo === SPACE(n) ===
+
+SELECT LENGTH(SPACE(5)) AS five, LENGTH(SPACE(0)) AS zero;
+
+--echo === INSTR / LOCATE — 1-based; 0 on miss ===
+
+SELECT INSTR('hello world', 'world') AS found, INSTR('hello', 'xyz') AS miss;
+SELECT LOCATE('world', 'hello world') AS found, LOCATE('xyz', 'hello') AS miss;
+
+--echo === LOCATE with start-pos — positive plus clamps on overshoot / start=0 ===
+
+SELECT LOCATE('l', 'hello', 3) AS l_at_3, LOCATE('l', 'hello', 4) AS l_at_4;
+SELECT LOCATE('x', 'hello', 10) AS past_end, LOCATE('x', 'hello', 0) AS start_zero;
+SELECT LOCATE('', 'hello') AS empty_needle;
+
+--echo === INSERT — replace substring; pos=0/oversize is no-op ===
+
+SELECT INSERT('Hello, World', 8, 5, 'There') AS rep;
+SELECT INSERT('Hello', 0, 2, 'XX')           AS pos_zero;
+SELECT INSERT('Hello', 100, 5, 'XX')         AS pos_past;
+SELECT INSERT('Hello', 2, 0, 'XX')           AS len_zero;
+SELECT INSERT(NULL, 1, 1, 'x')               AS n;
+
+--echo === MID — alias for SUBSTRING ===
+
+SELECT MID('Hello World', 7, 5) AS m;
+
+--echo === POSITION(needle IN haystack) — 1-based ===
+
+SELECT POSITION('world' IN 'hello world') AS p, POSITION('xyz' IN 'hello') AS miss;
+
+--echo === ELT(N, ...) — N is 1-based; 0 / NULL / OOR → NULL ===
+
+SELECT ELT(2, 'one', 'two', 'three') AS two;
+SELECT ELT(0, 'a', 'b') AS zero, ELT(5, 'a', 'b') AS over, ELT(NULL, 'a', 'b') AS null_n;
+
+--error 1105
+SELECT ELT();
+
+--echo === FIELD(target, ...) — case-sensitive; 0 on miss / NULL target ===
+
+SELECT FIELD('b', 'a', 'b', 'c') AS found, FIELD('z', 'a', 'b', 'c') AS miss;
+SELECT FIELD('a', 'A', 'a', 'B') AS case_sens;
+SELECT FIELD(NULL, 'a', 'b') AS n;
+
+--error 1105
+SELECT FIELD('a');
+
+--echo === QUOTE — single-quote escape pinned via LENGTH ===
+
+# `it''s` is the 4-char literal `it's`; QUOTE wraps and
+# escapes the inner quote with a backslash, producing
+# `'it\'s'` (7 chars). LENGTH pins the escape — a missing
+# backslash would yield length 6.
+SELECT QUOTE('it''s') AS escaped, LENGTH(QUOTE('it''s')) AS esc_len;

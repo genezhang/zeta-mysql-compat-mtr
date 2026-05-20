@@ -1,0 +1,104 @@
+=== ASCII — multibyte returns codepoint (DIVERGES from MySQL UTF-8 byte) ===
+SELECT ASCII('Hello') AS leading_h, ASCII('é') AS multibyte_codepoint;
+leading_h	multibyte_codepoint
+72	233
+=== CHR — single Unicode codepoint; NULL propagates ===
+SELECT CHR(65) AS a_upper, CHR(8364) AS euro;
+a_upper	euro
+A	€
+SELECT CHR(NULL) AS n;
+n
+NULL
+=== CHAR — variadic codepoints; arity 0 errors 1105 ===
+SELECT CHAR(72, 105) AS hi;
+hi
+Hi
+SELECT CHAR();
+ERROR 1105: execution error: CHAR requires at least 1 argument
+=== CONV — base conversion (negative is unsigned 64-bit) ===
+SELECT CONV(255, 10, 16) AS hex_ff, CONV('ff', 16, 10) AS dec_255, CONV(10, 10, 2) AS bin_10;
+hex_ff	dec_255	bin_10
+FF	255	1010
+SELECT CONV(-1, 10, 16) AS unsigned_neg;
+unsigned_neg
+FFFFFFFFFFFFFFFF
+SELECT CONV('xyz', 16, 10) AS bad_input;
+bad_input
+0
+=== SOUNDEX — phonetic encoding ===
+SELECT SOUNDEX('Robert') AS r, SOUNDEX('Smith') AS s, SOUNDEX('') AS empty;
+r	s	empty
+R163	S530	
+SELECT SOUNDEX(NULL) AS n;
+n
+NULL
+=== SPACE(n) ===
+SELECT LENGTH(SPACE(5)) AS five, LENGTH(SPACE(0)) AS zero;
+five	zero
+5	0
+=== INSTR / LOCATE — 1-based; 0 on miss ===
+SELECT INSTR('hello world', 'world') AS found, INSTR('hello', 'xyz') AS miss;
+found	miss
+7	0
+SELECT LOCATE('world', 'hello world') AS found, LOCATE('xyz', 'hello') AS miss;
+found	miss
+7	0
+=== LOCATE with start-pos — positive plus clamps on overshoot / start=0 ===
+SELECT LOCATE('l', 'hello', 3) AS l_at_3, LOCATE('l', 'hello', 4) AS l_at_4;
+l_at_3	l_at_4
+3	4
+SELECT LOCATE('x', 'hello', 10) AS past_end, LOCATE('x', 'hello', 0) AS start_zero;
+past_end	start_zero
+0	0
+SELECT LOCATE('', 'hello') AS empty_needle;
+empty_needle
+1
+=== INSERT — replace substring; pos=0/oversize is no-op ===
+SELECT INSERT('Hello, World', 8, 5, 'There') AS rep;
+rep
+Hello, There
+SELECT INSERT('Hello', 0, 2, 'XX')           AS pos_zero;
+pos_zero
+Hello
+SELECT INSERT('Hello', 100, 5, 'XX')         AS pos_past;
+pos_past
+Hello
+SELECT INSERT('Hello', 2, 0, 'XX')           AS len_zero;
+len_zero
+HXXello
+SELECT INSERT(NULL, 1, 1, 'x')               AS n;
+n
+NULL
+=== MID — alias for SUBSTRING ===
+SELECT MID('Hello World', 7, 5) AS m;
+m
+World
+=== POSITION(needle IN haystack) — 1-based ===
+SELECT POSITION('world' IN 'hello world') AS p, POSITION('xyz' IN 'hello') AS miss;
+p	miss
+7	0
+=== ELT(N, ...) — N is 1-based; 0 / NULL / OOR → NULL ===
+SELECT ELT(2, 'one', 'two', 'three') AS two;
+two
+two
+SELECT ELT(0, 'a', 'b') AS zero, ELT(5, 'a', 'b') AS over, ELT(NULL, 'a', 'b') AS null_n;
+zero	over	null_n
+NULL	NULL	NULL
+SELECT ELT();
+ERROR 1105: execution error: ELT requires at least 2 arguments
+=== FIELD(target, ...) — case-sensitive; 0 on miss / NULL target ===
+SELECT FIELD('b', 'a', 'b', 'c') AS found, FIELD('z', 'a', 'b', 'c') AS miss;
+found	miss
+2	0
+SELECT FIELD('a', 'A', 'a', 'B') AS case_sens;
+case_sens
+2
+SELECT FIELD(NULL, 'a', 'b') AS n;
+n
+0
+SELECT FIELD('a');
+ERROR 1105: execution error: FIELD requires at least 2 arguments
+=== QUOTE — single-quote escape pinned via LENGTH ===
+SELECT QUOTE('it''s') AS escaped, LENGTH(QUOTE('it''s')) AS esc_len;
+escaped	esc_len
+'it\'s'	7
