@@ -1,0 +1,86 @@
+=== Setup ===
+DROP TABLE IF EXISTS ja;
+DROP TABLE IF EXISTS jb;
+CREATE TABLE ja (id INT PRIMARY KEY, v INT);
+CREATE TABLE jb (id INT PRIMARY KEY, v INT);
+INSERT INTO ja VALUES (1, 100), (2, 200), (3, 300);
+INSERT INTO jb VALUES (10, 50), (20, 250), (30, 350);
+=== Inequality JOIN — supported ===
+SELECT a.id AS aid, b.id AS bid FROM ja a JOIN jb b ON a.v < b.v ORDER BY a.id, b.id;
+aid	bid
+1	20
+1	30
+2	20
+2	30
+3	30
+=== JOIN against derived table ===
+SELECT a.id, sub.cnt FROM ja a JOIN (SELECT COUNT(*) AS cnt FROM jb) sub ON 1=1 ORDER BY a.id;
+id	cnt
+1	3
+2	3
+3	3
+=== INNER JOIN with NULL keys — excludes the row ===
+DROP TABLE IF EXISTS jn1;
+DROP TABLE IF EXISTS jn2;
+CREATE TABLE jn1 (id INT, v INT);
+CREATE TABLE jn2 (id INT, v INT);
+INSERT INTO jn1 VALUES (1, 10), (NULL, 20);
+INSERT INTO jn2 VALUES (1, 100), (NULL, 200);
+SELECT j1.id, j1.v, j2.v FROM jn1 j1 JOIN jn2 j2 ON j1.id = j2.id;
+id	v	v
+1	10	100
+=== LEFT JOIN with NULL keys — preserves left side ===
+SELECT j1.id, j1.v, j2.v FROM jn1 j1 LEFT JOIN jn2 j2 ON j1.id = j2.id ORDER BY j1.id;
+id	v	v
+1	10	100
+NULL	20	NULL
+=== ON 1=1 — cartesian product (9 rows) ===
+SELECT a.id, b.id FROM ja a JOIN jb b ON 1=1 ORDER BY a.id, b.id;
+id	id
+1	10
+1	20
+1	30
+2	10
+2	20
+2	30
+3	10
+3	20
+3	30
+=== ON FALSE — zero rows ===
+SELECT a.id, b.id FROM ja a JOIN jb b ON FALSE;
+=== Anti-JOIN pattern (LEFT JOIN + WHERE b.id IS NULL) ===
+SELECT a.id FROM ja a LEFT JOIN jb b ON a.v = b.v WHERE b.id IS NULL ORDER BY a.id;
+id
+1
+2
+3
+=== Multi-col USING — equi-join on both columns ===
+DROP TABLE IF EXISTS u1;
+DROP TABLE IF EXISTS u2;
+CREATE TABLE u1 (a INT, b INT, x INT);
+CREATE TABLE u2 (a INT, b INT, y INT);
+INSERT INTO u1 VALUES (1,1,10), (2,2,20);
+INSERT INTO u2 VALUES (1,1,100), (3,3,300);
+SELECT * FROM u1 JOIN u2 USING (a, b);
+u1.a	u1.b	u1.x	u2.y
+1	1	10	100
+=== JOIN with GROUP BY + HAVING ===
+SELECT a.id, COUNT(*) AS c FROM ja a JOIN jb b ON a.id = b.id - 9 GROUP BY a.id HAVING COUNT(*) > 0 ORDER BY a.id;
+id	c
+1	1
+=== Three-way self-join with chained inequality ===
+SELECT a1.id AS l, a2.id AS m, a3.id AS r FROM ja a1 JOIN ja a2 ON a1.v < a2.v JOIN ja a3 ON a2.v < a3.v ORDER BY l, m, r;
+l	m	r
+1	2	3
+=== Simple LATERAL (no correlation) ===
+SELECT a.id, sub.x FROM ja a, LATERAL (SELECT 1 AS x) AS sub ORDER BY a.id;
+id	x
+1	1
+2	1
+3	1
+DROP TABLE ja;
+DROP TABLE jb;
+DROP TABLE jn1;
+DROP TABLE jn2;
+DROP TABLE u1;
+DROP TABLE u2;
