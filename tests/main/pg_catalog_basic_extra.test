@@ -1,0 +1,145 @@
+# Independently authored pg_catalog / introspection smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test (this pins PG-style pg_catalog
+# access from the MySQL wire). Orthogonal to info_schema_
+# basic_extra (which already covers information_schema in
+# depth).
+#
+# Key finding: pg_catalog is shimmed only on the PG wire
+# inside the catalog handlers that drive psql's `\d` /
+# `\dt` / `\dn` meta-commands; the MySQL wire path does
+# not route any pg_catalog table at all. So from the MySQL
+# wire the entire pg_catalog namespace is unavailable —
+# but the MySQL-side introspection surface (SHOW, DESCRIBE,
+# information_schema.*) is reasonably complete.
+#
+# Adaptation notes:
+#   # zeta-adapt: SHOW DATABASES — supported (returns the
+#     databases, not user schemas).
+#   # zeta-adapt: SHOW TABLES — supported (returns tables
+#     in the current database).
+#   # zeta-adapt: SHOW COLUMNS FROM <t> — supported,
+#     MySQL-style output with Field / Type / Null / Key /
+#     Default / Extra columns.
+#   # zeta-adapt: DESCRIBE <t> — supported (alias for
+#     SHOW COLUMNS).
+#   # zeta-adapt: information_schema.tables — supported.
+#   # zeta-adapt: information_schema.columns — supported.
+#   # zeta-adapt: information_schema.schemata — supported
+#     (returns DATABASES, not user schemas — see
+#     schema_basic_extra).
+#   # zeta-adapt: information_schema.table_constraints —
+#     supported. PRIMARY shows up as PRIMARY KEY.
+#   # zeta-adapt: information_schema.statistics — supported
+#     (MySQL-flavoured index list).
+#   # zeta-adapt: information_schema.key_column_usage —
+#     supported.
+#   # zeta-adapt: information_schema.engines (MySQL-only) —
+#     returns a synthetic InnoDB row for ORM compatibility.
+#   # zeta-adapt: KNOWN GAP — `pg_catalog.pg_class`,
+#     `pg_catalog.pg_attribute`, `pg_catalog.pg_index`,
+#     `pg_catalog.pg_constraint`, `pg_catalog.pg_type`,
+#     `pg_catalog.pg_proc`, `pg_catalog.pg_namespace` all
+#     error 1146 "table not found" via the MySQL wire.
+#     These tables are only reachable via the PG wire's
+#     catalog handler that drives psql's `\d` / `\dt` /
+#     `\dn` meta-commands. Substitute: use the corresponding
+#     `information_schema.*` view (e.g. `information_schema
+#     .tables` for `pg_class`, `information_schema.columns`
+#     for `pg_attribute`).
+#   # zeta-adapt: KNOWN DIVERGENCE — `information_schema.
+#     tables.table_name` and `.table_schema` are populated
+#     with the DATABASE name + bare table name, NOT the
+#     PG-style `<schema>.<table>` pair. So
+#     `table_schema = 'public'` won't match — match on
+#     `table_schema = '<database>'` (e.g. 'test') instead.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS pct;
+CREATE TABLE pct (id INT PRIMARY KEY, name TEXT NOT NULL, age INT DEFAULT 0);
+CREATE INDEX ix_pct_name ON pct(name);
+
+--echo === SHOW DATABASES ===
+
+SHOW DATABASES;
+
+--echo === SHOW TABLES (current database) ===
+
+SHOW TABLES;
+
+--echo === SHOW COLUMNS FROM <t> (MySQL form) ===
+
+SHOW COLUMNS FROM pct;
+
+--echo === DESCRIBE <t> (alias of SHOW COLUMNS) ===
+
+DESCRIBE pct;
+
+--echo === information_schema.tables ===
+
+SELECT table_schema, table_name
+  FROM information_schema.tables
+  WHERE table_name = 'pct'
+  ORDER BY table_schema, table_name;
+
+--echo === information_schema.columns ===
+
+SELECT column_name, data_type, is_nullable, column_default
+  FROM information_schema.columns
+  WHERE table_name = 'pct'
+  ORDER BY ordinal_position;
+
+--echo === information_schema.schemata (returns DATABASES, not user schemas) ===
+
+SELECT schema_name FROM information_schema.schemata ORDER BY schema_name;
+
+--echo === information_schema.table_constraints ===
+
+SELECT constraint_name, constraint_type
+  FROM information_schema.table_constraints
+  WHERE table_name = 'pct';
+
+--echo === information_schema.engines (MySQL-only ORM shim) ===
+
+SELECT engine, support FROM information_schema.engines;
+
+--echo === Cleanup setup table before catalog probes ===
+
+DROP INDEX ix_pct_name;
+DROP TABLE pct;
+
+--echo === KNOWN GAP: pg_catalog.pg_class via MySQL wire — errno 1146 ===
+
+--error 1146
+SELECT relname FROM pg_catalog.pg_class;
+
+--echo === KNOWN GAP: pg_catalog.pg_attribute — errno 1146 ===
+
+--error 1146
+SELECT attname FROM pg_catalog.pg_attribute;
+
+--echo === KNOWN GAP: pg_catalog.pg_index — errno 1146 ===
+
+--error 1146
+SELECT indrelid FROM pg_catalog.pg_index;
+
+--echo === KNOWN GAP: pg_catalog.pg_constraint — errno 1146 ===
+
+--error 1146
+SELECT conname FROM pg_catalog.pg_constraint;
+
+--echo === KNOWN GAP: pg_catalog.pg_type — errno 1146 ===
+
+--error 1146
+SELECT typname FROM pg_catalog.pg_type;
+
+--echo === KNOWN GAP: pg_catalog.pg_proc — errno 1146 ===
+
+--error 1146
+SELECT proname FROM pg_catalog.pg_proc;
+
+--echo === KNOWN GAP: pg_catalog.pg_namespace — errno 1146 ===
+
+--error 1146
+SELECT nspname FROM pg_catalog.pg_namespace;
