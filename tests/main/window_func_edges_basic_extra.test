@@ -11,19 +11,20 @@
 # Big-picture finding: zeta handles LAG/LEAD overflow
 # correctly (returns NULL or the default value), NTH_VALUE
 # with the explicit ROWS frame works, ROW_NUMBER tolerates
-# OVER () without ORDER BY. Two remaining issues: (a)
-# NTILE(0) and NTILE(-1) silently return per-row bucket
-# numbers instead of erroring (MySQL: error for n <= 0).
-# (b) LAG with a negative offset returns NULL instead of
-# acting like LEAD (PG/MySQL semantics: `LAG(n, -k)` ≡
-# `LEAD(n, k)`). Nested window functions don't error but
-# evaluate to NULL; window functions in WHERE error 1105
-# (correct).
+# OVER () without ORDER BY. Window functions in WHERE
+# error 1105 (correct).
 #
 # FILTER clause on aggregate window functions now errors
 # explicitly (fixed in zeta PR #1215). Previously silently
 # IGNORED — gave wrong answers without an error signal.
 # Full semantic support (PG/Spark behavior) is a follow-up.
+#
+# NTILE(<=0) and LAG/LEAD negative-offset behavior fixed
+# in zeta PR #1216. NTILE rejects non-positive args;
+# LAG(n, -k) flips to LEAD(n, k) and vice versa.
+#
+# Remaining: nested window functions don't error but
+# evaluate to NULL.
 #
 # Adaptation notes:
 #   # zeta-adapt: LAG/LEAD offset > partition size returns
@@ -55,13 +56,14 @@
 #     running aggregate) is a follow-up; for now, rewrite
 #     as a subquery with a CASE expression:
 #     `SUM(CASE WHEN n > 15 THEN n END) OVER (...)`.
-#   # zeta-adapt: KNOWN DIVERGENCE — NTILE(0) returns 1
-#     for every row instead of erroring; NTILE(-1) returns
-#     1..N as if N were positive. MySQL doc says NTILE(n)
-#     requires n > 0; zeta silently accepts.
-#   # zeta-adapt: KNOWN DIVERGENCE — LAG(n, -k) returns
-#     NULL where PG/MySQL semantics are `LAG(n, -k)` ≡
-#     `LEAD(n, k)` (negative offset flips direction).
+#   # zeta-adapt: NTILE(<=0) errors 1105 \"argument of
+#     NTILE must be greater than zero\". Fixed in zeta PR
+#     #1216 — previously silently returned bucket=1 for
+#     every row.
+#   # zeta-adapt: LAG(n, -k) and LEAD(n, -k) flip
+#     direction: `LAG(n, -k)` ≡ `LEAD(n, k)` and
+#     vice versa. Fixed in zeta PR #1216 — previously
+#     returned NULL because the offset was usize-cast.
 #   # zeta-adapt: KNOWN DIVERGENCE — nested window
 #     functions like `SUM(ROW_NUMBER() OVER ()) OVER ()`
 #     return NULL instead of erroring 'window function
@@ -112,13 +114,17 @@ SELECT id, n, SUM(n) FILTER (WHERE n > 15) OVER (ORDER BY id) AS s_filt FROM wf 
 
 SELECT id, n, SUM(CASE WHEN n > 15 THEN n END) OVER (ORDER BY id) AS s_filt_case FROM wf ORDER BY id;
 
---echo === KNOWN DIVERGENCE: NTILE(0) returns 1 per row (MySQL would error) ===
+--echo === NTILE(<=0) errors 1105 (was silently 1 per row) ===
 
+--error 1105
 SELECT id, NTILE(0) OVER (ORDER BY id) AS n0 FROM wf ORDER BY id;
+--error 1105
+SELECT id, NTILE(-3) OVER (ORDER BY id) AS n_neg FROM wf ORDER BY id;
 
---echo === KNOWN DIVERGENCE: LAG(n, -1) returns NULL (PG/MySQL: ≡ LEAD(n, 1)) ===
+--echo === LAG(n, -k) ≡ LEAD(n, k) — negative offset flips direction ===
 
-SELECT id, LAG(n, -1) OVER (ORDER BY id) AS lag_neg FROM wf ORDER BY id;
+SELECT id, n, LAG(n, -1) OVER (ORDER BY id) AS lag_neg, LEAD(n, 1) OVER (ORDER BY id) AS lead_pos FROM wf ORDER BY id;
+SELECT id, n, LEAD(n, -1) OVER (ORDER BY id) AS lead_neg, LAG(n, 1) OVER (ORDER BY id) AS lag_pos FROM wf ORDER BY id;
 
 --echo === KNOWN DIVERGENCE: nested window functions evaluate to NULL (PG: error) ===
 

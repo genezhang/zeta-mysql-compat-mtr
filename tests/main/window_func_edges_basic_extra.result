@@ -61,18 +61,22 @@ id	n	s_filt_case
 1	10	NULL
 2	20	20
 3	30	50
-=== KNOWN DIVERGENCE: NTILE(0) returns 1 per row (MySQL would error) ===
+=== NTILE(<=0) errors 1105 (was silently 1 per row) ===
 SELECT id, NTILE(0) OVER (ORDER BY id) AS n0 FROM wf ORDER BY id;
-id	n0
-1	1
-2	1
-3	1
-=== KNOWN DIVERGENCE: LAG(n, -1) returns NULL (PG/MySQL: ≡ LEAD(n, 1)) ===
-SELECT id, LAG(n, -1) OVER (ORDER BY id) AS lag_neg FROM wf ORDER BY id;
-id	lag_neg
-1	NULL
-2	NULL
-3	NULL
+ERROR 1105: execution error: argument of NTILE must be greater than zero (got 0)
+SELECT id, NTILE(-3) OVER (ORDER BY id) AS n_neg FROM wf ORDER BY id;
+ERROR 1105: execution error: argument of NTILE must be greater than zero (got -3)
+=== LAG(n, -k) ≡ LEAD(n, k) — negative offset flips direction ===
+SELECT id, n, LAG(n, -1) OVER (ORDER BY id) AS lag_neg, LEAD(n, 1) OVER (ORDER BY id) AS lead_pos FROM wf ORDER BY id;
+id	n	lag_neg	lead_pos
+1	10	20	20
+2	20	30	30
+3	30	NULL	NULL
+SELECT id, n, LEAD(n, -1) OVER (ORDER BY id) AS lead_neg, LAG(n, 1) OVER (ORDER BY id) AS lag_pos FROM wf ORDER BY id;
+id	n	lead_neg	lag_pos
+1	10	NULL	NULL
+2	20	10	10
+3	30	20	20
 === KNOWN DIVERGENCE: nested window functions evaluate to NULL (PG: error) ===
 SELECT id, SUM(ROW_NUMBER() OVER ()) OVER () AS nested FROM wf ORDER BY id;
 id	nested
