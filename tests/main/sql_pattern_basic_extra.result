@@ -1,0 +1,96 @@
+=== LIKE NULL propagation ===
+SELECT 'abc' LIKE NULL AS lhs;
+lhs
+NULL
+SELECT NULL LIKE 'abc' AS rhs;
+rhs
+NULL
+SELECT NULL LIKE NULL AS both;
+both
+NULL
+SELECT 'abc' NOT LIKE NULL AS not_lhs;
+not_lhs
+NULL
+=== LIKE % and _ boundaries ===
+SELECT 'abc' LIKE '%' AS pct_any;
+pct_any
+1
+SELECT 'abc' LIKE '' AS empty_nomatch;
+empty_nomatch
+0
+SELECT '' LIKE '' AS empty_empty;
+empty_empty
+1
+SELECT 'abc' LIKE '%abc' AS pct_prefix;
+pct_prefix
+1
+SELECT 'abc' LIKE 'abc%' AS pct_suffix;
+pct_suffix
+1
+SELECT 'a' LIKE '_' AS single_char;
+single_char
+1
+=== LIKE multi-byte UTF-8 — _ matches one code-point ===
+SELECT 'héllo' LIKE '_éllo' AS mb;
+mb
+1
+SELECT 'café' LIKE 'caf%' AS mb_suf;
+mb_suf
+1
+SELECT 'café' LIKE '%é' AS mb_pre;
+mb_pre
+1
+=== REGEXP_REPLACE 2-arg — first-match-only (PG default) ===
+SELECT REGEXP_REPLACE('hello world hello', 'hello', 'X') AS no_flag;
+no_flag
+X world hello
+=== REGEXP_REPLACE 4-arg with 'g' (global) flag ===
+SELECT REGEXP_REPLACE('hello world hello', 'hello', 'X', 'g') AS gflag;
+gflag
+X world X
+SELECT REGEXP_REPLACE('aaa', 'a', 'b', 'g') AS reps_g;
+reps_g
+bbb
+=== REGEXP_REPLACE 4-arg with 'i' (case-insensitive) ===
+SELECT REGEXP_REPLACE('Hello', 'hello', 'X', 'i') AS ci_first;
+ci_first
+X
+=== REGEXP_SUBSTR with position arg ===
+SELECT REGEXP_SUBSTR('hello world', 'wor.*') AS first;
+first
+world
+SELECT REGEXP_SUBSTR('abcabcabc', 'abc', 4) AS pos;
+pos
+abc
+SELECT REGEXP_SUBSTR('foo123bar', '[0-9]+') AS digits;
+digits
+123
+SELECT REGEXP_SUBSTR('hello', 'no_match') AS no_match;
+no_match
+NULL
+=== REGEXP_INSTR with position arg ===
+SELECT REGEXP_INSTR('abcabcabc', 'abc', 4) AS pos2;
+pos2
+4
+SELECT REGEXP_INSTR('abc', 'no') AS no_match;
+no_match
+0
+=== POSIX character classes in REGEXP_LIKE ===
+SELECT REGEXP_LIKE('abc123', '[[:digit:]]+') AS d;
+d
+1
+SELECT REGEXP_LIKE('abc', '[[:alpha:]]+') AS a;
+a
+1
+SELECT REGEXP_LIKE('abc', '[[:upper:]]+') AS u_no;
+u_no
+0
+SELECT REGEXP_LIKE('ABC', '[[:upper:]]+') AS u_yes;
+u_yes
+1
+=== KNOWN GAP: REGEXP_SUBSTR 4-arg (occurrence) — errno 1105 ===
+SELECT REGEXP_SUBSTR('abcabcabc', 'abc', 1, 2);
+ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+=== KNOWN GAP: SIMILAR TO (PG) — errno 1064 ===
+SELECT 'foo' SIMILAR TO 'fo+';
+ERROR 1064: SQL parse error: unsupported expression: 'foo' SIMILAR TO 'fo+'
