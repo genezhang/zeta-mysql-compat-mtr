@@ -13,10 +13,12 @@
 # with explicit algorithm arg) — all 3-arg, no MySQL
 # 2-arg shortcuts. SHA2 supports the full 224/256/384/512
 # range. CRC32 returns u32 with correct empty/NULL handling.
-# Most of MySQL's legacy crypto family (AES_ENCRYPT,
-# COMPRESS, PASSWORD, RANDOM_BYTES) is absent and the
-# 2-arg ENCRYPT / HMAC shortcuts are not accepted —
-# everything requires the 3-arg PG-style form.
+# Most of MySQL's legacy crypto family (COMPRESS,
+# PASSWORD, RANDOM_BYTES) is absent and the 2-arg ENCRYPT
+# / HMAC shortcuts are not accepted — everything requires
+# the 3-arg PG-style form. Exception: AES_ENCRYPT /
+# AES_DECRYPT (the MySQL 2-arg shortcuts for the 'aes'
+# cipher) are supported as of zeta #1209.
 #
 # Adaptation notes:
 #   # zeta-adapt: SHA2(str, n) — n ∈ {224, 256, 384, 512}.
@@ -37,9 +39,11 @@
 #     GEN_RANDOM_BYTES(n) (PG pgcrypto) both error 1105
 #     "unknown function". No portable substitute exposed
 #     today.
-#   # zeta-adapt: KNOWN GAP — AES_ENCRYPT / AES_DECRYPT
-#     (MySQL) error 1105. Substitute via PG-style
-#     ENCRYPT(data, key, 'aes') / DECRYPT(..., 'aes').
+#   # zeta-adapt: AES_ENCRYPT(data, key) / AES_DECRYPT(...)
+#     — MySQL 2-arg shortcuts, supported since zeta #1209.
+#     Equivalent to ENCRYPT(data, key, 'aes') /
+#     DECRYPT(..., 'aes'). Returns BYTEA — wrap in HEX()
+#     to view; round-trip via AES_DECRYPT(AES_ENCRYPT(...)).
 #   # zeta-adapt: KNOWN GAP — COMPRESS / UNCOMPRESS
 #     (MySQL) error 1105. No compression surface exposed
 #     to SQL.
@@ -94,10 +98,10 @@ SELECT RANDOM_BYTES(16);
 --error 1105
 SELECT GEN_RANDOM_BYTES(16);
 
---echo === KNOWN GAP: AES_ENCRYPT (MySQL) — errno 1105 ===
+--echo === AES_ENCRYPT / AES_DECRYPT — supported since zeta #1209 ===
 
---error 1105
-SELECT AES_ENCRYPT('plain', 'key');
+SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'mykey'), 'mykey') AS round_trip;
+SELECT LENGTH(HEX(AES_ENCRYPT('plain', 'key'))) AS enc_hex_len;
 
 --echo === KNOWN GAP: COMPRESS (MySQL) — errno 1105 ===
 
