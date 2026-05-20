@@ -1,0 +1,117 @@
+# Independently authored transaction-extra smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/commit.test or transaction.test; pins zeta's
+# transaction-control surface NOT held by transaction_basic
+# (which covers BEGIN/COMMIT/ROLLBACK, START TRANSACTION,
+# BEGIN WORK, SAVEPOINT + ROLLBACK TO).
+#
+# Adaptation notes:
+#   # zeta-adapt: RELEASE SAVEPOINT — supported. Releasing a
+#     missing savepoint errors 1105 "savepoint does not exist".
+#   # zeta-adapt: SET TRANSACTION ISOLATION LEVEL — supported
+#     for READ COMMITTED, REPEATABLE READ, SERIALIZABLE; the
+#     statement is accepted at parse and applies to subsequent
+#     transactions (functional behavior is covered by
+#     zeta-server's own integration tests).
+#   # zeta-adapt: SET SESSION / SET GLOBAL TRANSACTION ISOLATION
+#     LEVEL — both accepted at parse (silent OK).
+#   # zeta-adapt: SET autocommit = 0/1 and SET @@autocommit =
+#     0/1 — both forms accepted (silent OK; autocommit is the
+#     default zeta mode).
+#   # zeta-adapt: START TRANSACTION READ WRITE — accepted at
+#     parse (silent OK; same default as bare START TRANSACTION).
+#   # zeta-adapt: Within-transaction visibility — INSERTs from
+#     inside a BEGIN are visible to subsequent SELECTs in the
+#     same connection; ROLLBACK discards them.
+#   # zeta-adapt: KNOWN GAP — COMMIT AND CHAIN / ROLLBACK AND
+#     CHAIN error 1105 "transaction control statements are not
+#     planned". Portable substitute: COMMIT (or ROLLBACK) +
+#     explicit BEGIN.
+#   # zeta-adapt: START TRANSACTION READ ONLY — KNOWN GAP,
+#     errno 1235 with the MySQL-standard "is not supported"
+#     message. Portable substitute: omit READ ONLY (zeta has
+#     no read-only-txn enforcement; queries within an ordinary
+#     txn that don't INSERT/UPDATE/DELETE behave the same way).
+#   # zeta-adapt: START TRANSACTION ISOLATION LEVEL <level>
+#     (inline form) — KNOWN GAP, errno 1235 with the helpful
+#     "use SET TRANSACTION ISOLATION LEVEL before BEGIN"
+#     message. Portable substitute follows that suggestion.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS txv;
+CREATE TABLE txv (id INT PRIMARY KEY, v INT);
+INSERT INTO txv VALUES (1, 10);
+
+--echo === Within-transaction visibility ===
+
+BEGIN;
+INSERT INTO txv VALUES (2, 20);
+SELECT id, v FROM txv ORDER BY id;
+ROLLBACK;
+SELECT id, v FROM txv ORDER BY id;
+
+--echo === RELEASE SAVEPOINT ===
+
+BEGIN;
+SAVEPOINT s1;
+RELEASE SAVEPOINT s1;
+COMMIT;
+
+--echo === SET TRANSACTION ISOLATION LEVEL — three forms ===
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+--echo === SET SESSION / SET GLOBAL TRANSACTION ISOLATION LEVEL ===
+
+SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET GLOBAL  TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+--echo === SET autocommit toggles ===
+
+SET autocommit = 0;
+SET autocommit = 1;
+SET @@autocommit = 0;
+SET @@autocommit = 1;
+
+--echo === START TRANSACTION READ WRITE — accepted ===
+
+START TRANSACTION READ WRITE;
+COMMIT;
+
+--echo === KNOWN GAP: COMMIT AND CHAIN — errno 1105 ===
+
+BEGIN;
+--error 1105
+COMMIT AND CHAIN;
+ROLLBACK;
+
+--echo === KNOWN GAP: ROLLBACK AND CHAIN — errno 1105 ===
+
+BEGIN;
+--error 1105
+ROLLBACK AND CHAIN;
+ROLLBACK;
+
+--echo === KNOWN GAP: START TRANSACTION READ ONLY — errno 1235 ===
+
+--error 1235
+START TRANSACTION READ ONLY;
+
+--echo === KNOWN GAP: START TRANSACTION ISOLATION LEVEL inline — errno 1235 ===
+
+--error 1235
+START TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+--echo === RELEASE SAVEPOINT on missing — errno 1105 ===
+
+BEGIN;
+--error 1105
+RELEASE SAVEPOINT no_such_sp;
+ROLLBACK;
+
+--echo === Cleanup ===
+
+DROP TABLE txv;
