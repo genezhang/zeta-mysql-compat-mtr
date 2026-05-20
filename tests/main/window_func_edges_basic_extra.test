@@ -11,16 +11,19 @@
 # Big-picture finding: zeta handles LAG/LEAD overflow
 # correctly (returns NULL or the default value), NTH_VALUE
 # with the explicit ROWS frame works, ROW_NUMBER tolerates
-# OVER () without ORDER BY. Three notable issues: (a) the
-# FILTER clause on aggregate window functions is silently
-# IGNORED — `SUM(n) FILTER (WHERE n > 15) OVER (...)`
-# returns the unfiltered cumulative sum. (b) NTILE(0) and
-# NTILE(-1) silently return per-row bucket numbers instead
-# of erroring (MySQL: error for n <= 0). (c) LAG with a
-# negative offset returns NULL instead of acting like LEAD
-# (PG/MySQL semantics: `LAG(n, -k)` ≡ `LEAD(n, k)`).
-# Nested window functions don't error but evaluate to
-# NULL; window functions in WHERE error 1105 (correct).
+# OVER () without ORDER BY. Two remaining issues: (a)
+# NTILE(0) and NTILE(-1) silently return per-row bucket
+# numbers instead of erroring (MySQL: error for n <= 0).
+# (b) LAG with a negative offset returns NULL instead of
+# acting like LEAD (PG/MySQL semantics: `LAG(n, -k)` ≡
+# `LEAD(n, k)`). Nested window functions don't error but
+# evaluate to NULL; window functions in WHERE error 1105
+# (correct).
+#
+# FILTER clause on aggregate window functions now errors
+# explicitly (fixed in zeta PR #1215). Previously silently
+# IGNORED — gave wrong answers without an error signal.
+# Full semantic support (PG/Spark behavior) is a follow-up.
 #
 # Adaptation notes:
 #   # zeta-adapt: LAG/LEAD offset > partition size returns
@@ -43,12 +46,15 @@
 #   # zeta-adapt: Window function in WHERE clause — errors
 #     1105 "unsupported expression: WindowFunction"
 #     (correct: SQL spec forbids).
-#   # zeta-adapt: KNOWN BUG — FILTER (WHERE ...) clause on
-#     aggregate window functions is SILENTLY IGNORED.
-#     `SUM(n) FILTER (WHERE n > 15) OVER (ORDER BY id)`
-#     returns the unfiltered cumulative sum. ORMs and
-#     reporting code relying on FILTER will get wrong
-#     numbers without an error signal.
+#   # zeta-adapt: FILTER (WHERE ...) clause on aggregate
+#     window functions errors 1064 \"FILTER clause on
+#     window aggregate \`<NAME>\` not yet supported\".
+#     Fixed in zeta PR #1215 — previously silently IGNORED
+#     (returned the unfiltered value). Full PG/Spark
+#     semantics (filter the per-row contribution to the
+#     running aggregate) is a follow-up; for now, rewrite
+#     as a subquery with a CASE expression:
+#     `SUM(CASE WHEN n > 15 THEN n END) OVER (...)`.
 #   # zeta-adapt: KNOWN DIVERGENCE — NTILE(0) returns 1
 #     for every row instead of erroring; NTILE(-1) returns
 #     1..N as if N were positive. MySQL doc says NTILE(n)
@@ -93,12 +99,18 @@ SELECT id, ROW_NUMBER() OVER () AS rn FROM wf ORDER BY id;
 
 SELECT id, ROW_NUMBER() OVER (PARTITION BY id % 2) AS rn FROM wf ORDER BY id;
 
---echo === KNOWN BUG: FILTER clause on aggregate window — silently IGNORED ===
---echo # Cumulative SUM should include only rows where n > 15:
---echo # row 1 (n=10): filter rejects → NULL or 0; row 2 (n=20): 20; row 3 (n=30): 50.
---echo # zeta returns the UNFILTERED cumulative sum instead.
+--echo === FILTER clause on aggregate window — errors 1064 (was silent-ignore) ===
+--echo # Fixed in zeta PR #1215. Previously returned the unfiltered
+--echo # cumulative sum without any error signal. Full PG/Spark
+--echo # semantics is a follow-up. Workaround: rewrite as
+--echo # `SUM(CASE WHEN n > 15 THEN n END) OVER (...)`.
 
+--error 1064
 SELECT id, n, SUM(n) FILTER (WHERE n > 15) OVER (ORDER BY id) AS s_filt FROM wf ORDER BY id;
+
+--echo === FILTER workaround using CASE ===
+
+SELECT id, n, SUM(CASE WHEN n > 15 THEN n END) OVER (ORDER BY id) AS s_filt_case FROM wf ORDER BY id;
 
 --echo === KNOWN DIVERGENCE: NTILE(0) returns 1 per row (MySQL would error) ===
 
