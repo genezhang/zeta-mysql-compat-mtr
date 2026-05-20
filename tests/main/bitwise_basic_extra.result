@@ -1,0 +1,65 @@
+=== Bitwise & (AND), | (OR) ===
+SELECT 6 & 3 AS and_op, 6 | 3 AS or_op;
+and_op	or_op
+2	7
+=== Shift << / >> ===
+SELECT 5 << 1 AS shl, 8 >> 1 AS shr;
+shl	shr
+10	4
+=== Unary ~ (NOT) ===
+SELECT ~5 AS r;
+r
+-6
+=== HEX(int) / HEX(text) ===
+SELECT HEX(255) AS h_int, HEX('hello') AS h_text;
+h_int	h_text
+FF	68656C6C6F
+=== HEX of negative int — two's-complement 64-bit ===
+SELECT HEX(-1) AS r;
+r
+FFFFFFFFFFFFFFFF
+=== UNHEX — decode hex back to text ===
+SELECT UNHEX('48656C6C6F') AS r, UNHEX('') AS empty;
+r	empty
+Hello	
+=== UNHEX on invalid hex chars — NULL ===
+SELECT UNHEX('Z') AS r;
+r
+NULL
+=== BIN(int) and BIN(-1) (64-bit unsigned form) ===
+SELECT BIN(10) AS r;
+r
+1010
+SELECT BIN(-1) AS r;
+r
+1111111111111111111111111111111111111111111111111111111111111111
+=== OCT(int) ===
+SELECT OCT(8) AS r;
+r
+10
+=== HEX / BIN / OCT NULL propagation ===
+SELECT HEX(NULL) AS h, BIN(NULL) AS b, OCT(NULL) AS o, UNHEX(NULL) AS u;
+h	b	o	u
+NULL	NULL	NULL	NULL
+=== KNOWN DIVERGENCE: BIT_LENGTH(<int>) measures TEXT length × 8 ===
+# `BIT_LENGTH(5)` returns 8 (length of "5" × 8), not 3.
+# `BIT_LENGTH(10)` returns 16. MySQL/PG would return the
+# actual bit width.
+SELECT BIT_LENGTH(5) AS bl5, BIT_LENGTH(10) AS bl10;
+bl5	bl10
+8	16
+=== KNOWN GAP: # (PG bitwise XOR) eaten by MySQL-wire comment shim ===
+# Substitute: (a | b) - (a & b).
+SELECT (6 | 3) - (6 & 3) AS xor_workaround;
+xor_workaround
+5
+=== KNOWN GAP: XOR infix — errno 1064 ===
+SELECT 6 XOR 3 AS r;
+ERROR 1064: SQL parse error: unsupported binary operator: XOR
+=== KNOWN GAP: XOR(a, b) function form — errno 1105 ===
+SELECT XOR(6, 3) AS r;
+ERROR 1105: execution error: unknown function: XOR
+=== KNOWN GAP: TO_HEX (PG alias) — errno 1105 ===
+# Substitute: HEX(...).
+SELECT TO_HEX(255) AS r;
+ERROR 1105: execution error: unknown function: TO_HEX
