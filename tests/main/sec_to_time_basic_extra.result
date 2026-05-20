@@ -14,9 +14,9 @@ n
 NULL
 === SEC_TO_TIME — out of range (MySQL allows; zeta rejects) ===
 SELECT SEC_TO_TIME(86401);
-ERROR 1105: execution error: SEC_TO_TIME: 86401 seconds out of 0..86400 range
+ERROR 1105: execution error: SEC_TO_TIME: 86401 seconds out of 0..=86400 range
 SELECT SEC_TO_TIME(-1);
-ERROR 1105: execution error: SEC_TO_TIME: -1 seconds out of 0..86400 range
+ERROR 1105: execution error: SEC_TO_TIME: -1 seconds out of 0..=86400 range
 === TIME_TO_SEC — TIME literal, string form, NULL ===
 SELECT TIME_TO_SEC(TIME '01:01:06') AS hms;
 hms
