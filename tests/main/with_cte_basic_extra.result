@@ -1,0 +1,73 @@
+=== WITH cte AS MATERIALIZED — accepted (silent no-op) ===
+# zeta accepts the MATERIALIZED hint at parse but the
+# planner inlines all CTEs regardless. Documented as a
+# silent divergence from PG (where the hint controls
+# execution-plan inlining).
+WITH cte AS MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte;
+v
+1
+=== WITH cte AS NOT MATERIALIZED — accepted (silent no-op) ===
+WITH cte AS NOT MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte;
+v
+1
+=== CTE referenced from another CTE's FROM clause ===
+WITH a AS (SELECT 1 AS x UNION ALL SELECT 2),
+     b AS (SELECT x * 10 AS y FROM a)
+SELECT y FROM b ORDER BY y;
+y
+10
+20
+=== ORDER BY inside CTE ===
+WITH a AS (SELECT v FROM (VALUES (3), (1), (2)) AS t(v) ORDER BY v DESC)
+SELECT v FROM a;
+v
+3
+2
+1
+=== RECURSIVE with UNION DISTINCT ===
+WITH RECURSIVE cnt(n) AS (
+  SELECT 1
+  UNION
+  SELECT n + 1 FROM cnt WHERE n < 5
+)
+SELECT n FROM cnt ORDER BY n;
+n
+1
+2
+3
+4
+5
+=== RECURSIVE with multi-column column-alias list ===
+WITH RECURSIVE c(a, b) AS (
+  SELECT 1, 10
+  UNION ALL
+  SELECT a + 1, b * 2 FROM c WHERE a < 4
+)
+SELECT a, b FROM c ORDER BY a;
+a	b
+1	10
+2	20
+3	40
+4	80
+=== Aggregate CTE referenced by main query ===
+WITH agg AS (
+  SELECT region, SUM(qty) AS total
+    FROM (VALUES ('east', 10), ('west', 20), ('east', 30)) AS t(region, qty)
+    GROUP BY region
+)
+SELECT region, total FROM agg ORDER BY region;
+region	total
+east	40
+west	20
+=== Infinite recursion bounded by outer LIMIT ===
+# `WITH RECURSIVE infinite(n)` has no terminating clause;
+# the outer LIMIT 5 must stop the recursion at 5 rows
+# rather than running forever.
+WITH RECURSIVE infinite(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM infinite)
+SELECT n FROM infinite LIMIT 5;
+n
+1
+2
+3
+4
+5
