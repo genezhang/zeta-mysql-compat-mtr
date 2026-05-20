@@ -12,6 +12,19 @@ thu_jan1_2026
 SELECT YEARWEEK(DATE '2026-12-31') AS thu_dec31_2026_w53;
 thu_dec31_2026_w53
 202653
+=== ISO year shift (iso_year != calendar year) ===
+# 2024-12-30 Mon → ISO week 1 of 2025 (forward shift)
+# 2023-01-01 Sun → ISO week 52 of 2022 (backward shift)
+# 2021-01-01 Fri → ISO week 53 of 2020 (53-week year + shift)
+SELECT YEARWEEK(DATE '2024-12-30') AS forward_shift_to_2025;
+forward_shift_to_2025
+202501
+SELECT YEARWEEK(DATE '2023-01-01') AS backward_shift_to_2022;
+backward_shift_to_2022
+202252
+SELECT YEARWEEK(DATE '2021-01-01') AS backward_shift_53w_year;
+backward_shift_53w_year
+202053
 === Optional mode arg — accepted 0..=7, ISO numbering used ===
 SELECT YEARWEEK(DATE '2026-05-19', 0) AS m0;
 m0
