@@ -1,0 +1,116 @@
+=== Setup ===
+DROP TABLE IF EXISTS sc;
+CREATE TABLE sc (id INT PRIMARY KEY, s TEXT);
+INSERT INTO sc VALUES (1, 'apple'), (2, 'Banana'), (3, 'apple'),
+                     (4, 'aPple'), (5, ''), (6, NULL), (7, 'ban');
+=== ORDER BY string — ASCII order (uppercase sorts before lowercase) ===
+# Empty string sorts FIRST, NULLs sort LAST (PG default).
+# 'Banana' (B=0x42) precedes 'aPple' (a=0x61).
+SELECT id, s FROM sc ORDER BY s, id;
+id	s
+5	
+2	Banana
+4	aPple
+1	apple
+3	apple
+7	ban
+6	NULL
+=== ORDER BY LOWER(s) for case-insensitive ordering ===
+SELECT id, s FROM sc ORDER BY LOWER(s), id;
+id	s
+5	
+1	apple
+3	apple
+4	aPple
+7	ban
+2	Banana
+6	NULL
+=== Equality is case-sensitive, no trailing-space trim ===
+SELECT 'abc' = 'abc' AS eq, 'abc' = 'ABC' AS eq_ci, 'abc' = 'abc  ' AS trail_eq;
+eq	eq_ci	trail_eq
+1	0	0
+=== ASCII ordering — uppercase letters precede lowercase ===
+SELECT 'a' < 'b' AS l, 'A' < 'a' AS u_lt_l, 'a' < 'A' AS l_lt_u;
+l	u_lt_l	l_lt_u
+1	1	0
+=== Empty string vs NULL ===
+SELECT '' = '' AS empty_eq, '' IS NULL AS empty_null, NULL IS NULL AS nn;
+empty_eq	empty_null	nn
+1	0	1
+SELECT NULL = NULL AS nl_eq, NULL = '' AS nl_eq_e, '' = NULL AS e_eq_nl;
+nl_eq	nl_eq_e	e_eq_nl
+NULL	NULL	NULL
+=== Empty string sorts before any non-empty (orderable) ===
+SELECT 'a' < '' AS a_lt_e, '' < 'a' AS e_lt_a;
+a_lt_e	e_lt_a
+0	1
+=== LENGTH ≡ CHAR_LENGTH (zeta divergence; PG/MySQL LENGTH = bytes) ===
+SELECT LENGTH('abc') AS l, CHAR_LENGTH('abc') AS cl, LENGTH('') AS l0;
+l	cl	l0
+3	3	0
+SELECT LENGTH('é') AS l_zeta, CHAR_LENGTH('é') AS cl_zeta;
+l_zeta	cl_zeta
+1	1
+=== OCTET_LENGTH and BIT_LENGTH = byte view ===
+SELECT OCTET_LENGTH('abc') AS o, BIT_LENGTH('abc') AS b;
+o	b
+3	24
+SELECT OCTET_LENGTH('é') AS o, BIT_LENGTH('é') AS b;
+o	b
+4	32
+=== || (concat) — NULL propagates ===
+SELECT 'a' || 'b' AS r, 'a' || NULL AS pipe_null, NULL || 'a' AS null_pipe;
+r	pipe_null	null_pipe
+ab	NULL	NULL
+=== CONCAT(...) — NULL argument poisons (MySQL semantics) ===
+SELECT CONCAT('a', 'b', 'c') AS r, CONCAT('a', NULL, 'b') AS r_null,
+       CONCAT('a', 1, 'b') AS r_int;
+r	r_null	r_int
+abc	NULL	a1b
+=== CONCAT_WS — NULL arguments are SKIPPED (not poisoning) ===
+SELECT CONCAT_WS(',', 'a', NULL, 'b') AS r, CONCAT_WS('-', 'x', NULL, NULL, 'y') AS r2;
+r	r2
+a,b	x-y
+=== LIKE ESCAPE clause — backslash and custom escape char ===
+SELECT 'abc%def' LIKE 'abc\%def' ESCAPE '\\' AS lit_pct_bs;
+lit_pct_bs
+1
+SELECT 'abc_def' LIKE 'abc\_def' ESCAPE '\\' AS lit_und_bs;
+lit_und_bs
+1
+SELECT 'a%b' LIKE 'a$%b' ESCAPE '$' AS lit_pct_dollar;
+lit_pct_dollar
+1
+SELECT 'a_b' LIKE 'a$_b' ESCAPE '$' AS lit_und_dollar;
+lit_und_dollar
+1
+=== STRCMP — MySQL-flavoured 3-way string compare ===
+SELECT STRCMP('a', 'b') AS lt, STRCMP('a', 'a') AS eq, STRCMP('b', 'a') AS gt;
+lt	eq	gt
+-1	0	1
+=== FIND_IN_SET (MySQL) — 1-based position in CSV string ===
+SELECT FIND_IN_SET('b', 'a,b,c') AS r, FIND_IN_SET('z', 'a,b,c') AS r_miss;
+r	r_miss
+2	0
+=== FIELD (MySQL) — 1-based position in variadic argument list ===
+SELECT FIELD('b', 'a', 'b', 'c') AS r, FIELD('z', 'a', 'b', 'c') AS r_miss;
+r	r_miss
+2	0
+=== SOUNDEX (4-char code) and QUOTE (SQL-escaped string) ===
+SELECT SOUNDEX('Smith') AS sx;
+sx
+S530
+SELECT QUOTE('it''s') AS q;
+q
+'it\'s'
+=== KNOWN GAP: COLLATE clause — errno 1064 ===
+# zeta has no collation surface yet; substitute: LOWER()
+# or UPPER() for case-insensitive compare/order.
+SELECT 'abc' COLLATE "C" AS r;
+ERROR 1064: SQL parse error: unsupported expression: 'abc' COLLATE "C"
+=== KNOWN GAP: MySQL BINARY <expr> cast — errno 1105 ===
+# Substitute: CAST(x AS BYTEA) for a byte view.
+SELECT BINARY 'A' = BINARY 'a' AS r;
+ERROR 1105: execution error: unsupported CAST target type: BINARY
+=== Cleanup ===
+DROP TABLE sc;

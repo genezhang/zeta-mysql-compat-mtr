@@ -1,0 +1,153 @@
+# Independently authored string-comparison smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/strings.test or type_varchar.test; pins zeta's
+# string-comparison semantics — orthogonal to string_func_basic
+# (which covers function I/O) and comparison_predicate_basic_extra
+# (which covers basic LIKE/ILIKE without ESCAPE).
+#
+# Adaptation notes:
+#   # zeta-adapt: String equality is case-sensitive (PG default,
+#     diverges from MySQL's default case-insensitive utf8mb4_*_ci
+#     collation). `'abc' = 'ABC'` returns 0.
+#   # zeta-adapt: Trailing whitespace is NOT trimmed in equality
+#     (PG behaviour, diverges from MySQL's PAD SPACE semantics
+#     where `'a' = 'a   '` returns 1). `'a' = 'a   '` returns 0.
+#   # zeta-adapt: Empty string is NOT NULL — `'' IS NULL` is 0,
+#     `'' = ''` is 1, `NULL = ''` is NULL.
+#   # zeta-adapt: ORDER BY is ASCII-byte-ordered. Uppercase
+#     A–Z (0x41–0x5A) sorts before lowercase a–z (0x61–0x7A).
+#     NULLs sort LAST (PG default), empty string sorts FIRST.
+#   # zeta-adapt: LIKE ESCAPE clause — supported with both
+#     backslash and a custom single-char escape (e.g. `$`).
+#   # zeta-adapt: LIKE without ESCAPE — `\` is a regular char,
+#     not an escape (PG default; MySQL treats `\` as escape).
+#   # zeta-adapt: CONCAT_WS(sep, …) — NULL arguments are
+#     skipped (matches both MySQL and PG behaviour).
+#   # zeta-adapt: || (concat) — NULL propagates: `'a' || NULL`
+#     returns NULL.
+#   # zeta-adapt: CONCAT(a, NULL, b) — returns NULL (MySQL
+#     semantics; PG's CONCAT skips NULLs). Worth flagging if
+#     porting from PG.
+#   # zeta-adapt: OCTET_LENGTH — byte count; BIT_LENGTH —
+#     bits (= 8 × octets). Both supported per SQL standard.
+#   # zeta-adapt: STRCMP (MySQL fn) — supported, returns
+#     -1 / 0 / 1.
+#   # zeta-adapt: FIND_IN_SET (MySQL fn) — supported.
+#   # zeta-adapt: FIELD (MySQL fn) — supported.
+#   # zeta-adapt: SOUNDEX — supported (4-char Soundex code).
+#   # zeta-adapt: QUOTE (MySQL fn) — supported, returns the
+#     SQL-quoted form of a string with backslash-escaped
+#     embedded single-quotes.
+#   # zeta-adapt: KNOWN DIVERGENCE — LENGTH() returns the
+#     character count, not the byte count. PG/MySQL `LENGTH`
+#     returns bytes (so `LENGTH('é')` is 2 in PG/MySQL, but 1
+#     in zeta). Use OCTET_LENGTH for portable byte count, or
+#     CHAR_LENGTH for portable character count. In zeta the
+#     two are identical: `LENGTH ≡ CHAR_LENGTH`.
+#   # zeta-adapt: KNOWN GAP — `COLLATE "<name>"` clause errors
+#     1064 "unsupported expression". zeta has no collation
+#     surface yet; equality and ordering always follow the
+#     server's default (byte/ASCII). Substitute: use LOWER()
+#     or UPPER() for case-insensitive compare/order.
+#   # zeta-adapt: KNOWN GAP — MySQL's `BINARY <expr>` cast
+#     errors 1105 "unsupported CAST target type: BINARY".
+#     Substitute: cast to BYTEA via `CAST(x AS BYTEA)` where
+#     a byte view is needed.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sc;
+CREATE TABLE sc (id INT PRIMARY KEY, s TEXT);
+INSERT INTO sc VALUES (1, 'apple'), (2, 'Banana'), (3, 'apple'),
+                     (4, 'aPple'), (5, ''), (6, NULL), (7, 'ban');
+
+--echo === ORDER BY string — ASCII order (uppercase sorts before lowercase) ===
+--echo # Empty string sorts FIRST, NULLs sort LAST (PG default).
+--echo # 'Banana' (B=0x42) precedes 'aPple' (a=0x61).
+
+SELECT id, s FROM sc ORDER BY s, id;
+
+--echo === ORDER BY LOWER(s) for case-insensitive ordering ===
+
+SELECT id, s FROM sc ORDER BY LOWER(s), id;
+
+--echo === Equality is case-sensitive, no trailing-space trim ===
+
+SELECT 'abc' = 'abc' AS eq, 'abc' = 'ABC' AS eq_ci, 'abc' = 'abc  ' AS trail_eq;
+
+--echo === ASCII ordering — uppercase letters precede lowercase ===
+
+SELECT 'a' < 'b' AS l, 'A' < 'a' AS u_lt_l, 'a' < 'A' AS l_lt_u;
+
+--echo === Empty string vs NULL ===
+
+SELECT '' = '' AS empty_eq, '' IS NULL AS empty_null, NULL IS NULL AS nn;
+SELECT NULL = NULL AS nl_eq, NULL = '' AS nl_eq_e, '' = NULL AS e_eq_nl;
+
+--echo === Empty string sorts before any non-empty (orderable) ===
+
+SELECT 'a' < '' AS a_lt_e, '' < 'a' AS e_lt_a;
+
+--echo === LENGTH ≡ CHAR_LENGTH (zeta divergence; PG/MySQL LENGTH = bytes) ===
+
+SELECT LENGTH('abc') AS l, CHAR_LENGTH('abc') AS cl, LENGTH('') AS l0;
+SELECT LENGTH('é') AS l_zeta, CHAR_LENGTH('é') AS cl_zeta;
+
+--echo === OCTET_LENGTH and BIT_LENGTH = byte view ===
+
+SELECT OCTET_LENGTH('abc') AS o, BIT_LENGTH('abc') AS b;
+SELECT OCTET_LENGTH('é') AS o, BIT_LENGTH('é') AS b;
+
+--echo === || (concat) — NULL propagates ===
+
+SELECT 'a' || 'b' AS r, 'a' || NULL AS pipe_null, NULL || 'a' AS null_pipe;
+
+--echo === CONCAT(...) — NULL argument poisons (MySQL semantics) ===
+
+SELECT CONCAT('a', 'b', 'c') AS r, CONCAT('a', NULL, 'b') AS r_null,
+       CONCAT('a', 1, 'b') AS r_int;
+
+--echo === CONCAT_WS — NULL arguments are SKIPPED (not poisoning) ===
+
+SELECT CONCAT_WS(',', 'a', NULL, 'b') AS r, CONCAT_WS('-', 'x', NULL, NULL, 'y') AS r2;
+
+--echo === LIKE ESCAPE clause — backslash and custom escape char ===
+
+SELECT 'abc%def' LIKE 'abc\%def' ESCAPE '\\' AS lit_pct_bs;
+SELECT 'abc_def' LIKE 'abc\_def' ESCAPE '\\' AS lit_und_bs;
+SELECT 'a%b' LIKE 'a$%b' ESCAPE '$' AS lit_pct_dollar;
+SELECT 'a_b' LIKE 'a$_b' ESCAPE '$' AS lit_und_dollar;
+
+--echo === STRCMP — MySQL-flavoured 3-way string compare ===
+
+SELECT STRCMP('a', 'b') AS lt, STRCMP('a', 'a') AS eq, STRCMP('b', 'a') AS gt;
+
+--echo === FIND_IN_SET (MySQL) — 1-based position in CSV string ===
+
+SELECT FIND_IN_SET('b', 'a,b,c') AS r, FIND_IN_SET('z', 'a,b,c') AS r_miss;
+
+--echo === FIELD (MySQL) — 1-based position in variadic argument list ===
+
+SELECT FIELD('b', 'a', 'b', 'c') AS r, FIELD('z', 'a', 'b', 'c') AS r_miss;
+
+--echo === SOUNDEX (4-char code) and QUOTE (SQL-escaped string) ===
+
+SELECT SOUNDEX('Smith') AS sx;
+SELECT QUOTE('it''s') AS q;
+
+--echo === KNOWN GAP: COLLATE clause — errno 1064 ===
+--echo # zeta has no collation surface yet; substitute: LOWER()
+--echo # or UPPER() for case-insensitive compare/order.
+
+--error 1064
+SELECT 'abc' COLLATE "C" AS r;
+
+--echo === KNOWN GAP: MySQL BINARY <expr> cast — errno 1105 ===
+--echo # Substitute: CAST(x AS BYTEA) for a byte view.
+
+--error 1105
+SELECT BINARY 'A' = BINARY 'a' AS r;
+
+--echo === Cleanup ===
+
+DROP TABLE sc;
