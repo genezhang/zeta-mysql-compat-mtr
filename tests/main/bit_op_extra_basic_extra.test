@@ -20,8 +20,8 @@
 # wrap mod 64 (zeta returns `1 << 65 = 2`) where MySQL
 # returns 0, and `1 << 63` returns the sign bit as a
 # negative i64 instead of MySQL's u64-cast positive
-# value. The BIT_XOR aggregate is missing entirely
-# (BIT_AND and BIT_OR work).
+# value. (Originally also pinned BIT_XOR as missing;
+# zeta PR #1206 added it.)
 #
 # Adaptation notes:
 #   # zeta-adapt: column & / | / ~ / << / >> — supported on
@@ -43,10 +43,9 @@
 #   # zeta-adapt: KNOWN GAP — `^` (caret) XOR operator
 #     (MySQL spelling) errors 1064 "unsupported binary
 #     operator". Substitute: `(a | b) - (a & b)`.
-#   # zeta-adapt: KNOWN GAP — BIT_XOR aggregate function
-#     errors 1105 "unknown function: BIT_XOR". BIT_AND and
-#     BIT_OR work; for XOR aggregate, fold manually via a
-#     correlated subquery or app-side reduction.
+#   # zeta-adapt: BIT_XOR aggregate — supported since zeta
+#     #1206. Folds the integer column with XOR; returns
+#     NULL on empty input.
 #   # zeta-adapt: TO_HEX is the PG alias for HEX, supported
 #     since zeta #1205. FROM_HEX is still missing — substitute
 #     via UNHEX (MySQL spelling).
@@ -95,10 +94,9 @@ SELECT 1 << 63 AS sign_bit;
 --error 1064
 SELECT 6 ^ 3;
 
---echo === KNOWN GAP: BIT_XOR aggregate — errno 1105 ===
+--echo === BIT_XOR aggregate — supported since zeta #1206 ===
 
---error 1105
-SELECT BIT_XOR(b) FROM bt;
+SELECT BIT_XOR(b) AS xor_all FROM bt;
 
 --echo === TO_HEX alias for HEX — supported since zeta #1205 ===
 
