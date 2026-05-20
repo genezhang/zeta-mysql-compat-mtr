@@ -1,0 +1,158 @@
+# Independently authored boolean-logic smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/bool*.test or type_bit.test; pins zeta's
+# BOOLEAN column + 3-valued-logic surface (no prior compat
+# coverage for booleans).
+#
+# Adaptation notes:
+#   # zeta-adapt: BOOLEAN column type — supported. BOOL is an
+#     accepted alias.
+#   # zeta-adapt: BOOLEAN values render as `1` / `0` over the
+#     MySQL wire (TINYINT(1) convention).
+#   # zeta-adapt: Literal `TRUE` / `FALSE` (case-insensitive) —
+#     supported.
+#   # zeta-adapt: AND / OR / NOT — supported with SQL standard
+#     3-valued logic.
+#   # zeta-adapt: 3VL truth table — `true AND NULL = NULL`,
+#     `false AND NULL = false`, `true OR NULL = true`,
+#     `false OR NULL = NULL`, `NULL AND NULL = NULL`.
+#   # zeta-adapt: IS TRUE / IS NOT TRUE / IS FALSE /
+#     IS NOT FALSE — supported. `NULL IS NOT TRUE` is TRUE,
+#     `NULL IS NOT FALSE` is TRUE.
+#   # zeta-adapt: IS NULL / IS NOT NULL — supported.
+#   # zeta-adapt: IS UNKNOWN — supported (synonym for IS NULL
+#     for boolean predicates).
+#   # zeta-adapt: IS DISTINCT FROM / IS NOT DISTINCT FROM —
+#     supported. `NULL IS DISTINCT FROM NULL` returns 0
+#     (they're the same NULL), and `NULL IS NOT DISTINCT FROM
+#     NULL` returns 1.
+#   # zeta-adapt: FILTER clause (PG WHERE-inside-aggregate) —
+#     supported on COUNT.
+#   # zeta-adapt: BOOL_AND, BOOL_OR, EVERY — supported.
+#   # zeta-adapt: BOOLEAN ORDER BY — false (0) < true (1) <
+#     NULL (NULLs last).
+#   # zeta-adapt: BOOLEAN in WHERE — `WHERE flag` matches
+#     true rows, `WHERE NOT flag` matches false rows (NULL is
+#     excluded from both, per 3VL).
+#   # zeta-adapt: BOOLEAN comparison with `= true` /
+#     `= TRUE` — supported.
+#   # zeta-adapt: BOOLEAN string-literal casts (PG-style) —
+#     'true','false','t','f','1','0','yes','no' all cast
+#     successfully.
+#   # zeta-adapt: CAST(int AS BOOLEAN) — supported
+#     (0 → false, nonzero → true).
+#   # zeta-adapt: BOOLEAN column with DEFAULT false — supported.
+#   # zeta-adapt: CHECK constraint on BOOLEAN column —
+#     supported (errno 1105 on violation).
+#   # zeta-adapt: COALESCE with BOOLEAN — supported.
+#   # zeta-adapt: KNOWN GAP — bool → INT cast errors 1105
+#     "cannot cast to INT". The reverse (INT → BOOLEAN) works.
+#     Substitute: `CASE WHEN flag THEN 1 ELSE 0 END`.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS bt;
+CREATE TABLE bt (id INT PRIMARY KEY, flag BOOLEAN, name TEXT);
+INSERT INTO bt VALUES (1, true, 'a'), (2, false, 'b'), (3, NULL, 'c');
+
+--echo === BOOLEAN renders as 1 / 0 over MySQL wire ===
+
+SELECT id, flag FROM bt ORDER BY id;
+
+--echo === BOOLEAN in WHERE: WHERE flag matches true; WHERE NOT flag matches false ===
+
+SELECT id FROM bt WHERE flag;
+SELECT id FROM bt WHERE NOT flag;
+
+--echo === IS TRUE / IS NOT TRUE / IS FALSE / IS NOT FALSE ===
+
+SELECT id FROM bt WHERE flag IS TRUE;
+SELECT id FROM bt WHERE flag IS NOT TRUE ORDER BY id;
+SELECT id FROM bt WHERE flag IS FALSE;
+SELECT id FROM bt WHERE flag IS NOT FALSE ORDER BY id;
+
+--echo === IS NULL / IS UNKNOWN ===
+
+SELECT id FROM bt WHERE flag IS NULL;
+SELECT id FROM bt WHERE flag IS UNKNOWN;
+
+--echo === Equality with TRUE literal ===
+
+SELECT id FROM bt WHERE flag = true ORDER BY id;
+
+--echo === 3-valued AND / OR / NOT — full truth table for NULL ===
+
+SELECT true AND false AS aa, true OR false AS oo, NOT true AS nt;
+SELECT true AND NULL AS tan, false AND NULL AS fan,
+       true OR NULL AS ton, false OR NULL AS fon;
+SELECT NULL AND NULL AS r;
+
+--echo === IS DISTINCT FROM / IS NOT DISTINCT FROM ===
+
+SELECT NULL IS DISTINCT FROM NULL AS nidn, NULL IS DISTINCT FROM true AS nidt,
+       true IS DISTINCT FROM true AS tidt;
+SELECT NULL IS NOT DISTINCT FROM NULL AS r;
+
+--echo === FILTER clause and boolean aggregates ===
+
+SELECT COUNT(*) FILTER (WHERE flag) AS yes_cnt, COUNT(*) AS total FROM bt;
+SELECT BOOL_AND(flag) AS ba, BOOL_OR(flag) AS bo, EVERY(flag) AS ev FROM bt;
+SELECT BOOL_AND(flag) AS ba FROM bt WHERE id IN (1, 2);
+
+--echo === ORDER BY boolean — false (0) before true (1), NULLs last ===
+
+SELECT id, flag FROM bt ORDER BY flag, id;
+
+--echo === String-literal casts to BOOLEAN ===
+
+SELECT 't'::BOOLEAN, 'f'::BOOLEAN, '1'::BOOLEAN, '0'::BOOLEAN,
+       'true'::BOOLEAN, 'false'::BOOLEAN, 'yes'::BOOLEAN, 'no'::BOOLEAN;
+
+--echo === CAST(int AS BOOLEAN) ===
+
+SELECT CAST(1 AS BOOLEAN) AS r1, CAST(0 AS BOOLEAN) AS r2;
+
+--echo === BOOL alias of BOOLEAN ===
+
+DROP TABLE IF EXISTS bool_alt;
+CREATE TABLE bool_alt (id INT PRIMARY KEY, b1 BOOL, b2 BOOLEAN);
+INSERT INTO bool_alt VALUES (1, true, false);
+SELECT id, b1, b2 FROM bool_alt;
+DROP TABLE bool_alt;
+
+--echo === BOOLEAN column with DEFAULT false ===
+
+DROP TABLE IF EXISTS bool_def;
+CREATE TABLE bool_def (id INT PRIMARY KEY, flag BOOLEAN DEFAULT false);
+INSERT INTO bool_def (id) VALUES (1), (2);
+SELECT id, flag FROM bool_def ORDER BY id;
+DROP TABLE bool_def;
+
+--echo === CHECK constraint on BOOLEAN column ===
+
+DROP TABLE IF EXISTS bool_chk;
+CREATE TABLE bool_chk (id INT PRIMARY KEY, flag BOOLEAN, CHECK (flag IS NOT NULL));
+INSERT INTO bool_chk VALUES (1, true);
+--error 1105
+INSERT INTO bool_chk VALUES (2, NULL);
+DROP TABLE bool_chk;
+
+--echo === COALESCE on BOOLEAN ===
+
+SELECT COALESCE(NULL::BOOLEAN, true) AS r1, COALESCE(NULL::BOOLEAN, NULL) AS r2;
+
+--echo === CASE WHEN bool_col THEN ... ===
+
+SELECT id, CASE WHEN flag THEN 'on' ELSE 'off' END AS s FROM bt ORDER BY id;
+
+--echo === KNOWN GAP: bool → INT cast — errno 1105 ===
+--echo # The reverse direction (INT → BOOLEAN) works; only
+--echo # bool → INT fails. Substitute:
+--echo # `CASE WHEN flag THEN 1 ELSE 0 END`.
+
+--error 1105
+SELECT flag::INT FROM bt WHERE id = 1;
+
+--echo === Cleanup ===
+
+DROP TABLE bt;
