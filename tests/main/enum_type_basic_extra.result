@@ -1,0 +1,107 @@
+=== CREATE TYPE AS ENUM (PG form) + table column + INSERT + SELECT ===
+DROP TABLE IF EXISTS e1;
+DROP TYPE IF EXISTS mood;
+CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
+CREATE TABLE e1 (id INT PRIMARY KEY, m mood);
+INSERT INTO e1 VALUES (1, 'sad'), (2, 'ok'), (3, 'happy'), (4, 'sad');
+SELECT id, m FROM e1 ORDER BY id;
+id	m
+1	sad
+2	ok
+3	happy
+4	sad
+=== ORDER BY follows DECLARATION order (sad < ok < happy) ===
+# Note: alphabetical would put 'happy' first.
+SELECT id, m FROM e1 ORDER BY m, id;
+id	m
+1	sad
+4	sad
+2	ok
+3	happy
+=== Equality and ordered comparison ===
+SELECT id FROM e1 WHERE m = 'happy';
+id
+3
+SELECT id, m FROM e1 WHERE m > 'sad' ORDER BY id;
+id	m
+2	ok
+3	happy
+=== INSERT of an invalid value — errno 1105 ===
+INSERT INTO e1 VALUES (5, 'bogus');
+ERROR 1105: execution error: invalid input value for enum mood: "bogus"
+=== UPDATE to a valid value ===
+UPDATE e1 SET m = 'ok' WHERE id = 1;
+SELECT id, m FROM e1 ORDER BY id;
+id	m
+1	ok
+2	ok
+3	happy
+4	sad
+DROP TABLE e1;
+DROP TYPE mood;
+=== ::enum cast and CAST(text AS enum) ===
+DROP TYPE IF EXISTS color;
+CREATE TYPE color AS ENUM ('red', 'green', 'blue');
+SELECT 'red'::color AS r1, CAST('blue' AS color) AS r2;
+r1	r2
+red	blue
+SELECT 'red'::color = 'red'::color AS eq, 'red'::color <> 'blue'::color AS neq;
+eq	neq
+1	1
+SELECT 'red'::color < 'blue'::color AS lt;
+lt
+1
+=== ::enum cast on invalid string — errno 1105 ===
+SELECT 'bogus'::color AS r;
+ERROR 1105: execution error: invalid input value for enum color: "bogus"
+DROP TYPE color;
+=== MySQL inline form: column ENUM('a','b','c') ===
+DROP TABLE IF EXISTS my_enum;
+CREATE TABLE my_enum (id INT PRIMARY KEY, c ENUM('red', 'green', 'blue'));
+INSERT INTO my_enum VALUES (1, 'red'), (2, 'green');
+SELECT id, c FROM my_enum ORDER BY id;
+id	c
+1	red
+2	green
+INSERT INTO my_enum VALUES (3, 'bogus');
+ERROR 1105: execution error: invalid input value for enum test.public.my_enum_c_enum: "bogus"
+DROP TABLE my_enum;
+=== ALTER TYPE … ADD VALUE ===
+DROP TYPE IF EXISTS extending;
+CREATE TYPE extending AS ENUM ('a', 'b');
+ALTER TYPE extending ADD VALUE 'c';
+SELECT 'c'::extending AS r;
+r
+c
+DROP TYPE extending;
+=== DROP TYPE IF EXISTS — no-op on missing ===
+DROP TYPE IF EXISTS no_such_type;
+=== DROP TYPE on missing — errno 1105 ===
+DROP TYPE no_such_type;
+ERROR 1105: execution error: type "no_such_type" does not exist
+=== Empty ENUM accepted at parse time; cast errors 1105 ===
+DROP TYPE IF EXISTS empty_enum;
+CREATE TYPE empty_enum AS ENUM ();
+SELECT 'a'::empty_enum AS r;
+ERROR 1105: execution error: invalid input value for enum empty_enum: "a"
+DROP TYPE empty_enum;
+=== ENUM value with whitespace ===
+DROP TYPE IF EXISTS ws_enum;
+CREATE TYPE ws_enum AS ENUM ('with space', 'no space');
+SELECT 'with space'::ws_enum AS r;
+r
+with space
+DROP TYPE ws_enum;
+=== COALESCE on ENUM column with ENUM literal ===
+DROP TABLE IF EXISTS tasks;
+DROP TYPE IF EXISTS status;
+CREATE TYPE status AS ENUM ('new', 'open', 'closed');
+CREATE TABLE tasks (id INT PRIMARY KEY, s status);
+INSERT INTO tasks VALUES (1, 'new'), (2, 'closed'), (3, NULL);
+SELECT id, COALESCE(s, 'new'::status) AS s FROM tasks ORDER BY id;
+id	s
+1	new
+2	closed
+3	new
+DROP TABLE tasks;
+DROP TYPE status;

@@ -1,0 +1,137 @@
+# Independently authored ENUM smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/enum.test or type_enum.test; pins zeta's
+# ENUM surface (no prior compat coverage). zeta supports
+# BOTH the PG `CREATE TYPE … AS ENUM` form and the inline
+# MySQL `column ENUM('a','b','c')` form.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE TYPE <name> AS ENUM ('v1', 'v2', …)
+#     (PG form) — supported.
+#   # zeta-adapt: Column with named ENUM type — supported.
+#   # zeta-adapt: ENUM ordering follows DECLARATION order
+#     (PG semantics), not alphabetical: ('sad','ok','happy')
+#     orders as sad < ok < happy.
+#   # zeta-adapt: ENUM equality and ordered comparison
+#     (=, <, >, <=, >=) — supported.
+#   # zeta-adapt: ::enum cast (PG) and CAST(text AS enum)
+#     — both supported.
+#   # zeta-adapt: INSERT of an invalid value errors 1105
+#     "invalid input value for enum <name>: <value>".
+#   # zeta-adapt: ::enum cast on an invalid string errors
+#     1105 (same message).
+#   # zeta-adapt: UPDATE to a valid enum value — supported.
+#   # zeta-adapt: COALESCE on an ENUM column with an enum
+#     literal — supported.
+#   # zeta-adapt: MySQL inline form `col ENUM('a', 'b', …)`
+#     in CREATE TABLE — supported. Internally creates a
+#     synthetic enum type (e.g. test.public.<table>_<col>_enum)
+#     visible in error messages.
+#   # zeta-adapt: ALTER TYPE … ADD VALUE — supported.
+#     New value is appended and immediately usable.
+#   # zeta-adapt: DROP TYPE on a missing type errors 1105
+#     "type … does not exist". The DROP TYPE IF EXISTS form
+#     is a silent no-op on missing.
+#   # zeta-adapt: Empty ENUM `CREATE TYPE x AS ENUM ()` —
+#     accepted at parse time (no error). No values can be
+#     cast into it; any attempted ::x cast errors 1105.
+#   # zeta-adapt: ENUM with whitespace inside a value —
+#     supported.
+
+--echo === CREATE TYPE AS ENUM (PG form) + table column + INSERT + SELECT ===
+
+DROP TABLE IF EXISTS e1;
+DROP TYPE IF EXISTS mood;
+CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
+CREATE TABLE e1 (id INT PRIMARY KEY, m mood);
+INSERT INTO e1 VALUES (1, 'sad'), (2, 'ok'), (3, 'happy'), (4, 'sad');
+SELECT id, m FROM e1 ORDER BY id;
+
+--echo === ORDER BY follows DECLARATION order (sad < ok < happy) ===
+--echo # Note: alphabetical would put 'happy' first.
+
+SELECT id, m FROM e1 ORDER BY m, id;
+
+--echo === Equality and ordered comparison ===
+
+SELECT id FROM e1 WHERE m = 'happy';
+SELECT id, m FROM e1 WHERE m > 'sad' ORDER BY id;
+
+--echo === INSERT of an invalid value — errno 1105 ===
+
+--error 1105
+INSERT INTO e1 VALUES (5, 'bogus');
+
+--echo === UPDATE to a valid value ===
+
+UPDATE e1 SET m = 'ok' WHERE id = 1;
+SELECT id, m FROM e1 ORDER BY id;
+DROP TABLE e1;
+DROP TYPE mood;
+
+--echo === ::enum cast and CAST(text AS enum) ===
+
+DROP TYPE IF EXISTS color;
+CREATE TYPE color AS ENUM ('red', 'green', 'blue');
+SELECT 'red'::color AS r1, CAST('blue' AS color) AS r2;
+SELECT 'red'::color = 'red'::color AS eq, 'red'::color <> 'blue'::color AS neq;
+SELECT 'red'::color < 'blue'::color AS lt;
+
+--echo === ::enum cast on invalid string — errno 1105 ===
+
+--error 1105
+SELECT 'bogus'::color AS r;
+DROP TYPE color;
+
+--echo === MySQL inline form: column ENUM('a','b','c') ===
+
+DROP TABLE IF EXISTS my_enum;
+CREATE TABLE my_enum (id INT PRIMARY KEY, c ENUM('red', 'green', 'blue'));
+INSERT INTO my_enum VALUES (1, 'red'), (2, 'green');
+SELECT id, c FROM my_enum ORDER BY id;
+--error 1105
+INSERT INTO my_enum VALUES (3, 'bogus');
+DROP TABLE my_enum;
+
+--echo === ALTER TYPE … ADD VALUE ===
+
+DROP TYPE IF EXISTS extending;
+CREATE TYPE extending AS ENUM ('a', 'b');
+ALTER TYPE extending ADD VALUE 'c';
+SELECT 'c'::extending AS r;
+DROP TYPE extending;
+
+--echo === DROP TYPE IF EXISTS — no-op on missing ===
+
+DROP TYPE IF EXISTS no_such_type;
+
+--echo === DROP TYPE on missing — errno 1105 ===
+
+--error 1105
+DROP TYPE no_such_type;
+
+--echo === Empty ENUM accepted at parse time; cast errors 1105 ===
+
+DROP TYPE IF EXISTS empty_enum;
+CREATE TYPE empty_enum AS ENUM ();
+--error 1105
+SELECT 'a'::empty_enum AS r;
+DROP TYPE empty_enum;
+
+--echo === ENUM value with whitespace ===
+
+DROP TYPE IF EXISTS ws_enum;
+CREATE TYPE ws_enum AS ENUM ('with space', 'no space');
+SELECT 'with space'::ws_enum AS r;
+DROP TYPE ws_enum;
+
+--echo === COALESCE on ENUM column with ENUM literal ===
+
+DROP TABLE IF EXISTS tasks;
+DROP TYPE IF EXISTS status;
+CREATE TYPE status AS ENUM ('new', 'open', 'closed');
+CREATE TABLE tasks (id INT PRIMARY KEY, s status);
+INSERT INTO tasks VALUES (1, 'new'), (2, 'closed'), (3, NULL);
+SELECT id, COALESCE(s, 'new'::status) AS s FROM tasks ORDER BY id;
+DROP TABLE tasks;
+DROP TYPE status;
