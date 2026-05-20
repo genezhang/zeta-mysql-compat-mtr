@@ -1,0 +1,133 @@
+# Independently authored variables / SET / SHOW smoke test
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/variables*.test or show_check.test;
+# pins zeta's session-variable / system-variable / SET
+# surface (no prior compat coverage).
+#
+# Adaptation notes:
+#   # zeta-adapt: `@@<var>` system-variable reference —
+#     supported in a bare SELECT projection. Returns:
+#       `@@autocommit` → 'ON'
+#       `@@version` → '8.0.36-zeta'
+#       `@@SESSION.<name>` and `@@GLOBAL.<name>` both work.
+#   # zeta-adapt: `SET @x = value` and `SET @x := value`
+#     (MySQL session-variable declarations) — both parse
+#     and execute without error. (See KNOWN GAP for the
+#     read side, where `SELECT @x` errors 1064.)
+#   # zeta-adapt: `SET @@<name> = value` — parsed and
+#     accepted (silent no-op for unrecognised variables).
+#   # zeta-adapt: `SET SESSION <name> = value`,
+#     `SET LOCAL <name> = value` — parsed and accepted.
+#   # zeta-adapt: SHOW CHARACTER SET — returns one synthetic
+#     `utf8mb4` row for ORM compatibility.
+#   # zeta-adapt: SHOW COLLATION — returns one synthetic
+#     `utf8mb4_general_ci` row.
+#   # zeta-adapt: KNOWN GAP — user-variable READ via
+#     `SELECT @x` errors 1064 "unsupported unary operator:
+#     @". The `SET @x = ...` form parses but the value is
+#     not actually bound (or not visible to the planner).
+#     Substitute: use a SELECT-derived literal, e.g.
+#     `WITH cte AS (SELECT 10 AS x) SELECT x FROM cte`.
+#   # zeta-adapt: KNOWN GAP — `SELECT @@<var> AS <alias>`
+#     does NOT alias correctly. With `AS r`, zeta returns
+#     NULL and the column header is literally `@@<var> as r`.
+#     Substitute: read the var first, then alias in an
+#     outer SELECT, OR use `SELECT @@<var>` without an
+#     alias.
+#   # zeta-adapt: KNOWN GAP — `(@@<var>)` parenthesised
+#     errors 1064 "unsupported unary operator: @@".
+#     Substitute: write `@@<var>` bare.
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW VARIABLES, SHOW
+#     STATUS, SHOW WARNINGS, SHOW ENGINES, SHOW PROCESSLIST
+#     all return an empty result set instead of MySQL's
+#     populated tables. The data exists (see
+#     `information_schema.engines` in
+#     `pg_catalog_basic_extra`) but the SHOW shim doesn't
+#     expose it. ORMs that introspect via these commands
+#     will see nothing.
+
+--echo === @@autocommit returns 'ON' ===
+
+SELECT @@autocommit;
+
+--echo === @@version returns the zeta-tagged MySQL version string ===
+
+SELECT @@version;
+
+--echo === @@SESSION.<name> and @@GLOBAL.<name> qualified forms ===
+
+SELECT @@SESSION.autocommit;
+SELECT @@GLOBAL.version;
+
+--echo === Multi-column system-var SELECT ===
+
+SELECT @@autocommit, @@version;
+
+--echo === SET @@autocommit (silent no-op) ===
+
+SET @@autocommit = 0;
+SET @@autocommit = 1;
+
+--echo === SET @x and SET @x := … (both parse silently) ===
+
+SET @x = 10;
+SET @y := 'hello';
+
+--echo === SET SESSION / SET LOCAL — silent ===
+
+SET SESSION sql_mode = 'STRICT_ALL_TABLES';
+SET LOCAL my_param = 1;
+
+--echo === SHOW CHARACTER SET — synthetic utf8mb4 row ===
+
+SHOW CHARACTER SET;
+
+--echo === SHOW COLLATION — synthetic utf8mb4_general_ci row ===
+
+SHOW COLLATION;
+
+--echo === KNOWN GAP: SELECT @x (user-var read) — errno 1064 ===
+--echo # SET @x = ... parses but @x is not visible to the
+--echo # planner. Substitute: a derived literal.
+
+--error 1064
+SELECT @x;
+
+--echo === KNOWN GAP: SELECT @@autocommit AS r — alias breaks @@var ===
+--echo # zeta returns NULL and the header becomes the literal
+--echo # string `@@autocommit as r`. Read without AS.
+
+SELECT @@autocommit AS r;
+
+--echo === KNOWN GAP: (@@autocommit) parenthesised — errno 1064 ===
+
+--error 1064
+SELECT (@@autocommit) AS r;
+
+--echo === KNOWN DIVERGENCE: SHOW VARIABLES — empty result ===
+--echo # MySQL returns a populated table. zeta returns no rows.
+
+SHOW VARIABLES;
+
+--echo === KNOWN DIVERGENCE: SHOW VARIABLES LIKE '...' — empty ===
+
+SHOW VARIABLES LIKE 'version%';
+
+--echo === KNOWN DIVERGENCE: SHOW STATUS — empty result ===
+
+SHOW STATUS;
+
+--echo === KNOWN DIVERGENCE: SHOW WARNINGS — empty result ===
+
+SHOW WARNINGS;
+
+--echo === KNOWN DIVERGENCE: SHOW ENGINES — empty result ===
+--echo # Data IS available via information_schema.engines
+--echo # (see pg_catalog_basic_extra); only the SHOW shim
+--echo # returns nothing.
+
+SHOW ENGINES;
+
+--echo === KNOWN DIVERGENCE: SHOW PROCESSLIST — empty result ===
+
+SHOW PROCESSLIST;

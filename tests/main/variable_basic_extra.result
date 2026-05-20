@@ -1,0 +1,66 @@
+=== @@autocommit returns 'ON' ===
+SELECT @@autocommit;
+@@autocommit
+ON
+=== @@version returns the zeta-tagged MySQL version string ===
+SELECT @@version;
+@@version
+8.0.36-zeta
+=== @@SESSION.<name> and @@GLOBAL.<name> qualified forms ===
+SELECT @@SESSION.autocommit;
+@@session.autocommit
+ON
+SELECT @@GLOBAL.version;
+@@global.version
+8.0.36-zeta
+=== Multi-column system-var SELECT ===
+SELECT @@autocommit, @@version;
+@@autocommit	@@version
+ON	8.0.36-zeta
+=== SET @@autocommit (silent no-op) ===
+SET @@autocommit = 0;
+SET @@autocommit = 1;
+=== SET @x and SET @x := … (both parse silently) ===
+SET @x = 10;
+SET @y := 'hello';
+=== SET SESSION / SET LOCAL — silent ===
+SET SESSION sql_mode = 'STRICT_ALL_TABLES';
+SET LOCAL my_param = 1;
+=== SHOW CHARACTER SET — synthetic utf8mb4 row ===
+SHOW CHARACTER SET;
+Charset	Description	Default collation	Maxlen
+utf8mb4	UTF-8 Unicode	utf8mb4_general_ci	4
+=== SHOW COLLATION — synthetic utf8mb4_general_ci row ===
+SHOW COLLATION;
+Collation	Charset	Id	Default	Compiled	Sortlen
+utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
+=== KNOWN GAP: SELECT @x (user-var read) — errno 1064 ===
+# SET @x = ... parses but @x is not visible to the
+# planner. Substitute: a derived literal.
+SELECT @x;
+ERROR 1064: SQL parse error: unsupported unary operator: @
+=== KNOWN GAP: SELECT @@autocommit AS r — alias breaks @@var ===
+# zeta returns NULL and the header becomes the literal
+# string `@@autocommit as r`. Read without AS.
+SELECT @@autocommit AS r;
+@@autocommit as r
+NULL
+=== KNOWN GAP: (@@autocommit) parenthesised — errno 1064 ===
+SELECT (@@autocommit) AS r;
+ERROR 1064: SQL parse error: unsupported unary operator: @@
+=== KNOWN DIVERGENCE: SHOW VARIABLES — empty result ===
+# MySQL returns a populated table. zeta returns no rows.
+SHOW VARIABLES;
+=== KNOWN DIVERGENCE: SHOW VARIABLES LIKE '...' — empty ===
+SHOW VARIABLES LIKE 'version%';
+=== KNOWN DIVERGENCE: SHOW STATUS — empty result ===
+SHOW STATUS;
+=== KNOWN DIVERGENCE: SHOW WARNINGS — empty result ===
+SHOW WARNINGS;
+=== KNOWN DIVERGENCE: SHOW ENGINES — empty result ===
+# Data IS available via information_schema.engines
+# (see pg_catalog_basic_extra); only the SHOW shim
+# returns nothing.
+SHOW ENGINES;
+=== KNOWN DIVERGENCE: SHOW PROCESSLIST — empty result ===
+SHOW PROCESSLIST;
