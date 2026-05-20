@@ -1,0 +1,56 @@
+=== TEXT → DATE / TIMESTAMP / TIME ===
+SELECT CAST('2024-05-19' AS DATE) AS d;
+d
+2024-05-19
+SELECT CAST('2024-05-19 14:30:00' AS TIMESTAMP) AS ts;
+ts
+2024-05-19 14:30:00
+SELECT CAST('14:30:00' AS TIME) AS t;
+t
+14:30:00
+=== TEXT → DATE malformed — errno 1105 ===
+SELECT CAST('not-a-date' AS DATE);
+ERROR 1105: execution error: cannot cast 'not-a-date' to DATE
+=== CAST narrow INT overflow — errno 1105 ===
+SELECT CAST(99999 AS SMALLINT);
+ERROR 1105: execution error: smallint out of range for INT2: 99999
+=== CAST INT overflow at i32 boundary — errno 1105 ===
+SELECT CAST(2147483648 AS INT);
+ERROR 1105: execution error: integer out of range for INT4: 2147483648
+=== CAST BIGINT — i64::MAX works ===
+SELECT CAST(9223372036854775807 AS BIGINT) AS max_i64;
+max_i64
+9223372036854775807
+=== KNOWN BUG: CAST i64::MAX + 1 AS BIGINT silently clamps to i64::MAX ===
+SELECT CAST(9223372036854775808 AS BIGINT) AS overflow_clamp;
+overflow_clamp
+9223372036854775807
+=== PG ::TYPE postfix and chained casts ===
+SELECT '42'::INT AS pg_cast, '2024-05-19'::DATE AS pg_date, 42::TEXT::INT AS chained;
+pg_cast	pg_date	chained
+42	2024-05-19	42
+=== Whitespace handling ===
+SELECT CAST('  42  ' AS INT) AS int_strip, CAST('  42.5  ' AS DECIMAL(5,2)) AS dec_strip;
+int_strip	dec_strip
+42	42.5
+SELECT CAST('  hello  ' AS TEXT) AS text_keep;
+text_keep
+  hello  
+=== FLOAT → INT rounds half-away-from-zero (PG truncates; MySQL rounds) ===
+SELECT CAST(3.7 AS INT) AS pos, CAST(-3.7 AS INT) AS neg;
+pos	neg
+4	-4
+=== INT → BOOLEAN ===
+SELECT CAST(0 AS BOOLEAN) AS zero, CAST(1 AS BOOLEAN) AS one, CAST(-1 AS BOOLEAN) AS neg, CAST(42 AS BOOLEAN) AS big;
+zero	one	neg	big
+0	1	1	1
+=== String → INT[] (PG array literal) ===
+SELECT CAST('{1,2,3}' AS INT[]) AS arr;
+arr
+Array { element_type: Int32, elements: [Int32(1), Int32(2), Int32(3)] }
+=== KNOWN GAP: CAST BOOL → INT — errno 1105 ===
+SELECT CAST(TRUE AS INT);
+ERROR 1105: execution error: cannot cast to INT
+=== KNOWN GAP: CAST ARRAY → TEXT — errno 1105 ===
+SELECT CAST(ARRAY[1,2,3] AS TEXT);
+ERROR 1105: execution error: cannot cast to TEXT

@@ -1,0 +1,124 @@
+# Independently authored type-CAST edge smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/cast.test or PG regress; complements
+# cast_basic_extra (which covers basic numeric / DECIMAL /
+# DATE / BOOLEAN / TRY_CAST / float overflow / DECIMAL
+# truncation / BYTEA / UNSIGNED-via-CONVERT) by pinning the
+# EDGE behavior NOT covered there: TEXT→DATE/TIMESTAMP/TIME,
+# CAST narrow overflow rejection, BIGINT overflow silent-
+# clamp BUG, PG ::TYPE postfix, whitespace handling, FLOAT
+# → INT rounding divergence, INT → BOOL coercion, BOOL →
+# INT gap, ARRAY casts.
+#
+# Big-picture finding: zeta has solid TEXT-to-temporal
+# casting (DATE, TIMESTAMP, TIME) with clean error messages
+# for malformed input. CAST narrow with overflow value
+# (e.g., 99999 → SMALLINT) correctly errors 1105 at CAST
+# time (in CONTRAST with ALTER COLUMN TYPE, which silently
+# accepts — pinned separately as a bug in
+# alter_column_type_edges_basic_extra). PG ::TYPE postfix
+# works and can be chained. Whitespace is stripped for
+# numeric casts but preserved for TEXT cast.
+#
+# Three notable divergences/bugs: (a) CAST to BIGINT with
+# a value above i64::MAX silently CLAMPS to i64::MAX
+# without an error (parsing accepts the literal because
+# sqlparser allows arbitrarily-large integer literals). (b)
+# CAST FLOAT → INT rounds half-away-from-zero (3.7 → 4,
+# -3.7 → -4) where PG TRUNCATES (3.7 → 3). (c) CAST BOOL
+# → INT errors 1105 — the reverse direction is supported
+# but the boolean-to-integer cast isn't. (d) ARRAY → TEXT
+# cast errors 1105.
+#
+# Adaptation notes:
+#   # zeta-adapt: TEXT → DATE / TIMESTAMP / TIME — works
+#     for ISO-8601 input strings.
+#   # zeta-adapt: TEXT → DATE malformed input errors 1105
+#     "cannot cast '...' to DATE".
+#   # zeta-adapt: CAST narrow numeric with overflow value
+#     errors 1105 "smallint out of range for INT2: <val>"
+#     (CONTRAST with ALTER COLUMN TYPE: that silently
+#     accepts — separate bug).
+#   # zeta-adapt: PG ::TYPE postfix and chained `::a::b`
+#     casts both supported.
+#   # zeta-adapt: Whitespace stripped from numeric / DECIMAL
+#     cast strings; preserved for TEXT cast.
+#   # zeta-adapt: FLOAT → INT rounds half-away-from-zero
+#     (3.7 → 4, -3.7 → -4). PG TRUNCATES toward zero (3.7
+#     → 3, -3.7 → -3).
+#   # zeta-adapt: INT → BOOLEAN — 0 → false, any other
+#     value → true (matches MySQL / PG).
+#   # zeta-adapt: String → INT[] (PG array literal) —
+#     supported; parses '{1,2,3}' into Array.
+#   # zeta-adapt: KNOWN BUG — CAST <int_literal_above_i64::MAX>
+#     AS BIGINT silently CLAMPS to i64::MAX (9223372036854775807).
+#     Should error. Surfaces e.g. as
+#     `CAST(9223372036854775808 AS BIGINT) → 9223372036854775807`.
+#   # zeta-adapt: KNOWN GAP — `CAST(TRUE AS INT)` /
+#     `CAST(FALSE AS INT)` errors 1105 "cannot cast to
+#     INT". The reverse (INT → BOOL) works. Substitute
+#     via `CASE WHEN bool_col THEN 1 ELSE 0 END`.
+#   # zeta-adapt: KNOWN GAP — `CAST(ARRAY[...] AS TEXT)`
+#     errors 1105 "cannot cast to TEXT". No array-to-
+#     string formatter exposed via CAST. Substitute via
+#     ARRAY_TO_STRING(arr, ',').
+
+--echo === TEXT → DATE / TIMESTAMP / TIME ===
+
+SELECT CAST('2024-05-19' AS DATE) AS d;
+SELECT CAST('2024-05-19 14:30:00' AS TIMESTAMP) AS ts;
+SELECT CAST('14:30:00' AS TIME) AS t;
+
+--echo === TEXT → DATE malformed — errno 1105 ===
+
+--error 1105
+SELECT CAST('not-a-date' AS DATE);
+
+--echo === CAST narrow INT overflow — errno 1105 ===
+
+--error 1105
+SELECT CAST(99999 AS SMALLINT);
+
+--echo === CAST INT overflow at i32 boundary — errno 1105 ===
+
+--error 1105
+SELECT CAST(2147483648 AS INT);
+
+--echo === CAST BIGINT — i64::MAX works ===
+
+SELECT CAST(9223372036854775807 AS BIGINT) AS max_i64;
+
+--echo === KNOWN BUG: CAST i64::MAX + 1 AS BIGINT silently clamps to i64::MAX ===
+
+SELECT CAST(9223372036854775808 AS BIGINT) AS overflow_clamp;
+
+--echo === PG ::TYPE postfix and chained casts ===
+
+SELECT '42'::INT AS pg_cast, '2024-05-19'::DATE AS pg_date, 42::TEXT::INT AS chained;
+
+--echo === Whitespace handling ===
+
+SELECT CAST('  42  ' AS INT) AS int_strip, CAST('  42.5  ' AS DECIMAL(5,2)) AS dec_strip;
+SELECT CAST('  hello  ' AS TEXT) AS text_keep;
+
+--echo === FLOAT → INT rounds half-away-from-zero (PG truncates; MySQL rounds) ===
+
+SELECT CAST(3.7 AS INT) AS pos, CAST(-3.7 AS INT) AS neg;
+
+--echo === INT → BOOLEAN ===
+
+SELECT CAST(0 AS BOOLEAN) AS zero, CAST(1 AS BOOLEAN) AS one, CAST(-1 AS BOOLEAN) AS neg, CAST(42 AS BOOLEAN) AS big;
+
+--echo === String → INT[] (PG array literal) ===
+
+SELECT CAST('{1,2,3}' AS INT[]) AS arr;
+
+--echo === KNOWN GAP: CAST BOOL → INT — errno 1105 ===
+
+--error 1105
+SELECT CAST(TRUE AS INT);
+
+--echo === KNOWN GAP: CAST ARRAY → TEXT — errno 1105 ===
+
+--error 1105
+SELECT CAST(ARRAY[1,2,3] AS TEXT);
