@@ -1,0 +1,141 @@
+# Independently authored JSON-path-and-introspection smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/json_*.test or PG regress;
+# complements json_basic / jsonb_basic_extra (which cover
+# JSON_EXTRACT / -> / ->> / @> / ? / JSON_LENGTH(1-arg) /
+# JSON_KEYS basics) by pinning the EXTENDED introspection,
+# multi-arg path, set-returning, and PG-specific operators
+# NOT covered there.
+#
+# Big-picture finding: zeta's JSONB surface is very PG-
+# flavored and rich at the function level: JSONB_EXTRACT_
+# PATH / _TEXT (multi-key), JSONB_TYPEOF, JSONB_PRETTY,
+# JSONB_STRIP_NULLS, JSONB_OBJECT_KEYS and JSONB_EACH as
+# SRFs, plus JSON_DEPTH/VALID all work. Containment (@>)
+# handles nested objects and array elements correctly.
+# Key-exists (`?`, `?|`, `?&`) all supported, with the
+# ARRAY-of-key forms requiring ARRAY[] syntax. The MySQL-
+# flavored JSON_LENGTH(json, '$.path') 2-arg form is NOT
+# accepted (requires the 1-arg form), and JSON_TABLE
+# parses as an unsupported FROM clause. PG's
+# jsonb_path_query is missing too.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSONB_EXTRACT_PATH(j, k1, k2, ...) — PG
+#     multi-key path traversal. Returns JSONB.
+#   # zeta-adapt: JSONB_EXTRACT_PATH_TEXT — same but
+#     unquoted text result.
+#   # zeta-adapt: `@>` containment handles nested objects
+#     and array elements ('[10,20,30]' @> '[20]' = true).
+#   # zeta-adapt: `?|` and `?&` accept ARRAY['k1','k2'] for
+#     ANY-key-exists / ALL-key-exists respectively.
+#   # zeta-adapt: JSON_DEPTH counts nesting; JSON_DEPTH on
+#     '[1,[2,[3,[4]]]]' returns 5.
+#   # zeta-adapt: JSONB_TYPEOF — returns 'object' / 'array'
+#     / 'string' / 'number' / 'boolean' / 'null'.
+#   # zeta-adapt: JSON_VALID — 1 for valid, 0 for invalid.
+#   # zeta-adapt: JSONB_PRETTY — formats with 4-space
+#     indent and newlines.
+#   # zeta-adapt: JSONB_STRIP_NULLS — removes top-level
+#     `"key": null` pairs (does NOT recurse into nested
+#     objects in zeta? — pinned per probe).
+#   # zeta-adapt: JSONB_OBJECT_KEYS / JSONB_EACH — set-
+#     returning functions, usable in FROM clause with
+#     `AS t(k)` / `AS t(k, v)` column aliases.
+#   # zeta-adapt: KNOWN GAP — JSON_LENGTH(j, '$.path')
+#     2-arg form errors 1105 "JSON_LENGTH requires 1
+#     argument". Substitute via
+#     JSON_LENGTH(JSONB_EXTRACT_PATH(j, 'path')) or
+#     JSON_LENGTH(j -> 'path').
+#   # zeta-adapt: KNOWN GAP — `jsonb_path_query(j, '$.x')`
+#     (PG JSONPath query) errors 1105 "unknown function".
+#     No portable substitute exposed today.
+#   # zeta-adapt: KNOWN GAP — JSON_TABLE (MySQL TVF) errors
+#     1064 "unsupported FROM clause". No lateral-table
+#     JSON-flatten path supported via MySQL syntax;
+#     substitute via JSONB_EACH (PG SRF).
+#   # zeta-adapt: KNOWN GAP — JSON_OBJECT_KEYS (without
+#     JSONB prefix) errors 1105 "unknown function". Use
+#     JSONB_OBJECT_KEYS.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS j;
+CREATE TABLE j (id INT PRIMARY KEY, d JSONB);
+INSERT INTO j VALUES
+  (1, '{"a": 1, "b": [1,2,3], "c": {"d": "deep"}}'),
+  (2, '[10, 20, 30]'),
+  (3, '{"name": "alice", "tags": ["x","y"], "addr": {"city": "NYC", "zip": "10001"}}');
+
+--echo === JSONB_EXTRACT_PATH — single key + nested ===
+
+SELECT id, JSONB_EXTRACT_PATH(d, 'a') AS a FROM j WHERE id = 1;
+SELECT id, JSONB_EXTRACT_PATH(d, 'c', 'd') AS nested FROM j WHERE id = 1;
+
+--echo === JSONB_EXTRACT_PATH_TEXT — unquoted ===
+
+SELECT id, JSONB_EXTRACT_PATH_TEXT(d, 'name') AS n FROM j WHERE id = 3;
+SELECT id, JSONB_EXTRACT_PATH_TEXT(d, 'addr', 'city') AS city FROM j WHERE id = 3;
+
+--echo === @> nested object containment ===
+
+SELECT id FROM j WHERE d @> '{"a": 1}' ORDER BY id;
+SELECT id FROM j WHERE d @> '{"c": {"d": "deep"}}' ORDER BY id;
+SELECT id FROM j WHERE d @> '{"c": {"d": "wrong"}}' ORDER BY id;
+
+--echo === @> array element containment ===
+
+SELECT id FROM j WHERE d @> '[20]' ORDER BY id;
+
+--echo === ?| / ?& — ANY / ALL key-exists ===
+
+SELECT id FROM j WHERE d ?| ARRAY['a', 'name'] ORDER BY id;
+SELECT id FROM j WHERE d ?& ARRAY['a', 'b'] ORDER BY id;
+SELECT id FROM j WHERE d ?& ARRAY['a', 'no_such'] ORDER BY id;
+
+--echo === JSON_DEPTH — nesting count ===
+
+SELECT JSON_DEPTH(d) AS dep FROM j WHERE id = 1;
+SELECT JSON_DEPTH('[1,[2,[3,[4]]]]'::JSONB) AS dep_deep;
+
+--echo === JSONB_TYPEOF ===
+
+SELECT id, JSONB_TYPEOF(d) AS t FROM j ORDER BY id;
+
+--echo === JSON_VALID ===
+
+SELECT JSON_VALID('{"a":1}') AS ok, JSON_VALID('{a:1}') AS bad;
+
+--echo === JSONB_STRIP_NULLS ===
+
+SELECT JSONB_STRIP_NULLS('{"a": 1, "b": null, "c": 3}'::JSONB) AS stripped;
+
+--echo === JSONB_OBJECT_KEYS as SRF ===
+
+SELECT * FROM JSONB_OBJECT_KEYS('{"a":1,"b":2}'::JSONB) AS t(k);
+
+--echo === JSONB_EACH as SRF ===
+
+SELECT * FROM JSONB_EACH('{"a":1,"b":2}'::JSONB) AS t(k, v);
+
+--echo === KNOWN GAP: JSON_LENGTH 2-arg (with path) — errno 1105 ===
+
+--error 1105
+SELECT JSON_LENGTH(d, '$.b') FROM j WHERE id = 1;
+
+--echo === KNOWN GAP: jsonb_path_query (PG) — errno 1105 ===
+
+--error 1105
+SELECT jsonb_path_query('[1,2,3]', '$[*]');
+
+--echo === KNOWN GAP: JSON_TABLE (MySQL TVF) — errno 1064 ===
+
+--error 1064
+SELECT * FROM JSON_TABLE('[1,2,3]', '$[*]' COLUMNS (x INT PATH '$')) AS t;
+
+--echo === KNOWN GAP: JSON_OBJECT_KEYS (without JSONB prefix) — errno 1105 ===
+
+--error 1105
+SELECT JSON_OBJECT_KEYS('{"a":1,"b":2}'::JSONB);
+
+DROP TABLE j;

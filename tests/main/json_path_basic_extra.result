@@ -1,0 +1,86 @@
+=== Setup ===
+DROP TABLE IF EXISTS j;
+CREATE TABLE j (id INT PRIMARY KEY, d JSONB);
+INSERT INTO j VALUES
+  (1, '{"a": 1, "b": [1,2,3], "c": {"d": "deep"}}'),
+  (2, '[10, 20, 30]'),
+  (3, '{"name": "alice", "tags": ["x","y"], "addr": {"city": "NYC", "zip": "10001"}}');
+=== JSONB_EXTRACT_PATH — single key + nested ===
+SELECT id, JSONB_EXTRACT_PATH(d, 'a') AS a FROM j WHERE id = 1;
+id	a
+1	1
+SELECT id, JSONB_EXTRACT_PATH(d, 'c', 'd') AS nested FROM j WHERE id = 1;
+id	nested
+1	"deep"
+=== JSONB_EXTRACT_PATH_TEXT — unquoted ===
+SELECT id, JSONB_EXTRACT_PATH_TEXT(d, 'name') AS n FROM j WHERE id = 3;
+id	n
+3	alice
+SELECT id, JSONB_EXTRACT_PATH_TEXT(d, 'addr', 'city') AS city FROM j WHERE id = 3;
+id	city
+3	NYC
+=== @> nested object containment ===
+SELECT id FROM j WHERE d @> '{"a": 1}' ORDER BY id;
+id
+1
+SELECT id FROM j WHERE d @> '{"c": {"d": "deep"}}' ORDER BY id;
+id
+1
+SELECT id FROM j WHERE d @> '{"c": {"d": "wrong"}}' ORDER BY id;
+=== @> array element containment ===
+SELECT id FROM j WHERE d @> '[20]' ORDER BY id;
+id
+2
+=== ?| / ?& — ANY / ALL key-exists ===
+SELECT id FROM j WHERE d ?| ARRAY['a', 'name'] ORDER BY id;
+id
+1
+3
+SELECT id FROM j WHERE d ?& ARRAY['a', 'b'] ORDER BY id;
+id
+1
+SELECT id FROM j WHERE d ?& ARRAY['a', 'no_such'] ORDER BY id;
+=== JSON_DEPTH — nesting count ===
+SELECT JSON_DEPTH(d) AS dep FROM j WHERE id = 1;
+dep
+3
+SELECT JSON_DEPTH('[1,[2,[3,[4]]]]'::JSONB) AS dep_deep;
+dep_deep
+5
+=== JSONB_TYPEOF ===
+SELECT id, JSONB_TYPEOF(d) AS t FROM j ORDER BY id;
+id	t
+1	object
+2	array
+3	object
+=== JSON_VALID ===
+SELECT JSON_VALID('{"a":1}') AS ok, JSON_VALID('{a:1}') AS bad;
+ok	bad
+1	0
+=== JSONB_STRIP_NULLS ===
+SELECT JSONB_STRIP_NULLS('{"a": 1, "b": null, "c": 3}'::JSONB) AS stripped;
+stripped
+{"a":1,"c":3}
+=== JSONB_OBJECT_KEYS as SRF ===
+SELECT * FROM JSONB_OBJECT_KEYS('{"a":1,"b":2}'::JSONB) AS t(k);
+k
+a
+b
+=== JSONB_EACH as SRF ===
+SELECT * FROM JSONB_EACH('{"a":1,"b":2}'::JSONB) AS t(k, v);
+k	v
+a	1
+b	2
+=== KNOWN GAP: JSON_LENGTH 2-arg (with path) — errno 1105 ===
+SELECT JSON_LENGTH(d, '$.b') FROM j WHERE id = 1;
+ERROR 1105: execution error: JSON_LENGTH requires 1 argument
+=== KNOWN GAP: jsonb_path_query (PG) — errno 1105 ===
+SELECT jsonb_path_query('[1,2,3]', '$[*]');
+ERROR 1105: execution error: unknown function: jsonb_path_query
+=== KNOWN GAP: JSON_TABLE (MySQL TVF) — errno 1064 ===
+SELECT * FROM JSON_TABLE('[1,2,3]', '$[*]' COLUMNS (x INT PATH '$')) AS t;
+ERROR 1064: SQL parse error: unsupported FROM clause (only table references, subqueries, and functions supported)
+=== KNOWN GAP: JSON_OBJECT_KEYS (without JSONB prefix) — errno 1105 ===
+SELECT JSON_OBJECT_KEYS('{"a":1,"b":2}'::JSONB);
+ERROR 1105: execution error: unknown function: JSON_OBJECT_KEYS
+DROP TABLE j;
