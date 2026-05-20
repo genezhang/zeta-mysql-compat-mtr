@@ -1,0 +1,121 @@
+# Independently authored bitwise + radix-conversion smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/func_op.test or func_str.test;
+# pins zeta's bitwise + HEX / BIN / OCT / UNHEX surface
+# (no prior compat coverage for these). Orthogonal to
+# numeric_func_basic_extra (which covers CONV/BIT_COUNT/COT).
+#
+# Adaptation notes:
+#   # zeta-adapt: `&` (bitwise AND) — supported.
+#   # zeta-adapt: `|` (bitwise OR) — supported.
+#   # zeta-adapt: `<<` (left shift) — supported.
+#   # zeta-adapt: `>>` (right shift) — supported.
+#   # zeta-adapt: `~` (bitwise NOT, unary) — supported.
+#   # zeta-adapt: HEX(int) — supported; returns uppercase
+#     hex. Negative ints render as two's-complement 64-bit
+#     (-1 → 'FFFFFFFFFFFFFFFF'), matching MySQL.
+#   # zeta-adapt: HEX(text) — supported; renders each byte
+#     as uppercase hex (e.g. 'hello' → '68656C6C6F').
+#   # zeta-adapt: UNHEX(text) — supported; returns the
+#     decoded text (e.g. '48656C6C6F' → 'Hello'). Empty
+#     input returns an empty string; invalid hex returns
+#     NULL.
+#   # zeta-adapt: BIN(int) — supported; returns the
+#     unsigned 64-bit binary representation (no leading-
+#     zero trimming for negative ints — `BIN(-1)` returns
+#     64 '1' bits).
+#   # zeta-adapt: OCT(int) — supported.
+#   # zeta-adapt: HEX / BIN / OCT propagate NULL.
+#   # zeta-adapt: BIT_LENGTH(int) — supported; counts the
+#     number of bits used by the value's TEXT rendering
+#     × 8 (so `BIT_LENGTH(5)` returns 8 — length of "5" ×
+#     8). MySQL returns the integer's actual bit width.
+#     Listed as a divergence below.
+#   # zeta-adapt: KNOWN DIVERGENCE — `BIT_LENGTH(<int>)`
+#     measures the TEXT rendering of the integer × 8 (so
+#     `BIT_LENGTH(5)` is 8, `BIT_LENGTH(10)` is 16) rather
+#     than the integer's actual bit width (3 for 5, 4 for
+#     10). Use the bit ops to compute true bit widths.
+#   # zeta-adapt: KNOWN GAP — `#` (PG bitwise XOR operator)
+#     is consumed by the MySQL wire shim as a single-line
+#     comment marker. The statement `SELECT 6 # 3` is
+#     truncated at the `#` and errors 1064 on the next
+#     statement boundary. Substitute on MySQL wire: write
+#     `(a | b) - (a & b)` to express XOR.
+#   # zeta-adapt: KNOWN GAP — MySQL `XOR` infix operator
+#     errors 1064 "unsupported binary operator: XOR".
+#     Substitute: same workaround as above.
+#   # zeta-adapt: KNOWN GAP — `XOR(a, b)` function form
+#     errors 1105 "unknown function: XOR".
+#   # zeta-adapt: KNOWN GAP — `TO_HEX(int)` (PG alias)
+#     errors 1105 "unknown function: TO_HEX". Substitute:
+#     HEX(int) (MySQL spelling).
+
+--echo === Bitwise & (AND), | (OR) ===
+
+SELECT 6 & 3 AS and_op, 6 | 3 AS or_op;
+
+--echo === Shift << / >> ===
+
+SELECT 5 << 1 AS shl, 8 >> 1 AS shr;
+
+--echo === Unary ~ (NOT) ===
+
+SELECT ~5 AS r;
+
+--echo === HEX(int) / HEX(text) ===
+
+SELECT HEX(255) AS h_int, HEX('hello') AS h_text;
+
+--echo === HEX of negative int — two's-complement 64-bit ===
+
+SELECT HEX(-1) AS r;
+
+--echo === UNHEX — decode hex back to text ===
+
+SELECT UNHEX('48656C6C6F') AS r, UNHEX('') AS empty;
+
+--echo === UNHEX on invalid hex chars — NULL ===
+
+SELECT UNHEX('Z') AS r;
+
+--echo === BIN(int) and BIN(-1) (64-bit unsigned form) ===
+
+SELECT BIN(10) AS r;
+SELECT BIN(-1) AS r;
+
+--echo === OCT(int) ===
+
+SELECT OCT(8) AS r;
+
+--echo === HEX / BIN / OCT NULL propagation ===
+
+SELECT HEX(NULL) AS h, BIN(NULL) AS b, OCT(NULL) AS o, UNHEX(NULL) AS u;
+
+--echo === KNOWN DIVERGENCE: BIT_LENGTH(<int>) measures TEXT length × 8 ===
+--echo # `BIT_LENGTH(5)` returns 8 (length of "5" × 8), not 3.
+--echo # `BIT_LENGTH(10)` returns 16. MySQL/PG would return the
+--echo # actual bit width.
+
+SELECT BIT_LENGTH(5) AS bl5, BIT_LENGTH(10) AS bl10;
+
+--echo === KNOWN GAP: # (PG bitwise XOR) eaten by MySQL-wire comment shim ===
+--echo # Substitute: (a | b) - (a & b).
+
+SELECT (6 | 3) - (6 & 3) AS xor_workaround;
+
+--echo === KNOWN GAP: XOR infix — errno 1064 ===
+
+--error 1064
+SELECT 6 XOR 3 AS r;
+
+--echo === KNOWN GAP: XOR(a, b) function form — errno 1105 ===
+
+--error 1105
+SELECT XOR(6, 3) AS r;
+
+--echo === KNOWN GAP: TO_HEX (PG alias) — errno 1105 ===
+--echo # Substitute: HEX(...).
+
+--error 1105
+SELECT TO_HEX(255) AS r;
