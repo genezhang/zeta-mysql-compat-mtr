@@ -1,0 +1,52 @@
+=== GRANT ALL ON test.* TO <role> — silent no-op ===
+GRANT ALL ON test.* TO u2;
+=== GRANT USAGE ON SCHEMA — silent no-op ===
+GRANT USAGE ON SCHEMA public TO r1;
+=== REVOKE ALL ON test.* FROM <role> — silent no-op ===
+REVOKE ALL ON test.* FROM u2;
+=== SET ROLE <role> — silent no-op ===
+SET ROLE r1;
+=== SHOW GRANTS — empty result ===
+SHOW GRANTS;
+=== SHOW GRANTS FOR 'u'@'h' — accepted, empty result ===
+SHOW GRANTS FOR 'u2'@'localhost';
+=== SET PASSWORD = '...' — silent no-op ===
+SET PASSWORD = 'newpw';
+=== SET PASSWORD FOR 'u'@'h' = '...' — silent no-op ===
+SET PASSWORD FOR 'u1'@'%' = 'newpw';
+=== KNOWN GAP: CREATE ROLE — errno 1064 ===
+CREATE ROLE r1;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== KNOWN GAP: CREATE ROLE WITH LOGIN — errno 1064 ===
+CREATE ROLE r2 WITH LOGIN;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== KNOWN GAP: DROP ROLE — errno 1064 ===
+DROP ROLE r1;
+ERROR 1064: SQL parse error: unsupported DROP ROLE statement
+=== KNOWN GAP: DROP ROLE IF EXISTS — errno 1064 ===
+DROP ROLE IF EXISTS no_such;
+ERROR 1064: SQL parse error: unsupported DROP ROLE statement
+=== KNOWN GAP: MySQL CREATE USER 'u'@'h' — errno 1064 ===
+CREATE USER 'u1'@'%' IDENTIFIED BY 'pw';
+ERROR 1064: SQL parse error: sql parser error: Expected: another option, EOF, SemiColon, Comma or ')', found: '%' at Line: 1, Column: 18
+=== KNOWN GAP: PG CREATE USER u — errno 1064 ===
+CREATE USER u1;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== KNOWN GAP: MySQL DROP USER 'u'@'h' — errno 1064 ===
+DROP USER 'u1'@'%';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: @ at Line: 1, Column: 15
+=== KNOWN GAP: PG DROP USER u — errno 1064 ===
+DROP USER u1;
+ERROR 1064: SQL parse error: unsupported DROP USER statement
+=== KNOWN GAP: RESET ROLE — errno 1064 ===
+RESET ROLE;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== KNOWN GAP: ALTER USER u IDENTIFIED BY '...' — errno 1064 ===
+ALTER USER u1 IDENTIFIED BY 'newpw';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: IDENTIFIED at Line: 1, Column: 15
+=== KNOWN GAP: ALTER ROLE r WITH PASSWORD '...' — errno 1064 ===
+ALTER ROLE r1 WITH PASSWORD 'newpw';
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== KNOWN GAP: FLUSH PRIVILEGES — errno 1064 ===
+FLUSH PRIVILEGES;
+ERROR 1064: SQL parse error: sql parser error: Unsupported statement FLUSH at Line: 1, Column: 7
