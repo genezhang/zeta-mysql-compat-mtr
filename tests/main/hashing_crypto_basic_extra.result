@@ -49,9 +49,13 @@ ERROR 1105: execution error: unknown function: RANDOM_BYTES
 === KNOWN GAP: GEN_RANDOM_BYTES (PG pgcrypto) — errno 1105 ===
 SELECT GEN_RANDOM_BYTES(16);
 ERROR 1105: execution error: unknown function: GEN_RANDOM_BYTES
-=== KNOWN GAP: AES_ENCRYPT (MySQL) — errno 1105 ===
-SELECT AES_ENCRYPT('plain', 'key');
-ERROR 1105: execution error: unknown function: AES_ENCRYPT
+=== AES_ENCRYPT / AES_DECRYPT — supported since zeta #1209 ===
+SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'mykey'), 'mykey') AS round_trip;
+round_trip
+hello
+SELECT LENGTH(HEX(AES_ENCRYPT('plain', 'key'))) AS enc_hex_len;
+enc_hex_len
+64
 === KNOWN GAP: COMPRESS (MySQL) — errno 1105 ===
 SELECT COMPRESS('hello');
 ERROR 1105: execution error: unknown function: COMPRESS
