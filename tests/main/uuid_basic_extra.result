@@ -1,0 +1,95 @@
+=== GEN_RANDOM_UUID() returns a fresh UUID ===
+# Each call returns a different value — we can't pin
+# the exact value, so we just verify the result is a
+# valid UUID by casting it through the type.
+SELECT GEN_RANDOM_UUID() IS NOT NULL AS not_null;
+not_null
+1
+SELECT LENGTH(GEN_RANDOM_UUID()) AS len;
+len
+36
+=== UUID_GENERATE_V4 (uuid-ossp alias) ===
+SELECT UUID_GENERATE_V4() IS NOT NULL AS not_null;
+not_null
+1
+SELECT LENGTH(UUID_GENERATE_V4()) AS len;
+len
+36
+=== ::UUID cast on valid string ===
+SELECT '550e8400-e29b-41d4-a716-446655440000'::UUID AS r;
+r
+550e8400-e29b-41d4-a716-446655440000
+SELECT CAST('550e8400-e29b-41d4-a716-446655440000' AS UUID) AS r;
+r
+550e8400-e29b-41d4-a716-446655440000
+=== ::UUID cast on invalid string — errno 1105 ===
+SELECT 'not-a-uuid'::UUID AS r;
+ERROR 1105: execution error: invalid UUID format: 'not-a-uuid' (expected 8-4-4-4-12)
+=== LENGTH(uuid) returns 36 (canonical hyphenated form chars) ===
+SELECT LENGTH('550e8400-e29b-41d4-a716-446655440000'::UUID) AS r;
+r
+36
+=== UUID PRIMARY KEY — duplicate errors 1062 ===
+DROP TABLE IF EXISTS u_pk;
+CREATE TABLE u_pk (id UUID PRIMARY KEY, n INT);
+INSERT INTO u_pk VALUES ('550e8400-e29b-41d4-a716-446655440000', 1);
+INSERT INTO u_pk VALUES ('550e8400-e29b-41d4-a716-446655440000', 2);
+ERROR 1062: duplicate key value violates primary key "test.public.u_pk": Key already exists in table "test.public.u_pk"
+SELECT id, n FROM u_pk;
+id	n
+550e8400-e29b-41d4-a716-446655440000	1
+DROP TABLE u_pk;
+=== ORDER BY UUID — lexicographic / byte order ===
+DROP TABLE IF EXISTS u_ord;
+CREATE TABLE u_ord (id INT, u UUID);
+INSERT INTO u_ord VALUES (1, '00000000-0000-0000-0000-000000000001'),
+                          (2, '00000000-0000-0000-0000-000000000003'),
+                          (3, '00000000-0000-0000-0000-000000000002');
+SELECT id, u FROM u_ord ORDER BY u;
+id	u
+1	00000000-0000-0000-0000-000000000001
+3	00000000-0000-0000-0000-000000000002
+2	00000000-0000-0000-0000-000000000003
+SELECT id FROM u_ord WHERE u = '00000000-0000-0000-0000-000000000003';
+id
+2
+DROP TABLE u_ord;
+=== UUID NULL handling ===
+DROP TABLE IF EXISTS u_null;
+CREATE TABLE u_null (id INT, u UUID);
+INSERT INTO u_null VALUES (1, NULL), (2, '00000000-0000-0000-0000-000000000001');
+SELECT id, u FROM u_null ORDER BY id;
+id	u
+1	NULL
+2	00000000-0000-0000-0000-000000000001
+SELECT COUNT(*) AS null_count FROM u_null WHERE u IS NULL;
+null_count
+1
+DROP TABLE u_null;
+=== GEN_RANDOM_UUID() uniqueness across multiple INSERTs ===
+DROP TABLE IF EXISTS u_uniq;
+CREATE TABLE u_uniq (id INT PRIMARY KEY, u UUID);
+INSERT INTO u_uniq VALUES
+  (1, GEN_RANDOM_UUID()), (2, GEN_RANDOM_UUID()),
+  (3, GEN_RANDOM_UUID()), (4, GEN_RANDOM_UUID()),
+  (5, GEN_RANDOM_UUID());
+SELECT COUNT(DISTINCT u) AS distinct_count, COUNT(*) AS total FROM u_uniq;
+distinct_count	total
+5	5
+DROP TABLE u_uniq;
+=== KNOWN GAP: MySQL UUID() (no underscore) — errno 1105 ===
+# Substitute: GEN_RANDOM_UUID() or UUID_GENERATE_V4().
+SELECT UUID() AS r;
+ERROR 1105: execution error: unknown function: UUID
+=== KNOWN GAP: DEFAULT GEN_RANDOM_UUID() — errno 1105 ===
+# The DEFAULT expression is bound as a text literal,
+# so zeta tries to UUID-parse the string
+# 'GEN_RANDOM_UUID()'. Same root cause as the
+# DEFAULT NEXTVAL gap in sequence_basic_extra.
+# Substitute: pass GEN_RANDOM_UUID() explicitly in
+# each INSERT's VALUES list.
+DROP TABLE IF EXISTS u_dflt;
+CREATE TABLE u_dflt (id UUID DEFAULT GEN_RANDOM_UUID() PRIMARY KEY, n INT);
+INSERT INTO u_dflt (n) VALUES (1);
+ERROR 1105: execution error: invalid UUID character 'G' in 'GEN_RANDOM_UUID()'
+DROP TABLE u_dflt;
