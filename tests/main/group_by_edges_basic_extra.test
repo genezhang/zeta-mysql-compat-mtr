@@ -1,0 +1,121 @@
+# Independently authored GROUP BY edge-case smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/group_by.test or PG regress;
+# complements group_basic (which covers single/multi/
+# ordinal GROUP BY + basic HAVING) by pinning the EDGE
+# behavior NOT covered there: expression / function /
+# alias GROUP BY, ROLLUP / CUBE / GROUPING SETS,
+# GROUPING() function, multi-col positional, NULL
+# grouping, GROUP BY ALL gap, MySQL WITH ROLLUP gap,
+# and the "HAVING without GROUP BY and no aggregate in
+# SELECT" bug.
+#
+# Big-picture finding: zeta has rich GROUP BY support
+# including ROLLUP, CUBE, GROUPING SETS, and the
+# GROUPING() introspection function — these were not
+# pinned before. Expression and SELECT-alias grouping
+# both work (MySQL/PG dialects). Multi-column positional
+# (`GROUP BY 1, 2`) works. NULL is grouped as a single
+# group (SQL standard).
+#
+# Two missing surface bits: (a) MySQL's `GROUP BY col WITH
+# ROLLUP` suffix errors 1064 — use PG-flavored
+# `GROUP BY ROLLUP(col)` instead. (b) The Spark/SQL Server
+# `GROUP BY ALL` shortcut errors 1064 "not supported".
+#
+# Adaptation notes:
+#   # zeta-adapt: GROUP BY <expression> (e.g. LOWER(col),
+#     id % 2) — works.
+#   # zeta-adapt: GROUP BY <SELECT alias> (MySQL/PG ext) —
+#     works.
+#   # zeta-adapt: GROUP BY positional with multiple cols
+#     (`GROUP BY 1, 2`) — works.
+#   # zeta-adapt: GROUP BY ROLLUP(col) — works. Adds a
+#     grand-total row with NULL in the grouped column.
+#   # zeta-adapt: GROUP BY CUBE(col) — works. Same as
+#     ROLLUP for a single column (mathematically).
+#   # zeta-adapt: GROUP BY GROUPING SETS ((a), (b)) —
+#     works. Each set produces its own group rows.
+#   # zeta-adapt: GROUPING(col) function — returns 0 for
+#     real values, 1 for grand-total rows from ROLLUP/CUBE.
+#   # zeta-adapt: NULL grouping — all NULL values fall
+#     into a single group (SQL standard).
+#   # zeta-adapt: HAVING with an aggregate predicate even
+#     when the SELECT list has no aggregate and no GROUP
+#     BY — works as an implicit-aggregate single-group
+#     query, returning at most one row.
+#   # zeta-adapt: KNOWN GAP — `GROUP BY col WITH ROLLUP`
+#     (MySQL suffix syntax) errors 1064 "Expected end of
+#     statement, found WITH". Substitute via
+#     `GROUP BY ROLLUP(col)` (PG / standard).
+#   # zeta-adapt: KNOWN GAP — `GROUP BY ALL`
+#     (Spark / SQL Server shortcut to auto-include all
+#     non-aggregate columns) errors 1064 "GROUP BY ALL
+#     not supported".
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS gb;
+CREATE TABLE gb (id INT PRIMARY KEY, name VARCHAR(20), region VARCHAR(10), amt INT);
+INSERT INTO gb VALUES
+  (1, 'Alice', 'east', 100),
+  (2, 'BOB', 'east', 200),
+  (3, 'carol', 'west', 150),
+  (4, 'Dan', 'west', 300),
+  (5, NULL, NULL, 50);
+
+--echo === GROUP BY expression / function ===
+
+SELECT LOWER(name) AS lname, COUNT(*) AS c FROM gb GROUP BY LOWER(name) ORDER BY lname;
+SELECT id % 2 AS parity, COUNT(*) AS c FROM gb GROUP BY id % 2 ORDER BY parity;
+
+--echo === GROUP BY SELECT alias (MySQL/PG extension) ===
+
+SELECT LOWER(name) AS lname, COUNT(*) AS c FROM gb GROUP BY lname ORDER BY lname;
+
+--echo === GROUP BY positional with multiple cols ===
+
+SELECT region, name, COUNT(*) AS c FROM gb GROUP BY 1, 2 ORDER BY 1, 2;
+
+--echo === ROLLUP — adds grand-total NULL row ===
+
+SELECT region, SUM(amt) AS s FROM gb GROUP BY ROLLUP(region) ORDER BY region;
+
+--echo === CUBE — same as ROLLUP for single col ===
+
+SELECT region, SUM(amt) AS s FROM gb GROUP BY CUBE(region) ORDER BY region;
+
+--echo === GROUPING SETS — multi-set ===
+
+SELECT region, name, SUM(amt) AS s FROM gb GROUP BY GROUPING SETS ((region), (name)) ORDER BY region, name;
+
+--echo === GROUPING() function — distinguishes real vs grand-total NULL ===
+
+SELECT region, SUM(amt) AS s, GROUPING(region) AS g FROM gb GROUP BY ROLLUP(region) ORDER BY region;
+
+--echo === GROUP BY NULL — all NULLs collapse to one group ===
+
+SELECT region, COUNT(*) AS c FROM gb GROUP BY region ORDER BY region;
+
+--echo === HAVING with raw aggregate predicate ===
+
+SELECT COUNT(*) AS c FROM gb HAVING c > 0;
+SELECT COUNT(*) AS c FROM gb HAVING c > 1000;
+
+--echo === HAVING with implicit single-group aggregate (no aggregates in SELECT) ===
+--echo # SQL standard / PG / MySQL: at most ONE row. zeta correctly
+--echo # recognizes the implicit-aggregate single-group form.
+
+SELECT 1 AS v FROM gb HAVING COUNT(*) > 0;
+
+--echo === KNOWN GAP: GROUP BY col WITH ROLLUP (MySQL suffix) — errno 1064 ===
+
+--error 1064
+SELECT region, SUM(amt) FROM gb GROUP BY region WITH ROLLUP;
+
+--echo === KNOWN GAP: GROUP BY ALL (Spark / SQL Server) — errno 1064 ===
+
+--error 1064
+SELECT region, COUNT(*) FROM gb GROUP BY ALL;
+
+DROP TABLE gb;
