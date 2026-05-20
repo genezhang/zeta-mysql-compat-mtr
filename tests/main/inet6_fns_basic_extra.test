@@ -1,0 +1,84 @@
+# Independently authored INET6_ATON / INET6_NTOA smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/func_misc.test or PG
+# regress. Both functions were missing in zeta before
+# zeta PR #1229 (errored "unknown function"); this slice
+# locks in the new behavior. Companion to
+# inet_fns_basic_extra (which covers INET_ATON/NTOA +
+# IS_IPV4/6) and rounds out the IPv4/IPv6 helper surface.
+#
+# Big-picture finding: INET6_ATON returns VARBINARY(16)
+# for IPv6-shaped input or VARBINARY(4) for IPv4-shaped
+# input (matches MySQL). NULL → NULL. Unparseable → NULL
+# (no error). INET6_NTOA is the inverse and dispatches on
+# byte length: 4 → IPv4 dotted quad, 16 → IPv6 condensed
+# form, anything else → NULL. The binary is wrapped in
+# HEX() for these tests so the output stays printable on
+# the wire.
+#
+# Adaptation notes:
+#   # zeta-adapt: INET6_ATON(str) returns 4-byte BINARY for
+#     IPv4-shaped strings, 16-byte BINARY for IPv6, NULL
+#     on parse failure or NULL input. Lenient on input
+#     type (matches INET_ATON).
+#   # zeta-adapt: INET6_NTOA(bin) returns dotted quad for
+#     4-byte input, IPv6 condensed form for 16-byte input;
+#     anything else (including string-typed bytes) returns
+#     NULL.
+#   # zeta-adapt: Roundtrip INET6_NTOA(INET6_ATON(x)) = x
+#     for canonical IPv4 / IPv6 forms.
+#   # zeta-adapt: Arity != 1 → errno 1105 for both.
+
+--echo === INET6_ATON — IPv6 forms ===
+
+SELECT HEX(INET6_ATON('::1'))             AS lo6;
+SELECT HEX(INET6_ATON('2001:db8::1'))     AS doc;
+SELECT HEX(INET6_ATON('fe80::1'))         AS link_local;
+
+--echo === INET6_ATON — IPv4 forms produce 4-byte BINARY ===
+
+SELECT HEX(INET6_ATON('192.168.1.1'))     AS v4;
+SELECT HEX(INET6_ATON('0.0.0.0'))         AS lo4;
+SELECT HEX(INET6_ATON('255.255.255.255')) AS hi4;
+
+--echo === INET6_ATON — IPv4-mapped IPv6 stays 16-byte ===
+
+SELECT HEX(INET6_ATON('::ffff:192.168.1.1')) AS mapped;
+
+--echo === INET6_ATON — bad / NULL → NULL ===
+
+SELECT INET6_ATON('not-an-ip') IS NULL AS bad_is_null;
+SELECT INET6_ATON('300.0.0.1') IS NULL AS bad_v4_is_null;
+SELECT INET6_ATON(NULL)        IS NULL AS null_is_null;
+
+--echo === INET6_NTOA — IPv6 + IPv4 roundtrips ===
+
+SELECT INET6_NTOA(INET6_ATON('::1'))         AS rt_lo6;
+SELECT INET6_NTOA(INET6_ATON('2001:db8::1')) AS rt_doc;
+SELECT INET6_NTOA(INET6_ATON('192.168.1.1')) AS rt_v4;
+
+--echo === INET6_NTOA — NULL → NULL; wrong length → NULL ===
+
+SELECT INET6_NTOA(NULL) AS n;
+SELECT INET6_NTOA(UNHEX('AABB')) IS NULL AS short_is_null;
+SELECT INET6_NTOA(UNHEX('AABBCCDDEE')) IS NULL AS odd_is_null;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT INET6_ATON();
+--error 1105
+SELECT INET6_ATON('::1', '::2');
+--error 1105
+SELECT INET6_NTOA();
+--error 1105
+SELECT INET6_NTOA(UNHEX('00000001'), UNHEX('00000002'));
+
+--echo === On TEXT column inside SELECT / WHERE (IPv6 filter) ===
+
+DROP TABLE IF EXISTS hosts6;
+CREATE TABLE hosts6 (id INT, ip TEXT);
+INSERT INTO hosts6 VALUES (1, '10.0.0.1'), (2, '2001:db8::1'), (3, '::ffff:10.0.0.2'), (4, 'invalid');
+SELECT id, HEX(INET6_ATON(ip)) AS packed FROM hosts6 ORDER BY id;
+SELECT id FROM hosts6 WHERE INET6_ATON(ip) IS NOT NULL ORDER BY id;
+DROP TABLE hosts6;

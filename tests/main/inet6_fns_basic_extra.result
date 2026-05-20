@@ -1,0 +1,79 @@
+=== INET6_ATON — IPv6 forms ===
+SELECT HEX(INET6_ATON('::1'))             AS lo6;
+lo6
+00000000000000000000000000000001
+SELECT HEX(INET6_ATON('2001:db8::1'))     AS doc;
+doc
+20010DB8000000000000000000000001
+SELECT HEX(INET6_ATON('fe80::1'))         AS link_local;
+link_local
+FE800000000000000000000000000001
+=== INET6_ATON — IPv4 forms produce 4-byte BINARY ===
+SELECT HEX(INET6_ATON('192.168.1.1'))     AS v4;
+v4
+C0A80101
+SELECT HEX(INET6_ATON('0.0.0.0'))         AS lo4;
+lo4
+00000000
+SELECT HEX(INET6_ATON('255.255.255.255')) AS hi4;
+hi4
+FFFFFFFF
+=== INET6_ATON — IPv4-mapped IPv6 stays 16-byte ===
+SELECT HEX(INET6_ATON('::ffff:192.168.1.1')) AS mapped;
+mapped
+00000000000000000000FFFFC0A80101
+=== INET6_ATON — bad / NULL → NULL ===
+SELECT INET6_ATON('not-an-ip') IS NULL AS bad_is_null;
+bad_is_null
+1
+SELECT INET6_ATON('300.0.0.1') IS NULL AS bad_v4_is_null;
+bad_v4_is_null
+1
+SELECT INET6_ATON(NULL)        IS NULL AS null_is_null;
+null_is_null
+1
+=== INET6_NTOA — IPv6 + IPv4 roundtrips ===
+SELECT INET6_NTOA(INET6_ATON('::1'))         AS rt_lo6;
+rt_lo6
+::1
+SELECT INET6_NTOA(INET6_ATON('2001:db8::1')) AS rt_doc;
+rt_doc
+2001:db8::1
+SELECT INET6_NTOA(INET6_ATON('192.168.1.1')) AS rt_v4;
+rt_v4
+192.168.1.1
+=== INET6_NTOA — NULL → NULL; wrong length → NULL ===
+SELECT INET6_NTOA(NULL) AS n;
+n
+NULL
+SELECT INET6_NTOA(UNHEX('AABB')) IS NULL AS short_is_null;
+short_is_null
+1
+SELECT INET6_NTOA(UNHEX('AABBCCDDEE')) IS NULL AS odd_is_null;
+odd_is_null
+1
+=== Arity errors ===
+SELECT INET6_ATON();
+ERROR 1105: execution error: INET6_ATON requires 1 argument
+SELECT INET6_ATON('::1', '::2');
+ERROR 1105: execution error: INET6_ATON requires 1 argument
+SELECT INET6_NTOA();
+ERROR 1105: execution error: INET6_NTOA requires 1 argument
+SELECT INET6_NTOA(UNHEX('00000001'), UNHEX('00000002'));
+ERROR 1105: execution error: INET6_NTOA requires 1 argument
+=== On TEXT column inside SELECT / WHERE (IPv6 filter) ===
+DROP TABLE IF EXISTS hosts6;
+CREATE TABLE hosts6 (id INT, ip TEXT);
+INSERT INTO hosts6 VALUES (1, '10.0.0.1'), (2, '2001:db8::1'), (3, '::ffff:10.0.0.2'), (4, 'invalid');
+SELECT id, HEX(INET6_ATON(ip)) AS packed FROM hosts6 ORDER BY id;
+id	packed
+1	0A000001
+2	20010DB8000000000000000000000001
+3	00000000000000000000FFFF0A000002
+4	NULL
+SELECT id FROM hosts6 WHERE INET6_ATON(ip) IS NOT NULL ORDER BY id;
+id
+1
+2
+3
+DROP TABLE hosts6;
