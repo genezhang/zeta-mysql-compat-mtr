@@ -1,0 +1,51 @@
+=== Setup ===
+DROP TABLE IF EXISTS bt;
+CREATE TABLE bt (id INT PRIMARY KEY, b INT);
+INSERT INTO bt VALUES (1, 12), (2, 10), (3, 6);
+=== Column bitwise & | ~ << >> ===
+SELECT id, b, b & 5 AS and5, b | 1 AS or1, ~b AS not_b, b << 1 AS shl, b >> 1 AS shr FROM bt ORDER BY id;
+id	b	and5	or1	not_b	shl	shr
+1	12	4	13	-13	24	6
+2	10	0	11	-11	20	5
+3	6	4	7	-7	12	3
+=== BIT_COUNT edges ===
+SELECT BIT_COUNT(7) AS three_ones, BIT_COUNT(255) AS eight_ones;
+three_ones	eight_ones
+3	8
+SELECT BIT_COUNT(0) AS zero, BIT_COUNT(-1) AS neg_one_64, BIT_COUNT(NULL) AS nl;
+zero	neg_one_64	nl
+0	64	NULL
+=== BIT_AND / BIT_OR aggregates ===
+SELECT BIT_AND(b) AS a, BIT_OR(b) AS o FROM bt;
+a	o
+0	14
+=== NULL propagates through &, |, ~, <<, >> ===
+SELECT NULL & 5 AS nl_and, 5 | NULL AS nl_or, ~NULL AS nl_not, NULL << 1 AS nl_shl, NULL >> 1 AS nl_shr;
+nl_and	nl_or	nl_not	nl_shl	nl_shr
+NULL	NULL	NULL	NULL	NULL
+=== Negative shift count ===
+SELECT 8 >> -1 AS neg_shift, 8 << -1 AS neg_shl;
+neg_shift	neg_shl
+0	0
+=== KNOWN DIVERGENCE: operator precedence is left-to-right (NOT & > |) ===
+SELECT 6 | 3 & 5 AS unparen, (6 | 3) & 5 AS lparen_eq_unparen, 6 | (3 & 5) AS mysql_would_be;
+unparen	lparen_eq_unparen	mysql_would_be
+5	5	7
+=== KNOWN DIVERGENCE: 1 << 65 wraps mod 64 (MySQL returns 0) ===
+SELECT 1 << 65 AS wraps;
+wraps
+2
+=== KNOWN DIVERGENCE: 1 << 63 returns sign bit as negative i64 ===
+SELECT 1 << 63 AS sign_bit;
+sign_bit
+-9223372036854775808
+=== KNOWN GAP: ^ caret XOR (MySQL) — errno 1064 ===
+SELECT 6 ^ 3;
+ERROR 1064: SQL parse error: unsupported binary operator: ^
+=== KNOWN GAP: BIT_XOR aggregate — errno 1105 ===
+SELECT BIT_XOR(b) FROM bt;
+ERROR 1105: execution error: unknown function: BIT_XOR
+=== KNOWN GAP: TO_HEX alias — errno 1105 ===
+SELECT TO_HEX(255);
+ERROR 1105: execution error: unknown function: TO_HEX
+DROP TABLE bt;

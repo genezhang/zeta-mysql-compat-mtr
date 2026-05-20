@@ -1,0 +1,107 @@
+# Independently authored bitwise-operator edge-case smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/bitwise.test;
+# complements bitwise_basic_extra by pinning the COLUMN-
+# based bitwise behavior, BIT_COUNT edge cases, aggregate
+# bit-ops (BIT_AND/BIT_OR/BIT_XOR), operator precedence,
+# negative shift counts, shift-overflow wrap, and the
+# `^` (caret) XOR operator gap.
+#
+# Big-picture finding: zeta supports all single-row
+# bitwise operators (&, |, ~, <<, >>) and the column
+# forms work correctly; NULL propagates through every
+# operator and through ~ uniformly. Two notable
+# divergences: (a) the `^` caret XOR operator (MySQL
+# uses `^` instead of PG's `#`) errors 1064 "unsupported
+# binary operator"; (b) operator precedence is left-to-
+# right rather than & > | (MySQL standard), so
+# `6 | 3 & 5` yields 5 in zeta but 7 in MySQL. Two more
+# minor divergences in shift behavior: large shift counts
+# wrap mod 64 (zeta returns `1 << 65 = 2`) where MySQL
+# returns 0, and `1 << 63` returns the sign bit as a
+# negative i64 instead of MySQL's u64-cast positive
+# value. The BIT_XOR aggregate is missing entirely
+# (BIT_AND and BIT_OR work).
+#
+# Adaptation notes:
+#   # zeta-adapt: column & / | / ~ / << / >> — supported on
+#     integer columns; NULL propagates through all of them.
+#   # zeta-adapt: BIT_COUNT(n) — popcount; BIT_COUNT(-1) =
+#     64 (sign-extended 64-bit); NULL → NULL.
+#   # zeta-adapt: BIT_AND / BIT_OR aggregates — supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — operator precedence
+#     is left-to-right, NOT MySQL's & > |. `6 | 3 & 5` →
+#     5 in zeta, 7 in MySQL. Explicit parens recommended.
+#   # zeta-adapt: KNOWN DIVERGENCE — `1 << 65` returns 2
+#     (wraps mod 64) in zeta; MySQL returns 0 for shift ≥
+#     64.
+#   # zeta-adapt: KNOWN DIVERGENCE — `1 << 63` returns
+#     -9223372036854775808 (signed i64 minimum, sign bit
+#     set) in zeta; MySQL casts to BIGINT UNSIGNED so the
+#     same shift produces 9223372036854775808.
+#   # zeta-adapt: negative shift count `8 >> -1` returns 0.
+#   # zeta-adapt: KNOWN GAP — `^` (caret) XOR operator
+#     (MySQL spelling) errors 1064 "unsupported binary
+#     operator". Substitute: `(a | b) - (a & b)`.
+#   # zeta-adapt: KNOWN GAP — BIT_XOR aggregate function
+#     errors 1105 "unknown function: BIT_XOR". BIT_AND and
+#     BIT_OR work; for XOR aggregate, fold manually via a
+#     correlated subquery or app-side reduction.
+#   # zeta-adapt: KNOWN GAP — TO_HEX / FROM_HEX aliases
+#     for HEX/UNHEX error 1105 "unknown function".
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS bt;
+CREATE TABLE bt (id INT PRIMARY KEY, b INT);
+INSERT INTO bt VALUES (1, 12), (2, 10), (3, 6);
+
+--echo === Column bitwise & | ~ << >> ===
+
+SELECT id, b, b & 5 AS and5, b | 1 AS or1, ~b AS not_b, b << 1 AS shl, b >> 1 AS shr FROM bt ORDER BY id;
+
+--echo === BIT_COUNT edges ===
+
+SELECT BIT_COUNT(7) AS three_ones, BIT_COUNT(255) AS eight_ones;
+SELECT BIT_COUNT(0) AS zero, BIT_COUNT(-1) AS neg_one_64, BIT_COUNT(NULL) AS nl;
+
+--echo === BIT_AND / BIT_OR aggregates ===
+
+SELECT BIT_AND(b) AS a, BIT_OR(b) AS o FROM bt;
+
+--echo === NULL propagates through &, |, ~, <<, >> ===
+
+SELECT NULL & 5 AS nl_and, 5 | NULL AS nl_or, ~NULL AS nl_not, NULL << 1 AS nl_shl, NULL >> 1 AS nl_shr;
+
+--echo === Negative shift count ===
+
+SELECT 8 >> -1 AS neg_shift, 8 << -1 AS neg_shl;
+
+--echo === KNOWN DIVERGENCE: operator precedence is left-to-right (NOT & > |) ===
+
+SELECT 6 | 3 & 5 AS unparen, (6 | 3) & 5 AS lparen_eq_unparen, 6 | (3 & 5) AS mysql_would_be;
+
+--echo === KNOWN DIVERGENCE: 1 << 65 wraps mod 64 (MySQL returns 0) ===
+
+SELECT 1 << 65 AS wraps;
+
+--echo === KNOWN DIVERGENCE: 1 << 63 returns sign bit as negative i64 ===
+
+SELECT 1 << 63 AS sign_bit;
+
+--echo === KNOWN GAP: ^ caret XOR (MySQL) — errno 1064 ===
+
+--error 1064
+SELECT 6 ^ 3;
+
+--echo === KNOWN GAP: BIT_XOR aggregate — errno 1105 ===
+
+--error 1105
+SELECT BIT_XOR(b) FROM bt;
+
+--echo === KNOWN GAP: TO_HEX alias — errno 1105 ===
+
+--error 1105
+SELECT TO_HEX(255);
+
+DROP TABLE bt;
