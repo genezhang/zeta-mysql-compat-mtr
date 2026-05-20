@@ -42,9 +42,10 @@ sign_bit
 === KNOWN GAP: ^ caret XOR (MySQL) — errno 1064 ===
 SELECT 6 ^ 3;
 ERROR 1064: SQL parse error: unsupported binary operator: ^
-=== KNOWN GAP: BIT_XOR aggregate — errno 1105 ===
-SELECT BIT_XOR(b) FROM bt;
-ERROR 1105: execution error: unknown function: BIT_XOR
+=== BIT_XOR aggregate — supported since zeta #1206 ===
+SELECT BIT_XOR(b) AS xor_all FROM bt;
+xor_all
+0
 === TO_HEX alias for HEX — supported since zeta #1205 ===
 SELECT TO_HEX(255) AS th;
 th
