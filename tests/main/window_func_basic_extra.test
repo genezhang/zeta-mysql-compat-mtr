@@ -1,0 +1,103 @@
+# Independently authored window-function-extra smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/window_functions.test or window_basic.test;
+# pins zeta's window-function surface NOT held by
+# window_func_basic (which covers ROW_NUMBER / RANK / DENSE_
+# RANK / LAG-LEAD default / FIRST_VALUE per-partition /
+# NTILE(2) / COUNT-SUM-OVER / running total via ROWS
+# UNBOUNDED PRECEDING / ROWS BETWEEN N PRECEDING AND CURRENT
+# ROW / RANGE BETWEEN N numeric / named WINDOW / NULLS FIRST
+# in OVER).
+#
+# Adaptation notes:
+#   # zeta-adapt: LAG(col, offset, default) and LEAD(col,
+#     offset, default) — 3-arg forms supported. The default
+#     value substitutes for rows that fall outside the
+#     partition.
+#   # zeta-adapt: LAST_VALUE with explicit ROWS BETWEEN
+#     UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING — supported.
+#     The unbounded frame is required to get the per-partition
+#     last value (the default RANGE frame ends at CURRENT ROW).
+#   # zeta-adapt: NTH_VALUE(col, n) — supported. Returns the
+#     value of the nth row in the current frame (1-based).
+#   # zeta-adapt: PERCENT_RANK() and CUME_DIST() — supported.
+#     PERCENT_RANK returns (rank - 1) / (count - 1);
+#     CUME_DIST returns count_up_to_current / total_count.
+#   # zeta-adapt: NTILE(N) with N > 2 — supported. Distributes
+#     rows into N approximately-equal buckets.
+#   # zeta-adapt: ROWS BETWEEN N PRECEDING AND N FOLLOWING —
+#     supported (centered sliding window).
+#   # zeta-adapt: KNOWN GAP — EXCLUDE clause (CURRENT ROW /
+#     GROUP / TIES / NO OTHERS) errors 1064 at parse. The
+#     SQL-standard EXCLUDE syntax isn't honored. Portable
+#     substitute: filter via a CASE expression on the running
+#     window, or post-process.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS wf;
+CREATE TABLE wf (id INT PRIMARY KEY, region VARCHAR(10), n INT);
+INSERT INTO wf VALUES
+  (1, 'east', 10), (2, 'east', 20), (3, 'east', 30),
+  (4, 'west', 40), (5, 'west', 50);
+
+--echo === LAG with offset + default ===
+
+SELECT id, LAG(n, 2, -1) OVER (ORDER BY id) AS lag2 FROM wf ORDER BY id;
+
+--echo === LEAD with offset + default ===
+
+SELECT id, LEAD(n, 2, -1) OVER (ORDER BY id) AS lead2 FROM wf ORDER BY id;
+
+--echo === LAST_VALUE with UNBOUNDED frame ===
+
+SELECT id,
+       LAST_VALUE(n) OVER (
+         PARTITION BY region ORDER BY id
+         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+       ) AS lv
+  FROM wf
+  ORDER BY id;
+
+--echo === NTH_VALUE — 2nd row per partition ===
+
+SELECT id,
+       NTH_VALUE(n, 2) OVER (
+         PARTITION BY region ORDER BY id
+         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+       ) AS nv
+  FROM wf
+  ORDER BY id;
+
+--echo === PERCENT_RANK + CUME_DIST ===
+
+SELECT id,
+       PERCENT_RANK() OVER (ORDER BY n) AS pr,
+       CUME_DIST()    OVER (ORDER BY n) AS cd
+  FROM wf
+  ORDER BY id;
+
+--echo === NTILE(3) — three buckets ===
+
+SELECT id, NTILE(3) OVER (ORDER BY id) AS t FROM wf ORDER BY id;
+
+--echo === ROWS BETWEEN N PRECEDING AND N FOLLOWING ===
+--echo # Centered sliding window: SUM of {prev, current, next}.
+
+SELECT id,
+       SUM(n) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS sw
+  FROM wf
+  ORDER BY id;
+
+--echo === KNOWN GAP: EXCLUDE clause — errno 1064 ===
+
+--error 1064
+SELECT id,
+       SUM(n) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+                    EXCLUDE CURRENT ROW) AS sw
+  FROM wf
+  ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE wf;
