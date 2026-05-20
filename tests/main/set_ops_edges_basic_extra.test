@@ -1,0 +1,114 @@
+# Independently authored set-operation edge-case smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/union_*.test or PG regress;
+# complements set_op_basic / set_op_basic_extra (which
+# cover UNION/UNION ALL/INTERSECT/EXCEPT base shapes,
+# precedence, mixed coercion, empty-side handling) by
+# pinning the ALL-variant multi-set semantics, MINUS,
+# column-count mismatch, LIMIT scoping, ORDER BY
+# positional and unknown-column behavior, and the
+# CORRESPONDING gap.
+#
+# Big-picture finding: zeta has solid set-operation
+# support including the INTERSECT ALL / EXCEPT ALL
+# multi-set variants (proper count-aware semantics — sa
+# has two '1's and sb has zero, so EXCEPT ALL keeps both
+# '1's in the result). The Oracle MINUS keyword aliases
+# to EXCEPT. Column-count mismatch errors correctly.
+# ORDER BY accepts positional references (`ORDER BY 2`,
+# `ORDER BY 1 DESC`). One notable divergence: ORDER BY by
+# a column name that doesn't appear in the unified result
+# is silently ignored (the result is returned in default
+# order) instead of erroring. The PG `CORRESPONDING`
+# keyword is missing entirely.
+#
+# Adaptation notes:
+#   # zeta-adapt: INTERSECT ALL — multi-set semantics
+#     (min count across both sides per value).
+#   # zeta-adapt: EXCEPT ALL — multi-set semantics
+#     (left count minus right count, clamped to ≥ 0).
+#   # zeta-adapt: MINUS — Oracle alias for EXCEPT;
+#     supported, same dedup semantics.
+#   # zeta-adapt: Column-count mismatch errors 1105
+#     "set operation column count mismatch: left has N,
+#     right has M" in either direction.
+#   # zeta-adapt: LIMIT after the whole set op applies to
+#     the unified result. (LIMIT inside parens has a
+#     mysql_async-runner-environment-specific row-count
+#     drift; not pinned here.)
+#   # zeta-adapt: NULL columns survive UNION (NULLs dedup
+#     to a single NULL); UNION ALL preserves NULL
+#     duplicates.
+#   # zeta-adapt: ORDER BY positional — `ORDER BY 1`,
+#     `ORDER BY 2 DESC` work as expected.
+#   # zeta-adapt: KNOWN DIVERGENCE — ORDER BY a column
+#     name that doesn't appear in the unified set-op
+#     result is SILENTLY IGNORED (default order returned)
+#     instead of erroring "column ... not in scope". ORMs
+#     that build set ops dynamically with stale ORDER BY
+#     refs will get wrong ordering without an error
+#     signal.
+#   # zeta-adapt: KNOWN GAP — `UNION CORRESPONDING`
+#     (SQL-standard name-based column matching) errors
+#     1064 at parse. No portable substitute exposed
+#     today; rewrite the branches to select columns in
+#     the same order.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sa;
+DROP TABLE IF EXISTS sb;
+CREATE TABLE sa (id INT, name TEXT);
+CREATE TABLE sb (id INT, name TEXT);
+INSERT INTO sa VALUES (1, 'a'), (2, 'b'), (1, 'a');
+INSERT INTO sb VALUES (2, 'b'), (3, 'c'), (3, 'c');
+
+--echo === INTERSECT ALL — multi-set min count ===
+
+SELECT id FROM sa INTERSECT ALL SELECT id FROM sb ORDER BY id;
+
+--echo === EXCEPT ALL — left count minus right count ===
+
+SELECT id FROM sa EXCEPT ALL SELECT id FROM sb ORDER BY id;
+
+--echo === MINUS — Oracle alias for EXCEPT ===
+
+SELECT id FROM sa MINUS SELECT id FROM sb ORDER BY id;
+
+--echo === Mismatched column count errors 1105 ===
+
+--error 1105
+SELECT id, name FROM sa UNION SELECT id FROM sb;
+
+--echo === Mismatched column count (asymmetric) ===
+
+--error 1105
+SELECT id FROM sa UNION SELECT id, name FROM sb;
+
+--echo === LIMIT after a set op scopes to the unified result ===
+
+SELECT id FROM sa UNION SELECT id FROM sb ORDER BY id LIMIT 3;
+
+--echo === NULL columns in set ops — UNION dedups NULLs ===
+
+SELECT NULL AS v UNION SELECT NULL;
+SELECT 1 AS v UNION ALL SELECT NULL UNION ALL SELECT NULL ORDER BY v;
+
+--echo === ORDER BY positional ===
+
+SELECT id, name FROM sa UNION SELECT id, name FROM sb ORDER BY 2;
+SELECT id, name FROM sa UNION SELECT id, name FROM sb ORDER BY 1 DESC;
+
+--echo === KNOWN DIVERGENCE: ORDER BY unknown column silently ignored ===
+--echo # Result columns are only `id`; `ORDER BY name` should error,
+--echo # but zeta returns rows in default order with no diagnostic.
+
+SELECT id FROM sa UNION SELECT id FROM sb ORDER BY name;
+
+--echo === KNOWN GAP: CORRESPONDING (SQL standard) — errno 1064 ===
+
+--error 1064
+SELECT id, name FROM sa UNION CORRESPONDING SELECT name, id FROM sb;
+
+DROP TABLE sa;
+DROP TABLE sb;
