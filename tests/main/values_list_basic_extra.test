@@ -7,7 +7,7 @@
 # also supports via `VALUES ROW(...)`): bare query,
 # derived table, set-op, ORDER BY / LIMIT / OFFSET,
 # CROSS JOIN, IN subquery, arithmetic / function calls,
-# arity validation, and the CTE-with-VALUES gap.
+# arity validation, and VALUES inside a CTE body.
 #
 # Big-picture finding: zeta accepts standalone VALUES as
 # a query form with auto-generated `column1`, `column2`,
