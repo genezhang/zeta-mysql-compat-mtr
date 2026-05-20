@@ -1,0 +1,40 @@
+=== Setup ===
+DROP TABLE IF EXISTS cp;
+CREATE TABLE cp (id INT PRIMARY KEY, n INT);
+INSERT INTO cp VALUES (1, 10), (2, 20);
+=== COPY t TO STDOUT — parsed, silent no-op via MySQL wire ===
+COPY cp TO STDOUT;
+=== COPY ... WITH CSV (legacy form) ===
+COPY cp TO STDOUT WITH CSV;
+=== COPY ... WITH (FORMAT CSV) ===
+COPY cp TO STDOUT WITH (FORMAT CSV);
+=== COPY ... WITH (FORMAT CSV, HEADER true) ===
+COPY cp TO STDOUT WITH (FORMAT CSV, HEADER true);
+=== COPY ... WITH (FORMAT TEXT) ===
+COPY cp TO STDOUT WITH (FORMAT TEXT);
+=== COPY ... WITH (FORMAT BINARY) — accepted, no error ===
+COPY cp TO STDOUT WITH (FORMAT BINARY);
+=== COPY ... WITH (DELIMITER ',') ===
+COPY cp TO STDOUT WITH (DELIMITER ',');
+=== COPY ... WITH (NULL '\N') — NULL spec ===
+COPY cp TO STDOUT WITH (NULL '\N');
+=== COPY t (col, col) TO STDOUT — column-list form ===
+COPY cp (id) TO STDOUT;
+=== COPY (<SELECT>) TO STDOUT ===
+COPY (SELECT id FROM cp) TO STDOUT;
+=== COPY t TO '<file path>' — parsed (silent no-op) ===
+COPY cp TO '/tmp/out.csv';
+=== KNOWN GAP: COPY t FROM STDIN — errno 1064 (no in-band STDIN) ===
+COPY cp FROM STDIN;
+ERROR 1064: SQL parse error: sql parser error: Expected: ;, found: EOF
+=== KNOWN GAP: COPY t FROM STDIN WITH CSV — errno 1064 ===
+COPY cp FROM STDIN WITH CSV;
+ERROR 1064: SQL parse error: sql parser error: Expected: ;, found: EOF
+=== KNOWN GAP: MySQL LOAD DATA INFILE — errno 1064 ===
+LOAD DATA INFILE '/tmp/x' INTO TABLE cp;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: INFILE at Line: 1, Column: 11
+=== KNOWN GAP: MySQL SELECT ... INTO OUTFILE — errno 1064 ===
+SELECT * FROM cp INTO OUTFILE '/tmp/x';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: OUTFILE at Line: 1, Column: 23
+=== Cleanup ===
+DROP TABLE cp;

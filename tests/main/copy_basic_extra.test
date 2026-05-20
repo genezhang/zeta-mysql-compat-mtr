@@ -1,0 +1,131 @@
+# Independently authored COPY-extra smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test (MySQL has LOAD DATA INFILE; PG has COPY). Pins
+# zeta's COPY-statement surface as seen from the MySQL wire
+# (no prior compat coverage).
+#
+# Big-picture finding: COPY ... TO STDOUT is implemented on
+# the PG wire (verified via psql in the design notes) but the
+# MySQL wire dispatcher does NOT carry the streamed-rows
+# response back to the client. From the MySQL wire, COPY
+# statements parse and "succeed" without emitting any data.
+# So the entire COPY surface is effectively a silent no-op
+# through the MySQL wire — but the parse paths are well-
+# covered (no unexpected 1064s).
+#
+# Adaptation notes:
+#   # zeta-adapt: COPY t TO STDOUT — parsed and accepted;
+#     produces no client-visible output over the MySQL wire.
+#   # zeta-adapt: COPY t TO STDOUT WITH CSV (legacy form)
+#     — parsed.
+#   # zeta-adapt: COPY t TO STDOUT WITH (FORMAT CSV) —
+#     parsed.
+#   # zeta-adapt: COPY t TO STDOUT WITH (FORMAT CSV, HEADER
+#     true) — parsed.
+#   # zeta-adapt: COPY t TO STDOUT WITH (FORMAT TEXT) —
+#     parsed.
+#   # zeta-adapt: COPY t TO STDOUT WITH (DELIMITER ',') —
+#     parsed.
+#   # zeta-adapt: COPY t TO STDOUT WITH (NULL '\\N') —
+#     parsed.
+#   # zeta-adapt: COPY t (col1, col2) TO STDOUT — parsed
+#     (column-list form).
+#   # zeta-adapt: COPY (<SELECT>) TO STDOUT — parsed.
+#   # zeta-adapt: COPY t TO '<file path>' — parsed
+#     (server-side file output is silently accepted but does
+#     not actually write the file when invoked via the
+#     MySQL wire).
+#   # zeta-adapt: KNOWN DIVERGENCE — none of the COPY ... TO
+#     STDOUT shapes emit rows to a MySQL client. Verified
+#     against the same database via psql that the data IS
+#     readable — the gap is on the MySQL wire's row-stream
+#     dispatcher, not the COPY executor. To export rows over
+#     the MySQL wire, use a plain SELECT.
+#   # zeta-adapt: KNOWN GAP — COPY ... TO STDOUT WITH
+#     (FORMAT BINARY) errors NOT raised; behaves the same as
+#     the other formats (silent). Pinned positively.
+#   # zeta-adapt: KNOWN GAP — COPY t FROM STDIN errors 1064
+#     "Expected: ;, found: EOF" — the MTR-runner / mysql
+#     client cannot feed the in-band STDIN bytes that the
+#     PG-style COPY-IN protocol expects. PG-wire psql does
+#     handle this. Substitute on MySQL wire: INSERT.
+#   # zeta-adapt: KNOWN GAP — MySQL LOAD DATA INFILE errors
+#     1064 "Expected: end of statement, found: INFILE". No
+#     LOAD DATA surface at all.
+#   # zeta-adapt: KNOWN GAP — MySQL SELECT ... INTO OUTFILE
+#     errors 1064 "Expected: end of statement, found:
+#     OUTFILE". No INTO OUTFILE surface.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS cp;
+CREATE TABLE cp (id INT PRIMARY KEY, n INT);
+INSERT INTO cp VALUES (1, 10), (2, 20);
+
+--echo === COPY t TO STDOUT — parsed, silent no-op via MySQL wire ===
+
+COPY cp TO STDOUT;
+
+--echo === COPY ... WITH CSV (legacy form) ===
+
+COPY cp TO STDOUT WITH CSV;
+
+--echo === COPY ... WITH (FORMAT CSV) ===
+
+COPY cp TO STDOUT WITH (FORMAT CSV);
+
+--echo === COPY ... WITH (FORMAT CSV, HEADER true) ===
+
+COPY cp TO STDOUT WITH (FORMAT CSV, HEADER true);
+
+--echo === COPY ... WITH (FORMAT TEXT) ===
+
+COPY cp TO STDOUT WITH (FORMAT TEXT);
+
+--echo === COPY ... WITH (FORMAT BINARY) — accepted, no error ===
+
+COPY cp TO STDOUT WITH (FORMAT BINARY);
+
+--echo === COPY ... WITH (DELIMITER ',') ===
+
+COPY cp TO STDOUT WITH (DELIMITER ',');
+
+--echo === COPY ... WITH (NULL '\N') — NULL spec ===
+
+COPY cp TO STDOUT WITH (NULL '\N');
+
+--echo === COPY t (col, col) TO STDOUT — column-list form ===
+
+COPY cp (id) TO STDOUT;
+
+--echo === COPY (<SELECT>) TO STDOUT ===
+
+COPY (SELECT id FROM cp) TO STDOUT;
+
+--echo === COPY t TO '<file path>' — parsed (silent no-op) ===
+
+COPY cp TO '/tmp/out.csv';
+
+--echo === KNOWN GAP: COPY t FROM STDIN — errno 1064 (no in-band STDIN) ===
+
+--error 1064
+COPY cp FROM STDIN;
+
+--echo === KNOWN GAP: COPY t FROM STDIN WITH CSV — errno 1064 ===
+
+--error 1064
+COPY cp FROM STDIN WITH CSV;
+
+--echo === KNOWN GAP: MySQL LOAD DATA INFILE — errno 1064 ===
+
+--error 1064
+LOAD DATA INFILE '/tmp/x' INTO TABLE cp;
+
+--echo === KNOWN GAP: MySQL SELECT ... INTO OUTFILE — errno 1064 ===
+
+--error 1064
+SELECT * FROM cp INTO OUTFILE '/tmp/x';
+
+--echo === Cleanup ===
+
+DROP TABLE cp;
