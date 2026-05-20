@@ -1,0 +1,67 @@
+=== Setup ===
+DROP TABLE IF EXISTS pa;
+CREATE TABLE pa (id INT, name VARCHAR(20));
+INSERT INTO pa VALUES (1, 'a'), (2, 'b');
+=== ALTER TABLE ADD PRIMARY KEY (col) — builds PK from existing data ===
+ALTER TABLE pa ADD PRIMARY KEY (id);
+SHOW INDEX FROM pa;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+pa	0	PRIMARY	1	id	BTREE
+=== ADD PRIMARY KEY when one already exists — errno 1105 ===
+ALTER TABLE pa ADD PRIMARY KEY (name);
+ERROR 1105: execution error: table 'test.public.pa' already has a primary key
+=== Composite PRIMARY KEY (a, b) — duplicate tuple → 1062 ===
+DROP TABLE IF EXISTS pc;
+CREATE TABLE pc (a INT, b INT, PRIMARY KEY (a, b));
+INSERT INTO pc VALUES (1, 2), (1, 3), (2, 2);
+INSERT INTO pc VALUES (1, 2);
+ERROR 1062: duplicate key value violates primary key "test.public.pc": Key already exists in table "test.public.pc"
+=== PK on TEXT column — duplicate → 1062 ===
+DROP TABLE IF EXISTS pt;
+CREATE TABLE pt (name VARCHAR(20) PRIMARY KEY, n INT);
+INSERT INTO pt VALUES ('alice', 1), ('bob', 2);
+INSERT INTO pt VALUES ('alice', 99);
+ERROR 1062: duplicate key value violates primary key "test.public.pt": Key already exists in table "test.public.pt"
+=== INSERT NULL into PK column — errno 1105 (PK implies NOT NULL) ===
+DROP TABLE IF EXISTS pn;
+CREATE TABLE pn (id INT PRIMARY KEY, n INT);
+INSERT INTO pn (id, n) VALUES (NULL, 1);
+ERROR 1105: execution error: null value in column "id" of relation "test.public.pn" violates not-null constraint
+=== CREATE TABLE id INT NULL PRIMARY KEY — NULL silently overridden ===
+DROP TABLE IF EXISTS pnnull;
+CREATE TABLE pnnull (id INT NULL PRIMARY KEY);
+INSERT INTO pnnull VALUES (NULL);
+ERROR 1105: execution error: null value in column "id" of relation "test.public.pnnull" violates not-null constraint
+INSERT INTO pnnull VALUES (1);
+SELECT id FROM pnnull;
+id
+1
+=== ADD PRIMARY KEY on duplicate data — errno 1105 ===
+DROP TABLE IF EXISTS pad;
+CREATE TABLE pad (id INT, n INT);
+INSERT INTO pad VALUES (1, 10), (1, 20);
+ALTER TABLE pad ADD PRIMARY KEY (id);
+ERROR 1105: execution error: could not create primary key: duplicate key values found
+=== AUTO_INCREMENT batch INSERT — sequential IDs from 1 ===
+DROP TABLE IF EXISTS pi;
+CREATE TABLE pi (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(20));
+INSERT INTO pi (name) VALUES ('a'), ('b'), ('c');
+SELECT id, name FROM pi ORDER BY id;
+id	name
+1	a
+2	b
+3	c
+=== LAST_INSERT_ID() — returns FIRST id of last batch (MySQL semantics) ===
+SELECT LAST_INSERT_ID() AS first_id;
+LAST_INSERT_ID()
+1
+=== KNOWN GAP: ALTER TABLE DROP PRIMARY KEY — errno 1064 ===
+ALTER TABLE pi DROP PRIMARY KEY;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: DROP PRIMARY KEY
+DROP TABLE pa;
+DROP TABLE pc;
+DROP TABLE pt;
+DROP TABLE pn;
+DROP TABLE pnnull;
+DROP TABLE pad;
+DROP TABLE pi;
