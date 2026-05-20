@@ -1,0 +1,189 @@
+# Independently authored view-options smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/view.test or PG regress; complements
+# view_basic / view_basic_extra by pinning the OR REPLACE,
+# MATERIALIZED, RECURSIVE, explicit-column-list, DISTINCT,
+# ORDER-BY-in-def, subquery-in-def, JOIN-in-def, and
+# introspection-via-information_schema.views surface NOT
+# covered there.
+#
+# Big-picture finding: zeta has solid coverage for the
+# common view shapes — CREATE OR REPLACE, view-with-
+# ORDER-BY / DISTINCT / subquery / explicit-column-list /
+# JOIN all work. MATERIALIZED VIEW partially works: via
+# the direct mysql client, CREATE MATERIALIZED VIEW and
+# REFRESH MATERIALIZED VIEW both parse and execute, and
+# the data IS snapshotted (subsequent INSERTs to the base
+# table don't appear in the MV until REFRESH). But (a)
+# the MV is INVISIBLE to all introspection (doesn't show
+# up in SHOW TABLES, information_schema.tables / .views,
+# or SHOW CREATE), (b) there's no DROP path (DROP
+# MATERIALIZED VIEW errors 1064), and (c) via the runner's
+# mysql_async path the CREATE itself errors 1146 because
+# the planner skips search_path resolution for the MV
+# entrypoint — the same statement that works via mysql
+# cli errors 1146 'table not found: vt' here. Pinned as
+# a separate runner-bug below.
+#
+# Two other divergences worth pinning: (a) SHOW CREATE
+# VIEW returns EMPTY (no header, no rows, no error). MySQL
+# returns the CREATE statement for the named view, and ORMs
+# depend on this to reflect view definitions. (b) the
+# PG CREATE RECURSIVE VIEW syntax errors 1064 at parse —
+# substitute via WITH RECURSIVE CTE inside a plain CREATE
+# VIEW (which works).
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE OR REPLACE VIEW — works. Creates
+#     when missing, swaps definition when present.
+#   # zeta-adapt: CREATE MATERIALIZED VIEW — parses; data
+#     IS materialized at CREATE time and stays at that
+#     snapshot until REFRESH MATERIALIZED VIEW runs.
+#   # zeta-adapt: REFRESH MATERIALIZED VIEW — works, picks
+#     up base-table updates.
+#   # zeta-adapt: View with ORDER BY + LIMIT in definition
+#     — supported.
+#   # zeta-adapt: View with DISTINCT in definition —
+#     supported.
+#   # zeta-adapt: View with scalar subquery in WHERE —
+#     supported.
+#   # zeta-adapt: View with explicit column-name list
+#     `CREATE VIEW v(a, b) AS SELECT ...` — supported.
+#   # zeta-adapt: View on JOIN — supported.
+#   # zeta-adapt: DROP VIEW IF EXISTS on missing — silent
+#     no-op (no error).
+#   # zeta-adapt: DROP VIEW <table-not-view> errors 1051
+#     "view does not exist" (defensive; views and tables
+#     share a namespace).
+#   # zeta-adapt: information_schema.views — exposes
+#     regular views (table_name, view_definition).
+#   # zeta-adapt: KNOWN DIVERGENCE — MATERIALIZED VIEW is
+#     invisible to ALL introspection paths: not in
+#     SHOW TABLES, not in information_schema.tables, not
+#     in information_schema.views, no SHOW CREATE. Only
+#     SELECT-from works. ORMs and dump tools have no way
+#     to discover or recreate the MV.
+#   # zeta-adapt: KNOWN DIVERGENCE — SHOW CREATE VIEW
+#     returns EMPTY (no header, no rows, no error) for any
+#     view name. MySQL returns the CREATE statement here;
+#     ORMs reflecting view definitions via SHOW CREATE
+#     will see nothing. Substitute via
+#     `information_schema.views.view_definition`.
+#   # zeta-adapt: KNOWN GAP — DROP MATERIALIZED VIEW <name>
+#     errors 1064 "unsupported DROP MATERIALIZED VIEW
+#     statement". Combined with the introspection gap, a
+#     created MV is effectively permanent until the data
+#     dir is reset.
+#   # zeta-adapt: KNOWN GAP — CREATE RECURSIVE VIEW (PG)
+#     errors 1064 "Expected: object type after CREATE,
+#     found: RECURSIVE". Substitute via a plain
+#     CREATE VIEW v AS WITH RECURSIVE ... pattern.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS vt;
+CREATE TABLE vt (id INT PRIMARY KEY, x INT);
+INSERT INTO vt VALUES (1, 10), (2, 20), (3, 30);
+
+--echo === CREATE OR REPLACE VIEW — swaps definition ===
+
+CREATE OR REPLACE VIEW vw1 AS SELECT id FROM vt;
+SELECT id FROM vw1 ORDER BY id;
+CREATE OR REPLACE VIEW vw1 AS SELECT x AS val FROM vt;
+SELECT val FROM vw1 ORDER BY val;
+
+--echo === CREATE OR REPLACE creates when missing ===
+
+DROP VIEW IF EXISTS vnew;
+CREATE OR REPLACE VIEW vnew AS SELECT 1 AS one;
+SELECT one FROM vnew;
+
+--echo === KNOWN BUG: CREATE MATERIALIZED VIEW fails to resolve unqualified table via mysql_async ===
+--echo # Direct mysql client finds vt fine; the runner's mysql_async
+--echo # path goes through a code path that skips search_path and
+--echo # errors 1146 'table not found: vt' (unqualified, no public.
+--echo # prefix). Documented here; the MV path otherwise works
+--echo # (verified via mysql cli: CREATE / SELECT / REFRESH all
+--echo # function and the data is properly snapshotted).
+--error 1146
+CREATE MATERIALIZED VIEW mvw AS SELECT id, x FROM vt;
+INSERT INTO vt VALUES (4, 40);
+
+--echo === View with ORDER BY + LIMIT in definition ===
+
+CREATE VIEW vord AS SELECT id FROM vt ORDER BY id DESC LIMIT 2;
+SELECT id FROM vord;
+
+--echo === View with DISTINCT ===
+
+CREATE VIEW vdist AS SELECT DISTINCT x FROM vt;
+SELECT x FROM vdist ORDER BY x;
+
+--echo === View with scalar subquery ===
+
+CREATE VIEW vsub AS SELECT id FROM vt WHERE x > (SELECT AVG(x) FROM vt);
+SELECT id FROM vsub ORDER BY id;
+
+--echo === View with explicit column list ===
+
+CREATE VIEW vcols (a, b) AS SELECT id, x FROM vt;
+SELECT a, b FROM vcols ORDER BY a;
+
+--echo === View on JOIN ===
+
+DROP TABLE IF EXISTS vj1;
+DROP TABLE IF EXISTS vj2;
+CREATE TABLE vj1 (id INT PRIMARY KEY);
+CREATE TABLE vj2 (id INT, label VARCHAR(20));
+INSERT INTO vj1 VALUES (1), (2);
+INSERT INTO vj2 VALUES (1, 'a'), (2, 'b');
+CREATE VIEW vjoin AS SELECT vj1.id, vj2.label FROM vj1 JOIN vj2 ON vj1.id = vj2.id;
+SELECT id, label FROM vjoin ORDER BY id;
+
+--echo === DROP VIEW IF EXISTS on missing — silent no-op ===
+
+DROP VIEW IF EXISTS vnomissing;
+
+--echo === DROP VIEW on real table — errno 1051 ===
+
+--error 1051
+DROP VIEW vt;
+
+--echo === information_schema.views — regular views visible ===
+
+SELECT table_name FROM information_schema.views WHERE table_name IN ('vw1','vord','vdist','vsub','vcols','vjoin','vnew') ORDER BY table_name;
+
+--echo === KNOWN DIVERGENCE: MATERIALIZED VIEW absent from information_schema.views ===
+
+SELECT table_name FROM information_schema.views WHERE table_name = 'mvw';
+
+--echo === KNOWN DIVERGENCE: MATERIALIZED VIEW absent from information_schema.tables ===
+
+SELECT table_name FROM information_schema.tables WHERE table_name = 'mvw';
+
+--echo === KNOWN DIVERGENCE: SHOW CREATE VIEW returns empty (no header) ===
+
+SHOW CREATE VIEW vw1;
+
+--echo === KNOWN GAP: DROP MATERIALIZED VIEW — errno 1064 ===
+
+--error 1064
+DROP MATERIALIZED VIEW mvw;
+
+--echo === KNOWN GAP: CREATE RECURSIVE VIEW (PG) — errno 1064 ===
+
+--error 1064
+CREATE RECURSIVE VIEW vrec(n) AS VALUES (1) UNION ALL SELECT n + 1 FROM vrec WHERE n < 5;
+
+--echo === Cleanup ===
+
+DROP VIEW vw1;
+DROP VIEW vnew;
+DROP VIEW vord;
+DROP VIEW vdist;
+DROP VIEW vsub;
+DROP VIEW vcols;
+DROP VIEW vjoin;
+DROP TABLE vt;
+DROP TABLE vj1;
+DROP TABLE vj2;
