@@ -1,0 +1,78 @@
+# Independently authored SQL-text PREPARE/EXECUTE smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/ps.test or sql_prepare.test;
+# pins zeta's SQL-text-form prepared-statement surface (no
+# prior compat coverage).
+#
+# Important: zeta DOES support server-side prepared
+# statements via the wire-protocol path (the MySQL binary
+# wire's COM_STMT_PREPARE / COM_STMT_EXECUTE and the PG
+# extended-query protocol's Parse/Bind/Execute). What this
+# test pins is the SQL-TEXT form (PREPARE …; EXECUTE …),
+# which is currently effectively unsupported on both wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: DEALLOCATE — silent ok regardless of whether
+#     the named prepared statement exists (both PG `DEALLOCATE
+#     <name>` and MySQL `DEALLOCATE PREPARE <name>` forms).
+#   # zeta-adapt: KNOWN GAP — PG-style `PREPARE <name> AS
+#     <stmt>` errors 1105 "plan error: statement is handled
+#     before planning". The handler is registered but doesn't
+#     actually save the statement.
+#   # zeta-adapt: KNOWN GAP — PG-style EXECUTE errors 1105
+#     "statement is handled before planning" (same).
+#   # zeta-adapt: KNOWN GAP — PG-style `PREPARE p(INT) AS
+#     SELECT $1 + 10` parameterised form same error.
+#   # zeta-adapt: KNOWN GAP — `EXECUTE p3(5)` same error.
+#   # zeta-adapt: KNOWN GAP — MySQL `PREPARE p FROM
+#     '<stmt>'` errors 1064 "Expected: AS, found: FROM". No
+#     parser branch for the MySQL FROM-string form.
+#   # zeta-adapt: KNOWN GAP — MySQL `PREPARE p FROM @var`
+#     same parse error.
+#   # zeta-adapt: KNOWN GAP — `EXECUTE IMMEDIATE 'SELECT …'`
+#     errors 1105 "statement is handled before planning".
+#   # zeta-adapt: workaround — for parameter binding, use
+#     the wire-level prepared-statement path (mysql-connector
+#     `?` placeholders, JDBC PreparedStatement, libpq
+#     PQprepare) which DOES work; the SQL-text form just
+#     can't drive prepared statements as of this slice.
+
+--echo === DEALLOCATE on missing — silent ok (both forms) ===
+
+DEALLOCATE no_such_pg;
+DEALLOCATE PREPARE no_such_mysql;
+
+--echo === KNOWN GAP: PG-style PREPARE ... AS ... — errno 1105 ===
+
+--error 1105
+PREPARE p1 AS SELECT 1 + 1;
+
+--echo === KNOWN GAP: PG-style EXECUTE — errno 1105 ===
+
+--error 1105
+EXECUTE p1;
+
+--echo === KNOWN GAP: PG-style PREPARE with parameter — errno 1105 ===
+
+--error 1105
+PREPARE p3(INT) AS SELECT $1 + 10;
+
+--echo === KNOWN GAP: PG-style EXECUTE with arg list — errno 1105 ===
+
+--error 1105
+EXECUTE p3(5);
+
+--echo === KNOWN GAP: MySQL PREPARE FROM string — errno 1064 ===
+
+--error 1064
+PREPARE p2 FROM 'SELECT 2 + 2';
+
+--echo === KNOWN GAP: MySQL PREPARE FROM @var — errno 1064 ===
+
+--error 1064
+PREPARE p4 FROM @s;
+
+--echo === KNOWN GAP: EXECUTE IMMEDIATE — errno 1105 ===
+
+--error 1105
+EXECUTE IMMEDIATE 'SELECT 99';
