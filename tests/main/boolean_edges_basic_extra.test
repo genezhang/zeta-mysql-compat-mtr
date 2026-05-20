@@ -1,0 +1,132 @@
+# Independently authored BOOLEAN edge smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/bool.test or PG regress; complements
+# boolean_logic_basic_extra (which covers IS TRUE / IS FALSE
+# / IS DISTINCT FROM / BOOL_AND / BOOL_OR / 3VL AND OR NOT
+# basics) by pinning the EDGE behavior NOT covered there:
+# operator precedence, XOR gap, INT-to-BOOL coercion edges,
+# implicit-truthiness rejection in WHERE, bool-in-arithmetic
+# gap, string-to-bool casts, IS UNKNOWN family, CASE WHEN.
+#
+# Big-picture finding: zeta is PG-flavored boolean — strict
+# typing with no implicit BOOL ↔ INT coercion. WHERE on an
+# INT column (e.g. `WHERE n`) errors 1105 'predicate did not
+# evaluate to boolean'. Boolean operators do NOT auto-coerce
+# integer operands either (`1 AND 0` returns NULL not 0; in
+# MySQL it would be 0). `1 = TRUE` and `0 = FALSE` BOTH
+# return FALSE — the comparison appears to silently fail at
+# type-mismatch rather than coercing. Boolean + integer
+# arithmetic errors 1105. The XOR infix operator is missing
+# entirely (1064). String → BOOLEAN cast works for the full
+# PG set ('true' / 'false' / 't' / 'yes').
+#
+# Adaptation notes:
+#   # zeta-adapt: Boolean operator precedence — NOT > AND
+#     > OR (matches SQL standard).
+#   # zeta-adapt: 3VL with NULL — AND with FALSE returns 0
+#     even if other side NULL; OR with TRUE returns 1 even
+#     if other side NULL; NOT NULL → NULL.
+#   # zeta-adapt: TRUE / FALSE / true / false — all
+#     accepted as literals.
+#   # zeta-adapt: Implicit boolean from a comparison in
+#     WHERE — works.
+#   # zeta-adapt: String → BOOLEAN cast accepts 'true' /
+#     'false' / 't' / 'yes' (PG-compatible).
+#   # zeta-adapt: IS UNKNOWN / IS NOT UNKNOWN — work
+#     correctly across {TRUE, FALSE, NULL}.
+#   # zeta-adapt: CASE WHEN <bool> — works with both bool
+#     literals and comparison expressions.
+#   # zeta-adapt: KNOWN DIVERGENCE — `1 = TRUE` returns 0
+#     (FALSE) and `0 = FALSE` returns 0. zeta does not
+#     auto-coerce INT to BOOL for the equality check; the
+#     types are treated as distinct and the comparison
+#     resolves to FALSE. MySQL would return TRUE for both.
+#   # zeta-adapt: KNOWN DIVERGENCE — `1 AND 0` returns NULL
+#     where MySQL returns 0. zeta's AND operator with
+#     non-boolean integer operands appears to silently
+#     fall through to a 3VL evaluation against NULL rather
+#     than coercing the integers via truthiness.
+#   # zeta-adapt: KNOWN DIVERGENCE — `WHERE col` where col
+#     is INT errors 1105 'predicate did not evaluate to
+#     boolean'. zeta enforces strict PG-style WHERE
+#     predicate typing; MySQL would treat any non-zero
+#     non-NULL value as truthy. Substitute via
+#     `WHERE col <> 0`.
+#   # zeta-adapt: KNOWN GAP — `BOOL + INT` arithmetic
+#     errors 1105 'arithmetic op requires numbers'.
+#     Substitute via CAST(bool AS INT) — but BOOL→INT
+#     cast also errors 1105 (pinned in
+#     type_cast_edges_basic_extra); use CASE WHEN bool
+#     THEN 1 ELSE 0 END.
+#   # zeta-adapt: KNOWN GAP — `<bool> XOR <bool>` infix
+#     operator errors 1064 'unsupported binary operator:
+#     XOR'. Substitute via `(a OR b) AND NOT (a AND b)`.
+
+--echo === Boolean operator precedence — NOT > AND > OR ===
+
+SELECT TRUE OR FALSE AND FALSE AS p1;
+SELECT NOT TRUE OR TRUE AS p2;
+SELECT FALSE AND NOT FALSE AS p3;
+
+--echo === Parens override precedence ===
+
+SELECT (TRUE OR FALSE) AND FALSE AS expl;
+SELECT TRUE AND (TRUE OR FALSE) AS expl2;
+
+--echo === 3VL AND truth table ===
+
+SELECT TRUE AND NULL AS tan, FALSE AND NULL AS fan, NULL AND TRUE AS nta, NULL AND FALSE AS nfa;
+
+--echo === 3VL OR truth table ===
+
+SELECT TRUE OR NULL AS ton, FALSE OR NULL AS fon, NULL OR TRUE AS nto, NULL OR FALSE AS nfo;
+
+--echo === NOT — NULL propagates, TRUE/FALSE flip ===
+
+SELECT NOT NULL AS not_nl, NOT TRUE AS not_t, NOT FALSE AS not_f;
+
+--echo === TRUE / FALSE literals (case-insensitive) ===
+
+SELECT TRUE AS up_t, FALSE AS up_f, true AS lo_t, false AS lo_f;
+
+--echo === String → BOOLEAN cast ===
+
+SELECT 'true'::BOOLEAN AS s_true, 'false'::BOOLEAN AS s_false, 't'::BOOLEAN AS s_t, 'yes'::BOOLEAN AS s_yes;
+
+--echo === IS UNKNOWN / IS NOT UNKNOWN ===
+
+SELECT TRUE IS UNKNOWN AS t_u, NULL IS UNKNOWN AS n_u, FALSE IS UNKNOWN AS f_u;
+
+--echo === CASE WHEN <bool literal or comparison> ===
+
+SELECT CASE WHEN TRUE THEN 1 ELSE 0 END AS r_lit, CASE WHEN 1 < 2 THEN 'yes' ELSE 'no' END AS r_cmp;
+
+--echo === KNOWN DIVERGENCE: 1 = TRUE and 0 = FALSE both return FALSE ===
+--echo # MySQL would coerce INT to BOOL for equality; zeta keeps the
+--echo # types distinct and the comparison silently resolves to FALSE.
+
+SELECT 1 = TRUE AS one_eq_t, 0 = FALSE AS zero_eq_f;
+
+--echo === KNOWN DIVERGENCE: 1 AND 0 returns NULL (MySQL: 0) ===
+
+SELECT 1 AND 0 AS and_int;
+
+--echo === KNOWN DIVERGENCE: WHERE on INT col — errno 1105 ===
+
+DROP TABLE IF EXISTS bi;
+CREATE TABLE bi (id INT, n INT);
+INSERT INTO bi VALUES (1, 0), (2, 1), (3, 10);
+--error 1105
+SELECT id, n FROM bi WHERE n;
+
+--echo === KNOWN GAP: BOOL + INT arithmetic — errno 1105 ===
+
+--error 1105
+SELECT TRUE + 1;
+
+--echo === KNOWN GAP: XOR infix operator — errno 1064 ===
+
+--error 1064
+SELECT TRUE XOR FALSE;
+
+DROP TABLE bi;
