@@ -105,10 +105,10 @@ sq
 SELECT QUOTE(123) AS num;
 num
 '123'
-=== KNOWN DIVERGENCE: QUOTE(NULL) → NULL, MySQL → 'NULL' string ===
-SELECT QUOTE(NULL) AS qn;
-qn
-NULL
+=== QUOTE(NULL) returns literal 'NULL' string (matches MySQL) ===
+SELECT QUOTE(NULL) AS qn, LENGTH(QUOTE(NULL)) AS qn_len, QUOTE(NULL) IS NULL AS is_nl;
+qn	qn_len	is_nl
+NULL	4	0
 === KNOWN GAP: FORMAT(n, dec, 'locale') — errno 1105 ===
 SELECT FORMAT(1234.56, 2, 'de_DE');
 ERROR 1105: execution error: FORMAT requires 2 arguments (number, decimals)
