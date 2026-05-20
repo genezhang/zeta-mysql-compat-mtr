@@ -1,0 +1,87 @@
+=== ILIKE — case-insensitive LIKE ===
+SELECT 'ABC' ILIKE 'abc' AS r1, 'aBc' ILIKE 'abc%' AS r2, 'XYZ' ILIKE 'a%' AS r3;
+r1	r2	r3
+1	1	0
+=== ILIKE NULL propagation ===
+SELECT NULL ILIKE 'abc' AS r1, 'abc' ILIKE NULL AS r2;
+r1	r2
+NULL	NULL
+=== NOT LIKE / NOT ILIKE ===
+SELECT 'abc' NOT LIKE 'def' AS r1, 'abc' NOT LIKE 'abc' AS r2, 'ABC' NOT ILIKE 'abc' AS r3;
+r1	r2	r3
+1	0	0
+=== REGEXP (MySQL) — basic match / non-match / anchors ===
+SELECT 'abc123' REGEXP '[0-9]+' AS r1, 'hello' REGEXP '^h' AS r2, 'hello' REGEXP 'c$' AS r3, 'hello' REGEXP '^hello$' AS r4, 'hello' REGEXP 'x' AS no_match;
+r1	r2	r3	r4	no_match
+1	1	0	1	0
+=== RLIKE (MySQL alias of REGEXP) ===
+SELECT 'abc' RLIKE 'b' AS r1, 'abc' NOT RLIKE 'x' AS r2;
+r1	r2
+1	1
+=== NOT REGEXP ===
+SELECT 'abc' NOT REGEXP 'x' AS r1, 'abc' NOT REGEXP 'b' AS r2;
+r1	r2
+1	0
+=== REGEXP empty pattern — matches everything ===
+SELECT 'abc' REGEXP '' AS r;
+r
+1
+=== PG ~ — case-sensitive regex match, Bool result ===
+SELECT 'abc' ~ 'b' AS r1, 'ABC' ~ 'abc' AS r2;
+r1	r2
+1	0
+=== PG ~* — case-insensitive regex match ===
+SELECT 'ABC' ~* 'abc' AS r1, 'XYZ' ~* '^a' AS r2;
+r1	r2
+1	0
+=== PG !~ / !~* — negated regex match ===
+SELECT 'abc' !~ 'x' AS r1, 'ABC' !~* 'abc' AS r2;
+r1	r2
+1	0
+=== LIKE with literal regex meta-chars — treated as literal ===
+SELECT 'a.b' LIKE 'a.b' AS dot_literal, 'aXb' LIKE 'a.b' AS dot_not_meta;
+dot_literal	dot_not_meta
+1	0
+SELECT 'a[b]' LIKE 'a[b]' AS brackets;
+brackets
+1
+=== LIKE ESCAPE — custom escape character ===
+SELECT '100%' LIKE '100/%' ESCAPE '/' AS esc_pct, 'a_b' LIKE 'a/_b' ESCAPE '/' AS esc_under;
+esc_pct	esc_under
+1	1
+=== LIKE in WHERE — Bool result accepted ===
+DROP TABLE IF EXISTS strs;
+CREATE TABLE strs (id INT, s TEXT);
+INSERT INTO strs VALUES (1,'hello'),(2,'HELLO'),(3,'World'),(4,'wHoP');
+SELECT id FROM strs WHERE s LIKE 'h%' ORDER BY id;
+id
+1
+=== ILIKE in WHERE — Bool result accepted ===
+SELECT id FROM strs WHERE s ILIKE 'h%' ORDER BY id;
+id
+1
+2
+=== NOT LIKE in WHERE ===
+SELECT id FROM strs WHERE s NOT LIKE 'h%' ORDER BY id;
+id
+2
+3
+4
+=== PG ~* in WHERE — Bool result accepted ===
+SELECT id FROM strs WHERE s ~* '^h' ORDER BY id;
+id
+1
+2
+=== KNOWN GAP: REGEXP / RLIKE in WHERE — errno 1105 (Int result) ===
+# Both REGEXP and RLIKE return Int64 (0/1) for projection
+# compatibility, but the WHERE-predicate validator rejects
+# non-Bool. Workaround: wrap with `= 1`, or use the PG ~
+# form which returns Bool.
+SELECT id FROM strs WHERE s REGEXP '^[Hh]' ORDER BY id;
+ERROR 1105: execution error: predicate did not evaluate to boolean
+=== REGEXP in WHERE workaround — explicit `= 1` ===
+SELECT id FROM strs WHERE s REGEXP '^[Hh]' = 1 ORDER BY id;
+id
+1
+2
+DROP TABLE strs;
