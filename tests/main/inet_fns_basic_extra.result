@@ -1,0 +1,103 @@
+=== INET_ATON — basic dotted quad ===
+SELECT INET_ATON('192.168.1.1') AS basic;
+basic
+3232235777
+SELECT INET_ATON('0.0.0.0')       AS lo;
+lo
+0
+SELECT INET_ATON('255.255.255.255') AS hi;
+hi
+4294967295
+=== INET_ATON — unparseable → NULL; NULL → NULL ===
+SELECT INET_ATON('not-an-ip') AS bad;
+bad
+NULL
+SELECT INET_ATON(NULL)        AS n;
+n
+NULL
+=== INET_NTOA — inverse ===
+SELECT INET_NTOA(3232235777) AS basic;
+basic
+192.168.1.1
+SELECT INET_NTOA(0)          AS lo;
+lo
+0.0.0.0
+SELECT INET_NTOA(4294967295) AS hi;
+hi
+255.255.255.255
+=== INET_NTOA — negative / overflow / NULL → NULL ===
+SELECT INET_NTOA(-1)         AS neg;
+neg
+NULL
+SELECT INET_NTOA(4294967296) AS over;
+over
+NULL
+SELECT INET_NTOA(NULL)       AS n;
+n
+NULL
+=== Roundtrip INET_NTOA(INET_ATON(x)) ===
+SELECT INET_NTOA(INET_ATON('172.16.5.4')) AS rt;
+rt
+172.16.5.4
+=== IS_IPV4 — 1/0; NULL → NULL ===
+SELECT IS_IPV4('192.168.1.1') AS good;
+good
+1
+SELECT IS_IPV4('300.0.0.1')   AS bad_octet;
+bad_octet
+0
+SELECT IS_IPV4('::1')         AS v6;
+v6
+0
+SELECT IS_IPV4('')            AS empty;
+empty
+0
+SELECT IS_IPV4(NULL)          AS n;
+n
+NULL
+=== IS_IPV6 — 1/0; NULL → NULL ===
+SELECT IS_IPV6('::1')         AS lo;
+lo
+1
+SELECT IS_IPV6('2001:db8::1') AS doc;
+doc
+1
+SELECT IS_IPV6('192.168.1.1') AS v4;
+v4
+0
+SELECT IS_IPV6('not-an-ip')   AS bad;
+bad
+0
+SELECT IS_IPV6(NULL)          AS n;
+n
+NULL
+=== Arity errors ===
+SELECT INET_ATON();
+ERROR 1105: execution error: INET_ATON requires 1 argument
+SELECT INET_ATON('1.2.3.4', '5.6.7.8');
+ERROR 1105: execution error: INET_ATON requires 1 argument
+SELECT INET_NTOA();
+ERROR 1105: execution error: INET_NTOA requires 1 argument
+SELECT IS_IPV4();
+ERROR 1105: execution error: IS_IPV4 requires 1 argument
+SELECT IS_IPV6();
+ERROR 1105: execution error: IS_IPV6 requires 1 argument
+=== On TEXT column inside SELECT / WHERE ===
+DROP TABLE IF EXISTS hosts;
+CREATE TABLE hosts (id INT, ip TEXT);
+INSERT INTO hosts VALUES (1, '10.0.0.1'), (2, '10.0.0.2'), (3, '2001:db8::1'), (4, 'invalid');
+SELECT id, IS_IPV4(ip) AS v4, IS_IPV6(ip) AS v6 FROM hosts ORDER BY id;
+id	v4	v6
+1	1	0
+2	1	0
+3	0	1
+4	0	0
+SELECT id FROM hosts WHERE IS_IPV4(ip) = 1 ORDER BY id;
+id
+1
+2
+SELECT id, INET_ATON(ip) AS packed FROM hosts WHERE IS_IPV4(ip) = 1 ORDER BY id;
+id	packed
+1	167772161
+2	167772162
+DROP TABLE hosts;
