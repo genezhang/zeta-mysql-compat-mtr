@@ -1,0 +1,92 @@
+=== CREATE TEMPORARY TABLE + INSERT + SELECT + DROP ===
+DROP TABLE IF EXISTS tt;
+CREATE TEMPORARY TABLE tt (id INT PRIMARY KEY, n INT);
+INSERT INTO tt VALUES (1, 10), (2, 20);
+SELECT id, n FROM tt ORDER BY id;
+id	n
+1	10
+2	20
+DROP TABLE tt;
+=== CREATE TEMP TABLE (PG short form) ===
+DROP TABLE IF EXISTS tt2;
+CREATE TEMP TABLE tt2 (id INT PRIMARY KEY);
+INSERT INTO tt2 VALUES (1);
+SELECT id FROM tt2;
+id
+1
+DROP TABLE tt2;
+=== CREATE TEMPORARY TABLE IF NOT EXISTS — second is no-op ===
+DROP TABLE IF EXISTS tt_ine;
+CREATE TEMPORARY TABLE IF NOT EXISTS tt_ine (id INT);
+CREATE TEMPORARY TABLE IF NOT EXISTS tt_ine (id INT);
+DROP TABLE tt_ine;
+=== Primary key enforced on TEMP table ===
+DROP TABLE IF EXISTS tt_pk;
+CREATE TEMPORARY TABLE tt_pk (id INT PRIMARY KEY, n INT);
+INSERT INTO tt_pk VALUES (1, 10);
+INSERT INTO tt_pk VALUES (1, 99);
+ERROR 1062: duplicate key value violates primary key "test.public.tt_pk": Key already exists in table "test.public.tt_pk"
+SELECT id, n FROM tt_pk;
+id	n
+1	10
+DROP TABLE tt_pk;
+=== UNIQUE constraint enforced on TEMP table ===
+DROP TABLE IF EXISTS tt_unique;
+CREATE TEMPORARY TABLE tt_unique (id INT, name TEXT, UNIQUE(name));
+INSERT INTO tt_unique VALUES (1, 'a');
+INSERT INTO tt_unique VALUES (2, 'a');
+ERROR 1062: duplicate key value violates unique constraint "test.public.tt_unique_name_key": Key already exists in index "test.public.tt_unique_name_key"
+DROP TABLE tt_unique;
+=== CREATE INDEX on TEMP table ===
+DROP TABLE IF EXISTS tt_idx;
+CREATE TEMPORARY TABLE tt_idx (id INT, n INT);
+INSERT INTO tt_idx VALUES (1, 10), (2, 20);
+CREATE INDEX ix_tt ON tt_idx(n);
+SELECT id FROM tt_idx WHERE n = 20;
+id
+2
+DROP TABLE tt_idx;
+=== TEMP table created inside BEGIN/COMMIT persists after COMMIT ===
+DROP TABLE IF EXISTS tt_tx;
+BEGIN;
+CREATE TEMPORARY TABLE tt_tx (id INT PRIMARY KEY);
+INSERT INTO tt_tx VALUES (1);
+SELECT id FROM tt_tx;
+id
+1
+COMMIT;
+SELECT id FROM tt_tx;
+id
+1
+DROP TABLE tt_tx;
+=== ON COMMIT DROP option — parsed and accepted ===
+DROP TABLE IF EXISTS tt_oc;
+CREATE TEMPORARY TABLE tt_oc (id INT) ON COMMIT DROP;
+INSERT INTO tt_oc VALUES (1);
+DROP TABLE tt_oc;
+=== KNOWN GAP: CREATE TABLE … AS SELECT (CTAS) — errno 1146 ===
+# CTAS planner fails to resolve the source table even
+# though plain SELECT from it works. Substitute:
+# CREATE TABLE … (columns) + INSERT … SELECT.
+DROP TABLE IF EXISTS ctas_src;
+DROP TABLE IF EXISTS ctas_dst;
+CREATE TABLE ctas_src (id INT PRIMARY KEY);
+INSERT INTO ctas_src VALUES (1), (2);
+CREATE TABLE ctas_dst AS SELECT * FROM ctas_src;
+ERROR 1146: table not found: ctas_src
+DROP TABLE ctas_src;
+=== KNOWN GAP: TEMP table cannot shadow regular table — errno 1050 ===
+# zeta requires distinct names. PG/MySQL allow a temp
+# table to shadow a regular one of the same name.
+DROP TABLE IF EXISTS shadow_t;
+CREATE TABLE shadow_t (id INT, kind TEXT);
+CREATE TEMPORARY TABLE shadow_t (id INT, kind TEXT);
+ERROR 1050: table already exists: test.public.shadow_t
+DROP TABLE shadow_t;
+=== KNOWN GAP: DROP TEMPORARY TABLE syntax — errno 1064 ===
+# MySQL-only spelling not parsed. Substitute: DROP TABLE.
+DROP TABLE IF EXISTS tt_drop;
+CREATE TEMPORARY TABLE tt_drop (id INT);
+DROP TEMPORARY TABLE tt_drop;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: TEMPORARY at Line: 1, Column: 6
+DROP TABLE tt_drop;
