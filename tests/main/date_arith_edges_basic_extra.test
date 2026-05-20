@@ -1,0 +1,130 @@
+# Independently authored date/INTERVAL arithmetic edge
+# smoke test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/datetime_arith.test or
+# PG regress; complements date_time_basic_extra /
+# temporal_arithmetic_basic_extra (which cover the
+# function-form and base operator-form temporal arithmetic)
+# by pinning the EDGE behavior NOT covered there: date
+# range overflow / underflow, DATE-DATE subtraction,
+# INTERVAL multiplication / division (with day-precision
+# bug), negative INTERVAL, INTERVAL comparison, INTERVAL
+# +/- INTERVAL, year-month interval ops, date+date
+# rejection.
+#
+# Big-picture finding: zeta accepts dates outside the
+# canonical MySQL range (9999-12-31 is not the upper
+# bound — zeta allows 10000+ and 0000-12-31). DATE - DATE
+# returns an integer day count. TIMESTAMP - TIMESTAMP
+# returns a duration interval. DATE + DATE correctly
+# errors (arithmetic op requires numbers). Negative
+# INTERVAL works in both literal form and arithmetic.
+# INTERVAL comparison works. Year/month INTERVAL
+# multiplication preserves the y/m structure.
+#
+# One notable bug: INTERVAL '1 day' / 2 returns 24:00:00
+# (= 1 day, unchanged) instead of 12:00:00. The day-level
+# duration division loses fractional precision because the
+# storage representation keeps the integer day count
+# separately from micros. INTERVAL '4 hours' / 2 works
+# correctly (yields 2 hours) because hours are stored as
+# microseconds.
+#
+# Adaptation notes:
+#   # zeta-adapt: DATE - DATE returns an integer day
+#     count.
+#   # zeta-adapt: TIMESTAMP - TIMESTAMP returns a HH:MM:SS
+#     duration interval.
+#   # zeta-adapt: DATE + DATE errors 1105 "arithmetic op
+#     requires numbers" (correct rejection — dates aren't
+#     addable).
+#   # zeta-adapt: INTERVAL multiplication — `INTERVAL
+#     '1 day' * 3` and `3 * INTERVAL '1 day'` both work.
+#   # zeta-adapt: INTERVAL +/- INTERVAL — mixed units
+#     collapse to the largest common duration.
+#   # zeta-adapt: Negative INTERVAL — works in literal
+#     ('-1 day'), in date arithmetic, and in comparison.
+#   # zeta-adapt: INTERVAL comparison — `INTERVAL '1 hour'
+#     = INTERVAL '60 minutes'` is TRUE; `INTERVAL '1 day'
+#     = INTERVAL '24 hours'` is TRUE.
+#   # zeta-adapt: Year/month INTERVAL multiplication
+#     preserves the y/m structure: `INTERVAL '1 year 6
+#     months' * 2` → '3 years' (after normalization).
+#   # zeta-adapt: DATE + INTERVAL across year boundaries —
+#     works (2024-12-31 + 1 day → 2025-01-01).
+#   # zeta-adapt: Leap-day handling — `2024-02-29 + 1
+#     year` → 2025-02-28 (clamps to last valid day of
+#     target month). Matches PG/MySQL.
+#   # zeta-adapt: KNOWN BUG — INTERVAL '1 day' / 2 returns
+#     1 day (24:00:00) instead of 12 hours (12:00:00).
+#     The integer day-count storage loses fractional
+#     precision on division. INTERVAL '4 hours' / 2
+#     yields the correct 2 hours, so the bug is
+#     specifically in the day-tier representation.
+#   # zeta-adapt: KNOWN DIVERGENCE — zeta accepts dates
+#     outside the canonical 0001-01-01..9999-12-31 MySQL
+#     range. `DATE '9999-12-31' + INTERVAL '1 day'`
+#     yields 10000-01-01 (year 10000); `DATE '0001-01-01'
+#     - INTERVAL '1 day'` yields 0000-12-31 (year 0).
+#     MySQL would error 1292 'incorrect datetime value'.
+
+--echo === DATE - DATE returns integer day count ===
+
+SELECT DATE '2024-05-19' - DATE '2024-05-10' AS day_diff;
+
+--echo === TIMESTAMP - TIMESTAMP returns duration ===
+
+SELECT TIMESTAMP '2024-05-19 14:00:00' - TIMESTAMP '2024-05-19 10:00:00' AS hr_diff;
+
+--echo === DATE + DATE — errno 1105 (correct rejection) ===
+
+--error 1105
+SELECT DATE '2024-01-01' + DATE '2024-02-01';
+
+--echo === INTERVAL multiplication — both operand orderings ===
+
+SELECT INTERVAL '1 day' * 3 AS l, 3 * INTERVAL '1 day' AS r;
+
+--echo === INTERVAL +/- INTERVAL ===
+
+SELECT INTERVAL '1 day' + INTERVAL '2 hours' AS add;
+SELECT INTERVAL '1 day' - INTERVAL '2 hours' AS sub;
+SELECT INTERVAL '1 hour' + INTERVAL '-30 minutes' AS neg_add;
+
+--echo === Negative INTERVAL ===
+
+SELECT INTERVAL '-1 day' AS neg;
+SELECT DATE '2024-05-19' + INTERVAL '-3 days' AS d_plus_neg;
+SELECT DATE '2024-05-19' - INTERVAL '-3 days' AS d_minus_neg;
+
+--echo === INTERVAL comparison ===
+
+SELECT INTERVAL '1 hour' = INTERVAL '60 minutes' AS hr_eq;
+SELECT INTERVAL '1 day' = INTERVAL '24 hours' AS day_eq;
+SELECT INTERVAL '-1 day' < INTERVAL '0 days' AS neg_lt;
+
+--echo === Year-month INTERVAL multiplication preserves structure ===
+
+SELECT INTERVAL '1 year' * 2 AS yr2;
+SELECT INTERVAL '1 year 6 months' * 2 AS yr1mo6x2;
+
+--echo === DATE + INTERVAL across year/month boundaries ===
+
+SELECT DATE '2024-12-31' + INTERVAL '1 day' AS new_year;
+SELECT DATE '2024-12-31' + INTERVAL '1 month' AS next_jan;
+
+--echo === Leap-day handling — clamps to last valid day ===
+
+SELECT DATE '2024-02-29' + INTERVAL '1 year' AS leap_to_nonleap;
+SELECT DATE '2023-02-28' + INTERVAL '1 year' AS nonleap_to_leap;
+
+--echo === KNOWN BUG: INTERVAL '1 day' / 2 returns 1 day (should be 12 hours) ===
+--echo # Day-tier division loses fractional precision; hour-tier works.
+
+SELECT INTERVAL '1 day' / 2 AS bug_day_div, INTERVAL '4 hours' / 2 AS ok_hour_div;
+
+--echo === KNOWN DIVERGENCE: date range allows year > 9999 and year < 1 ===
+--echo # MySQL errors 1292 'incorrect datetime value' outside
+--echo # 0001-01-01..9999-12-31; zeta accepts year 0 and 10000+.
+
+SELECT DATE '9999-12-31' + INTERVAL '1 day' AS over;
+SELECT DATE '0001-01-01' - INTERVAL '1 day' AS under;
