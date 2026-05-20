@@ -1,0 +1,110 @@
+# Independently authored DISTINCT edge smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/distinct.test or PG regress; complements
+# null_3vl_basic_extra (DISTINCT NULL collapse) and
+# agg_func_basic_extra (COUNT(DISTINCT col)) by pinning
+# the EDGE behavior NOT covered there: multi-column
+# DISTINCT, PG DISTINCT ON, COUNT(DISTINCT a, b),
+# DISTINCT with ORDER BY mismatch, DISTINCT *, DISTINCT
+# inside set-ops, DISTINCT ON without ORDER BY, ALL
+# keyword bug, COLLATE gap.
+#
+# Big-picture finding: zeta supports the full DISTINCT
+# surface — multi-column DISTINCT, PG DISTINCT ON,
+# COUNT(DISTINCT a, b) multi-arg form. DISTINCT and NULL
+# behavior collapses NULLs into a single row (already
+# pinned). DISTINCT ON requires the leading ORDER BY
+# columns to match (otherwise errors 1105).
+#
+# Two notable issues: (a) `SELECT ALL` is treated as
+# `SELECT DISTINCT` instead of as a no-op (SQL standard:
+# ALL is the default and returns ALL rows including
+# duplicates). The result of `SELECT ALL a FROM t` should
+# be N rows (one per row in t), but zeta returns the
+# deduplicated row count. (b) DISTINCT with an ORDER BY
+# column NOT in the SELECT list is silently ignored
+# (already pinned more broadly in order_by_edges).
+#
+# Adaptation notes:
+#   # zeta-adapt: SELECT DISTINCT on multiple columns —
+#     works; rows distinct on the column tuple.
+#   # zeta-adapt: DISTINCT ON (col) (PG) — works; returns
+#     one row per distinct value of `col`, choosing by
+#     the leading ORDER BY columns.
+#   # zeta-adapt: DISTINCT ON (col) ORDER BY <mismatch>
+#     errors 1105 "DISTINCT ON expressions must match
+#     initial ORDER BY expressions".
+#   # zeta-adapt: COUNT(DISTINCT a, b) (multi-arg) — works
+#     correctly. NULL on any side excludes the row from
+#     the count (matches SQL standard).
+#   # zeta-adapt: SELECT DISTINCT * — distinct on the full
+#     row.
+#   # zeta-adapt: DISTINCT inside a UNION — UNION already
+#     dedups, so DISTINCT-then-UNION is a no-op against
+#     it.
+#   # zeta-adapt: DISTINCT + LIMIT — works.
+#   # zeta-adapt: KNOWN BUG — `SELECT ALL <col>` is
+#     treated as `SELECT DISTINCT <col>`. SQL standard
+#     says ALL is the default and returns all rows
+#     including duplicates; zeta deduplicates. Verified
+#     against the same data: `SELECT a` returns 5 rows
+#     (with duplicates), `SELECT ALL a` returns only 3.
+#   # zeta-adapt: KNOWN GAP — `SELECT DISTINCT a COLLATE
+#     <name>` errors 1064 "unsupported expression: a
+#     COLLATE ..." (already pinned in
+#     order_by_edges_basic_extra for ORDER BY).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS dt;
+CREATE TABLE dt (id INT, a INT, b INT);
+INSERT INTO dt VALUES (1, 1, 10), (2, 1, 20), (3, 2, 10), (4, 2, 10), (5, NULL, 10);
+
+--echo === DISTINCT on multiple columns ===
+
+SELECT DISTINCT a, b FROM dt ORDER BY a, b;
+
+--echo === DISTINCT ON (PG) — first row per distinct value of leading col ===
+
+SELECT DISTINCT ON (a) a, b FROM dt ORDER BY a, b;
+SELECT DISTINCT ON (a) a, b FROM dt ORDER BY a, b DESC;
+
+--echo === COUNT(DISTINCT a, b) — multi-arg form ===
+
+SELECT COUNT(DISTINCT a, b) AS d FROM dt;
+
+--echo === Multi COUNT(DISTINCT col) ===
+
+SELECT COUNT(DISTINCT a) AS d_a, COUNT(DISTINCT b) AS d_b FROM dt;
+
+--echo === SELECT DISTINCT * — distinct on full row ===
+
+SELECT DISTINCT * FROM dt ORDER BY id;
+
+--echo === DISTINCT inside UNION (UNION already dedups) ===
+
+SELECT DISTINCT a FROM dt UNION SELECT DISTINCT a FROM dt ORDER BY a;
+
+--echo === DISTINCT + LIMIT ===
+
+SELECT DISTINCT a FROM dt ORDER BY a LIMIT 2;
+
+--echo === KNOWN BUG: SELECT ALL is treated as SELECT DISTINCT ===
+--echo # SQL standard: ALL is the default and returns all rows
+--echo # including duplicates. zeta deduplicates. Compare with
+--echo # the regular SELECT below which correctly shows duplicates.
+
+SELECT ALL a FROM dt ORDER BY a;
+SELECT a FROM dt ORDER BY a;
+
+--echo === DISTINCT ON with non-matching ORDER BY — errno 1105 ===
+
+--error 1105
+SELECT DISTINCT ON (a) a, b FROM dt ORDER BY b;
+
+--echo === KNOWN GAP: DISTINCT a COLLATE name — errno 1064 ===
+
+--error 1064
+SELECT DISTINCT a COLLATE utf8mb4_bin FROM dt ORDER BY a;
+
+DROP TABLE dt;

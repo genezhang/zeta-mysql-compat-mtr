@@ -1,0 +1,72 @@
+=== Setup ===
+DROP TABLE IF EXISTS dt;
+CREATE TABLE dt (id INT, a INT, b INT);
+INSERT INTO dt VALUES (1, 1, 10), (2, 1, 20), (3, 2, 10), (4, 2, 10), (5, NULL, 10);
+=== DISTINCT on multiple columns ===
+SELECT DISTINCT a, b FROM dt ORDER BY a, b;
+a	b
+1	10
+1	20
+2	10
+NULL	10
+=== DISTINCT ON (PG) — first row per distinct value of leading col ===
+SELECT DISTINCT ON (a) a, b FROM dt ORDER BY a, b;
+a	b
+1	10
+2	10
+NULL	10
+SELECT DISTINCT ON (a) a, b FROM dt ORDER BY a, b DESC;
+a	b
+1	20
+2	10
+NULL	10
+=== COUNT(DISTINCT a, b) — multi-arg form ===
+SELECT COUNT(DISTINCT a, b) AS d FROM dt;
+d
+3
+=== Multi COUNT(DISTINCT col) ===
+SELECT COUNT(DISTINCT a) AS d_a, COUNT(DISTINCT b) AS d_b FROM dt;
+d_a	d_b
+2	2
+=== SELECT DISTINCT * — distinct on full row ===
+SELECT DISTINCT * FROM dt ORDER BY id;
+id	a	b
+1	1	10
+2	1	20
+3	2	10
+4	2	10
+5	NULL	10
+=== DISTINCT inside UNION (UNION already dedups) ===
+SELECT DISTINCT a FROM dt UNION SELECT DISTINCT a FROM dt ORDER BY a;
+a
+1
+2
+NULL
+=== DISTINCT + LIMIT ===
+SELECT DISTINCT a FROM dt ORDER BY a LIMIT 2;
+a
+1
+2
+=== KNOWN BUG: SELECT ALL is treated as SELECT DISTINCT ===
+# SQL standard: ALL is the default and returns all rows
+# including duplicates. zeta deduplicates. Compare with
+# the regular SELECT below which correctly shows duplicates.
+SELECT ALL a FROM dt ORDER BY a;
+a
+1
+2
+NULL
+SELECT a FROM dt ORDER BY a;
+a
+1
+1
+2
+2
+NULL
+=== DISTINCT ON with non-matching ORDER BY — errno 1105 ===
+SELECT DISTINCT ON (a) a, b FROM dt ORDER BY b;
+ERROR 1105: plan error: SELECT DISTINCT ON expressions must match initial ORDER BY expressions
+=== KNOWN GAP: DISTINCT a COLLATE name — errno 1064 ===
+SELECT DISTINCT a COLLATE utf8mb4_bin FROM dt ORDER BY a;
+ERROR 1064: SQL parse error: unsupported expression: a COLLATE utf8mb4_bin
+DROP TABLE dt;
