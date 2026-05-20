@@ -1,0 +1,134 @@
+# Independently authored LIKE / ILIKE / REGEXP infix-
+# operator edge smoke test for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/t/
+# func_like.test or func_regexp.test; complements
+# sql_pattern_basic_extra (LIKE NULL/wildcard/multibyte,
+# REGEXP_REPLACE / REGEXP_SUBSTR function forms) by
+# pinning the INFIX operator surface: ILIKE / NOT LIKE /
+# NOT ILIKE / NOT REGEXP / RLIKE / NOT RLIKE plus PG ~,
+# ~*, !~, !~* and the LIKE-vs-REGEXP return-type gap that
+# leaks into WHERE clauses.
+#
+# Big-picture finding: all the infix pattern-matching
+# operators evaluate correctly for the truth value:
+# - LIKE returns Bool; ILIKE returns Bool; NOT LIKE /
+#   NOT ILIKE invert correctly.
+# - REGEXP / RLIKE evaluate the regex correctly, but
+#   return Int64 (0 / 1) rather than Bool. This makes
+#   them usable in projections and explicit comparisons,
+#   but they cannot be used as bare WHERE predicates
+#   (the executor rejects with \"predicate did not
+#   evaluate to boolean\").
+# - PG ~ / ~* / !~ / !~* operators all work and return
+#   Bool, so they ARE usable in WHERE without wrapping.
+#
+# Adaptation notes:
+#   # zeta-adapt: ILIKE — case-insensitive LIKE, Bool
+#     result, accepted in WHERE.
+#   # zeta-adapt: NOT LIKE / NOT ILIKE — Bool inverse,
+#     accepted in WHERE.
+#   # zeta-adapt: NULL on either side of LIKE / ILIKE
+#     yields NULL.
+#   # zeta-adapt: REGEXP / RLIKE — MySQL semantics,
+#     case-sensitive by default. Returns INT (0/1) for
+#     projection compatibility.
+#   # zeta-adapt: REGEXP / RLIKE in WHERE — errors 1105
+#     \"predicate did not evaluate to boolean\". Workaround:
+#     `WHERE s REGEXP 'pat' = 1`. PG ~ does NOT have this
+#     gap and can be used bare.
+#   # zeta-adapt: PG ~ — case-sensitive regex match,
+#     returns Bool, accepted in WHERE.
+#   # zeta-adapt: PG ~* — case-insensitive regex match,
+#     Bool.
+#   # zeta-adapt: PG !~ / !~* — negated regex matches.
+#   # zeta-adapt: REGEXP with anchors `^` / `$` — works.
+#   # zeta-adapt: REGEXP with empty pattern — matches
+#     everything (returns 1).
+#   # zeta-adapt: LIKE with literal regex meta-chars (`.`,
+#     `[`, `]`) in pattern — treated as literal (correct;
+#     LIKE only honors `%` and `_`).
+#   # zeta-adapt: LIKE ESCAPE — custom escape character
+#     works for `%` and `_`.
+
+--echo === ILIKE — case-insensitive LIKE ===
+
+SELECT 'ABC' ILIKE 'abc' AS r1, 'aBc' ILIKE 'abc%' AS r2, 'XYZ' ILIKE 'a%' AS r3;
+
+--echo === ILIKE NULL propagation ===
+
+SELECT NULL ILIKE 'abc' AS r1, 'abc' ILIKE NULL AS r2;
+
+--echo === NOT LIKE / NOT ILIKE ===
+
+SELECT 'abc' NOT LIKE 'def' AS r1, 'abc' NOT LIKE 'abc' AS r2, 'ABC' NOT ILIKE 'abc' AS r3;
+
+--echo === REGEXP (MySQL) — basic match / non-match / anchors ===
+
+SELECT 'abc123' REGEXP '[0-9]+' AS r1, 'hello' REGEXP '^h' AS r2, 'hello' REGEXP 'c$' AS r3, 'hello' REGEXP '^hello$' AS r4, 'hello' REGEXP 'x' AS no_match;
+
+--echo === RLIKE (MySQL alias of REGEXP) ===
+
+SELECT 'abc' RLIKE 'b' AS r1, 'abc' NOT RLIKE 'x' AS r2;
+
+--echo === NOT REGEXP ===
+
+SELECT 'abc' NOT REGEXP 'x' AS r1, 'abc' NOT REGEXP 'b' AS r2;
+
+--echo === REGEXP empty pattern — matches everything ===
+
+SELECT 'abc' REGEXP '' AS r;
+
+--echo === PG ~ — case-sensitive regex match, Bool result ===
+
+SELECT 'abc' ~ 'b' AS r1, 'ABC' ~ 'abc' AS r2;
+
+--echo === PG ~* — case-insensitive regex match ===
+
+SELECT 'ABC' ~* 'abc' AS r1, 'XYZ' ~* '^a' AS r2;
+
+--echo === PG !~ / !~* — negated regex match ===
+
+SELECT 'abc' !~ 'x' AS r1, 'ABC' !~* 'abc' AS r2;
+
+--echo === LIKE with literal regex meta-chars — treated as literal ===
+
+SELECT 'a.b' LIKE 'a.b' AS dot_literal, 'aXb' LIKE 'a.b' AS dot_not_meta;
+SELECT 'a[b]' LIKE 'a[b]' AS brackets;
+
+--echo === LIKE ESCAPE — custom escape character ===
+
+SELECT '100%' LIKE '100/%' ESCAPE '/' AS esc_pct, 'a_b' LIKE 'a/_b' ESCAPE '/' AS esc_under;
+
+--echo === LIKE in WHERE — Bool result accepted ===
+
+DROP TABLE IF EXISTS strs;
+CREATE TABLE strs (id INT, s TEXT);
+INSERT INTO strs VALUES (1,'hello'),(2,'HELLO'),(3,'World'),(4,'wHoP');
+SELECT id FROM strs WHERE s LIKE 'h%' ORDER BY id;
+
+--echo === ILIKE in WHERE — Bool result accepted ===
+
+SELECT id FROM strs WHERE s ILIKE 'h%' ORDER BY id;
+
+--echo === NOT LIKE in WHERE ===
+
+SELECT id FROM strs WHERE s NOT LIKE 'h%' ORDER BY id;
+
+--echo === PG ~* in WHERE — Bool result accepted ===
+
+SELECT id FROM strs WHERE s ~* '^h' ORDER BY id;
+
+--echo === KNOWN GAP: REGEXP / RLIKE in WHERE — errno 1105 (Int result) ===
+--echo # Both REGEXP and RLIKE return Int64 (0/1) for projection
+--echo # compatibility, but the WHERE-predicate validator rejects
+--echo # non-Bool. Workaround: wrap with `= 1`, or use the PG ~
+--echo # form which returns Bool.
+
+--error 1105
+SELECT id FROM strs WHERE s REGEXP '^[Hh]' ORDER BY id;
+
+--echo === REGEXP in WHERE workaround — explicit `= 1` ===
+
+SELECT id FROM strs WHERE s REGEXP '^[Hh]' = 1 ORDER BY id;
+
+DROP TABLE strs;
