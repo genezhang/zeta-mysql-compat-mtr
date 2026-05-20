@@ -1,0 +1,94 @@
+=== DEFAULT CURRENT_TIMESTAMP ===
+# Compare against a fixed past timestamp to confirm the
+# default was actually substituted.
+DROP TABLE IF EXISTS de;
+CREATE TABLE de (id INT PRIMARY KEY, ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+INSERT INTO de (id) VALUES (1);
+SELECT id, ts > '2020-01-01' AS ts_set FROM de;
+id	ts_set
+1	1
+=== AUTO_INCREMENT — IDs auto-assigned ===
+DROP TABLE IF EXISTS ai;
+CREATE TABLE ai (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(20));
+INSERT INTO ai (name) VALUES ('a'), ('b'), ('c');
+SELECT id, name FROM ai ORDER BY id;
+id	name
+1	a
+2	b
+3	c
+=== SERIAL (PG pseudo-type) ===
+DROP TABLE IF EXISTS s;
+CREATE TABLE s (id SERIAL PRIMARY KEY, name VARCHAR(20));
+INSERT INTO s (name) VALUES ('a'), ('b');
+SELECT id, name FROM s ORDER BY id;
+id	name
+1	a
+2	b
+=== BIGSERIAL (PG pseudo-type) ===
+DROP TABLE IF EXISTS bs;
+CREATE TABLE bs (id BIGSERIAL PRIMARY KEY, name VARCHAR(20));
+INSERT INTO bs (name) VALUES ('a'), ('b');
+SELECT id, name FROM bs ORDER BY id;
+id	name
+1	a
+2	b
+=== GENERATED ALWAYS AS (expr) STORED ===
+DROP TABLE IF EXISTS g;
+CREATE TABLE g (a INT, b INT, c INT GENERATED ALWAYS AS (a + b) STORED, PRIMARY KEY (a, b));
+INSERT INTO g (a, b) VALUES (1, 2), (3, 4);
+SELECT a, b, c FROM g ORDER BY a;
+a	b	c
+1	2	3
+3	4	7
+=== Column-level CHECK — violation errno 1105 ===
+DROP TABLE IF EXISTS cc;
+CREATE TABLE cc (id INT PRIMARY KEY, age INT CHECK (age > 0));
+INSERT INTO cc VALUES (1, -5);
+ERROR 1105: execution error: new row violates check constraint "test.public.cc_check1"
+=== Column COMMENT clause — silent OK ===
+DROP TABLE IF EXISTS cm;
+CREATE TABLE cm (id INT PRIMARY KEY COMMENT 'primary key',
+                 name VARCHAR(20) COMMENT 'user name');
+=== ENUM column type — valid insert ===
+DROP TABLE IF EXISTS en;
+CREATE TABLE en (id INT PRIMARY KEY, color ENUM('red', 'green', 'blue'));
+INSERT INTO en VALUES (1, 'red'), (2, 'blue');
+SELECT id, color FROM en ORDER BY id;
+id	color
+1	red
+2	blue
+=== ENUM column type — invalid value errno 1105 ===
+INSERT INTO en VALUES (3, 'yellow');
+ERROR 1105: execution error: invalid input value for enum test.public.en_color_enum: "yellow"
+=== Multiple constraints on one column (NOT NULL UNIQUE DEFAULT) ===
+DROP TABLE IF EXISTS mc;
+CREATE TABLE mc (id INT PRIMARY KEY,
+                 code VARCHAR(10) NOT NULL UNIQUE DEFAULT 'x');
+INSERT INTO mc (id) VALUES (1);
+SELECT id, code FROM mc;
+id	code
+1	x
+=== KNOWN DIVERGENCE: COLLATE clause — silent no-op ===
+DROP TABLE IF EXISTS cs;
+CREATE TABLE cs (name VARCHAR(20) COLLATE utf8mb4_general_ci);
+=== KNOWN DIVERGENCE: INVISIBLE column — NOT hidden from SELECT * ===
+# MySQL 8 hides INVISIBLE columns from SELECT * unless
+# explicitly named; zeta returns them like any column.
+DROP TABLE IF EXISTS inv;
+CREATE TABLE inv (id INT PRIMARY KEY, hidden INT INVISIBLE);
+INSERT INTO inv (id, hidden) VALUES (1, 100);
+SELECT * FROM inv;
+id	hidden
+1	100
+=== Cleanup ===
+DROP TABLE de;
+DROP TABLE ai;
+DROP TABLE s;
+DROP TABLE bs;
+DROP TABLE g;
+DROP TABLE cc;
+DROP TABLE cm;
+DROP TABLE en;
+DROP TABLE mc;
+DROP TABLE cs;
+DROP TABLE inv;
