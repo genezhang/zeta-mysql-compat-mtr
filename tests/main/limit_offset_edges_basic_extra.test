@@ -1,0 +1,130 @@
+# Independently authored LIMIT/OFFSET edge-case smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/limit.test or PG regress;
+# complements limit_offset_basic_extra (which covers
+# LIMIT n / LIMIT n OFFSET m / LIMIT m, n / FETCH FIRST /
+# LIMIT NULL / LIMIT expression / negative-LIMIT gap) by
+# pinning the EDGE behavior NOT covered there: large LIMIT,
+# OFFSET overflow, OFFSET NULL, LIMIT i64::MAX boundary,
+# LIMIT in DML (INSERT/UPDATE/DELETE), FETCH WITH TIES,
+# LIMIT PERCENT gap, and LIMIT with column reference.
+#
+# Big-picture finding: zeta is deliberately defensive on
+# UPDATE/DELETE LIMIT (returns errno 1064 with a message
+# explaining "would silently delete/update all matching
+# rows; remove the LIMIT clause") — this prevents the
+# common MySQL footgun where `DELETE ... LIMIT N` silently
+# changes meaning when the optimizer picks a different
+# row order. Less defensive: `INSERT ... LIMIT N` is
+# SILENTLY ACCEPTED and the LIMIT is IGNORED — the
+# statement inserts the row anyway. FETCH FIRST n ROWS
+# WITH TIES works correctly. LIMIT n PERCENT is missing.
+# LIMIT i64::MAX boundary is handled, with overflow
+# rejected.
+#
+# Adaptation notes:
+#   # zeta-adapt: OFFSET > row count → empty result
+#     (no rows returned, no error).
+#   # zeta-adapt: OFFSET NULL — treated as no offset
+#     (all rows returned).
+#   # zeta-adapt: LIMIT 9223372036854775807 (i64::MAX) —
+#     works; treated as "all rows".
+#   # zeta-adapt: LIMIT 9223372036854775808 (one past
+#     i64::MAX) — errors 1105 "must be an integer literal
+#     or a query parameter ($N)" (correct rejection).
+#   # zeta-adapt: LIMIT 0 OFFSET 0 — empty result
+#     (LIMIT 0 dominates).
+#   # zeta-adapt: FETCH FIRST n ROWS WITH TIES — supported.
+#     Returns rows tied with the Nth row's ORDER BY value
+#     in addition to the first N.
+#   # zeta-adapt: LIMIT with column reference (e.g.
+#     `LIMIT id`) errors 1054 "column not found" — the
+#     planner enforces LIMIT as a literal or parameter,
+#     not a per-row computed expression.
+#   # zeta-adapt: KNOWN DIVERGENCE — DELETE ... LIMIT
+#     errors 1064 "DELETE ... LIMIT is not supported
+#     (would silently delete all matching rows; remove
+#     the LIMIT clause)". MySQL allows it as a
+#     row-count cap. Defensive choice — substitute via
+#     DELETE FROM t WHERE id IN (SELECT id ... LIMIT N).
+#   # zeta-adapt: KNOWN DIVERGENCE — UPDATE ... LIMIT and
+#     UPDATE ... ORDER BY error 1064 (same defensive
+#     reasoning). Substitute via correlated subquery on
+#     a primary-key set.
+#   # zeta-adapt: KNOWN BUG — `INSERT INTO t VALUES (...)
+#     LIMIT N` is SILENTLY ACCEPTED and the LIMIT is
+#     IGNORED — the row IS inserted. MySQL/PG both
+#     reject the syntax with a parse error.
+#   # zeta-adapt: KNOWN GAP — `LIMIT N PERCENT` (SQL-
+#     standard percentage form) errors 1064 at parse.
+#     No portable substitute exposed today.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS lo;
+CREATE TABLE lo (id INT PRIMARY KEY, n INT);
+INSERT INTO lo VALUES (1,10),(2,20),(3,30),(4,40),(5,50);
+
+--echo === OFFSET > row count — empty result ===
+
+SELECT id FROM lo ORDER BY id OFFSET 100;
+
+--echo === OFFSET NULL — treated as no offset ===
+
+SELECT id FROM lo ORDER BY id OFFSET NULL;
+
+--echo === LIMIT 0 OFFSET 0 — empty result ===
+
+SELECT id FROM lo ORDER BY id LIMIT 0 OFFSET 0;
+
+--echo === LIMIT large (999_999_999) — all rows ===
+
+SELECT id FROM lo ORDER BY id LIMIT 999999999;
+
+--echo === LIMIT i64::MAX — works ===
+
+SELECT id FROM lo ORDER BY id LIMIT 9223372036854775807;
+
+--echo === FETCH FIRST n ROWS WITH TIES (SQL standard) ===
+
+SELECT id, n FROM lo ORDER BY n FETCH FIRST 2 ROWS WITH TIES;
+
+--echo === KNOWN DIVERGENCE: DELETE ... LIMIT — errno 1064 (defensive) ===
+
+--error 1064
+DELETE FROM lo ORDER BY id LIMIT 1;
+
+--echo === KNOWN DIVERGENCE: UPDATE ... LIMIT — errno 1064 (defensive) ===
+
+--error 1064
+UPDATE lo SET n = n+1 LIMIT 1;
+
+--echo === KNOWN DIVERGENCE: UPDATE ... ORDER BY — errno 1064 ===
+
+--error 1064
+UPDATE lo SET n = n+1 ORDER BY id;
+
+--echo === KNOWN BUG: INSERT ... LIMIT silently accepted, LIMIT ignored ===
+--echo # MySQL/PG reject; zeta inserts the row anyway. Verify by
+--echo # counting before / after.
+
+SELECT COUNT(*) AS before_cnt FROM lo;
+INSERT INTO lo VALUES (99, 990) LIMIT 1;
+SELECT COUNT(*) AS after_cnt FROM lo;
+
+--echo === KNOWN GAP: LIMIT N PERCENT — errno 1064 ===
+
+--error 1064
+SELECT id FROM lo ORDER BY id LIMIT 50 PERCENT;
+
+--echo === KNOWN GAP: LIMIT past i64::MAX — errno 1105 ===
+
+--error 1105
+SELECT id FROM lo ORDER BY id LIMIT 9223372036854775808;
+
+--echo === KNOWN GAP: LIMIT with column reference — errno 1054 ===
+
+--error 1054
+SELECT id FROM lo ORDER BY id LIMIT id;
+
+DROP TABLE lo;

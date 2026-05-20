@@ -1,0 +1,66 @@
+=== Setup ===
+DROP TABLE IF EXISTS lo;
+CREATE TABLE lo (id INT PRIMARY KEY, n INT);
+INSERT INTO lo VALUES (1,10),(2,20),(3,30),(4,40),(5,50);
+=== OFFSET > row count — empty result ===
+SELECT id FROM lo ORDER BY id OFFSET 100;
+=== OFFSET NULL — treated as no offset ===
+SELECT id FROM lo ORDER BY id OFFSET NULL;
+id
+1
+2
+3
+4
+5
+=== LIMIT 0 OFFSET 0 — empty result ===
+SELECT id FROM lo ORDER BY id LIMIT 0 OFFSET 0;
+=== LIMIT large (999_999_999) — all rows ===
+SELECT id FROM lo ORDER BY id LIMIT 999999999;
+id
+1
+2
+3
+4
+5
+=== LIMIT i64::MAX — works ===
+SELECT id FROM lo ORDER BY id LIMIT 9223372036854775807;
+id
+1
+2
+3
+4
+5
+=== FETCH FIRST n ROWS WITH TIES (SQL standard) ===
+SELECT id, n FROM lo ORDER BY n FETCH FIRST 2 ROWS WITH TIES;
+id	n
+1	10
+2	20
+=== KNOWN DIVERGENCE: DELETE ... LIMIT — errno 1064 (defensive) ===
+DELETE FROM lo ORDER BY id LIMIT 1;
+ERROR 1064: SQL parse error: DELETE ... LIMIT is not supported (would silently delete all matching rows; remove the LIMIT clause)
+=== KNOWN DIVERGENCE: UPDATE ... LIMIT — errno 1064 (defensive) ===
+UPDATE lo SET n = n+1 LIMIT 1;
+ERROR 1064: SQL parse error: UPDATE ... LIMIT is not supported (would silently update all matching rows; remove the LIMIT clause)
+=== KNOWN DIVERGENCE: UPDATE ... ORDER BY — errno 1064 ===
+UPDATE lo SET n = n+1 ORDER BY id;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ORDER at Line: 1, Column: 23
+=== KNOWN BUG: INSERT ... LIMIT silently accepted, LIMIT ignored ===
+# MySQL/PG reject; zeta inserts the row anyway. Verify by
+# counting before / after.
+SELECT COUNT(*) AS before_cnt FROM lo;
+before_cnt
+5
+INSERT INTO lo VALUES (99, 990) LIMIT 1;
+SELECT COUNT(*) AS after_cnt FROM lo;
+after_cnt
+6
+=== KNOWN GAP: LIMIT N PERCENT — errno 1064 ===
+SELECT id FROM lo ORDER BY id LIMIT 50 PERCENT;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PERCENT at Line: 1, Column: 40
+=== KNOWN GAP: LIMIT past i64::MAX — errno 1105 ===
+SELECT id FROM lo ORDER BY id LIMIT 9223372036854775808;
+ERROR 1105: plan error: LIMIT/OFFSET must be an integer literal or a query parameter ($N)
+=== KNOWN GAP: LIMIT with column reference — errno 1054 ===
+SELECT id FROM lo ORDER BY id LIMIT id;
+ERROR 1054: column not found: LIMIT/OFFSET references column `id`; either it is correlated to an outer scope (deferred to per-row evaluation) or unsupported here
+DROP TABLE lo;
