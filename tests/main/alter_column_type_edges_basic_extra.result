@@ -1,0 +1,82 @@
+=== ALTER COLUMN TYPE widen INT → BIGINT ===
+DROP TABLE IF EXISTS act;
+CREATE TABLE act (id INT, n INT);
+INSERT INTO act VALUES (1, 10), (2, 20);
+ALTER TABLE act ALTER COLUMN n TYPE BIGINT;
+INSERT INTO act VALUES (3, 9223372036854775807);
+SELECT id, n FROM act ORDER BY id;
+id	n
+1	10
+2	20
+3	9223372036854775807
+=== MySQL MODIFY COLUMN ===
+DROP TABLE IF EXISTS amod;
+CREATE TABLE amod (id INT, n INT);
+INSERT INTO amod VALUES (1, 10);
+ALTER TABLE amod MODIFY COLUMN n BIGINT;
+SELECT id, n FROM amod;
+id	n
+1	10
+=== MySQL CHANGE COLUMN (rename + retype) ===
+ALTER TABLE amod CHANGE COLUMN n m BIGINT;
+SELECT id, m FROM amod;
+id	m
+1	10
+=== ALTER COLUMN TYPE on PRIMARY KEY column — errno 1105 ===
+DROP TABLE IF EXISTS acpk;
+CREATE TABLE acpk (id INT PRIMARY KEY, n INT);
+INSERT INTO acpk VALUES (1, 10);
+ALTER TABLE acpk ALTER COLUMN id TYPE BIGINT;
+ERROR 1105: execution error: cannot change type of primary key column "id": key encoding would change; re-create the table instead
+=== ALTER COLUMN TYPE on indexed column — errno 1105 ===
+DROP TABLE IF EXISTS aci2;
+CREATE TABLE aci2 (id INT PRIMARY KEY, n INT);
+CREATE INDEX aci2_n ON aci2 (n);
+INSERT INTO aci2 VALUES (1, 10);
+ALTER TABLE aci2 ALTER COLUMN n TYPE BIGINT;
+ERROR 1105: execution error: cannot change type of column "n": index "aci2_n" uses it; drop the index first, then change the type
+=== ALTER COLUMN TYPE on FOREIGN KEY column — errno 1105 ===
+DROP TABLE IF EXISTS acfk_p;
+DROP TABLE IF EXISTS acfk_c;
+CREATE TABLE acfk_p (id INT PRIMARY KEY);
+CREATE TABLE acfk_c (id INT PRIMARY KEY, pid INT, FOREIGN KEY (pid) REFERENCES acfk_p(id));
+ALTER TABLE acfk_c ALTER COLUMN pid TYPE BIGINT;
+ERROR 1105: execution error: cannot change type of column "pid": index "test.public.acfk_c_pid_fkey_fk_idx" uses it; drop the index first, then change the type
+=== KNOWN GAP: ALTER COLUMN TYPE USING <expr> (PG) — errno 1105 with hint ===
+DROP TABLE IF EXISTS acu;
+CREATE TABLE acu (id INT, t TEXT);
+INSERT INTO acu VALUES (1, '100');
+ALTER TABLE acu ALTER COLUMN t TYPE INT USING t::INT;
+ERROR 1105: execution error: USING clause in ALTER COLUMN TYPE is not yet supported; omit it and use a separate UPDATE to convert existing values if needed
+=== KNOWN BUG: narrow with overflow data silently accepted ===
+# ALTER INT → SMALLINT on a column containing 99999 succeeds;
+# value stays at 99999 (no truncation); subsequent inserts of
+# values exceeding SMALLINT range also succeed.
+DROP TABLE IF EXISTS acn;
+CREATE TABLE acn (id INT, n INT);
+INSERT INTO acn VALUES (1, 99999);
+ALTER TABLE acn ALTER COLUMN n TYPE SMALLINT;
+INSERT INTO acn VALUES (2, 99999);
+SELECT id, n FROM acn ORDER BY id;
+id	n
+1	99999
+2	99999
+=== KNOWN BUG: INT → TEXT silently accepted ===
+DROP TABLE IF EXISTS aci;
+CREATE TABLE aci (id INT, n INT);
+INSERT INTO aci VALUES (1, 10);
+ALTER TABLE aci ALTER COLUMN n TYPE TEXT;
+INSERT INTO aci VALUES (2, 'hello');
+SELECT id, n FROM aci ORDER BY id;
+id	n
+1	10
+2	hello
+DROP TABLE act;
+DROP TABLE amod;
+DROP TABLE acpk;
+DROP TABLE aci2;
+DROP TABLE acfk_c;
+DROP TABLE acfk_p;
+DROP TABLE acu;
+DROP TABLE acn;
+DROP TABLE aci;
