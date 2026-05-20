@@ -1,0 +1,133 @@
+# Independently authored transaction-isolation edge smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/transaction.test or PG regress;
+# complements transaction_basic / transaction_basic_extra
+# (which cover BEGIN/COMMIT/ROLLBACK + basic SAVEPOINT +
+# SET TRANSACTION ISOLATION LEVEL parse-acceptance + the
+# READ ONLY 1235 divergence) by pinning the EDGE behavior
+# NOT covered there: READ UNCOMMITTED, READ WRITE, SESSION
+# scope, START TRANSACTION READ WRITE, @@tx_isolation /
+# @@transaction_isolation / @@autocommit variable reads,
+# isolation-doesn't-actually-change divergence, BEGIN
+# ISOLATION LEVEL combined, WORK keyword, AND CHAIN gap,
+# DEFERRABLE gap, START TRANSACTION ISOLATION LEVEL gap.
+#
+# Big-picture finding: zeta accepts all five isolation
+# levels (READ UNCOMMITTED, READ COMMITTED, REPEATABLE
+# READ, SERIALIZABLE, plus READ WRITE access-mode), both
+# session- and transaction-scoped SET forms, START
+# TRANSACTION READ WRITE, the BEGIN ISOLATION LEVEL ...
+# combined form, COMMIT WORK / ROLLBACK WORK legacy
+# aliases, and SET autocommit = 0/1. The @@tx_isolation
+# and @@transaction_isolation variables return the default
+# 'REPEATABLE-READ'. But: SET TRANSACTION ISOLATION LEVEL
+# is silently accepted without actually changing the
+# @@tx_isolation reading — the level you set isn't
+# reflected back. Two PG forms are missing: BEGIN
+# DEFERRABLE (1064) and `COMMIT AND CHAIN` inside an
+# active transaction (1105). MySQL's `START TRANSACTION
+# ISOLATION LEVEL ...` (combined, with no SET first)
+# errors 1235 with a helpful hint pointing at SET
+# TRANSACTION ISOLATION LEVEL before BEGIN.
+#
+# Adaptation notes:
+#   # zeta-adapt: SET TRANSACTION ISOLATION LEVEL READ
+#     UNCOMMITTED — parsed, no error (silently accepted).
+#   # zeta-adapt: SET TRANSACTION READ WRITE — parsed.
+#   # zeta-adapt: SET SESSION TRANSACTION ISOLATION LEVEL
+#     <level> — parsed.
+#   # zeta-adapt: START TRANSACTION READ WRITE — parsed.
+#   # zeta-adapt: @@tx_isolation and @@transaction_isolation
+#     return 'REPEATABLE-READ' (default).
+#   # zeta-adapt: @@autocommit returns 'ON' / 'OFF'.
+#   # zeta-adapt: SET autocommit = 0 / 1 — updates the
+#     @@autocommit variable.
+#   # zeta-adapt: BEGIN ISOLATION LEVEL <level> — combined
+#     form supported. Same silent-acceptance: doesn't
+#     actually change @@tx_isolation.
+#   # zeta-adapt: COMMIT WORK / ROLLBACK WORK — legacy
+#     SQL keyword 'WORK' accepted.
+#   # zeta-adapt: KNOWN DIVERGENCE — SET TRANSACTION
+#     ISOLATION LEVEL is SILENTLY ACCEPTED but the
+#     subsequent @@tx_isolation reading still returns
+#     'REPEATABLE-READ' regardless of which level was set.
+#     ORMs that read @@tx_isolation to verify the level
+#     applied will get the wrong answer without an error.
+#   # zeta-adapt: KNOWN GAP — `START TRANSACTION ISOLATION
+#     LEVEL ...` (combined, no preceding SET) errors 1235
+#     "use SET TRANSACTION ISOLATION LEVEL before BEGIN"
+#     — a helpful rewrite hint pointing at the supported
+#     form.
+#   # zeta-adapt: KNOWN GAP — BEGIN DEFERRABLE (PG) errors
+#     1064 "Expected: end of statement, found: DEFERRABLE".
+#   # zeta-adapt: KNOWN GAP — `COMMIT AND CHAIN` while a
+#     transaction is active errors 1105 "transaction
+#     control statements are not planned". Works only when
+#     no transaction is open (no-op then).
+
+--echo === SET TRANSACTION ISOLATION LEVEL — all four levels ===
+
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+--echo === SET TRANSACTION READ WRITE / SESSION-scoped ===
+
+SET TRANSACTION READ WRITE;
+SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+--echo === START TRANSACTION READ WRITE ===
+
+START TRANSACTION READ WRITE;
+COMMIT;
+
+--echo === @@tx_isolation and @@transaction_isolation defaults ===
+
+SELECT @@tx_isolation;
+SELECT @@transaction_isolation;
+
+--echo === @@autocommit + SET autocommit ===
+
+SELECT @@autocommit;
+SET autocommit = 0;
+SELECT @@autocommit;
+SET autocommit = 1;
+SELECT @@autocommit;
+
+--echo === BEGIN ISOLATION LEVEL <level> combined form ===
+
+BEGIN ISOLATION LEVEL SERIALIZABLE;
+COMMIT;
+
+--echo === COMMIT WORK / ROLLBACK WORK legacy aliases ===
+
+BEGIN;
+COMMIT WORK;
+BEGIN;
+ROLLBACK WORK;
+
+--echo === KNOWN DIVERGENCE: SET TRANSACTION ISOLATION LEVEL silently no-op ===
+--echo # @@tx_isolation stays at 'REPEATABLE-READ' regardless of which
+--echo # level was just SET; ORMs reading the variable will see the
+--echo # wrong value with no error signal.
+
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SELECT @@tx_isolation;
+
+--echo === KNOWN GAP: START TRANSACTION ISOLATION LEVEL — errno 1235 with hint ===
+
+--error 1235
+START TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+--echo === KNOWN GAP: BEGIN DEFERRABLE (PG) — errno 1064 ===
+
+--error 1064
+BEGIN DEFERRABLE;
+
+--echo === KNOWN GAP: COMMIT AND CHAIN inside active txn — errno 1105 ===
+
+BEGIN;
+--error 1105
+COMMIT AND CHAIN;
+COMMIT;
