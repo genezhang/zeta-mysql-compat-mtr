@@ -47,8 +47,9 @@
 #     #1206. Folds the integer column with XOR; returns
 #     NULL on empty input.
 #   # zeta-adapt: TO_HEX is the PG alias for HEX, supported
-#     since zeta #1205. FROM_HEX is still missing — substitute
-#     via UNHEX (MySQL spelling).
+#     since zeta #1205. FROM_HEX is the PG alias for UNHEX,
+#     supported since zeta #1207 (same semantics: odd-length
+#     / invalid / NULL → NULL).
 
 --echo === Setup ===
 
@@ -101,5 +102,10 @@ SELECT BIT_XOR(b) AS xor_all FROM bt;
 --echo === TO_HEX alias for HEX — supported since zeta #1205 ===
 
 SELECT TO_HEX(255) AS th;
+
+--echo === FROM_HEX alias for UNHEX — supported since zeta #1207 ===
+
+SELECT FROM_HEX('616263') AS fh;
+SELECT FROM_HEX('1') AS odd, FROM_HEX(NULL) AS nl;
 
 DROP TABLE bt;
