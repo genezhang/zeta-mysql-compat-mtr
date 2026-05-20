@@ -1,0 +1,133 @@
+# Independently authored UPDATE option edge-case smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/update.test or PG regress;
+# complements update_basic / update_basic_extra (which
+# cover basic UPDATE / multi-row / expression / JOIN-form /
+# LIMIT-rejected / IN-subquery / EXISTS / UPDATE-FROM /
+# RETURNING-divergence) by pinning the EDGE behavior NOT
+# covered there: UPDATE multi-table (MySQL), correlated
+# scalar subquery in SET, same-column-twice silent-accept,
+# CASE WHEN in SET, swap pattern, NULL-into-NOT-NULL,
+# zero-row UPDATE.
+#
+# Big-picture finding: zeta handles standard UPDATE
+# patterns correctly, including the swap pattern
+# (`SET a = b, b = a` correctly sees the original values
+# on both sides), CASE WHEN in SET, NULL assignment, and
+# zero-row UPDATE (no error). Three notable issues: (a)
+# the MySQL multi-table UPDATE syntax (`UPDATE t1, t2 SET
+# ...`) errors 1064; (b) correlated scalar subquery in
+# SET errors 1105 (same as DELETE-with-scalar-subquery);
+# (c) UPDATE same column twice (`SET n = 5, n = 99`)
+# silently uses the LAST value instead of erroring
+# 'column specified more than once'.
+#
+# Adaptation notes:
+#   # zeta-adapt: UPDATE ... CASE WHEN in SET — supported.
+#   # zeta-adapt: UPDATE col1 = col2, col2 = col1 (swap)
+#     — both sides see the ORIGINAL values, so the swap
+#     works correctly (SQL standard semantics).
+#   # zeta-adapt: UPDATE SET col = NULL — supported on
+#     nullable columns.
+#   # zeta-adapt: UPDATE SET col = NULL on NOT NULL col
+#     errors 1105 "violates not-null constraint".
+#   # zeta-adapt: UPDATE with no matching WHERE rows —
+#     no error, just affects 0 rows.
+#   # zeta-adapt: KNOWN GAP — MySQL multi-table UPDATE
+#     `UPDATE t1, t2 SET t1.x = t2.y, t2.z = ...` errors
+#     1064 "Expected: SET, found: ,". Substitute via
+#     UPDATE ... FROM (PG, already pinned in
+#     update_basic_extra) or by issuing one UPDATE per
+#     target table.
+#   # zeta-adapt: KNOWN GAP — UPDATE SET col =
+#     (correlated scalar subquery referring to outer
+#     table) errors 1105 "unsupported expression:
+#     ScalarSubquery". Substitute via UPDATE ... FROM
+#     with explicit join.
+#   # zeta-adapt: KNOWN DIVERGENCE — UPDATE same column
+#     twice in one SET (`SET n = 5, n = 99`) silently
+#     uses the LAST value (`n = 99`). PG/MySQL error
+#     'column specified more than once'. ORMs that build
+#     dynamic SET clauses may silently lose updates.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS u;
+CREATE TABLE u (id INT, status VARCHAR(10), n INT);
+INSERT INTO u VALUES (1, 'a', 10), (2, 'b', 20), (3, 'a', 30);
+
+--echo === UPDATE ... CASE WHEN in SET ===
+
+UPDATE u SET n = CASE WHEN status = 'a' THEN n * 2 ELSE n + 100 END;
+SELECT id, status, n FROM u ORDER BY id;
+
+--echo === UPDATE col1 = col2, col2 = col1 (swap) — both see ORIGINAL ===
+
+DROP TABLE IF EXISTS uw;
+CREATE TABLE uw (id INT, a INT, b INT);
+INSERT INTO uw VALUES (1, 10, 20);
+UPDATE uw SET a = b, b = a WHERE id = 1;
+SELECT id, a, b FROM uw;
+
+--echo === UPDATE SET col = NULL ===
+
+DROP TABLE IF EXISTS un;
+CREATE TABLE un (id INT, n INT);
+INSERT INTO un VALUES (1, 10);
+UPDATE un SET n = NULL WHERE id = 1;
+SELECT id, n FROM un;
+
+--echo === UPDATE SET NULL on NOT NULL col — errno 1105 ===
+
+DROP TABLE IF EXISTS unn;
+CREATE TABLE unn (id INT, n INT NOT NULL);
+INSERT INTO unn VALUES (1, 10);
+--error 1105
+UPDATE unn SET n = NULL WHERE id = 1;
+
+--echo === UPDATE with no matching WHERE rows — no error ===
+
+UPDATE un SET n = 999 WHERE id = 99;
+SELECT id, n FROM un;
+
+--echo === KNOWN DIVERGENCE: UPDATE same col twice silently uses last value ===
+--echo # PG/MySQL: 'column specified more than once' error.
+--echo # zeta: silently applies the last value (n = 99 wins).
+
+DROP TABLE IF EXISTS udup;
+CREATE TABLE udup (id INT, n INT);
+INSERT INTO udup VALUES (1, 0);
+UPDATE udup SET n = 5, n = 99 WHERE id = 1;
+SELECT id, n FROM udup;
+
+--echo === KNOWN GAP: MySQL multi-table UPDATE syntax — errno 1064 ===
+
+DROP TABLE IF EXISTS m1;
+DROP TABLE IF EXISTS m2;
+CREATE TABLE m1 (id INT PRIMARY KEY, name VARCHAR(20));
+CREATE TABLE m2 (id INT PRIMARY KEY, src VARCHAR(20));
+INSERT INTO m1 VALUES (1, 'a');
+INSERT INTO m2 VALUES (1, 'aa');
+--error 1064
+UPDATE m1, m2 SET m1.name = m2.src, m2.src = 'updated' WHERE m1.id = m2.id;
+
+--echo === KNOWN GAP: UPDATE SET col = correlated-scalar-subquery — errno 1105 ===
+
+DROP TABLE IF EXISTS u3;
+DROP TABLE IF EXISTS u4;
+CREATE TABLE u3 (id INT PRIMARY KEY, n INT);
+CREATE TABLE u4 (id INT, val INT);
+INSERT INTO u3 VALUES (1, 10), (2, 20);
+INSERT INTO u4 VALUES (1, 100), (2, 200);
+--error 1105
+UPDATE u3 SET n = (SELECT val FROM u4 WHERE u4.id = u3.id);
+
+DROP TABLE u;
+DROP TABLE uw;
+DROP TABLE un;
+DROP TABLE unn;
+DROP TABLE udup;
+DROP TABLE m1;
+DROP TABLE m2;
+DROP TABLE u3;
+DROP TABLE u4;
