@@ -1,0 +1,62 @@
+=== Setup ===
+DROP TABLE IF EXISTS ct;
+CREATE TABLE ct (id INT PRIMARY KEY, n INT);
+INSERT INTO ct VALUES (1, 10);
+=== COMMENT ON TABLE ... IS '...' — parsed, silent no-op ===
+COMMENT ON TABLE ct IS 'my table';
+=== COMMENT ON COLUMN ...col IS '...' ===
+COMMENT ON COLUMN ct.n IS 'numeric column';
+=== COMMENT ON SCHEMA public IS '...' ===
+COMMENT ON SCHEMA public IS 'public schema';
+=== COMMENT ON ... IS NULL — parsed, no error ===
+COMMENT ON TABLE ct IS NULL;
+=== KNOWN DIVERGENCE: info_schema.tables.table_comment stays empty ===
+SELECT table_name, table_comment
+  FROM information_schema.tables
+  WHERE table_name = 'ct';
+TABLE_NAME	TABLE_COMMENT
+ct	
+=== KNOWN DIVERGENCE: info_schema.columns.column_comment stays empty ===
+SELECT column_name, column_comment
+  FROM information_schema.columns
+  WHERE table_name = 'ct'
+  ORDER BY ordinal_position;
+COLUMN_NAME	COLUMN_COMMENT
+id	
+n	
+DROP TABLE ct;
+=== MySQL inline: column COMMENT '...' / table COMMENT='...' — parsed ===
+DROP TABLE IF EXISTS mct;
+CREATE TABLE mct (
+  id INT PRIMARY KEY COMMENT 'pk col',
+  n  INT             COMMENT 'a number'
+) COMMENT='my mysql table';
+=== SHOW CREATE TABLE strips the COMMENT clauses ===
+SHOW CREATE TABLE mct;
+Table	Create Table
+mct	CREATE TABLE `mct` (
+  `id` int NOT NULL,
+  `n` int,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+=== MySQL inline COMMENTs also don't reach info_schema ===
+SELECT table_name, table_comment FROM information_schema.tables WHERE table_name = 'mct';
+TABLE_NAME	TABLE_COMMENT
+mct	
+SELECT column_name, column_comment FROM information_schema.columns WHERE table_name = 'mct' ORDER BY ordinal_position;
+COLUMN_NAME	COLUMN_COMMENT
+id	
+n	
+DROP TABLE mct;
+=== KNOWN GAP: COMMENT ON INDEX — errno 1064 ===
+COMMENT ON INDEX no_such_ix IS 'idx comment';
+ERROR 1064: SQL parse error: sql parser error: Expected: comment object_type, found: INDEX at Line: 1, Column: 12
+=== KNOWN GAP: COMMENT ON FUNCTION — errno 1064 ===
+COMMENT ON FUNCTION no_fn() IS 'fn comment';
+ERROR 1064: SQL parse error: sql parser error: Expected: comment object_type, found: FUNCTION at Line: 1, Column: 12
+=== KNOWN GAP: COMMENT ON SEQUENCE — errno 1064 ===
+COMMENT ON SEQUENCE no_seq IS 'seq comment';
+ERROR 1064: SQL parse error: sql parser error: Expected: comment object_type, found: SEQUENCE at Line: 1, Column: 12
+=== KNOWN GAP: pg_catalog.pg_description not reachable — errno 1146 ===
+SELECT objoid FROM pg_catalog.pg_description LIMIT 1;
+ERROR 1146: table not found: pg_catalog.pg_description

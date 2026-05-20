@@ -1,0 +1,127 @@
+# Independently authored COMMENT-on smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test (MySQL uses CREATE TABLE … COMMENT=… inline
+# while this is the PG COMMENT-ON-OBJECT surface); pins
+# zeta's comment-attachment surface (no prior compat
+# coverage).
+#
+# Big-picture finding: COMMENT ON TABLE/COLUMN/SCHEMA/VIEW
+# are parsed and silently accepted — but the comment text
+# is NOT stored anywhere queryable. Both
+# `information_schema.tables.table_comment` and
+# `information_schema.columns.column_comment` stay empty
+# after COMMENT ON, and `pg_catalog.pg_description` (the
+# PG home for comments) does not exist as a queryable table.
+# The MySQL CREATE TABLE … COMMENT='...' inline form also
+# accepts the value but doesn't surface it. So every
+# COMMENT specification is effectively a no-op as far as
+# introspection is concerned.
+#
+# Adaptation notes:
+#   # zeta-adapt: COMMENT ON TABLE <t> IS '<text>' — parsed,
+#     silent no-op.
+#   # zeta-adapt: COMMENT ON COLUMN <t>.<c> IS '<text>' —
+#     parsed, silent no-op.
+#   # zeta-adapt: COMMENT ON SCHEMA <s> IS '<text>' —
+#     parsed, silent no-op.
+#   # zeta-adapt: COMMENT ON VIEW <v> IS '<text>' — parsed,
+#     silent no-op.
+#   # zeta-adapt: COMMENT ON <object> IS NULL — parsed,
+#     silent no-op (PG semantics: deletes the comment).
+#   # zeta-adapt: MySQL CREATE TABLE … COMMENT='...' inline
+#     — parsed, silent no-op. SHOW CREATE TABLE strips the
+#     COMMENT clause.
+#   # zeta-adapt: MySQL column COMMENT '<text>' inline —
+#     parsed, silent no-op. SHOW CREATE strips it.
+#   # zeta-adapt: KNOWN DIVERGENCE — COMMENT specifications
+#     have NO effect on `information_schema.tables
+#     .table_comment` / `.columns.column_comment` — both
+#     stay empty (NULL or blank) after a successful
+#     COMMENT ON. ORMs that read or write comments via
+#     these channels will see nothing.
+#   # zeta-adapt: KNOWN GAP — COMMENT ON INDEX errors 1064
+#     "Expected: comment object_type, found: INDEX".
+#   # zeta-adapt: KNOWN GAP — COMMENT ON FUNCTION errors
+#     1064 "Expected: comment object_type, found: FUNCTION".
+#   # zeta-adapt: KNOWN GAP — COMMENT ON SEQUENCE errors
+#     1064 "Expected: comment object_type, found: SEQUENCE".
+#   # zeta-adapt: KNOWN GAP — `pg_catalog.pg_description`
+#     (PG's home for object comments) errors 1146 "table
+#     not found" — same blanket pg_catalog-via-MySQL-wire
+#     gap pinned in pg_catalog_basic_extra.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ct;
+CREATE TABLE ct (id INT PRIMARY KEY, n INT);
+INSERT INTO ct VALUES (1, 10);
+
+--echo === COMMENT ON TABLE ... IS '...' — parsed, silent no-op ===
+
+COMMENT ON TABLE ct IS 'my table';
+
+--echo === COMMENT ON COLUMN ...col IS '...' ===
+
+COMMENT ON COLUMN ct.n IS 'numeric column';
+
+--echo === COMMENT ON SCHEMA public IS '...' ===
+
+COMMENT ON SCHEMA public IS 'public schema';
+
+--echo === COMMENT ON ... IS NULL — parsed, no error ===
+
+COMMENT ON TABLE ct IS NULL;
+
+--echo === KNOWN DIVERGENCE: info_schema.tables.table_comment stays empty ===
+
+SELECT table_name, table_comment
+  FROM information_schema.tables
+  WHERE table_name = 'ct';
+
+--echo === KNOWN DIVERGENCE: info_schema.columns.column_comment stays empty ===
+
+SELECT column_name, column_comment
+  FROM information_schema.columns
+  WHERE table_name = 'ct'
+  ORDER BY ordinal_position;
+
+DROP TABLE ct;
+
+--echo === MySQL inline: column COMMENT '...' / table COMMENT='...' — parsed ===
+
+DROP TABLE IF EXISTS mct;
+CREATE TABLE mct (
+  id INT PRIMARY KEY COMMENT 'pk col',
+  n  INT             COMMENT 'a number'
+) COMMENT='my mysql table';
+
+--echo === SHOW CREATE TABLE strips the COMMENT clauses ===
+
+SHOW CREATE TABLE mct;
+
+--echo === MySQL inline COMMENTs also don't reach info_schema ===
+
+SELECT table_name, table_comment FROM information_schema.tables WHERE table_name = 'mct';
+SELECT column_name, column_comment FROM information_schema.columns WHERE table_name = 'mct' ORDER BY ordinal_position;
+
+DROP TABLE mct;
+
+--echo === KNOWN GAP: COMMENT ON INDEX — errno 1064 ===
+
+--error 1064
+COMMENT ON INDEX no_such_ix IS 'idx comment';
+
+--echo === KNOWN GAP: COMMENT ON FUNCTION — errno 1064 ===
+
+--error 1064
+COMMENT ON FUNCTION no_fn() IS 'fn comment';
+
+--echo === KNOWN GAP: COMMENT ON SEQUENCE — errno 1064 ===
+
+--error 1064
+COMMENT ON SEQUENCE no_seq IS 'seq comment';
+
+--echo === KNOWN GAP: pg_catalog.pg_description not reachable — errno 1146 ===
+
+--error 1146
+SELECT objoid FROM pg_catalog.pg_description LIMIT 1;
