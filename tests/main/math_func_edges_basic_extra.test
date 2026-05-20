@@ -1,0 +1,128 @@
+# Independently authored math edge-case smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_math.test; complements
+# numeric_func_basic / numeric_func_basic_extra (which
+# already cover POW(0,0), ROUND half-away, BIT_COUNT, SQRT
+# domain, ASIN(2) NaN, RAND seed gap, FORMAT locale) by
+# pinning the MOD / ABS-overflow / GREATEST-LEAST mixed /
+# CEIL-FLOOR negative / LOG-domain / TRUNCATE / POWER-NaN
+# edges NOT covered there.
+#
+# Big-picture finding: zeta's math edge handling diverges
+# from MySQL in three notable ways. (a) Division by zero
+# (`MOD(x, 0)`, `x % 0`) errors 1105 instead of returning
+# NULL. (b) `ABS()` on the i64 minimum value overflows to
+# the same negative value (when the input is a CAST i64) or
+# to a near-MAX f64 with precision loss (when it's a raw
+# literal). (c) `POWER(-2, 0.5)` returns NaN instead of
+# MySQL's NULL. LOG/LOG10/LOG2 all error 1105 on zero/
+# negative input where MySQL returns NULL — pinned as a
+# single divergence row covering the whole log family.
+#
+# Adaptation notes:
+#   # zeta-adapt: MOD(neg, pos) — sign follows dividend (MOD
+#     (-10, 3) = -1), MOD(pos, neg) → 1 (matches MySQL).
+#   # zeta-adapt: MOD(10.5, 3) — float division, returns 1.5.
+#   # zeta-adapt: GREATEST/LEAST mixed-type — non-numeric
+#     args coerce to 0 then compared as numbers
+#     (`GREATEST(1, 'a', 2)` = 2).
+#   # zeta-adapt: GREATEST/LEAST NULL propagation — any
+#     NULL arg → NULL result.
+#   # zeta-adapt: CEIL / FLOOR on negative — CEIL(-3.2) =
+#     -3, FLOOR(-3.8) = -4 (matches MySQL).
+#   # zeta-adapt: SIGN(0/neg/pos/NULL) — 0 / -1 / 1 / NULL.
+#   # zeta-adapt: TRUNCATE(x, -n) — truncates to integer
+#     multiples of 10^n (matches MySQL).
+#   # zeta-adapt: TRUNCATE(neg, 0) — truncates toward zero
+#     (`TRUNCATE(-1.999, 0)` = -1).
+#   # zeta-adapt: POWER(0, 0) — already pinned as 1 in
+#     numeric_func_basic_extra.
+#   # zeta-adapt: POWER(-2, 3) — returns -8 (integer exp).
+#   # zeta-adapt: POWER(-2, 0.5) — returns NaN (see
+#     divergence below).
+#   # zeta-adapt: KNOWN DIVERGENCE — MOD(x, 0) and `x % 0`
+#     error 1105 "division by zero" where MySQL returns
+#     NULL. Substitute via NULLIF (b, 0) wrapper.
+#   # zeta-adapt: KNOWN DIVERGENCE — ABS(CAST(i64::MIN AS
+#     BIGINT)) returns the same negative value (-2^63
+#     overflows abs) instead of MySQL's BIGINT UNSIGNED
+#     2^63. ABS(-9223372036854775808) as a raw literal
+#     loses precision (becomes 9223372036854776000 via
+#     f64). Either way, applications relying on ABS of
+#     i64::MIN should range-check first.
+#   # zeta-adapt: KNOWN DIVERGENCE — POWER(-2, 0.5) returns
+#     NaN where MySQL returns NULL. Comes from f64
+#     `powf(-2.0, 0.5)` evaluating to NaN; the result
+#     surfaces as the literal string "NaN" rather than
+#     NULL on the wire.
+#   # zeta-adapt: KNOWN DIVERGENCE — LOG/LOG10/LOG2 of zero
+#     or negative error 1105 "cannot take logarithm of
+#     zero or negative number" where MySQL returns NULL.
+#     This applies uniformly across the whole log family;
+#     wrap in `CASE WHEN x > 0 THEN LOG(x) END` for
+#     portable NULL-on-bad-input semantics.
+
+--echo === MOD edges (positive cases) ===
+
+SELECT MOD(-10, 3) AS neg_dividend;
+SELECT MOD(10, -3) AS neg_divisor;
+SELECT MOD(NULL, 3) AS nl_n, MOD(10, NULL) AS nl_d;
+SELECT MOD(10.5, 3) AS flt;
+
+--echo === GREATEST / LEAST — multi-arg, mixed types, NULL ===
+
+SELECT GREATEST(1, 2, 3) AS g, LEAST(1, 2, 3) AS l;
+SELECT GREATEST('a', 'b', 'c') AS gs;
+SELECT GREATEST(1, 'a', 2) AS mixed_coerced;
+SELECT GREATEST(1, NULL, 2) AS with_null;
+SELECT GREATEST(1.5, 2, 1) AS flt;
+SELECT GREATEST(1) AS one_arg;
+
+--echo === CEIL / FLOOR — negative inputs ===
+
+SELECT CEIL(-3.2) AS c_neg, FLOOR(-3.8) AS f_neg;
+SELECT CEIL(-3.0) AS c_neg_int, FLOOR(-3.0) AS f_neg_int;
+SELECT CEIL(NULL) AS c_nl, FLOOR(NULL) AS f_nl;
+
+--echo === SIGN edges ===
+
+SELECT SIGN(0) AS s0, SIGN(-5) AS sn, SIGN(5) AS sp, SIGN(NULL) AS snl;
+
+--echo === TRUNCATE edges ===
+
+SELECT TRUNCATE(1.999, 0) AS t_int, TRUNCATE(1.999, 2) AS t_frac;
+SELECT TRUNCATE(1234.5, -2) AS t_neg_decimals;
+SELECT TRUNCATE(-1.999, 0) AS t_neg_value;
+
+--echo === POWER edges ===
+
+SELECT POWER(2, 0) AS p_zero, POWER(2, 0.5) AS p_frac, POWER(-2, 3) AS p_neg_base;
+
+--echo === KNOWN DIVERGENCE: MOD by zero errors 1105 (MySQL → NULL) ===
+
+--error 1105
+SELECT MOD(10, 0);
+
+--echo === KNOWN DIVERGENCE: % by zero same ===
+
+--error 1105
+SELECT 10 % 0;
+
+--echo === KNOWN DIVERGENCE: ABS i64::MIN cast overflows ===
+
+SELECT ABS(CAST(-9223372036854775808 AS BIGINT)) AS abs_i64_min;
+
+--echo === KNOWN DIVERGENCE: POWER(-2, 0.5) returns NaN (MySQL → NULL) ===
+
+SELECT POWER(-2, 0.5) AS p_neg_sqrt;
+
+--echo === KNOWN DIVERGENCE: LOG family errors on zero / negative (MySQL → NULL) ===
+
+--error 1105
+SELECT LOG(0);
+
+--error 1105
+SELECT LOG10(0);
+
+--error 1105
+SELECT LOG2(-1);

@@ -1,0 +1,81 @@
+=== MOD edges (positive cases) ===
+SELECT MOD(-10, 3) AS neg_dividend;
+neg_dividend
+-1
+SELECT MOD(10, -3) AS neg_divisor;
+neg_divisor
+1
+SELECT MOD(NULL, 3) AS nl_n, MOD(10, NULL) AS nl_d;
+nl_n	nl_d
+NULL	NULL
+SELECT MOD(10.5, 3) AS flt;
+flt
+1.5
+=== GREATEST / LEAST — multi-arg, mixed types, NULL ===
+SELECT GREATEST(1, 2, 3) AS g, LEAST(1, 2, 3) AS l;
+g	l
+3	1
+SELECT GREATEST('a', 'b', 'c') AS gs;
+gs
+c
+SELECT GREATEST(1, 'a', 2) AS mixed_coerced;
+mixed_coerced
+2
+SELECT GREATEST(1, NULL, 2) AS with_null;
+with_null
+NULL
+SELECT GREATEST(1.5, 2, 1) AS flt;
+flt
+2
+SELECT GREATEST(1) AS one_arg;
+one_arg
+1
+=== CEIL / FLOOR — negative inputs ===
+SELECT CEIL(-3.2) AS c_neg, FLOOR(-3.8) AS f_neg;
+c_neg	f_neg
+-3	-4
+SELECT CEIL(-3.0) AS c_neg_int, FLOOR(-3.0) AS f_neg_int;
+c_neg_int	f_neg_int
+-3	-3
+SELECT CEIL(NULL) AS c_nl, FLOOR(NULL) AS f_nl;
+c_nl	f_nl
+NULL	NULL
+=== SIGN edges ===
+SELECT SIGN(0) AS s0, SIGN(-5) AS sn, SIGN(5) AS sp, SIGN(NULL) AS snl;
+s0	sn	sp	snl
+0	-1	1	NULL
+=== TRUNCATE edges ===
+SELECT TRUNCATE(1.999, 0) AS t_int, TRUNCATE(1.999, 2) AS t_frac;
+t_int	t_frac
+1	1.99
+SELECT TRUNCATE(1234.5, -2) AS t_neg_decimals;
+t_neg_decimals
+1200
+SELECT TRUNCATE(-1.999, 0) AS t_neg_value;
+t_neg_value
+-1
+=== POWER edges ===
+SELECT POWER(2, 0) AS p_zero, POWER(2, 0.5) AS p_frac, POWER(-2, 3) AS p_neg_base;
+p_zero	p_frac	p_neg_base
+1	1.4142135623730951	-8
+=== KNOWN DIVERGENCE: MOD by zero errors 1105 (MySQL → NULL) ===
+SELECT MOD(10, 0);
+ERROR 1105: execution error: division by zero
+=== KNOWN DIVERGENCE: % by zero same ===
+SELECT 10 % 0;
+ERROR 1105: execution error: division by zero
+=== KNOWN DIVERGENCE: ABS i64::MIN cast overflows ===
+SELECT ABS(CAST(-9223372036854775808 AS BIGINT)) AS abs_i64_min;
+abs_i64_min
+-9223372036854775808
+=== KNOWN DIVERGENCE: POWER(-2, 0.5) returns NaN (MySQL → NULL) ===
+SELECT POWER(-2, 0.5) AS p_neg_sqrt;
+p_neg_sqrt
+NaN
+=== KNOWN DIVERGENCE: LOG family errors on zero / negative (MySQL → NULL) ===
+SELECT LOG(0);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LOG10(0);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LOG2(-1);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
