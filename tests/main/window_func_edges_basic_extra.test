@@ -23,8 +23,10 @@
 # in zeta PR #1216. NTILE rejects non-positive args;
 # LAG(n, -k) flips to LEAD(n, k) and vice versa.
 #
-# Remaining: nested window functions don't error but
-# evaluate to NULL.
+# Nested window function calls fixed in zeta PR #1217.
+# Both `window_fn(window_fn(...)) OVER (...)` and
+# `agg_fn(window_fn(...))` now error at parse time
+# instead of silently evaluating to NULL.
 #
 # Adaptation notes:
 #   # zeta-adapt: LAG/LEAD offset > partition size returns
@@ -64,10 +66,12 @@
 #     direction: `LAG(n, -k)` ≡ `LEAD(n, k)` and
 #     vice versa. Fixed in zeta PR #1216 — previously
 #     returned NULL because the offset was usize-cast.
-#   # zeta-adapt: KNOWN DIVERGENCE — nested window
-#     functions like `SUM(ROW_NUMBER() OVER ()) OVER ()`
-#     return NULL instead of erroring 'window function
-#     not allowed inside aggregate' (PG behavior).
+#   # zeta-adapt: nested window function calls error
+#     1064 at parse time. `SUM(ROW_NUMBER() OVER ()) OVER
+#     ()` → \"window function calls cannot be nested\";
+#     `SUM(ROW_NUMBER() OVER ())` → \"aggregate function
+#     \`SUM\` cannot contain window function calls\".
+#     Fixed in zeta PR #1217 — previously silent NULL.
 
 --echo === Setup ===
 
@@ -126,9 +130,12 @@ SELECT id, NTILE(-3) OVER (ORDER BY id) AS n_neg FROM wf ORDER BY id;
 SELECT id, n, LAG(n, -1) OVER (ORDER BY id) AS lag_neg, LEAD(n, 1) OVER (ORDER BY id) AS lead_pos FROM wf ORDER BY id;
 SELECT id, n, LEAD(n, -1) OVER (ORDER BY id) AS lead_neg, LAG(n, 1) OVER (ORDER BY id) AS lag_pos FROM wf ORDER BY id;
 
---echo === KNOWN DIVERGENCE: nested window functions evaluate to NULL (PG: error) ===
+--echo === Nested window function calls — errors 1064 (was silent NULL) ===
 
+--error 1064
 SELECT id, SUM(ROW_NUMBER() OVER ()) OVER () AS nested FROM wf ORDER BY id;
+--error 1064
+SELECT SUM(ROW_NUMBER() OVER ()) AS agg_of_win FROM wf;
 
 --echo === Window function in WHERE — correctly errors 1105 ===
 
