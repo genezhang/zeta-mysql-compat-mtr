@@ -1,0 +1,88 @@
+=== Setup ===
+DROP TABLE IF EXISTS sc;
+CREATE TABLE sc (id INT PRIMARY KEY, s VARCHAR(20));
+INSERT INTO sc VALUES (1, 'Apple'), (2, 'apple'), (3, 'APPLE'), (4, 'banana');
+=== LIKE — case-sensitive (PG default, diverges from MySQL ci) ===
+SELECT id, s FROM sc WHERE s LIKE 'a%' ORDER BY id;
+id	s
+2	apple
+SELECT id, s FROM sc WHERE s LIKE 'A%' ORDER BY id;
+id	s
+1	Apple
+3	APPLE
+=== ILIKE — case-insensitive match (PG extension) ===
+SELECT id, s FROM sc WHERE s ILIKE 'a%' ORDER BY id;
+id	s
+1	Apple
+2	apple
+3	APPLE
+=== REGEXP_LIKE — case-sensitive default; (?i) flag for ci ===
+SELECT REGEXP_LIKE('Apple', '^a') AS lo, REGEXP_LIKE('Apple', '^A') AS hi;
+lo	hi
+0	1
+SELECT REGEXP_LIKE('Apple', '(?i)apple') AS ci;
+ci
+1
+=== INSTR / LOCATE / POSITION — case-sensitive ===
+SELECT INSTR('Apple', 'a') AS ci_lo, INSTR('Apple', 'A') AS ci_hi;
+ci_lo	ci_hi
+0	1
+SELECT LOCATE('a', 'Apple') AS ci_lo, LOCATE('A', 'Apple') AS ci_hi;
+ci_lo	ci_hi
+0	1
+SELECT POSITION('a' IN 'Apple') AS ci_lo, POSITION('A' IN 'Apple') AS ci_hi;
+ci_lo	ci_hi
+0	1
+=== GROUP BY — case-distinct (4 groups for 4 capitalizations) ===
+SELECT s, COUNT(*) AS c FROM sc GROUP BY s ORDER BY s;
+s	c
+APPLE	1
+Apple	1
+apple	1
+banana	1
+=== GROUP BY LOWER(s) — collapse case ===
+SELECT LOWER(s) AS l, COUNT(*) AS c FROM sc GROUP BY LOWER(s) ORDER BY l;
+l	c
+apple	3
+banana	1
+=== DISTINCT — case-distinct ===
+SELECT DISTINCT s FROM sc ORDER BY s;
+s
+APPLE
+Apple
+apple
+banana
+SELECT COUNT(DISTINCT s) AS d, COUNT(DISTINCT LOWER(s)) AS d_lower FROM sc;
+d	d_lower
+4	2
+=== BETWEEN — case-sensitive (ASCII ordering) ===
+SELECT 'B' BETWEEN 'A' AND 'a' AS b1, 'b' BETWEEN 'A' AND 'a' AS b2;
+b1	b2
+1	0
+=== IN — case-sensitive ===
+SELECT 'apple' IN ('Apple', 'banana') AS in_ci, 'Apple' IN ('apple', 'APPLE') AS in_ci2;
+in_ci	in_ci2
+0	0
+=== UPPER / LOWER — multi-byte aware ===
+SELECT UPPER('hello') AS u, LOWER('HELLO') AS l;
+u	l
+HELLO	hello
+SELECT UPPER('héllo') AS u_mb, LOWER('HÉLLO') AS l_mb;
+u_mb	l_mb
+HÉLLO	héllo
+=== LCASE / UCASE — MySQL aliases ===
+SELECT LCASE('HELLO') AS l, UCASE('hello') AS u;
+l	u
+hello	HELLO
+=== UPPER round-trips through LOWER ===
+SELECT UPPER(LOWER('Hello')) = UPPER('Hello') AS round_trip;
+round_trip
+1
+=== KNOWN BUG: col REGEXP pat infix operator — errno 1105 ===
+SELECT id, s FROM sc WHERE s REGEXP '^a' ORDER BY id;
+ERROR 1105: execution error: predicate did not evaluate to boolean
+=== Substitute via REGEXP_LIKE = 1 — works ===
+SELECT id, s FROM sc WHERE REGEXP_LIKE(s, '^a') = 1 ORDER BY id;
+id	s
+2	apple
+DROP TABLE sc;
