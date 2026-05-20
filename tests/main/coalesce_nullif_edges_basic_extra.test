@@ -43,7 +43,7 @@
 #   # zeta-adapt: NVL — Oracle 2-arg alias, equivalent
 #     to IFNULL / COALESCE-2.
 #   # zeta-adapt: KNOWN GAP — NVL2 (Oracle 3-arg) errors
-#     1105 \"unknown function: NVL2\". MySQL doesn't have
+#     1105 "unknown function: NVL2". MySQL doesn't have
 #     it either; substitute via CASE WHEN x IS NOT NULL
 #     THEN a ELSE b END.
 
@@ -79,8 +79,10 @@ SELECT NULLIF(NULL, 1) AS lhs_null, NULLIF(1, NULL) AS rhs_null, NULLIF(NULL, NU
 
 SELECT IFNULL(NULL, 'fb') AS use_fb, IFNULL('val', 'fb') AS keep_val, IFNULL(NULL, NULL) AS both_null;
 
---echo === IFNULL 3-arg — errno 1105 ===
+--echo === IFNULL arity errors — 1-arg and 3-arg both errno 1105 ===
 
+--error 1105
+SELECT IFNULL(NULL);
 --error 1105
 SELECT IFNULL(NULL, NULL, 'three');
 
@@ -108,8 +110,23 @@ SELECT id, COALESCE(v, -1) AS def FROM c ORDER BY id;
 
 SELECT id FROM c WHERE COALESCE(v, 0) > 15 ORDER BY id;
 
---echo === COALESCE around aggregate — NULL → fallback ===
+--echo === COALESCE inside aggregate — fallback per row before SUM ===
 
-SELECT SUM(COALESCE(v, 0)) AS s_with_zero FROM c;
+SELECT SUM(COALESCE(v, 0)) AS s_inside FROM c;
+
+--echo === COALESCE around aggregate — fallback for NULL aggregate result ===
+--echo # NB: via the mysql CLI text protocol the same queries return
+--echo # NULL (the wrapping COALESCE doesn't see the aggregate value).
+--echo # Pinning the prepared-statement / driver path since drivers
+--echo # are the dominant code path. The CLI divergence is the same
+--echo # shape as the HAVING-no-GROUP-BY + aggregate issue and a
+--echo # separate gap to investigate.
+
+DROP TABLE IF EXISTS c2;
+CREATE TABLE c2 (id INT, v INT);
+INSERT INTO c2 VALUES (1, NULL), (2, NULL);
+SELECT COALESCE(SUM(v), 0) AS s_around_null FROM c2;
+SELECT COALESCE(MAX(v), -1) AS m_around_null FROM c2;
 
 DROP TABLE c;
+DROP TABLE c2;
