@@ -1,0 +1,75 @@
+=== Setup ===
+DROP TABLE IF EXISTS u;
+CREATE TABLE u (id INT, status VARCHAR(10), n INT);
+INSERT INTO u VALUES (1, 'a', 10), (2, 'b', 20), (3, 'a', 30);
+=== UPDATE ... CASE WHEN in SET ===
+UPDATE u SET n = CASE WHEN status = 'a' THEN n * 2 ELSE n + 100 END;
+SELECT id, status, n FROM u ORDER BY id;
+id	status	n
+1	a	20
+2	b	120
+3	a	60
+=== UPDATE col1 = col2, col2 = col1 (swap) — both see ORIGINAL ===
+DROP TABLE IF EXISTS uw;
+CREATE TABLE uw (id INT, a INT, b INT);
+INSERT INTO uw VALUES (1, 10, 20);
+UPDATE uw SET a = b, b = a WHERE id = 1;
+SELECT id, a, b FROM uw;
+id	a	b
+1	20	10
+=== UPDATE SET col = NULL ===
+DROP TABLE IF EXISTS un;
+CREATE TABLE un (id INT, n INT);
+INSERT INTO un VALUES (1, 10);
+UPDATE un SET n = NULL WHERE id = 1;
+SELECT id, n FROM un;
+id	n
+1	NULL
+=== UPDATE SET NULL on NOT NULL col — errno 1105 ===
+DROP TABLE IF EXISTS unn;
+CREATE TABLE unn (id INT, n INT NOT NULL);
+INSERT INTO unn VALUES (1, 10);
+UPDATE unn SET n = NULL WHERE id = 1;
+ERROR 1105: execution error: null value in column "n" of relation "test.public.unn" violates not-null constraint
+=== UPDATE with no matching WHERE rows — no error ===
+UPDATE un SET n = 999 WHERE id = 99;
+SELECT id, n FROM un;
+id	n
+1	NULL
+=== KNOWN DIVERGENCE: UPDATE same col twice silently uses last value ===
+# PG/MySQL: 'column specified more than once' error.
+# zeta: silently applies the last value (n = 99 wins).
+DROP TABLE IF EXISTS udup;
+CREATE TABLE udup (id INT, n INT);
+INSERT INTO udup VALUES (1, 0);
+UPDATE udup SET n = 5, n = 99 WHERE id = 1;
+SELECT id, n FROM udup;
+id	n
+1	99
+=== KNOWN GAP: MySQL multi-table UPDATE syntax — errno 1064 ===
+DROP TABLE IF EXISTS m1;
+DROP TABLE IF EXISTS m2;
+CREATE TABLE m1 (id INT PRIMARY KEY, name VARCHAR(20));
+CREATE TABLE m2 (id INT PRIMARY KEY, src VARCHAR(20));
+INSERT INTO m1 VALUES (1, 'a');
+INSERT INTO m2 VALUES (1, 'aa');
+UPDATE m1, m2 SET m1.name = m2.src, m2.src = 'updated' WHERE m1.id = m2.id;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET, found: , at Line: 1, Column: 10
+=== KNOWN GAP: UPDATE SET col = correlated-scalar-subquery — errno 1105 ===
+DROP TABLE IF EXISTS u3;
+DROP TABLE IF EXISTS u4;
+CREATE TABLE u3 (id INT PRIMARY KEY, n INT);
+CREATE TABLE u4 (id INT, val INT);
+INSERT INTO u3 VALUES (1, 10), (2, 20);
+INSERT INTO u4 VALUES (1, 100), (2, 200);
+UPDATE u3 SET n = (SELECT val FROM u4 WHERE u4.id = u3.id);
+ERROR 1105: execution error: unsupported expression: ScalarSubquery { subquery: SelectStmt { distinct: false, distinct_on: [], projections: [SelectItem { expr: Column("val"), alias: None }], from: [Table { name: "u4", alias: None }], where_clause: Some(BinaryOp { left: QualifiedColumn("u4", "id"), op: Eq, right: QualifiedColumn("u3", "id") }), group_by: [], grouping_sets: [], having: None, order_by: [], limit: None, offset: None, limit_with_ties: false, ctes: [], for_update: false } }
+DROP TABLE u;
+DROP TABLE uw;
+DROP TABLE un;
+DROP TABLE unn;
+DROP TABLE udup;
+DROP TABLE m1;
+DROP TABLE m2;
+DROP TABLE u3;
+DROP TABLE u4;
