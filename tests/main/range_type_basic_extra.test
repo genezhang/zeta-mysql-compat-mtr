@@ -1,0 +1,175 @@
+# Independently authored RANGE-type smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test (MySQL has no first-class RANGE type — this is
+# PG surface). Pins zeta's INT4RANGE / INT8RANGE / NUMRANGE /
+# DATERANGE / TSRANGE surface (no prior compat coverage).
+#
+# Adaptation notes:
+#   # zeta-adapt: INT4RANGE / INT8RANGE / NUMRANGE / TSRANGE /
+#     DATERANGE column types — supported.
+#   # zeta-adapt: Bracket-notation range literal — supported
+#     for `[a,b)`, `(a,b]`, `[a,b]`, `(a,b)`. Inclusivity is
+#     normalized for discrete subtypes (INT4: `(1,10)`
+#     becomes `[2,10)`; `[1,10]` becomes `[1,11)`).
+#   # zeta-adapt: `'empty'` range literal — supported, marks
+#     the range as empty.
+#   # zeta-adapt: Unbounded range — `(,10)` (no lower bound)
+#     and `[1,)` (no upper bound) — supported.
+#   # zeta-adapt: LOWER(range) / UPPER(range) — supported
+#     (return the bound endpoints).
+#   # zeta-adapt: LOWER_INC / UPPER_INC — boolean: whether
+#     the bound is inclusive.
+#   # zeta-adapt: LOWER_INF / UPPER_INF — boolean: whether
+#     the bound is unbounded.
+#   # zeta-adapt: ISEMPTY(range) — supported.
+#   # zeta-adapt: `@>` containment — both range-contains-
+#     element and range-contains-range — supported.
+#   # zeta-adapt: `&&` overlap — supported.
+#   # zeta-adapt: `<<` strictly-left-of — supported.
+#   # zeta-adapt: Range equality `=` and ordering `<` —
+#     supported.
+#   # zeta-adapt: KNOWN DIVERGENCE — RANGE values render via
+#     zeta's Debug formatter (`Range { subtype: Int32, lower:
+#     Some(Int32(1)), upper: Some(Int32(10)), … }`) instead
+#     of PG's `[1,10)`. The literal input form works; the
+#     display form does not round-trip.
+#   # zeta-adapt: KNOWN GAP — `*` (range intersection) and
+#     `+` (range union) error 1105 "arithmetic op requires
+#     numbers" — the planner picks the numeric-arithmetic
+#     overload for the operators before resolving the range
+#     types. Substitute: compute the intersection/union
+#     manually using LOWER/UPPER + a CASE on inclusivity.
+#   # zeta-adapt: KNOWN GAP — `-|-` (range-adjacency)
+#     operator errors 1064 "unsupported binary operator".
+#   # zeta-adapt: KNOWN GAP — type-named range constructors
+#     INT4RANGE(lo, hi), INT8RANGE(lo, hi), NUMRANGE(lo, hi),
+#     NUM_RANGE(...) all error 1105 "unknown function".
+#     Substitute: use the `'[lo,hi)'::TYPE` cast.
+#   # zeta-adapt: KNOWN GAP — RANGE_AGG errors 1105 "unknown
+#     function". Substitute: build the merged range via a
+#     subquery with MIN(LOWER), MAX(UPPER).
+#   # zeta-adapt: KNOWN GAP — TSTZRANGE column type errors
+#     1064 "unsupported data type: tstzrange". Substitute:
+#     TSRANGE (without timezone awareness) for time-bound
+#     intervals.
+#   # zeta-adapt: KNOWN GAP — `<range>::TEXT` cast errors
+#     1105 "cannot cast to TEXT".
+
+--echo === INT4RANGE column + bracket literal + display ===
+--echo # Display uses Debug formatter (see KNOWN DIVERGENCE).
+
+DROP TABLE IF EXISTS r1;
+CREATE TABLE r1 (id INT PRIMARY KEY, r INT4RANGE);
+INSERT INTO r1 VALUES (1, '[1,10)'), (2, '(5,15]'), (3, 'empty');
+SELECT id, r FROM r1 ORDER BY id;
+
+--echo === LOWER / UPPER ===
+
+SELECT LOWER(r) AS lo, UPPER(r) AS up FROM r1 WHERE id = 1;
+
+--echo === ISEMPTY ===
+
+SELECT ISEMPTY(r) AS not_empty FROM r1 WHERE id = 1;
+SELECT ISEMPTY('empty'::INT4RANGE) AS r;
+
+--echo === @> contains element ===
+
+SELECT id FROM r1 WHERE r @> 7 ORDER BY id;
+SELECT '[1,10)'::INT4RANGE @> 5 AS r;
+
+--echo === @> contains range, && overlap ===
+
+SELECT '[1,10)'::INT4RANGE @> '[2,8)'::INT4RANGE AS contains;
+SELECT '[1,10)'::INT4RANGE && '[5,15)'::INT4RANGE AS overlap;
+
+--echo === << strictly-left-of ===
+
+SELECT '[1,5)'::INT4RANGE << '[6,10)'::INT4RANGE AS strict_left;
+
+--echo === Range equality and < ordering ===
+
+SELECT '[1,10)'::INT4RANGE = '[1,10)'::INT4RANGE AS eq;
+SELECT '[1,5)'::INT4RANGE < '[1,10)'::INT4RANGE AS lt;
+
+--echo === LOWER_INC / UPPER_INC / LOWER_INF / UPPER_INF ===
+
+SELECT LOWER_INC('[1,10)'::INT4RANGE) AS li, UPPER_INC('[1,10)'::INT4RANGE) AS ui;
+SELECT LOWER_INF('(,10)'::INT4RANGE) AS li, UPPER_INF('[1,)'::INT4RANGE) AS ui;
+
+--echo === Inclusivity normalization for discrete (INT4) subtype ===
+--echo # PG canonicalizes INT4 ranges so the upper bound is
+--echo # always exclusive: `[1,10]` becomes `[1,11)`, and
+--echo # `(1,10)` becomes `[2,10)`.
+
+SELECT '[1,10]'::INT4RANGE AS inc_inc;
+SELECT '(1,10)'::INT4RANGE AS exc_exc;
+
+DROP TABLE r1;
+
+--echo === Other range subtypes ===
+
+DROP TABLE IF EXISTS r2;
+CREATE TABLE r2 (id INT PRIMARY KEY, r INT8RANGE);
+INSERT INTO r2 VALUES (1, '[100,200)');
+SELECT id, r FROM r2;
+DROP TABLE r2;
+
+DROP TABLE IF EXISTS r3;
+CREATE TABLE r3 (id INT PRIMARY KEY, r NUMRANGE);
+INSERT INTO r3 VALUES (1, '[1.5,3.5)');
+SELECT id, r FROM r3;
+DROP TABLE r3;
+
+DROP TABLE IF EXISTS r4;
+CREATE TABLE r4 (id INT PRIMARY KEY, r DATERANGE);
+INSERT INTO r4 VALUES (1, '[2024-01-01,2025-01-01)');
+SELECT id, r FROM r4;
+DROP TABLE r4;
+
+DROP TABLE IF EXISTS r5;
+CREATE TABLE r5 (id INT PRIMARY KEY, r TSRANGE);
+INSERT INTO r5 VALUES (1, '[2024-01-01 00:00:00,2024-02-01 00:00:00)');
+SELECT id, r FROM r5;
+DROP TABLE r5;
+
+--echo === KNOWN GAP: * (intersection) — errno 1105 ===
+
+--error 1105
+SELECT '[1,5)'::INT4RANGE * '[3,10)'::INT4RANGE AS intersect;
+
+--echo === KNOWN GAP: + (union) — errno 1105 ===
+
+--error 1105
+SELECT '[1,5)'::INT4RANGE + '[3,10)'::INT4RANGE AS union_;
+
+--echo === KNOWN GAP: -|- (adjacency) — errno 1064 ===
+
+--error 1064
+SELECT '[1,5)'::INT4RANGE -|- '[5,10)'::INT4RANGE AS adj;
+
+--echo === KNOWN GAP: type-named constructor INT4RANGE(lo, hi) — errno 1105 ===
+--echo # Substitute: '[lo,hi)'::INT4RANGE.
+
+--error 1105
+SELECT INT4RANGE(1, 10) AS r;
+
+--echo === KNOWN GAP: NUMRANGE(lo, hi) — errno 1105 ===
+
+--error 1105
+SELECT NUMRANGE(1.5, 3.5) AS r;
+
+--echo === KNOWN GAP: RANGE_AGG — errno 1105 ===
+
+--error 1105
+SELECT RANGE_AGG(r) FROM (VALUES ('[1,5)'::INT4RANGE)) AS t(r);
+
+--echo === KNOWN GAP: TSTZRANGE column type — errno 1064 ===
+--echo # Substitute: TSRANGE.
+
+--error 1064
+CREATE TABLE r_tstz_gap (id INT PRIMARY KEY, r TSTZRANGE);
+
+--echo === KNOWN GAP: <range>::TEXT cast — errno 1105 ===
+
+--error 1105
+SELECT '[1,10)'::INT4RANGE::TEXT AS r;
