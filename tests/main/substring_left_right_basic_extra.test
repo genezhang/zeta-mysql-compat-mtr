@@ -1,0 +1,101 @@
+# Independently authored SUBSTRING / LEFT / RIGHT /
+# SUBSTRING_INDEX edge smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/t/
+# func_str.test; complements string_func_basic /
+# string_func_extra (which use these functions in passing)
+# by pinning the EDGE behavior: negative positions /
+# lengths, zero, overflow, NULL propagation, multi-byte
+# UTF-8, combined call shapes, and the negative-start
+# divergence from MySQL.
+#
+# Big-picture finding: zeta's SUBSTRING / LEFT / RIGHT
+# follow PG semantics, not MySQL's. The most notable
+# divergence is the negative-N behavior: SUBSTRING(str,
+# -5) returns the WHOLE string (zeta starts at
+# position max(start, 1) rather than counting from the
+# end); LEFT(str, -1) returns "all but the last 1 char"
+# and RIGHT(str, -1) returns "all but the first 1 char"
+# (PG's length-N semantics rather than MySQL's empty-
+# string-on-negative). Multi-byte awareness is correct
+# across all four functions — `é` is treated as one code
+# point.
+#
+# Adaptation notes:
+#   # zeta-adapt: SUBSTRING(str, start) — works; start is
+#     1-based. start=0 treated as 1 (PG behavior).
+#   # zeta-adapt: SUBSTRING(str, start, len) — works.
+#     len=0 → empty; len<0 → empty; len > length →
+#     truncates to end of string.
+#   # zeta-adapt: SUBSTRING(NULL, ...) → NULL.
+#   # zeta-adapt: SUBSTRING multi-byte — counts UTF-8
+#     code points correctly ('café' substring 1,3 →
+#     'caf'; 'héllo' substring 2,3 → 'éll').
+#   # zeta-adapt: LEFT(str, n) / RIGHT(str, n) — n>0 takes
+#     n chars; n=0 → empty; n > length → returns the
+#     whole string; NULL propagates.
+#   # zeta-adapt: SUBSTRING_INDEX(str, delim, count) —
+#     count=0 → empty; count > number of delims → whole
+#     string; delim not found → whole string;
+#     NULL → NULL.
+#   # zeta-adapt: KNOWN DIVERGENCE — SUBSTRING(str, -N)
+#     returns the WHOLE string instead of N chars from
+#     the END. zeta uses max(start, 1) for negative
+#     start; MySQL counts from the end. Substitute via
+#     RIGHT(str, N).
+#   # zeta-adapt: KNOWN DIVERGENCE — LEFT(str, -N) and
+#     RIGHT(str, -N) use PG semantics: LEFT(s, -1) =
+#     "all but the last 1 char", RIGHT(s, -1) = "all
+#     but the first 1 char". MySQL returns the empty
+#     string for both negative cases.
+
+--echo === SUBSTRING basics — start=1 / start>1 / start=0 ===
+
+SELECT SUBSTRING('hello world', 1, 5) AS sub1, SUBSTRING('hello world', 7) AS sub2, SUBSTRING('hello world', 0) AS sub0;
+
+--echo === SUBSTRING edge lengths — len=0 / len<0 / len>length ===
+
+SELECT SUBSTRING('hello world', 1, 0) AS l0, SUBSTRING('hello world', 1, -1) AS lneg, SUBSTRING('hello world', 1, 100) AS lover;
+
+--echo === SUBSTRING NULL propagation ===
+
+SELECT SUBSTRING(NULL, 1, 3) AS nl;
+
+--echo === SUBSTRING multi-byte UTF-8 — code-point aware ===
+
+SELECT SUBSTRING('café', 1, 3) AS mb1, SUBSTRING('héllo', 2, 3) AS mb2;
+
+--echo === LEFT — positive / zero / overflow / NULL ===
+
+SELECT LEFT('hello', 3) AS l3, LEFT('hello', 0) AS l0, LEFT('hello', 100) AS lover, LEFT(NULL, 3) AS lnl;
+
+--echo === RIGHT — positive / zero / overflow ===
+
+SELECT RIGHT('hello', 3) AS r3, RIGHT('hello', 0) AS r0, RIGHT('hello', 100) AS rover;
+
+--echo === LEFT / RIGHT multi-byte ===
+
+SELECT LEFT('héllo', 3) AS l_mb, RIGHT('héllo', 3) AS r_mb;
+
+--echo === SUBSTRING_INDEX — 0 / overflow / delim-not-found / empty / NULL ===
+
+SELECT SUBSTRING_INDEX('a,b,c,d', ',', 0) AS si0, SUBSTRING_INDEX('a,b,c,d', ',', 10) AS si_over, SUBSTRING_INDEX('a,b,c,d', 'x', 2) AS no_delim;
+SELECT SUBSTRING_INDEX('', ',', 2) AS empty, SUBSTRING_INDEX(NULL, ',', 2) AS nl;
+
+--echo === Combined call shapes ===
+
+SELECT LPAD(FORMAT(1234.5, 2), 12, '*') AS combo_lf;
+SELECT UPPER(LPAD('abc', 5, '-')) AS combo_ul;
+SELECT UPPER(SUBSTRING('hello', 1, 3)) AS combo_us;
+
+--echo === KNOWN DIVERGENCE: SUBSTRING(str, -N) returns whole string (not last N) ===
+--echo # zeta uses max(start, 1); MySQL counts from end. Substitute
+--echo # with RIGHT(str, N) for MySQL-compatible behavior.
+
+SELECT SUBSTRING('hello world', -5) AS bug_neg, SUBSTRING('hello world', -5, 3) AS bug_neg3;
+
+--echo === KNOWN DIVERGENCE: LEFT(s, -1) / RIGHT(s, -1) — PG semantics ===
+--echo # zeta: LEFT(s,-1) = "all but last 1" → 'hell';
+--echo #       RIGHT(s,-1) = "all but first 1" → 'ello'.
+--echo # MySQL: both return empty string for negative N.
+
+SELECT LEFT('hello', -1) AS lneg, RIGHT('hello', -1) AS rneg;
