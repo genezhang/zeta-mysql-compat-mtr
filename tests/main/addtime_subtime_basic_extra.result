@@ -1,0 +1,65 @@
+=== ADDTIME — TIME + TIME → TIME ===
+SELECT ADDTIME(TIME '10:00:00', TIME '02:30:00') AS sum_t;
+sum_t
+12:30:00
+SELECT ADDTIME(TIME '23:30:00', TIME '00:30:00') AS day_boundary;
+day_boundary
+24:00:00
+SELECT ADDTIME(TIME '00:00:00', TIME '02:00:00') AS from_zero;
+from_zero
+02:00:00
+=== ADDTIME — TIMESTAMP + TIME → TIMESTAMP (with rollover) ===
+SELECT ADDTIME(TIMESTAMP '2026-05-19 10:00:00', TIME '02:30:00') AS same_day;
+same_day
+2026-05-19 12:30:00
+SELECT ADDTIME(TIMESTAMP '2026-05-19 23:00:00', TIME '02:00:00') AS rollover;
+rollover
+2026-05-20 01:00:00
+=== SUBTIME — TIME - TIME → TIME ===
+SELECT SUBTIME(TIME '10:00:00', TIME '02:30:00') AS diff_t;
+diff_t
+07:30:00
+=== SUBTIME — TIMESTAMP - TIME → TIMESTAMP (with rollback) ===
+SELECT SUBTIME(TIMESTAMP '2026-05-19 02:00:00', TIME '03:00:00') AS rollback;
+rollback
+2026-05-18 23:00:00
+=== String inputs accepted (TIME shape and TIMESTAMP shape) ===
+SELECT ADDTIME('10:00:00', '02:30:00')              AS str_time;
+str_time
+12:30:00
+SELECT ADDTIME('2026-05-19 10:00:00', '02:30:00')   AS str_ts;
+str_ts
+2026-05-19 12:30:00
+=== NULL propagation ===
+SELECT ADDTIME(NULL, TIME '01:00:00') AS n_in_a;
+n_in_a
+NULL
+SELECT SUBTIME(TIME '10:00:00', NULL) AS n_in_b;
+n_in_b
+NULL
+=== DIVERGENCE: TIME overflow errors (MySQL allows up to 838:59:59) ===
+SELECT ADDTIME(TIME '23:00:00', TIME '02:00:00');
+ERROR 1105: execution error: ADDTIME: result 90000000000 µs out of TIME range 0..=86400s
+=== SUBTIME TIME underflow errors ===
+SELECT SUBTIME(TIME '00:30:00', TIME '01:00:00');
+ERROR 1105: execution error: SUBTIME: result -1800000000 µs out of TIME range 0..=86400s
+=== Bad-string offset errors 1105 ===
+SELECT ADDTIME(TIME '10:00:00', 'not a time');
+ERROR 1105: execution error: ADDTIME: cannot parse "not a time" as a time offset
+=== Arity errors ===
+SELECT ADDTIME(TIME '10:00:00');
+ERROR 1105: execution error: ADDTIME requires 2 arguments
+SELECT SUBTIME(TIME '10:00:00', TIME '01:00:00', TIME '02:00:00');
+ERROR 1105: execution error: SUBTIME requires 2 arguments
+=== ADDTIME on column inside SELECT and WHERE ===
+DROP TABLE IF EXISTS tt;
+CREATE TABLE tt (id INT, t TIMESTAMP);
+INSERT INTO tt VALUES (1, TIMESTAMP '2026-05-19 10:00:00'), (2, TIMESTAMP '2026-05-19 22:30:00');
+SELECT id, ADDTIME(t, TIME '01:00:00') AS plus1h FROM tt ORDER BY id;
+id	plus1h
+1	2026-05-19 11:00:00
+2	2026-05-19 23:30:00
+SELECT id FROM tt WHERE ADDTIME(t, TIME '02:00:00') > TIMESTAMP '2026-05-19 23:00:00' ORDER BY id;
+id
+2
+DROP TABLE tt;

@@ -1,0 +1,93 @@
+# Independently authored ADDTIME / SUBTIME smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/t/func_time.test or PG regress.
+# Both functions were missing in zeta before zeta PR #1225
+# (errored "unknown function"); this slice locks in the
+# new behavior.
+#
+# Big-picture finding: ADDTIME(expr, time_offset) returns
+# expr + offset, with the same TYPE as expr (TIME or
+# TIMESTAMP). SUBTIME is the negated form. Both accept
+# strings parseable as either TIME or TIMESTAMP for expr,
+# and either TIME or string parseable as TIME for the
+# offset. NULL propagates in either arg.
+#
+# zeta's TIME storage is 0..86400 seconds, so a TIME+TIME
+# whose sum exceeds 24h (or a SUBTIME whose result goes
+# negative) errors 1105 — MySQL would allow up to 838:59:59,
+# so this is a documented DIVERGENCE. TIMESTAMP + TIME
+# crosses day boundaries fine.
+#
+# Adaptation notes:
+#   # zeta-adapt: ADDTIME/SUBTIME(TIME, TIME) — TIME result;
+#     out-of-[0,86400]s errors 1105 (zeta is tighter than
+#     MySQL on TIME range).
+#   # zeta-adapt: ADDTIME/SUBTIME(TIMESTAMP, TIME) —
+#     TIMESTAMP result; crosses day boundaries.
+#   # zeta-adapt: String arg accepted — TIME-shaped string
+#     resolves to TIME result; TIMESTAMP-shaped string to
+#     TIMESTAMP.
+#   # zeta-adapt: NULL → NULL.
+#   # zeta-adapt: Arity != 2 → errno 1105.
+#   # zeta-adapt: Bad-string offset → errno 1105 with
+#     "cannot parse".
+
+--echo === ADDTIME — TIME + TIME → TIME ===
+
+SELECT ADDTIME(TIME '10:00:00', TIME '02:30:00') AS sum_t;
+SELECT ADDTIME(TIME '23:30:00', TIME '00:30:00') AS day_boundary;
+SELECT ADDTIME(TIME '00:00:00', TIME '02:00:00') AS from_zero;
+
+--echo === ADDTIME — TIMESTAMP + TIME → TIMESTAMP (with rollover) ===
+
+SELECT ADDTIME(TIMESTAMP '2026-05-19 10:00:00', TIME '02:30:00') AS same_day;
+SELECT ADDTIME(TIMESTAMP '2026-05-19 23:00:00', TIME '02:00:00') AS rollover;
+
+--echo === SUBTIME — TIME - TIME → TIME ===
+
+SELECT SUBTIME(TIME '10:00:00', TIME '02:30:00') AS diff_t;
+
+--echo === SUBTIME — TIMESTAMP - TIME → TIMESTAMP (with rollback) ===
+
+SELECT SUBTIME(TIMESTAMP '2026-05-19 02:00:00', TIME '03:00:00') AS rollback;
+
+--echo === String inputs accepted (TIME shape and TIMESTAMP shape) ===
+
+SELECT ADDTIME('10:00:00', '02:30:00')              AS str_time;
+SELECT ADDTIME('2026-05-19 10:00:00', '02:30:00')   AS str_ts;
+
+--echo === NULL propagation ===
+
+SELECT ADDTIME(NULL, TIME '01:00:00') AS n_in_a;
+SELECT SUBTIME(TIME '10:00:00', NULL) AS n_in_b;
+
+--echo === DIVERGENCE: TIME overflow errors (MySQL allows up to 838:59:59) ===
+
+--error 1105
+SELECT ADDTIME(TIME '23:00:00', TIME '02:00:00');
+
+--echo === SUBTIME TIME underflow errors ===
+
+--error 1105
+SELECT SUBTIME(TIME '00:30:00', TIME '01:00:00');
+
+--echo === Bad-string offset errors 1105 ===
+
+--error 1105
+SELECT ADDTIME(TIME '10:00:00', 'not a time');
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT ADDTIME(TIME '10:00:00');
+--error 1105
+SELECT SUBTIME(TIME '10:00:00', TIME '01:00:00', TIME '02:00:00');
+
+--echo === ADDTIME on column inside SELECT and WHERE ===
+
+DROP TABLE IF EXISTS tt;
+CREATE TABLE tt (id INT, t TIMESTAMP);
+INSERT INTO tt VALUES (1, TIMESTAMP '2026-05-19 10:00:00'), (2, TIMESTAMP '2026-05-19 22:30:00');
+SELECT id, ADDTIME(t, TIME '01:00:00') AS plus1h FROM tt ORDER BY id;
+SELECT id FROM tt WHERE ADDTIME(t, TIME '02:00:00') > TIMESTAMP '2026-05-19 23:00:00' ORDER BY id;
+DROP TABLE tt;
