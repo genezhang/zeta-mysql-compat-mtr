@@ -1,0 +1,57 @@
+=== Basic in-range arithmetic still works ===
+SELECT 100 + 200 AS a, 200 - 50 AS b, 7 * 8 AS c, 100 / 3 AS d, 100 % 3 AS e;
+a	b	c	d	e
+300	150	56	33	1
+=== i64::MAX + 1 — errors (was silent wrap) ===
+SELECT 9223372036854775807 + 1;
+ERROR 1105: execution error: bigint out of range
+=== i64::MAX * 2 — errors (was silent wrap to -2) ===
+SELECT 9223372036854775807 * 2;
+ERROR 1105: execution error: bigint out of range
+=== Underflow via subtraction past i64::MIN — errors ===
+SELECT -9223372036854775807 - 2;
+ERROR 1105: execution error: bigint out of range
+=== In-range at the boundary still succeeds ===
+SELECT 9223372036854775806 + 1 AS edge_ok, 4611686018427387903 * 2 AS mul_ok;
+edge_ok	mul_ok
+9223372036854775807	9223372036854775806
+=== i64::MIN / -1 — errors (would overflow to i64::MAX+1) ===
+SELECT CAST(-9223372036854775808 AS BIGINT) / -1;
+ERROR 1105: execution error: bigint out of range
+=== Division / modulo by zero ===
+SELECT 10 / 0;
+ERROR 1105: execution error: division by zero
+SELECT 10 % 0;
+ERROR 1105: execution error: division by zero
+=== i32 + 1 at INT_MAX (column) — auto-widens to BIGINT ===
+DROP TABLE IF EXISTS i32t;
+CREATE TABLE i32t (a INT, b INT);
+INSERT INTO i32t VALUES (2147483647, 1);
+SELECT a + b AS widened FROM i32t;
+widened
+2147483648
+DELETE FROM i32t;
+=== i32 - 1 at INT_MIN (column) — auto-widens to BIGINT ===
+INSERT INTO i32t VALUES (-2147483648, 1);
+SELECT a - b AS widened_neg FROM i32t;
+widened_neg
+-2147483649
+DROP TABLE i32t;
+=== CAST string > i64::MAX — errno 1105 ===
+SELECT CAST('99999999999999999999' AS BIGINT);
+ERROR 1105: execution error: cannot cast '99999999999999999999' to BIGINT
+=== CAST float > i64::MAX — errno 1105 ===
+SELECT CAST(1e20 AS BIGINT);
+ERROR 1105: execution error: float out of range for BIGINT: 100000000000000000000
+=== CAST i64 literal > i32::MAX as INT — errno 1105 ===
+SELECT CAST(2147483648 AS INT);
+ERROR 1105: execution error: integer out of range for INT4: 2147483648
+=== KNOWN GAP: negative-direction CAST overflow silently clamps ===
+# `CAST(-9223372036854775809 AS BIGINT)` should error but
+# silently clamps to i64::MIN. The literal exceeds i64::MIN
+# so it's parsed as Decimal, and the Decimal→BIGINT cast
+# currently doesn't bounds-check. Separate gap from
+# add/sub/mul overflow (which now errors correctly).
+SELECT CAST(-9223372036854775809 AS BIGINT) AS clamped;
+clamped
+-9223372036854775808

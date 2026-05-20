@@ -1,0 +1,117 @@
+# Independently authored integer-arithmetic overflow edge
+# smoke test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/type_int.test or
+# overflow_int.test; complements basic numeric tests by
+# pinning the EDGE behavior: i64 / i32 add/sub/mul/div
+# overflow detection, i64::MIN / -1, division by zero, and
+# CAST overflow.
+#
+# Big-picture finding: arithmetic overflow now errors
+# (fixed in zeta PR #1213 — previously \`i64::MAX + 1\`
+# silently wrapped to i64::MIN, \`i64::MAX * 2\` returned
+# -2, and \`INT_MAX + 1\` on i32 columns silently truncated
+# to INT_MIN). i32 × i32 ops auto-promote to i64 when the
+# result no longer fits, matching the existing eval.rs
+# widening behavior. Division/modulo were already
+# overflow-checked; only add/sub/mul were affected.
+#
+# Adaptation notes:
+#   # zeta-adapt: i64 + 1 at MAX — errno 1105 \"bigint out
+#     of range\".
+#   # zeta-adapt: i64 * 2 at MAX/2+1 — errno 1105.
+#   # zeta-adapt: -i64::MAX - 2 (underflow) — errno 1105.
+#   # zeta-adapt: i64::MIN / -1 — errno 1105 \"bigint out
+#     of range\" (otherwise would overflow to i64::MAX+1).
+#   # zeta-adapt: 10 / 0 / 10 % 0 — errno 1105 \"division
+#     by zero\".
+#   # zeta-adapt: i32 + 1 at INT_MAX (column) — auto-widens
+#     to i64 (returns 2147483648 as BIGINT). PG-style
+#     promotion; MySQL would also accept this.
+#   # zeta-adapt: i32 - 1 at INT_MIN (column) — auto-widens
+#     to i64 (returns -2147483649).
+#   # zeta-adapt: CAST string > i64::MAX → errno 1105
+#     \"cannot cast '...' to BIGINT\".
+#   # zeta-adapt: CAST float > i64::MAX → errno 1105 \"float
+#     out of range for BIGINT\".
+#   # zeta-adapt: CAST i64 literal > i32::MAX as INT →
+#     errno 1105 \"integer out of range for INT4\".
+#   # zeta-adapt: in-range arithmetic at the boundary —
+#     works: \`i64::MAX - 1 + 1\` = i64::MAX.
+#   # zeta-adapt: KNOWN GAP — \`CAST(-9223372036854775809
+#     AS BIGINT)\` silently clamps to i64::MIN. The literal
+#     exceeds i64::MIN so it's parsed as Decimal first, and
+#     Decimal → BIGINT cast doesn't bounds-check. Separate
+#     gap from arithmetic overflow.
+
+--echo === Basic in-range arithmetic still works ===
+
+SELECT 100 + 200 AS a, 200 - 50 AS b, 7 * 8 AS c, 100 / 3 AS d, 100 % 3 AS e;
+
+--echo === i64::MAX + 1 — errors (was silent wrap) ===
+
+--error 1105
+SELECT 9223372036854775807 + 1;
+
+--echo === i64::MAX * 2 — errors (was silent wrap to -2) ===
+
+--error 1105
+SELECT 9223372036854775807 * 2;
+
+--echo === Underflow via subtraction past i64::MIN — errors ===
+
+--error 1105
+SELECT -9223372036854775807 - 2;
+
+--echo === In-range at the boundary still succeeds ===
+
+SELECT 9223372036854775806 + 1 AS edge_ok, 4611686018427387903 * 2 AS mul_ok;
+
+--echo === i64::MIN / -1 — errors (would overflow to i64::MAX+1) ===
+
+--error 1105
+SELECT CAST(-9223372036854775808 AS BIGINT) / -1;
+
+--echo === Division / modulo by zero ===
+
+--error 1105
+SELECT 10 / 0;
+--error 1105
+SELECT 10 % 0;
+
+--echo === i32 + 1 at INT_MAX (column) — auto-widens to BIGINT ===
+
+DROP TABLE IF EXISTS i32t;
+CREATE TABLE i32t (a INT, b INT);
+INSERT INTO i32t VALUES (2147483647, 1);
+SELECT a + b AS widened FROM i32t;
+DELETE FROM i32t;
+
+--echo === i32 - 1 at INT_MIN (column) — auto-widens to BIGINT ===
+
+INSERT INTO i32t VALUES (-2147483648, 1);
+SELECT a - b AS widened_neg FROM i32t;
+DROP TABLE i32t;
+
+--echo === CAST string > i64::MAX — errno 1105 ===
+
+--error 1105
+SELECT CAST('99999999999999999999' AS BIGINT);
+
+--echo === CAST float > i64::MAX — errno 1105 ===
+
+--error 1105
+SELECT CAST(1e20 AS BIGINT);
+
+--echo === CAST i64 literal > i32::MAX as INT — errno 1105 ===
+
+--error 1105
+SELECT CAST(2147483648 AS INT);
+
+--echo === KNOWN GAP: negative-direction CAST overflow silently clamps ===
+--echo # `CAST(-9223372036854775809 AS BIGINT)` should error but
+--echo # silently clamps to i64::MIN. The literal exceeds i64::MIN
+--echo # so it's parsed as Decimal, and the Decimal→BIGINT cast
+--echo # currently doesn't bounds-check. Separate gap from
+--echo # add/sub/mul overflow (which now errors correctly).
+
+SELECT CAST(-9223372036854775809 AS BIGINT) AS clamped;
