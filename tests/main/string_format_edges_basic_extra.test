@@ -1,0 +1,128 @@
+# Independently authored string-format edge-case smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test; complements
+# string_func_basic / string_func_extra by pinning the
+# EDGE-CASE behavior of FORMAT/CONV/HEX/UNHEX/BIN/OCT/
+# ASCII/ORD/CHAR/QUOTE (NULL inputs, negative numbers,
+# odd-length hex, empty strings, multi-arg CHAR, locale,
+# zero/empty edges) NOT covered there.
+#
+# Big-picture finding: zeta has thorough surface for the
+# binary/hex/string-conversion family with sensible NULL
+# propagation and correct UNHEX odd-length rejection.
+# Two notable misses: FORMAT does not accept the 3-arg
+# locale form (errors 1105), and QUOTE(NULL) returns NULL
+# instead of the literal 4-char string 'NULL' that MySQL
+# emits — both common in ORM / reporting code.
+#
+# CONV is fully supported with proper base-1..base-36
+# arithmetic, NULL propagation, and zero-base → NULL
+# (no prior coverage at all).
+#
+# Adaptation notes:
+#   # zeta-adapt: FORMAT(num, decimals) — supported.
+#     Returns thousand-separated string with the requested
+#     number of fractional digits, including trailing-zero
+#     padding. Negative numbers use leading minus.
+#   # zeta-adapt: FORMAT NULL propagation — NULL for either
+#     argument → NULL.
+#   # zeta-adapt: CONV(n, from_base, to_base) — supported.
+#     Bases 2..36 accepted. NULL in any arg → NULL.
+#     to_base or from_base = 0 → NULL.
+#   # zeta-adapt: HEX(int) returns the integer's hex; HEX(0)
+#     → '0'. HEX(str) returns the byte hex.
+#   # zeta-adapt: UNHEX('') → '' (empty); UNHEX(odd-length)
+#     → NULL; UNHEX(invalid chars) → NULL; UNHEX(NULL) →
+#     NULL.
+#   # zeta-adapt: BIN(neg) and OCT(neg) return two's
+#     complement representation (64-bit unsigned form).
+#   # zeta-adapt: ASCII('') — returns 0 (empty string has
+#     no leading byte).
+#   # zeta-adapt: CHAR(N) → 1-char string; CHAR(NULL) →
+#     empty string (NULL arg silently dropped, not NULL).
+#   # zeta-adapt: CHAR(N1, N2, ...) — multi-arg
+#     concatenation supported.
+#   # zeta-adapt: ORD(s) — returns leading byte value for
+#     single/multi-char input.
+#   # zeta-adapt: KNOWN DIVERGENCE — QUOTE(NULL) returns
+#     NULL where MySQL returns the literal 4-character
+#     string 'NULL'. ORMs using QUOTE to build SQL
+#     fragments will see NULL collapse instead of being
+#     stringified.
+#   # zeta-adapt: KNOWN GAP — FORMAT(n, decimals, 'locale')
+#     (the 3-arg locale-aware form) errors 1105 "FORMAT
+#     requires 2 arguments". The 2-arg form is supported.
+
+--echo === FORMAT base + padding + negative ===
+
+SELECT FORMAT(1234567.89, 2) AS basic;
+SELECT FORMAT(1234567.89, 0) AS no_dec;
+SELECT FORMAT(1234.5, 4) AS pad_dec;
+SELECT FORMAT(-1234.56, 2) AS neg;
+
+--echo === FORMAT NULL propagation ===
+
+SELECT FORMAT(NULL, 2) AS nl_n;
+SELECT FORMAT(123, NULL) AS nl_d;
+
+--echo === CONV base conversions ===
+
+SELECT CONV('FF', 16, 10) AS hex_dec;
+SELECT CONV(255, 10, 16) AS dec_hex;
+SELECT CONV('1010', 2, 10) AS bin_dec;
+SELECT CONV(100, 10, 2) AS dec_bin;
+SELECT CONV('FF', 16, 2) AS hex_bin;
+SELECT CONV('z', 36, 10) AS base36;
+
+--echo === CONV NULL propagation + zero base ===
+
+SELECT CONV(NULL, 16, 10) AS nl_n;
+SELECT CONV('ff', NULL, 10) AS nl_f;
+SELECT CONV('ff', 16, NULL) AS nl_t;
+SELECT CONV(10, 0, 10) AS zero_base;
+
+--echo === HEX integer and string forms ===
+
+SELECT HEX(255) AS int_hex, HEX(0) AS zero, HEX('abc') AS str_hex, HEX(NULL) AS nl;
+
+--echo === UNHEX edges ===
+
+SELECT UNHEX('616263') AS valid;
+SELECT UNHEX('') AS empty;
+SELECT UNHEX('1') AS odd_len;
+SELECT UNHEX('XYZ') AS invalid;
+SELECT UNHEX(NULL) AS nl;
+
+--echo === BIN / OCT negative — two's complement ===
+
+SELECT BIN(-1) AS bin_neg;
+SELECT OCT(-8) AS oct_neg;
+SELECT BIN(0) AS zero, OCT(0) AS zero2;
+
+--echo === ASCII empty / multi-byte ===
+
+SELECT ASCII('') AS empty;
+
+--echo === CHAR — single, multi-arg, NULL ===
+
+SELECT CHAR(65) AS a;
+SELECT CHAR(65, 66, 67) AS abc;
+SELECT LENGTH(CHAR(0)) AS len_zero;
+
+--echo === ORD on single vs multi-char ===
+
+SELECT ORD('A') AS single, ORD('AB') AS multi, ORD('') AS empty, ORD(NULL) AS nl;
+
+--echo === QUOTE — escape single quote and backslash ===
+
+SELECT QUOTE('don''t') AS sq;
+SELECT QUOTE(123) AS num;
+
+--echo === KNOWN DIVERGENCE: QUOTE(NULL) → NULL, MySQL → 'NULL' string ===
+
+SELECT QUOTE(NULL) AS qn;
+
+--echo === KNOWN GAP: FORMAT(n, dec, 'locale') — errno 1105 ===
+
+--error 1105
+SELECT FORMAT(1234.56, 2, 'de_DE');
