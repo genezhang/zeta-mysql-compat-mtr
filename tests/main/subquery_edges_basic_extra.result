@@ -1,0 +1,74 @@
+=== Setup ===
+DROP TABLE IF EXISTS sq;
+DROP TABLE IF EXISTS empty_t;
+CREATE TABLE sq (id INT PRIMARY KEY, n INT);
+INSERT INTO sq VALUES (1, 10), (2, 20), (3, 30);
+CREATE TABLE empty_t (id INT);
+=== Scalar subquery returning 0 rows → NULL ===
+SELECT (SELECT id FROM empty_t) AS zero_row;
+zero_row
+NULL
+=== Scalar subquery returning > 1 row — errno 1242 ===
+SELECT (SELECT id FROM sq);
+ERROR 1242: execution error: scalar subquery returned more than one row
+=== SOME — synonym for ANY ===
+SELECT 20 = SOME (SELECT n FROM sq) AS some_match, 99 = SOME (SELECT n FROM sq) AS some_nomatch;
+some_match	some_nomatch
+1	0
+=== Empty-subquery sentinels ===
+SELECT EXISTS (SELECT 1 FROM empty_t) AS ex_empty;
+ex_empty
+0
+SELECT NOT EXISTS (SELECT 1 FROM empty_t) AS not_ex_empty;
+not_ex_empty
+1
+SELECT 1 IN (SELECT id FROM empty_t) AS in_empty;
+in_empty
+0
+SELECT 1 NOT IN (SELECT id FROM empty_t) AS not_in_empty;
+not_in_empty
+1
+SELECT 1 = ANY (SELECT id FROM empty_t) AS any_empty;
+any_empty
+0
+=== Subquery in HAVING ===
+SELECT n FROM sq GROUP BY n HAVING COUNT(*) > (SELECT 0) ORDER BY n;
+n
+10
+20
+30
+=== Scalar-subquery comparison: (SELECT ...) op (SELECT ...) ===
+SELECT (SELECT MIN(n) FROM sq) = (SELECT MIN(n) FROM sq) AS scalar_eq;
+scalar_eq
+1
+SELECT (SELECT MIN(n) FROM sq) < (SELECT MAX(n) FROM sq) AS scalar_lt;
+scalar_lt
+1
+=== Multi-row scalar in SELECT-list errors 1242 ===
+SELECT id, (SELECT n FROM sq) FROM sq;
+ERROR 1242: execution error: scalar subquery returned more than one row
+=== NULL in subquery — 3VL semantics ===
+SELECT (SELECT NULL) AS nl;
+nl
+NULL
+SELECT NULL IN (SELECT n FROM sq) AS nl_in;
+nl_in
+NULL
+=== ANY / ALL with >, <, >=, <= operators ===
+SELECT 20 > ANY (SELECT n FROM sq) AS gt_any;
+gt_any
+1
+SELECT 99 > ALL (SELECT n FROM sq) AS gt_all;
+gt_all
+1
+SELECT 5 < ALL (SELECT n FROM sq) AS lt_all;
+lt_all
+1
+SELECT 99 = ANY (SELECT n FROM sq) AS eq_any_miss;
+eq_any_miss
+0
+=== KNOWN GAP: = ALL (subquery) — errno 1064 with rewrite hint ===
+SELECT 1 = ALL (SELECT id FROM empty_t);
+ERROR 1064: SQL parse error: = ALL(subquery) is not supported; use = ANY(subquery) or IN (subquery) instead
+DROP TABLE sq;
+DROP TABLE empty_t;

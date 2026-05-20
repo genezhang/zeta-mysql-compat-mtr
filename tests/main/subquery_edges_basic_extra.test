@@ -1,0 +1,112 @@
+# Independently authored subquery edge-case smoke test
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/subquery_*.test or PG regress;
+# complements subquery_basic / subquery_basic_extra
+# (which cover scalar / EXISTS / ANY / ALL / IN basics) by
+# pinning the EDGE behavior NOT covered there: scalar
+# subquery returning 0 rows, SOME synonym, empty-subquery
+# behavior across EXISTS/IN/ANY/ALL, HAVING-subquery,
+# multi-row in SELECT-list, NULL handling, scalar-subquery
+# comparison, ANY/ALL operator variants, the = ALL gap.
+#
+# Big-picture finding: zeta handles standard subquery
+# corner cases correctly: empty subqueries return the
+# expected sentinel values (EXISTS → FALSE, IN → FALSE,
+# NOT IN → TRUE, ANY → FALSE), 0-row scalar subquery
+# returns NULL, multi-row scalar errors 1242 with a clean
+# message. NULL semantics through 3VL are correct (NULL
+# IN ... → NULL). The one notable gap is `= ALL
+# (subquery)` which errors 1064 with a helpful message
+# directing users to use `= ANY` or `IN` instead — this
+# is a deliberate UX choice rather than a bug, but it
+# does mean ORMs emitting `= ALL` need a rewrite.
+#
+# Adaptation notes:
+#   # zeta-adapt: scalar subquery returning 0 rows → NULL.
+#   # zeta-adapt: scalar subquery returning > 1 row →
+#     1242 "scalar subquery returned more than one row".
+#   # zeta-adapt: SOME — synonym for ANY, supported.
+#   # zeta-adapt: empty-subquery sentinels:
+#     - EXISTS (empty) → 0 (FALSE)
+#     - NOT EXISTS (empty) → 1 (TRUE)
+#     - x IN (empty) → 0 (FALSE)
+#     - x NOT IN (empty) → 1 (TRUE)
+#     - x = ANY (empty) → 0 (FALSE)
+#   # zeta-adapt: subquery in HAVING — supported.
+#   # zeta-adapt: scalar-subquery comparison
+#     `(SELECT ...) = (SELECT ...)` — supported.
+#   # zeta-adapt: ANY / ALL with >, <, >=, <= operators —
+#     all supported.
+#   # zeta-adapt: NULL IN (subquery) → NULL (3VL).
+#   # zeta-adapt: KNOWN DIVERGENCE — `x NOT IN (subquery
+#     with NULL row)` errors 1105 instead of returning
+#     NULL (already pinned in null_3vl_basic_extra).
+#   # zeta-adapt: KNOWN GAP — `x = ALL (subquery)` errors
+#     1064 "= ALL(subquery) is not supported; use =
+#     ANY(subquery) or IN (subquery) instead". This is a
+#     deliberate UX rewrite-hint rather than a true
+#     unimplemented feature; PG/MySQL both support it
+#     directly.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sq;
+DROP TABLE IF EXISTS empty_t;
+CREATE TABLE sq (id INT PRIMARY KEY, n INT);
+INSERT INTO sq VALUES (1, 10), (2, 20), (3, 30);
+CREATE TABLE empty_t (id INT);
+
+--echo === Scalar subquery returning 0 rows → NULL ===
+
+SELECT (SELECT id FROM empty_t) AS zero_row;
+
+--echo === Scalar subquery returning > 1 row — errno 1242 ===
+
+--error 1242
+SELECT (SELECT id FROM sq);
+
+--echo === SOME — synonym for ANY ===
+
+SELECT 20 = SOME (SELECT n FROM sq) AS some_match, 99 = SOME (SELECT n FROM sq) AS some_nomatch;
+
+--echo === Empty-subquery sentinels ===
+
+SELECT EXISTS (SELECT 1 FROM empty_t) AS ex_empty;
+SELECT NOT EXISTS (SELECT 1 FROM empty_t) AS not_ex_empty;
+SELECT 1 IN (SELECT id FROM empty_t) AS in_empty;
+SELECT 1 NOT IN (SELECT id FROM empty_t) AS not_in_empty;
+SELECT 1 = ANY (SELECT id FROM empty_t) AS any_empty;
+
+--echo === Subquery in HAVING ===
+
+SELECT n FROM sq GROUP BY n HAVING COUNT(*) > (SELECT 0) ORDER BY n;
+
+--echo === Scalar-subquery comparison: (SELECT ...) op (SELECT ...) ===
+
+SELECT (SELECT MIN(n) FROM sq) = (SELECT MIN(n) FROM sq) AS scalar_eq;
+SELECT (SELECT MIN(n) FROM sq) < (SELECT MAX(n) FROM sq) AS scalar_lt;
+
+--echo === Multi-row scalar in SELECT-list errors 1242 ===
+
+--error 1242
+SELECT id, (SELECT n FROM sq) FROM sq;
+
+--echo === NULL in subquery — 3VL semantics ===
+
+SELECT (SELECT NULL) AS nl;
+SELECT NULL IN (SELECT n FROM sq) AS nl_in;
+
+--echo === ANY / ALL with >, <, >=, <= operators ===
+
+SELECT 20 > ANY (SELECT n FROM sq) AS gt_any;
+SELECT 99 > ALL (SELECT n FROM sq) AS gt_all;
+SELECT 5 < ALL (SELECT n FROM sq) AS lt_all;
+SELECT 99 = ANY (SELECT n FROM sq) AS eq_any_miss;
+
+--echo === KNOWN GAP: = ALL (subquery) — errno 1064 with rewrite hint ===
+
+--error 1064
+SELECT 1 = ALL (SELECT id FROM empty_t);
+
+DROP TABLE sq;
+DROP TABLE empty_t;
