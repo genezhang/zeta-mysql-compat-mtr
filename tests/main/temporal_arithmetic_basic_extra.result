@@ -93,9 +93,16 @@ t
 SELECT MAKE_DATE(2024, 5, 19) AS d, MAKE_TIME(14, 30, 45) AS t;
 d	t
 2024-05-19	14:30:45
-=== KNOWN GAP: MAKEDATE (MySQL spelling) — errno 1105 ===
-SELECT MAKEDATE(2024, 140);
-ERROR 1105: execution error: unknown function: MAKEDATE
+=== MAKEDATE (MySQL day-of-year form) — supported ===
+SELECT MAKEDATE(2024, 140) AS d;
+d
+2024-05-19
+SELECT MAKEDATE(2024, 367) AS rollover;
+rollover
+2025-01-01
+SELECT MAKEDATE(2024, 0) AS d_zero;
+d_zero
+NULL
 === KNOWN GAP: INTERVAL n MICROSECOND — errno 1064 ===
 SELECT INTERVAL 1 MICROSECOND;
 ERROR 1064: SQL parse error: unsupported interval field: MICROSECOND
