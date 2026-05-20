@@ -50,4 +50,11 @@ xor_all
 SELECT TO_HEX(255) AS th;
 th
 FF
+=== FROM_HEX alias for UNHEX — supported since zeta #1207 ===
+SELECT FROM_HEX('616263') AS fh;
+fh
+abc
+SELECT FROM_HEX('1') AS odd, FROM_HEX(NULL) AS nl;
+odd	nl
+NULL	NULL
 DROP TABLE bt;
