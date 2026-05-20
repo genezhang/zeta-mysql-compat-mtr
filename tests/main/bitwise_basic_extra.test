@@ -47,9 +47,9 @@
 #     Substitute: same workaround as above.
 #   # zeta-adapt: KNOWN GAP — `XOR(a, b)` function form
 #     errors 1105 "unknown function: XOR".
-#   # zeta-adapt: KNOWN GAP — `TO_HEX(int)` (PG alias)
-#     errors 1105 "unknown function: TO_HEX". Substitute:
-#     HEX(int) (MySQL spelling).
+#   # zeta-adapt: TO_HEX(int) — PG alias for HEX, supported
+#     since zeta #1205. Same single-arg semantics, uppercase
+#     output (matches HEX).
 
 --echo === Bitwise & (AND), | (OR) ===
 
@@ -114,8 +114,6 @@ SELECT 6 XOR 3 AS r;
 --error 1105
 SELECT XOR(6, 3) AS r;
 
---echo === KNOWN GAP: TO_HEX (PG alias) — errno 1105 ===
---echo # Substitute: HEX(...).
+--echo === TO_HEX (PG alias) — supported since zeta #1205 ===
 
---error 1105
 SELECT TO_HEX(255) AS r;

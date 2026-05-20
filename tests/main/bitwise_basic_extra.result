@@ -59,7 +59,7 @@ ERROR 1064: SQL parse error: unsupported binary operator: XOR
 === KNOWN GAP: XOR(a, b) function form — errno 1105 ===
 SELECT XOR(6, 3) AS r;
 ERROR 1105: execution error: unknown function: XOR
-=== KNOWN GAP: TO_HEX (PG alias) — errno 1105 ===
-# Substitute: HEX(...).
+=== TO_HEX (PG alias) — supported since zeta #1205 ===
 SELECT TO_HEX(255) AS r;
-ERROR 1105: execution error: unknown function: TO_HEX
+r
+FF
