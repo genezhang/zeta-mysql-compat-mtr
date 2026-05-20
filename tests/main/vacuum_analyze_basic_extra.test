@@ -1,0 +1,118 @@
+# Independently authored VACUUM / ANALYZE / maintenance smoke
+# test for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/analyze.test or repair.test;
+# pins zeta's table-maintenance surface (no prior compat
+# coverage).
+#
+# Adaptation notes:
+#   # zeta-adapt: VACUUM — supported (silent no-op; zeta's
+#     LSM compactor handles space reclamation).
+#   # zeta-adapt: VACUUM <table> — supported.
+#   # zeta-adapt: VACUUM ANALYZE (no table) — supported.
+#   # zeta-adapt: VACUUM FULL <table> — supported.
+#   # zeta-adapt: ANALYZE (no table) — supported.
+#   # zeta-adapt: ANALYZE <table> — supported.
+#   # zeta-adapt: ANALYZE TABLE <table> (MySQL spelling) —
+#     supported.
+#   # zeta-adapt: KNOWN GAP — VACUUM ANALYZE <table> (combined
+#     with a table target) errors 1064 "Expected: end of
+#     statement, found: <name>". Substitute: run as two
+#     statements: `VACUUM <t>; ANALYZE <t>;`.
+#   # zeta-adapt: KNOWN GAP — `VACUUM (OPTION, …) <table>`
+#     (PG options-in-parens form) errors 1064 "Expected:
+#     end of statement, found: (".
+#   # zeta-adapt: KNOWN GAP — REINDEX TABLE / INDEX / DATABASE
+#     all error 1064 "Expected: an SQL statement, found:
+#     REINDEX". No REINDEX parser branch. Substitute:
+#     DROP + re-CREATE INDEX (BTree rebuild) or just let the
+#     LSM compactor handle it.
+#   # zeta-adapt: KNOWN GAP — MySQL CHECKSUM TABLE errors 1064.
+#   # zeta-adapt: KNOWN GAP — MySQL OPTIMIZE TABLE errors 1064.
+#   # zeta-adapt: KNOWN GAP — MySQL REPAIR TABLE errors 1064.
+#   # zeta-adapt: KNOWN GAP — MySQL CHECK TABLE errors 1064.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS vt;
+CREATE TABLE vt (id INT PRIMARY KEY, n INT);
+INSERT INTO vt VALUES (1, 10), (2, 20);
+
+--echo === VACUUM (no args) — silent no-op ===
+
+VACUUM;
+
+--echo === VACUUM <table> — silent no-op ===
+
+VACUUM vt;
+
+--echo === VACUUM ANALYZE (no table) — silent no-op ===
+
+VACUUM ANALYZE;
+
+--echo === VACUUM FULL <table> — silent no-op ===
+
+VACUUM FULL vt;
+
+--echo === ANALYZE (no table) — silent no-op ===
+
+ANALYZE;
+
+--echo === ANALYZE <table> ===
+
+ANALYZE vt;
+
+--echo === ANALYZE TABLE <table> (MySQL spelling) ===
+
+ANALYZE TABLE vt;
+
+--echo === KNOWN GAP: VACUUM ANALYZE <table> combined — errno 1064 ===
+--echo # Substitute: VACUUM <t>; ANALYZE <t>;
+
+--error 1064
+VACUUM ANALYZE vt;
+
+--echo === KNOWN GAP: VACUUM (option, …) <table> (parens form) — errno 1064 ===
+
+--error 1064
+VACUUM (VERBOSE) vt;
+
+--echo === KNOWN GAP: REINDEX TABLE — errno 1064 ===
+--echo # No REINDEX parser branch. Substitute: DROP + re-CREATE
+--echo # INDEX, or let the LSM compactor handle it.
+
+--error 1064
+REINDEX TABLE vt;
+
+--echo === KNOWN GAP: REINDEX INDEX — errno 1064 ===
+
+--error 1064
+REINDEX INDEX no_such;
+
+--echo === KNOWN GAP: REINDEX DATABASE — errno 1064 ===
+
+--error 1064
+REINDEX DATABASE test;
+
+--echo === KNOWN GAP: MySQL CHECKSUM TABLE — errno 1064 ===
+
+--error 1064
+CHECKSUM TABLE vt;
+
+--echo === KNOWN GAP: MySQL OPTIMIZE TABLE — errno 1064 ===
+
+--error 1064
+OPTIMIZE TABLE vt;
+
+--echo === KNOWN GAP: MySQL REPAIR TABLE — errno 1064 ===
+
+--error 1064
+REPAIR TABLE vt;
+
+--echo === KNOWN GAP: MySQL CHECK TABLE — errno 1064 ===
+
+--error 1064
+CHECK TABLE vt;
+
+--echo === Cleanup ===
+
+DROP TABLE vt;
