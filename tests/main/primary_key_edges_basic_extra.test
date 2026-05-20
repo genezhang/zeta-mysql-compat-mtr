@@ -1,0 +1,135 @@
+# Independently authored PRIMARY KEY edge-case smoke test
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/t/constraint.test or PG regress;
+# complements constraint_basic / column_constraint_basic_
+# extra (which cover basic PK / UNIQUE / NOT NULL / CHECK
+# / FK + SERIAL / AUTO_INCREMENT / composite-PK-with-
+# generated) by pinning the EDGE behavior NOT covered
+# there: ADD PRIMARY KEY via ALTER, second-PK rejection,
+# DROP PRIMARY KEY gap, composite duplicate, TEXT PK,
+# explicit NULLABLE+PK coercion, ADD PK on duplicate
+# data, AUTO_INCREMENT batch + LAST_INSERT_ID.
+#
+# Big-picture finding: zeta enforces PK constraints
+# correctly across all paths: duplicate insert → 1062,
+# NULL into PK → 1105 not-null violation (matches
+# standard since PK implies NOT NULL), composite PK
+# duplicate → 1062 with composite-key message, TEXT PK
+# duplicate → 1062. ADD PRIMARY KEY via ALTER works,
+# and re-adding errors 1105 with a clear message
+# (`table already has a primary key`). One notable gap:
+# DROP PRIMARY KEY (MySQL syntax) is not supported at
+# parse — errors 1064 "unsupported ALTER TABLE
+# operation". DROP CONSTRAINT <pk_name> is the
+# substitute (covered in fk_alter_basic_extra).
+#
+# Adaptation notes:
+#   # zeta-adapt: ALTER TABLE ADD PRIMARY KEY (col) —
+#     supported. Builds the PK index from existing data.
+#   # zeta-adapt: ADD PRIMARY KEY when one already
+#     exists — errors 1105 "table already has a primary
+#     key".
+#   # zeta-adapt: Composite PK PRIMARY KEY (a, b) —
+#     supported. Duplicate (a, b) tuple → 1062
+#     "duplicate key value violates primary key".
+#   # zeta-adapt: PK on TEXT column — supported.
+#     Duplicate insert → 1062.
+#   # zeta-adapt: INSERT NULL into PK column — errors
+#     1105 "null value in column ... violates not-null
+#     constraint" (PK implies NOT NULL).
+#   # zeta-adapt: CREATE TABLE with `id INT NULL
+#     PRIMARY KEY` — the NULL declaration is silently
+#     overridden by the PK (NOT NULL wins). Inserting
+#     NULL still errors 1105.
+#   # zeta-adapt: ADD PRIMARY KEY on a table with
+#     duplicate data — errors 1105 "could not create
+#     primary key: duplicate key values found".
+#   # zeta-adapt: AUTO_INCREMENT batch INSERT —
+#     IDs are assigned sequentially starting from 1.
+#     LAST_INSERT_ID() returns the FIRST id of the
+#     last INSERT batch (matches MySQL semantics).
+#   # zeta-adapt: KNOWN GAP — `ALTER TABLE ... DROP
+#     PRIMARY KEY` (MySQL spelling) errors 1064
+#     "unsupported ALTER TABLE operation: DROP PRIMARY
+#     KEY". Substitute via `ALTER TABLE ... DROP
+#     CONSTRAINT <pk_name>` (PG-flavored).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS pa;
+CREATE TABLE pa (id INT, name VARCHAR(20));
+INSERT INTO pa VALUES (1, 'a'), (2, 'b');
+
+--echo === ALTER TABLE ADD PRIMARY KEY (col) — builds PK from existing data ===
+
+ALTER TABLE pa ADD PRIMARY KEY (id);
+SHOW INDEX FROM pa;
+
+--echo === ADD PRIMARY KEY when one already exists — errno 1105 ===
+
+--error 1105
+ALTER TABLE pa ADD PRIMARY KEY (name);
+
+--echo === Composite PRIMARY KEY (a, b) — duplicate tuple → 1062 ===
+
+DROP TABLE IF EXISTS pc;
+CREATE TABLE pc (a INT, b INT, PRIMARY KEY (a, b));
+INSERT INTO pc VALUES (1, 2), (1, 3), (2, 2);
+--error 1062
+INSERT INTO pc VALUES (1, 2);
+
+--echo === PK on TEXT column — duplicate → 1062 ===
+
+DROP TABLE IF EXISTS pt;
+CREATE TABLE pt (name VARCHAR(20) PRIMARY KEY, n INT);
+INSERT INTO pt VALUES ('alice', 1), ('bob', 2);
+--error 1062
+INSERT INTO pt VALUES ('alice', 99);
+
+--echo === INSERT NULL into PK column — errno 1105 (PK implies NOT NULL) ===
+
+DROP TABLE IF EXISTS pn;
+CREATE TABLE pn (id INT PRIMARY KEY, n INT);
+--error 1105
+INSERT INTO pn (id, n) VALUES (NULL, 1);
+
+--echo === CREATE TABLE id INT NULL PRIMARY KEY — NULL silently overridden ===
+
+DROP TABLE IF EXISTS pnnull;
+CREATE TABLE pnnull (id INT NULL PRIMARY KEY);
+--error 1105
+INSERT INTO pnnull VALUES (NULL);
+INSERT INTO pnnull VALUES (1);
+SELECT id FROM pnnull;
+
+--echo === ADD PRIMARY KEY on duplicate data — errno 1105 ===
+
+DROP TABLE IF EXISTS pad;
+CREATE TABLE pad (id INT, n INT);
+INSERT INTO pad VALUES (1, 10), (1, 20);
+--error 1105
+ALTER TABLE pad ADD PRIMARY KEY (id);
+
+--echo === AUTO_INCREMENT batch INSERT — sequential IDs from 1 ===
+
+DROP TABLE IF EXISTS pi;
+CREATE TABLE pi (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(20));
+INSERT INTO pi (name) VALUES ('a'), ('b'), ('c');
+SELECT id, name FROM pi ORDER BY id;
+
+--echo === LAST_INSERT_ID() — returns FIRST id of last batch (MySQL semantics) ===
+
+SELECT LAST_INSERT_ID() AS first_id;
+
+--echo === KNOWN GAP: ALTER TABLE DROP PRIMARY KEY — errno 1064 ===
+
+--error 1064
+ALTER TABLE pi DROP PRIMARY KEY;
+
+DROP TABLE pa;
+DROP TABLE pc;
+DROP TABLE pt;
+DROP TABLE pn;
+DROP TABLE pnnull;
+DROP TABLE pad;
+DROP TABLE pi;
