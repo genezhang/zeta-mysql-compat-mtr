@@ -1,0 +1,84 @@
+=== COALESCE all-NULL → NULL ===
+SELECT COALESCE(NULL, NULL, NULL) AS all_null;
+all_null
+NULL
+=== COALESCE single-arg ===
+SELECT COALESCE(NULL) AS single_null, COALESCE('a') AS single_set;
+single_null	single_set
+NULL	a
+=== COALESCE zero-arg — lenient NULL (PG / MySQL would error) ===
+SELECT COALESCE() AS empty;
+empty
+NULL
+=== COALESCE mixed types — first non-NULL ===
+SELECT COALESCE(NULL, 1, 'a') AS pick_int, COALESCE(NULL, 'a', 1) AS pick_str;
+pick_int	pick_str
+1	a
+=== COALESCE short-circuits — bad-cast tail arg not evaluated ===
+SELECT COALESCE(1, 10/0) AS short_div, COALESCE('result', CAST('not-a-date' AS DATE)) AS short_cast;
+short_div	short_cast
+1	result
+=== NULLIF type coercion — Int/Decimal equal, Int/String not ===
+SELECT NULLIF(1, 1.0) AS int_dec_eq, NULLIF(1, '1') AS int_str_keep, NULLIF('1', 1) AS str_int_keep;
+int_dec_eq	int_str_keep	str_int_keep
+NULL	1	1
+=== NULLIF with NULL — lhs-NULL, rhs-NULL, both-NULL ===
+SELECT NULLIF(NULL, 1) AS lhs_null, NULLIF(1, NULL) AS rhs_null, NULLIF(NULL, NULL) AS both_null;
+lhs_null	rhs_null	both_null
+NULL	1	NULL
+=== IFNULL arity — exactly 2 args ===
+SELECT IFNULL(NULL, 'fb') AS use_fb, IFNULL('val', 'fb') AS keep_val, IFNULL(NULL, NULL) AS both_null;
+use_fb	keep_val	both_null
+fb	val	NULL
+=== IFNULL arity errors — 1-arg and 3-arg both errno 1105 ===
+SELECT IFNULL(NULL);
+ERROR 1105: execution error: IFNULL requires exactly 2 arguments
+SELECT IFNULL(NULL, NULL, 'three');
+ERROR 1105: execution error: IFNULL requires exactly 2 arguments
+=== ISNULL — 1-arg boolean wrapper around IS NULL ===
+SELECT ISNULL(NULL) AS n1, ISNULL('a') AS n2;
+n1	n2
+1	0
+=== NVL — Oracle 2-arg alias ===
+SELECT NVL(NULL, 'fb') AS n_null, NVL('a', 'fb') AS n_keep;
+n_null	n_keep
+fb	a
+=== KNOWN GAP: NVL2 — errno 1105 "unknown function" ===
+SELECT NVL2('a', 'first', 'second');
+ERROR 1105: execution error: unknown function: NVL2
+=== COALESCE on table column — fallback for NULL rows ===
+DROP TABLE IF EXISTS c;
+CREATE TABLE c (id INT, v INT);
+INSERT INTO c VALUES (1,10), (2,NULL), (3,30), (4,NULL);
+SELECT id, COALESCE(v, -1) AS def FROM c ORDER BY id;
+id	def
+1	10
+2	-1
+3	30
+4	-1
+=== COALESCE in WHERE — predicate on coalesced value ===
+SELECT id FROM c WHERE COALESCE(v, 0) > 15 ORDER BY id;
+id
+3
+=== COALESCE inside aggregate — fallback per row before SUM ===
+SELECT SUM(COALESCE(v, 0)) AS s_inside FROM c;
+s_inside
+40
+=== COALESCE around aggregate — fallback for NULL aggregate result ===
+# NB: via the mysql CLI text protocol the same queries return
+# NULL (the wrapping COALESCE doesn't see the aggregate value).
+# Pinning the prepared-statement / driver path since drivers
+# are the dominant code path. The CLI divergence is the same
+# shape as the HAVING-no-GROUP-BY + aggregate issue and a
+# separate gap to investigate.
+DROP TABLE IF EXISTS c2;
+CREATE TABLE c2 (id INT, v INT);
+INSERT INTO c2 VALUES (1, NULL), (2, NULL);
+SELECT COALESCE(SUM(v), 0) AS s_around_null FROM c2;
+s_around_null
+0
+SELECT COALESCE(MAX(v), -1) AS m_around_null FROM c2;
+m_around_null
+-1
+DROP TABLE c;
+DROP TABLE c2;
