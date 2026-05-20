@@ -43,9 +43,13 @@ n1	n2
 SELECT NVL(NULL, 'fb') AS n_null, NVL('a', 'fb') AS n_keep;
 n_null	n_keep
 fb	a
-=== KNOWN GAP: NVL2 — errno 1105 "unknown function" ===
-SELECT NVL2('a', 'first', 'second');
-ERROR 1105: execution error: unknown function: NVL2
+=== NVL2 — Oracle 3-arg conditional with short-circuit ===
+SELECT NVL2('a', 'first', 'second') AS not_null, NVL2(NULL, 'first', 'second') AS is_null;
+not_null	is_null
+first	second
+SELECT NVL2(NULL, 1/0, 99) AS short_when_null, NVL2('x', 99, 1/0) AS short_when_notnull;
+short_when_null	short_when_notnull
+99	99
 === COALESCE on table column — fallback for NULL rows ===
 DROP TABLE IF EXISTS c;
 CREATE TABLE c (id INT, v INT);

@@ -42,10 +42,11 @@
 #     `IS NULL`.
 #   # zeta-adapt: NVL — Oracle 2-arg alias, equivalent
 #     to IFNULL / COALESCE-2.
-#   # zeta-adapt: KNOWN GAP — NVL2 (Oracle 3-arg) errors
-#     1105 "unknown function: NVL2". MySQL doesn't have
-#     it either; substitute via CASE WHEN x IS NOT NULL
-#     THEN a ELSE b END.
+#   # zeta-adapt: NVL2 (Oracle 3-arg) — returns 2nd arg
+#     when expr IS NOT NULL, 3rd when expr IS NULL.
+#     Short-circuits the not-taken branch. Equivalent
+#     to `CASE WHEN expr IS NOT NULL THEN x ELSE y END`.
+#     Added in zeta PR #1221.
 
 --echo === COALESCE all-NULL → NULL ===
 
@@ -94,10 +95,10 @@ SELECT ISNULL(NULL) AS n1, ISNULL('a') AS n2;
 
 SELECT NVL(NULL, 'fb') AS n_null, NVL('a', 'fb') AS n_keep;
 
---echo === KNOWN GAP: NVL2 — errno 1105 "unknown function" ===
+--echo === NVL2 — Oracle 3-arg conditional with short-circuit ===
 
---error 1105
-SELECT NVL2('a', 'first', 'second');
+SELECT NVL2('a', 'first', 'second') AS not_null, NVL2(NULL, 'first', 'second') AS is_null;
+SELECT NVL2(NULL, 1/0, 99) AS short_when_null, NVL2('x', 99, 1/0) AS short_when_notnull;
 
 --echo === COALESCE on table column — fallback for NULL rows ===
 
