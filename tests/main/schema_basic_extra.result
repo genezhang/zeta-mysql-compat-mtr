@@ -1,0 +1,98 @@
+=== CREATE SCHEMA + CREATE TABLE in schema + DML round-trip ===
+DROP SCHEMA IF EXISTS s1 CASCADE;
+CREATE SCHEMA s1;
+CREATE TABLE s1.t (id INT PRIMARY KEY, n INT);
+INSERT INTO s1.t VALUES (1, 10), (2, 20);
+SELECT id, n FROM s1.t ORDER BY id;
+id	n
+1	10
+2	20
+UPDATE s1.t SET n = 99 WHERE id = 1;
+DELETE FROM s1.t WHERE id = 2;
+SELECT id, n FROM s1.t;
+id	n
+1	99
+DROP TABLE s1.t;
+DROP SCHEMA s1;
+=== DROP SCHEMA on non-empty (no CASCADE) — errno 1105 ===
+DROP SCHEMA IF EXISTS sx;
+CREATE SCHEMA sx;
+CREATE TABLE sx.t (id INT);
+DROP SCHEMA sx;
+ERROR 1105: execution error: cannot drop schema "sx": schema is not empty
+DROP SCHEMA sx CASCADE;
+=== DROP SCHEMA missing without IF EXISTS — errno 1105 ===
+DROP SCHEMA no_such_schema;
+ERROR 1105: execution error: schema "no_such_schema" does not exist
+=== DROP SCHEMA IF EXISTS on missing — no-op ===
+DROP SCHEMA IF EXISTS no_such_schema;
+=== CREATE SCHEMA IF NOT EXISTS — second CREATE is no-op ===
+DROP SCHEMA IF EXISTS sy;
+CREATE SCHEMA IF NOT EXISTS sy;
+CREATE SCHEMA IF NOT EXISTS sy;
+DROP SCHEMA sy;
+=== DROP TABLE IF EXISTS on missing schema-qualified table — no-op ===
+DROP SCHEMA IF EXISTS sm CASCADE;
+CREATE SCHEMA sm;
+DROP TABLE IF EXISTS sm.no_such;
+DROP SCHEMA sm;
+=== DROP SCHEMA CASCADE empties + drops the schema ===
+DROP SCHEMA IF EXISTS s3 CASCADE;
+CREATE SCHEMA s3;
+CREATE TABLE s3.x (id INT PRIMARY KEY);
+INSERT INTO s3.x VALUES (1), (2);
+SELECT id FROM s3.x ORDER BY id;
+id
+1
+2
+DROP SCHEMA s3 CASCADE;
+=== Cross-schema FOREIGN KEY — enforced ===
+DROP SCHEMA IF EXISTS sa CASCADE;
+DROP SCHEMA IF EXISTS sb CASCADE;
+CREATE SCHEMA sa;
+CREATE SCHEMA sb;
+CREATE TABLE sa.parent (id INT PRIMARY KEY);
+CREATE TABLE sb.child (id INT PRIMARY KEY, pid INT REFERENCES sa.parent(id));
+INSERT INTO sa.parent VALUES (1);
+INSERT INTO sb.child VALUES (10, 1);
+SELECT pid FROM sb.child;
+pid
+1
+INSERT INTO sb.child VALUES (20, 99);
+ERROR 1105: foreign key violation: insert or update on table "sb.child" violates foreign key constraint "sb.child_pid_fkey": key is not present in table "sa.parent"
+DROP SCHEMA sb CASCADE;
+DROP SCHEMA sa CASCADE;
+=== KNOWN GAP: schema-qualified column ref — errno 1054 ===
+# `<schema>.<table>.<col>` is rejected; the bare
+# `<table>.<col>` works inside the same DML.
+DROP SCHEMA IF EXISTS sd CASCADE;
+CREATE SCHEMA sd;
+CREATE TABLE sd.t (id INT PRIMARY KEY, n INT);
+INSERT INTO sd.t VALUES (1, 10), (2, 20);
+SELECT id FROM sd.t WHERE sd.t.n > 15;
+ERROR 1054: column not found: sd.t.n
+DROP SCHEMA sd CASCADE;
+=== KNOWN GAP: SET search_path has no effect — errno 1146 ===
+# The unqualified SELECT FROM t still resolves only in
+# `public`. Substitute: always qualify the schema.
+DROP SCHEMA IF EXISTS sp CASCADE;
+CREATE SCHEMA sp;
+CREATE TABLE sp.t (id INT PRIMARY KEY);
+INSERT INTO sp.t VALUES (1);
+SET search_path TO sp, public;
+SELECT id FROM t;
+ERROR 1146: table not found: test.public.t
+SET search_path TO public;
+DROP SCHEMA sp CASCADE;
+=== KNOWN GAP: pg_catalog.pg_namespace — errno 1146 ===
+SELECT nspname FROM pg_catalog.pg_namespace;
+ERROR 1146: table not found: pg_catalog.pg_namespace
+=== KNOWN DIVERGENCE: SHOW SCHEMAS returns DATABASES ===
+# zeta's introspection surface lists databases under
+# the SHOW SCHEMAS / SHOW DATABASES / information_schema
+# .schemata names rather than the PG-style user-created
+# schemas (`s1`, `sa`, etc. are not visible here).
+SELECT schema_name FROM information_schema.schemata ORDER BY schema_name;
+SCHEMA_NAME
+test
+zeta
