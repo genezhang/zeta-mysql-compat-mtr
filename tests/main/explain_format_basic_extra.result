@@ -1,0 +1,73 @@
+=== Setup ===
+DROP TABLE IF EXISTS et;
+CREATE TABLE et (id INT PRIMARY KEY, n INT);
+INSERT INTO et VALUES (1,10),(2,20),(3,30);
+=== DESC <table> — MySQL shorthand for DESCRIBE ===
+DESC et;
+Field	Type	Null	Key	Default	Extra
+id	int	NO	PRI	NULL	
+n	int	YES		NULL	
+=== DESCRIBE <table> — full spelling ===
+DESCRIBE et;
+Field	Type	Null	Key	Default	Extra
+id	int	NO	PRI	NULL	
+n	int	YES		NULL	
+=== EXPLAIN (FORMAT YAML) — parses, output is plain text plan ===
+EXPLAIN (FORMAT YAML) SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== EXPLAIN (FORMAT XML) — parses, output is plain text plan ===
+EXPLAIN (FORMAT XML) SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== EXPLAIN (ANALYZE, BUFFERS) — parses, but ANALYZE NOT honored ===
+EXPLAIN (ANALYZE, BUFFERS) SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== EXPLAIN (COSTS OFF) — parses, costs still shown ===
+EXPLAIN (COSTS OFF) SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== EXPLAIN (BUFFERS) — parses, no buffer info added ===
+EXPLAIN (BUFFERS) SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== EXPLAIN (SETTINGS) — parses, no settings shown ===
+EXPLAIN (SETTINGS) SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== EXPLAIN FORMAT=TREE (MySQL) — parses, plain text plan ===
+EXPLAIN FORMAT=TREE SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== KNOWN DIVERGENCE: (FORMAT JUNK) accepted even though FORMAT=JUNK rejected ===
+EXPLAIN (FORMAT JUNK) SELECT * FROM et;
+QUERY PLAN
+SeqScan (et) [id, n]
+  (cost=1.00 rows=0)
+=== KNOWN DIVERGENCE: DESCRIBE SELECT returns empty (no error, no plan) ===
+DESCRIBE SELECT * FROM et;
+=== KNOWN GAP: EXPLAIN FORMAT=TRADITIONAL — errno 1064 ===
+EXPLAIN FORMAT=TRADITIONAL SELECT * FROM et;
+ERROR 1064: SQL parse error: sql parser error: Expected: fileformat, found: TRADITIONAL at Line: 1, Column: 16
+=== KNOWN GAP: EXPLAIN FORMAT=JUNK (no parens) — errno 1064 ===
+EXPLAIN FORMAT=JUNK SELECT * FROM et;
+ERROR 1064: SQL parse error: sql parser error: Expected: fileformat, found: JUNK at Line: 1, Column: 16
+=== KNOWN GAP: EXPLAIN ANALYZE INSERT — errno 1105 ===
+EXPLAIN ANALYZE INSERT INTO et VALUES (99, 99);
+ERROR 1105: execution error: EXPLAIN ANALYZE is not supported for DML/DDL statements
+=== KNOWN GAP: EXPLAIN ANALYZE UPDATE — errno 1105 ===
+EXPLAIN ANALYZE UPDATE et SET n = n+1;
+ERROR 1105: execution error: EXPLAIN ANALYZE is not supported for DML/DDL statements
+=== KNOWN GAP: EXPLAIN ANALYZE DELETE — errno 1105 ===
+EXPLAIN ANALYZE DELETE FROM et WHERE n = 99;
+ERROR 1105: execution error: EXPLAIN ANALYZE is not supported for DML/DDL statements
+=== Cleanup ===
+DROP TABLE et;
