@@ -1,0 +1,122 @@
+# Independently authored collation/case-sensitivity smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/ctype_*.test or PG
+# regress; complements string_compare_basic_extra by
+# pinning the EDGE-CASE case-sensitivity behavior across
+# LIKE/ILIKE/REGEXP/INSTR/LOCATE/POSITION/GROUP BY/
+# DISTINCT/BETWEEN/IN/UPPER/LOWER/LCASE/UCASE.
+#
+# Big-picture finding: zeta is PG-flavored — every string
+# comparison and matching operation is case-sensitive by
+# default (LIKE matches case-exactly, REGEXP_LIKE matches
+# case-exactly, INSTR/LOCATE/POSITION return 0 for case-
+# mismatch, GROUP BY / DISTINCT treat differently-cased
+# strings as distinct). MySQL's default utf8mb4_general_ci
+# collation is case-insensitive, so apps ported from MySQL
+# will see different filter cardinalities and grouping
+# behavior. zeta provides ILIKE (PG extension) for the
+# case-insensitive matching case; for the rest, the
+# portable substitute is LOWER(...) / UPPER(...) on both
+# sides.
+#
+# One real bug: the `col REGEXP pat` infix operator errors
+# 1105 "predicate did not evaluate to boolean" even when
+# the REGEXP_LIKE function (equivalent semantics) works
+# fine. The result type from REGEXP isn't surfaced as a
+# bool predicate, so WHERE/HAVING reject it.
+#
+# Adaptation notes:
+#   # zeta-adapt: All string equality / ordering / LIKE /
+#     REGEXP / INSTR / LOCATE / POSITION / GROUP BY /
+#     DISTINCT / BETWEEN / IN — case-sensitive by default
+#     (PG behavior). MySQL default (utf8mb4_general_ci) is
+#     case-insensitive; substitute via LOWER(...) on both
+#     sides, or use ILIKE for the matching case.
+#   # zeta-adapt: ILIKE (PG extension) — case-insensitive
+#     pattern match. Use this instead of MySQL's implicit
+#     case-insensitive LIKE.
+#   # zeta-adapt: REGEXP_LIKE(s, pat) — function form,
+#     case-sensitive default; embed `(?i)` in the pattern
+#     for case-insensitive matching.
+#   # zeta-adapt: UPPER / LOWER — supported, work on
+#     multi-byte UTF-8 ('héllo' → 'HÉLLO').
+#   # zeta-adapt: LCASE / UCASE — MySQL aliases for
+#     LOWER / UPPER, both supported.
+#   # zeta-adapt: KNOWN BUG — `col REGEXP pat` infix
+#     operator errors 1105 "predicate did not evaluate to
+#     boolean" when used in WHERE/HAVING. REGEXP_LIKE
+#     function has the same issue in WHERE because it
+#     returns INT 0/1 not BOOL — workaround is
+#     `REGEXP_LIKE(col, pat) = 1`. The function is fine in
+#     SELECT projections (typed result tolerated there).
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS sc;
+CREATE TABLE sc (id INT PRIMARY KEY, s VARCHAR(20));
+INSERT INTO sc VALUES (1, 'Apple'), (2, 'apple'), (3, 'APPLE'), (4, 'banana');
+
+--echo === LIKE — case-sensitive (PG default, diverges from MySQL ci) ===
+
+SELECT id, s FROM sc WHERE s LIKE 'a%' ORDER BY id;
+SELECT id, s FROM sc WHERE s LIKE 'A%' ORDER BY id;
+
+--echo === ILIKE — case-insensitive match (PG extension) ===
+
+SELECT id, s FROM sc WHERE s ILIKE 'a%' ORDER BY id;
+
+--echo === REGEXP_LIKE — case-sensitive default; (?i) flag for ci ===
+
+SELECT REGEXP_LIKE('Apple', '^a') AS lo, REGEXP_LIKE('Apple', '^A') AS hi;
+SELECT REGEXP_LIKE('Apple', '(?i)apple') AS ci;
+
+--echo === INSTR / LOCATE / POSITION — case-sensitive ===
+
+SELECT INSTR('Apple', 'a') AS ci_lo, INSTR('Apple', 'A') AS ci_hi;
+SELECT LOCATE('a', 'Apple') AS ci_lo, LOCATE('A', 'Apple') AS ci_hi;
+SELECT POSITION('a' IN 'Apple') AS ci_lo, POSITION('A' IN 'Apple') AS ci_hi;
+
+--echo === GROUP BY — case-distinct (4 groups for 4 capitalizations) ===
+
+SELECT s, COUNT(*) AS c FROM sc GROUP BY s ORDER BY s;
+
+--echo === GROUP BY LOWER(s) — collapse case ===
+
+SELECT LOWER(s) AS l, COUNT(*) AS c FROM sc GROUP BY LOWER(s) ORDER BY l;
+
+--echo === DISTINCT — case-distinct ===
+
+SELECT DISTINCT s FROM sc ORDER BY s;
+SELECT COUNT(DISTINCT s) AS d, COUNT(DISTINCT LOWER(s)) AS d_lower FROM sc;
+
+--echo === BETWEEN — case-sensitive (ASCII ordering) ===
+
+SELECT 'B' BETWEEN 'A' AND 'a' AS b1, 'b' BETWEEN 'A' AND 'a' AS b2;
+
+--echo === IN — case-sensitive ===
+
+SELECT 'apple' IN ('Apple', 'banana') AS in_ci, 'Apple' IN ('apple', 'APPLE') AS in_ci2;
+
+--echo === UPPER / LOWER — multi-byte aware ===
+
+SELECT UPPER('hello') AS u, LOWER('HELLO') AS l;
+SELECT UPPER('héllo') AS u_mb, LOWER('HÉLLO') AS l_mb;
+
+--echo === LCASE / UCASE — MySQL aliases ===
+
+SELECT LCASE('HELLO') AS l, UCASE('hello') AS u;
+
+--echo === UPPER round-trips through LOWER ===
+
+SELECT UPPER(LOWER('Hello')) = UPPER('Hello') AS round_trip;
+
+--echo === KNOWN BUG: col REGEXP pat infix operator — errno 1105 ===
+
+--error 1105
+SELECT id, s FROM sc WHERE s REGEXP '^a' ORDER BY id;
+
+--echo === Substitute via REGEXP_LIKE = 1 — works ===
+
+SELECT id, s FROM sc WHERE REGEXP_LIKE(s, '^a') = 1 ORDER BY id;
+
+DROP TABLE sc;
