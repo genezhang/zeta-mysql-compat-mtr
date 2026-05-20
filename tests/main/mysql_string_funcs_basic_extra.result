@@ -1,10 +1,7 @@
-=== ASCII — first byte of UTF-8; empty/NULL ===
-SELECT ASCII('A') AS upper_a, ASCII('Hello') AS first_byte, ASCII('') AS empty;
-upper_a	first_byte	empty
-65	72	0
-SELECT ASCII(NULL) AS n;
-n
-NULL
+=== ASCII — multibyte returns codepoint (DIVERGES from MySQL UTF-8 byte) ===
+SELECT ASCII('Hello') AS leading_h, ASCII('é') AS multibyte_codepoint;
+leading_h	multibyte_codepoint
+72	233
 === CHR — single Unicode codepoint; NULL propagates ===
 SELECT CHR(65) AS a_upper, CHR(8364) AS euro;
 a_upper	euro
@@ -46,7 +43,10 @@ found	miss
 SELECT LOCATE('world', 'hello world') AS found, LOCATE('xyz', 'hello') AS miss;
 found	miss
 7	0
-=== LOCATE with start-pos — clamps on overshoot / start=0 ===
+=== LOCATE with start-pos — positive plus clamps on overshoot / start=0 ===
+SELECT LOCATE('l', 'hello', 3) AS l_at_3, LOCATE('l', 'hello', 4) AS l_at_4;
+l_at_3	l_at_4
+3	4
 SELECT LOCATE('x', 'hello', 10) AS past_end, LOCATE('x', 'hello', 0) AS start_zero;
 past_end	start_zero
 0	0
@@ -98,10 +98,7 @@ n
 0
 SELECT FIELD('a');
 ERROR 1105: execution error: FIELD requires at least 2 arguments
-=== QUOTE — backslash-escapes single quotes; NULL → NULL; numeric coerced ===
-SELECT QUOTE('plain') AS q1, QUOTE(42) AS q2;
-q1	q2
-'plain'	'42'
-SELECT QUOTE(NULL) AS n;
-n
-NULL
+=== QUOTE — single-quote escape pinned via LENGTH ===
+SELECT QUOTE('it''s') AS escaped, LENGTH(QUOTE('it''s')) AS esc_len;
+escaped	esc_len
+'it\'s'	7

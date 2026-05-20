@@ -1,59 +1,58 @@
-# Independently authored MySQL string-function smoke
+# Independently authored MySQL string-function edge
 # test for the GPL MTR-format runner. NOT copied or
 # adapted from MySQL's mysql-test/t/func_str.test or PG
-# regress; complements string_func_basic /
-# string_func_basic_extra / string_format_edges (which
-# pin LENGTH, CONCAT, SUBSTRING, UPPER, etc.) by pinning
-# the MySQL-flavor lookup/conversion surface NOT covered
-# there: ASCII, CHR, CHAR, CONV, SOUNDEX, SPACE, INSTR,
-# LOCATE, ELT, FIELD, INSERT, MID, POSITION, QUOTE.
+# regress. The basic happy-path surface for these
+# functions is already pinned in string_func_basic
+# (LOCATE, INSERT, ELT, FIELD, SPACE, QUOTE, SOUNDEX,
+# ASCII) and string_format_edges_basic_extra (CONV
+# basics + NULLs + base 36 / base 0, CHAR + CHAR(0),
+# QUOTE numeric + QUOTE(NULL) with IS NULL / LENGTH).
+# This file narrows in on EDGE behavior not exercised
+# by those: multibyte ASCII, CHR (which neither test
+# touches), CONV negative-as-unsigned-64 and unparseable,
+# LOCATE with explicit start-pos (positive + clamp),
+# INSERT pos=0 / pos>len / len=0 boundary, INSTR-vs-
+# LOCATE-vs-POSITION equivalence, ELT N=0/NULL/OOR and
+# arity errors, FIELD case-sensitivity + NULL target +
+# arity errors, MID alias, and QUOTE with embedded
+# single quote.
 #
-# Big-picture finding: zeta implements the full MySQL
-# string-function surface examined here. INSTR / LOCATE
-# return 1-based positions (0 on miss). LOCATE with a
-# start-pos argument resumes from that pos and returns
-# 0 if start > haystack length or start = 0. INSERT
-# clamps to no-op when pos = 0 or pos > length; len = 0
-# is a pure insert. ELT returns NULL for out-of-range N
-# (including N = 0 and N = NULL); arity error <2 args.
-# FIELD is case-sensitive (`FIELD('a', 'A', 'a')` = 2)
-# and returns 0 on miss. CHR accepts any Unicode codepoint
-# (256+ produces multibyte chars). ASCII returns the FIRST
-# byte of the UTF-8 encoding for non-ASCII strings (195
-# for 'é', not 233).
+# Big-picture finding: zeta implements the surface, with
+# one notable DIVERGENCE from MySQL on multibyte ASCII:
+# zeta returns the Unicode CODEPOINT (`ASCII('é')` =
+# 233) where MySQL returns the FIRST UTF-8 BYTE (195).
+# Everything else (LOCATE start-pos, INSERT clamps, ELT
+# NULL semantics, FIELD case sensitivity) matches.
 #
 # Adaptation notes:
-#   # zeta-adapt: ASCII / CHR / CHAR — Unicode-aware; ASCII
-#     of multibyte returns first UTF-8 byte (matches MySQL).
-#   # zeta-adapt: CHAR()-no-arg → errno 1105; CHAR(0)
-#     produces a NUL byte (preserved in output).
-#   # zeta-adapt: CONV(n, from_base, to_base) — supports
-#     bases 2..36; negative input treated as unsigned 64-bit
-#     (`CONV(-1, 10, 16)` → 'FFFFFFFFFFFFFFFF'); unparseable
-#     input returns '0'.
-#   # zeta-adapt: SOUNDEX('') → '' (empty); SOUNDEX(NULL) → NULL.
-#   # zeta-adapt: SPACE(n) — n spaces; SPACE(0) → empty.
-#   # zeta-adapt: INSTR / LOCATE — 1-based; 0 on miss.
-#     LOCATE(needle, haystack, start) returns 0 if start = 0
-#     or start > haystack length. Empty needle → 1.
+#   # zeta-adapt: KNOWN DIVERGENCE — ASCII on multibyte
+#     returns the Unicode codepoint (233 for 'é'); MySQL
+#     returns the first UTF-8 byte (195). Both return the
+#     leading char's value for ASCII input, so basic tests
+#     don't surface this.
+#   # zeta-adapt: CHR(n) — accepts any Unicode codepoint;
+#     CHR(8364) → '€'. NULL propagates.
+#   # zeta-adapt: CONV — negative input treated as unsigned
+#     64-bit (`CONV(-1, 10, 16)` → 'FFFFFFFFFFFFFFFF');
+#     unparseable input returns '0' (vs NULL elsewhere).
+#   # zeta-adapt: LOCATE(needle, haystack, start) — searches
+#     from `start`; returns 0 if start = 0 or start > len.
+#     Empty needle → 1.
 #   # zeta-adapt: INSERT(str, pos, len, new) — pos=0 or
 #     pos > length leaves str unchanged. len=0 is a pure
-#     insert.
-#   # zeta-adapt: MID — alias for SUBSTRING (1-based start
-#     and length).
-#   # zeta-adapt: POSITION(needle IN haystack) — same as
-#     LOCATE (1-based; 0 on miss).
+#     insert (text at pos+1 shifts right).
+#   # zeta-adapt: POSITION(needle IN haystack) — same shape
+#     as LOCATE / INSTR (1-based; 0 on miss).
 #   # zeta-adapt: ELT(N, ...) — N=0 / N=NULL / N out of
 #     range → NULL. Arity <2 errors 1105.
 #   # zeta-adapt: FIELD(target, ...) — case-sensitive lookup;
 #     0 on miss; NULL target → 0. Arity <2 errors 1105.
-#   # zeta-adapt: QUOTE(NULL) → NULL; numeric arg coerced
-#     to string and quoted; single quotes backslash-escaped.
+#   # zeta-adapt: QUOTE — single quotes backslash-escaped
+#     (`QUOTE('it''s')` → `'it\'s'`, length 7).
 
---echo === ASCII — first byte of UTF-8; empty/NULL ===
+--echo === ASCII — multibyte returns codepoint (DIVERGES from MySQL UTF-8 byte) ===
 
-SELECT ASCII('A') AS upper_a, ASCII('Hello') AS first_byte, ASCII('') AS empty;
-SELECT ASCII(NULL) AS n;
+SELECT ASCII('Hello') AS leading_h, ASCII('é') AS multibyte_codepoint;
 
 --echo === CHR — single Unicode codepoint; NULL propagates ===
 
@@ -87,8 +86,9 @@ SELECT LENGTH(SPACE(5)) AS five, LENGTH(SPACE(0)) AS zero;
 SELECT INSTR('hello world', 'world') AS found, INSTR('hello', 'xyz') AS miss;
 SELECT LOCATE('world', 'hello world') AS found, LOCATE('xyz', 'hello') AS miss;
 
---echo === LOCATE with start-pos — clamps on overshoot / start=0 ===
+--echo === LOCATE with start-pos — positive plus clamps on overshoot / start=0 ===
 
+SELECT LOCATE('l', 'hello', 3) AS l_at_3, LOCATE('l', 'hello', 4) AS l_at_4;
 SELECT LOCATE('x', 'hello', 10) AS past_end, LOCATE('x', 'hello', 0) AS start_zero;
 SELECT LOCATE('', 'hello') AS empty_needle;
 
@@ -125,7 +125,10 @@ SELECT FIELD(NULL, 'a', 'b') AS n;
 --error 1105
 SELECT FIELD('a');
 
---echo === QUOTE — backslash-escapes single quotes; NULL → NULL; numeric coerced ===
+--echo === QUOTE — single-quote escape pinned via LENGTH ===
 
-SELECT QUOTE('plain') AS q1, QUOTE(42) AS q2;
-SELECT QUOTE(NULL) AS n;
+# `it''s` is the 4-char literal `it's`; QUOTE wraps and
+# escapes the inner quote with a backslash, producing
+# `'it\'s'` (7 chars). LENGTH pins the escape — a missing
+# backslash would yield length 6.
+SELECT QUOTE('it''s') AS escaped, LENGTH(QUOTE('it''s')) AS esc_len;
