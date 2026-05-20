@@ -63,14 +63,22 @@ id	x
 SELECT TRUE XOR TRUE XOR TRUE AS triple_true, TRUE XOR FALSE XOR TRUE AS tft;
 triple_true	tft
 1	0
-=== KNOWN GAP: integer XOR — returns NULL (same as integer AND/OR) ===
-# MySQL: `1 XOR 0` = 1, `1 XOR 1` = 0. zeta only
-# coerces Bool, so integer operands fall through to
-# NULL. Substitute with explicit predicate:
-# `(a > 0) XOR (b > 0)`.
+=== Numeric XOR — coerces to bool (0 → false, non-zero → true) ===
 SELECT 1 XOR 0 AS one_xor_zero, 5 XOR 0 AS five_xor_zero, 1 XOR 1 AS one_xor_one;
 one_xor_zero	five_xor_zero	one_xor_one
-NULL	NULL	NULL
+1	1	0
+=== Numeric AND/OR — same coercion ===
+SELECT 1 AND 1 AS a, 5 AND 3 AS b, 0 AND 1 AS c, 1 OR 0 AS d, 0 OR 0 AS e;
+a	b	c	d	e
+1	1	0	1	0
+=== Float / decimal XOR coercion ===
+SELECT 1.5 AND 1.5 AS fa, 0.0 OR 1.5 AS fb, 0.0 XOR 1.5 AS fc;
+fa	fb	fc
+1	1	1
+=== NOT on numeric — coerces ===
+SELECT NOT 0 AS k, NOT 1 AS l, NOT 5 AS m, NOT 0.0 AS n, NOT 1.5 AS o, NOT NULL AS p;
+k	l	m	n	o	p
+1	0	0	1	0	NULL
 === KNOWN DIVERGENCE: `<=>` is vector cosine distance, not NULL-safe equality ===
 # zeta repurposes the `<=>` token (PG / pgvector
 # convention). For MySQL NULL-safe equal, use
