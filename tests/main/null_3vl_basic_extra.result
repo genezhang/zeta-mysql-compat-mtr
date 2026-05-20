@@ -1,0 +1,108 @@
+=== IS UNKNOWN / IS NOT UNKNOWN ===
+SELECT TRUE IS UNKNOWN AS t_unk, NULL IS UNKNOWN AS n_unk, FALSE IS UNKNOWN AS f_unk;
+t_unk	n_unk	f_unk
+0	1	0
+SELECT TRUE IS NOT UNKNOWN AS t_nu, NULL IS NOT UNKNOWN AS n_nu, FALSE IS NOT UNKNOWN AS f_nu;
+t_nu	n_nu	f_nu
+1	0	1
+=== IS TRUE / IS FALSE for {TRUE, FALSE, NULL} ===
+SELECT TRUE IS TRUE AS t_t, FALSE IS FALSE AS f_f, NULL IS TRUE AS n_t, NULL IS FALSE AS n_f;
+t_t	f_f	n_t	n_f
+1	1	0	0
+=== IS NOT TRUE / IS NOT FALSE ===
+SELECT TRUE IS NOT TRUE AS t_nt, FALSE IS NOT FALSE AS f_nf, NULL IS NOT TRUE AS n_nt, NULL IS NOT FALSE AS n_nf;
+t_nt	f_nf	n_nt	n_nf
+0	0	1	1
+=== Setup table with NULLs ===
+DROP TABLE IF EXISTS nw;
+CREATE TABLE nw (id INT PRIMARY KEY, x INT);
+INSERT INTO nw VALUES (1, 10), (2, NULL), (3, 30);
+=== WHERE col = NULL — predicate-NULL → FALSE, zero rows ===
+SELECT id FROM nw WHERE x = NULL;
+=== WHERE bare NULL literal — zero rows ===
+SELECT id FROM nw WHERE NULL;
+=== GROUP BY collapses NULLs into one group ===
+SELECT x, COUNT(*) AS c FROM nw GROUP BY x ORDER BY x;
+x	c
+10	1
+30	1
+NULL	1
+=== COUNT(*) vs COUNT(col) ===
+SELECT COUNT(*) AS all_rows, COUNT(x) AS nonnull_x FROM nw;
+all_rows	nonnull_x
+3	2
+=== SUM / AVG / MIN / MAX skip NULL ===
+SELECT SUM(x) AS s, AVG(x) AS a, MIN(x) AS mn, MAX(x) AS mx FROM nw;
+s	a	mn	mx
+40	20	10	30
+=== SUM/MIN on all-NULL → NULL (not 0) ===
+SELECT SUM(x) AS s, MIN(x) AS mn FROM nw WHERE x IS NULL;
+s	mn
+NULL	NULL
+=== DISTINCT collapses NULLs to one row ===
+DROP TABLE IF EXISTS nd;
+CREATE TABLE nd (x INT);
+INSERT INTO nd VALUES (1), (1), (NULL), (NULL), (2);
+SELECT DISTINCT x FROM nd ORDER BY x;
+x
+1
+2
+NULL
+=== COUNT(DISTINCT col) ignores NULL ===
+SELECT COUNT(DISTINCT x) AS cd FROM nd;
+cd
+2
+=== UNIQUE allows multiple NULL entries ===
+DROP TABLE IF EXISTS nu;
+CREATE TABLE nu (id INT PRIMARY KEY, e VARCHAR(50), UNIQUE (e));
+INSERT INTO nu VALUES (1, NULL), (2, NULL), (3, 'x');
+SELECT id, e FROM nu ORDER BY id;
+id	e
+1	NULL
+2	NULL
+3	x
+=== CHECK with NULL operand evaluates to not-false, accepted ===
+DROP TABLE IF EXISTS nc;
+CREATE TABLE nc (id INT PRIMARY KEY, age INT CHECK (age > 0));
+INSERT INTO nc VALUES (1, NULL);
+SELECT id, age FROM nc;
+id	age
+1	NULL
+=== LEFT JOIN fills unmatched right with NULL ===
+DROP TABLE IF EXISTS nl;
+DROP TABLE IF EXISTS nr;
+CREATE TABLE nl (id INT, lv INT);
+CREATE TABLE nr (id INT, rv INT);
+INSERT INTO nl VALUES (1, 10), (2, 20);
+INSERT INTO nr VALUES (1, 100);
+SELECT nl.id, nl.lv, nr.rv FROM nl LEFT JOIN nr ON nl.id = nr.id ORDER BY nl.id;
+id	lv	rv
+1	10	100
+2	20	NULL
+=== KNOWN GAP: INSERT NULL into PRIMARY KEY — errno 1105 ===
+DROP TABLE IF EXISTS np;
+CREATE TABLE np (id INT PRIMARY KEY, n INT);
+INSERT INTO np VALUES (NULL, 1);
+ERROR 1105: execution error: null value in column "id" of relation "test.public.np" violates not-null constraint
+=== KNOWN DIVERGENCE: NOT IN (subquery with NULL) errors 1105 ===
+DROP TABLE IF EXISTS nsi;
+CREATE TABLE nsi (id INT, x INT);
+INSERT INTO nsi VALUES (1, 1), (2, 2), (3, NULL);
+DROP TABLE IF EXISTS nmain;
+CREATE TABLE nmain (id INT);
+INSERT INTO nmain VALUES (1), (2), (3), (4);
+SELECT id FROM nmain WHERE id NOT IN (SELECT x FROM nsi);
+ERROR 1105: execution error: IN/NOT IN subquery returned NULL values; filter out NULLs or use COALESCE in the subquery
+=== KNOWN GAP: NVL Oracle alias — errno 1105 unknown function ===
+SELECT NVL(NULL, 'fallback') AS use_fb;
+ERROR 1105: execution error: unknown function: NVL
+=== Cleanup ===
+DROP TABLE nw;
+DROP TABLE nd;
+DROP TABLE nu;
+DROP TABLE nc;
+DROP TABLE nl;
+DROP TABLE nr;
+DROP TABLE np;
+DROP TABLE nsi;
+DROP TABLE nmain;

@@ -1,0 +1,183 @@
+# Independently authored null three-valued-logic edge
+# cases for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/null.test or PG's
+# regress/select. Complements null_handling_basic_extra by
+# pinning the surfaces NOT already covered there:
+# IS UNKNOWN / IS TRUE / IS FALSE family, WHERE-predicate
+# NULL coercion, GROUP BY / DISTINCT / aggregate NULL
+# treatment, LEFT JOIN NULL fill, UNIQUE/CHECK with NULL,
+# PRIMARY-KEY-NULL rejection, NULL-IN-subquery, and the
+# Oracle NVL alias.
+#
+# Big-picture finding: zeta correctly implements SQL three-
+# value logic for the boolean predicate forms (IS UNKNOWN /
+# IS TRUE / IS FALSE all return the right values for {TRUE,
+# FALSE, NULL} arguments), and aggregate/DISTINCT/UNIQUE
+# all follow standard NULL semantics. WHERE predicates that
+# yield NULL coerce to FALSE (the SQL standard, matching
+# both MySQL and PG). CHECK constraints with NULL evaluate
+# to "not false" and are accepted (also standard).
+#
+# Two notable behaviors to pin: (a) `WHERE col NOT IN
+# (subquery with NULL row)` does NOT silently return zero
+# rows (the MySQL/standard SQL behavior). Instead zeta
+# errors 1105 telling the user to filter NULLs or use
+# COALESCE. This is more defensive than standard but worth
+# pinning because ORM-generated NOT IN queries will surface
+# this error against a real engine. (b) The Oracle NVL
+# function is missing entirely (1105 "unknown function") —
+# only COALESCE / IFNULL / ISNULL are supported.
+#
+# Adaptation notes:
+#   # zeta-adapt: IS UNKNOWN / IS NOT UNKNOWN return the
+#     correct 3VL truth values for {TRUE, NULL, FALSE}
+#     arguments.
+#   # zeta-adapt: IS TRUE / IS FALSE / IS NOT TRUE /
+#     IS NOT FALSE all return correct values, including
+#     NULL → 0 for both IS TRUE and IS FALSE.
+#   # zeta-adapt: WHERE col = NULL — returns zero rows
+#     (NULL predicate coerces to FALSE in WHERE/HAVING/ON).
+#   # zeta-adapt: WHERE NULL (bare NULL literal) — returns
+#     zero rows.
+#   # zeta-adapt: GROUP BY collapses NULLs into a single
+#     group (the SQL standard).
+#   # zeta-adapt: COUNT(*) counts all rows including those
+#     with NULL columns; COUNT(col) skips NULL values.
+#   # zeta-adapt: SUM / AVG / MIN / MAX skip NULL input;
+#     SUM on an all-NULL set returns NULL (not 0).
+#   # zeta-adapt: DISTINCT collapses NULLs to a single row;
+#     COUNT(DISTINCT col) ignores NULLs.
+#   # zeta-adapt: UNIQUE constraint allows multiple NULL
+#     entries (PG/standard semantics — NULL ≠ NULL for
+#     uniqueness).
+#   # zeta-adapt: CHECK constraint with a NULL operand
+#     evaluates to "not FALSE" and is accepted (standard).
+#   # zeta-adapt: LEFT JOIN fills unmatched right-side
+#     columns with NULL.
+#   # zeta-adapt: INSERT NULL into PRIMARY KEY column
+#     errors 1105 "null value in column violates not-null
+#     constraint" — PRIMARY KEY implies NOT NULL.
+#   # zeta-adapt: KNOWN DIVERGENCE — `col NOT IN (subquery
+#     that returns NULL)` errors 1105 "IN/NOT IN subquery
+#     returned NULL values; filter out NULLs or use
+#     COALESCE in the subquery". MySQL/PG silently return
+#     zero rows for the rows where the subquery has NULL.
+#     This is defensive, but ORM-generated NOT IN queries
+#     against a nullable column will surface as a hard
+#     error rather than a silent empty-result.
+#   # zeta-adapt: KNOWN GAP — `NVL(x, y)` (Oracle alias for
+#     COALESCE) errors 1105 "unknown function: NVL". Use
+#     COALESCE / IFNULL / ISNULL instead.
+
+--echo === IS UNKNOWN / IS NOT UNKNOWN ===
+
+SELECT TRUE IS UNKNOWN AS t_unk, NULL IS UNKNOWN AS n_unk, FALSE IS UNKNOWN AS f_unk;
+SELECT TRUE IS NOT UNKNOWN AS t_nu, NULL IS NOT UNKNOWN AS n_nu, FALSE IS NOT UNKNOWN AS f_nu;
+
+--echo === IS TRUE / IS FALSE for {TRUE, FALSE, NULL} ===
+
+SELECT TRUE IS TRUE AS t_t, FALSE IS FALSE AS f_f, NULL IS TRUE AS n_t, NULL IS FALSE AS n_f;
+
+--echo === IS NOT TRUE / IS NOT FALSE ===
+
+SELECT TRUE IS NOT TRUE AS t_nt, FALSE IS NOT FALSE AS f_nf, NULL IS NOT TRUE AS n_nt, NULL IS NOT FALSE AS n_nf;
+
+--echo === Setup table with NULLs ===
+
+DROP TABLE IF EXISTS nw;
+CREATE TABLE nw (id INT PRIMARY KEY, x INT);
+INSERT INTO nw VALUES (1, 10), (2, NULL), (3, 30);
+
+--echo === WHERE col = NULL — predicate-NULL → FALSE, zero rows ===
+
+SELECT id FROM nw WHERE x = NULL;
+
+--echo === WHERE bare NULL literal — zero rows ===
+
+SELECT id FROM nw WHERE NULL;
+
+--echo === GROUP BY collapses NULLs into one group ===
+
+SELECT x, COUNT(*) AS c FROM nw GROUP BY x ORDER BY x;
+
+--echo === COUNT(*) vs COUNT(col) ===
+
+SELECT COUNT(*) AS all_rows, COUNT(x) AS nonnull_x FROM nw;
+
+--echo === SUM / AVG / MIN / MAX skip NULL ===
+
+SELECT SUM(x) AS s, AVG(x) AS a, MIN(x) AS mn, MAX(x) AS mx FROM nw;
+
+--echo === SUM/MIN on all-NULL → NULL (not 0) ===
+
+SELECT SUM(x) AS s, MIN(x) AS mn FROM nw WHERE x IS NULL;
+
+--echo === DISTINCT collapses NULLs to one row ===
+
+DROP TABLE IF EXISTS nd;
+CREATE TABLE nd (x INT);
+INSERT INTO nd VALUES (1), (1), (NULL), (NULL), (2);
+SELECT DISTINCT x FROM nd ORDER BY x;
+
+--echo === COUNT(DISTINCT col) ignores NULL ===
+
+SELECT COUNT(DISTINCT x) AS cd FROM nd;
+
+--echo === UNIQUE allows multiple NULL entries ===
+
+DROP TABLE IF EXISTS nu;
+CREATE TABLE nu (id INT PRIMARY KEY, e VARCHAR(50), UNIQUE (e));
+INSERT INTO nu VALUES (1, NULL), (2, NULL), (3, 'x');
+SELECT id, e FROM nu ORDER BY id;
+
+--echo === CHECK with NULL operand evaluates to not-false, accepted ===
+
+DROP TABLE IF EXISTS nc;
+CREATE TABLE nc (id INT PRIMARY KEY, age INT CHECK (age > 0));
+INSERT INTO nc VALUES (1, NULL);
+SELECT id, age FROM nc;
+
+--echo === LEFT JOIN fills unmatched right with NULL ===
+
+DROP TABLE IF EXISTS nl;
+DROP TABLE IF EXISTS nr;
+CREATE TABLE nl (id INT, lv INT);
+CREATE TABLE nr (id INT, rv INT);
+INSERT INTO nl VALUES (1, 10), (2, 20);
+INSERT INTO nr VALUES (1, 100);
+SELECT nl.id, nl.lv, nr.rv FROM nl LEFT JOIN nr ON nl.id = nr.id ORDER BY nl.id;
+
+--echo === KNOWN GAP: INSERT NULL into PRIMARY KEY — errno 1105 ===
+
+DROP TABLE IF EXISTS np;
+CREATE TABLE np (id INT PRIMARY KEY, n INT);
+--error 1105
+INSERT INTO np VALUES (NULL, 1);
+
+--echo === KNOWN DIVERGENCE: NOT IN (subquery with NULL) errors 1105 ===
+
+DROP TABLE IF EXISTS nsi;
+CREATE TABLE nsi (id INT, x INT);
+INSERT INTO nsi VALUES (1, 1), (2, 2), (3, NULL);
+DROP TABLE IF EXISTS nmain;
+CREATE TABLE nmain (id INT);
+INSERT INTO nmain VALUES (1), (2), (3), (4);
+--error 1105
+SELECT id FROM nmain WHERE id NOT IN (SELECT x FROM nsi);
+
+--echo === KNOWN GAP: NVL Oracle alias — errno 1105 unknown function ===
+
+--error 1105
+SELECT NVL(NULL, 'fallback') AS use_fb;
+
+--echo === Cleanup ===
+
+DROP TABLE nw;
+DROP TABLE nd;
+DROP TABLE nu;
+DROP TABLE nc;
+DROP TABLE nl;
+DROP TABLE nr;
+DROP TABLE np;
+DROP TABLE nsi;
+DROP TABLE nmain;
