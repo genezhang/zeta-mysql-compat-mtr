@@ -45,8 +45,9 @@
 #     errors 1105 "unknown function". Substitute:
 #     `ARRAY(SELECT CASE WHEN x = old THEN new ELSE x END
 #     FROM UNNEST(arr) AS t(x))`.
-#   # zeta-adapt: KNOWN GAP — CARDINALITY(arr) errors 1105
-#     "unknown function". Substitute: ARRAY_LENGTH(arr, 1).
+#   # zeta-adapt: CARDINALITY(arr) — SQL-standard / PG name for
+#     total element count. Returns 0 for empty arrays (unlike
+#     ARRAY_LENGTH which returns NULL). Closed by zeta #1200.
 #   # zeta-adapt: KNOWN GAP — ARRAY_UPPER(arr, dim) and
 #     ARRAY_LOWER(arr, dim) both error 1105 "unknown function".
 #     1-D arrays in zeta are effectively 1..ARRAY_LENGTH(arr, 1)
@@ -136,11 +137,10 @@ SELECT ARRAY_PREPEND(0, ARRAY[1, 2, 3]) AS r;
 --error 1105
 SELECT ARRAY_REPLACE(ARRAY[1, 2, 3], 2, 9) AS r;
 
---echo === KNOWN GAP: CARDINALITY — errno 1105 ===
---echo # Substitute: ARRAY_LENGTH(arr, 1).
+--echo === CARDINALITY — supported (returns 0 for empty, NULL for NULL) ===
 
---error 1105
 SELECT CARDINALITY(ARRAY[1, 2, 3]) AS r;
+SELECT CARDINALITY(ARRAY[]::INT[]) AS empty;
 
 --echo === KNOWN GAP: ARRAY_UPPER / ARRAY_LOWER — errno 1105 ===
 
