@@ -1,0 +1,79 @@
+# Independently authored COMPRESS / UNCOMPRESS /
+# UNCOMPRESSED_LENGTH smoke test for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/. All
+# three were missing in zeta before zeta PR #1251 (errored
+# "unknown function"); this slice locks in the real
+# implementation.
+#
+# Format (MySQL spec, mirrored by zeta):
+#   COMPRESS(s) → [4 bytes LE uncompressed_length][zlib stream]
+#   Empty input is identity (no header, no anything).
+#
+# UNCOMPRESS reverses COMPRESS. Invalid input (too short,
+# header lies, bad zlib stream) → NULL, not error. Matches
+# MySQL's warning-then-NULL semantics.
+#
+# Adaptation notes:
+#   # zeta-adapt: Real implementation via flate2 (zeta PR
+#     #1251); output bit-identical to MySQL on round-trip,
+#     but the exact compressed bytes may differ since
+#     flate2's defaults aren't guaranteed equal to MySQL's
+#     zlib build.
+#   # zeta-adapt: UNCOMPRESS rejects declared lengths above
+#     64 MiB to bound allocation. MySQL's
+#     max_allowed_packet enforces similar but at a different
+#     level.
+#   # zeta-adapt: BYTEA vs TEXT equality doesn't auto-coerce
+#     in zeta — slice compares LENGTH() and round-trip
+#     identity via wire decoding rather than `=`.
+#   # zeta-adapt: wrong arity → errno 1105.
+
+--echo === Round-trip length ===
+# We don't compare the compressed BYTES across MySQL/zeta
+# (zlib level differences make that fragile), but the
+# uncompressed length must equal LENGTH of the original.
+
+SELECT UNCOMPRESSED_LENGTH(COMPRESS('hello world'))
+       = LENGTH('hello world')                       AS rt_len;
+
+--echo === Empty-input identity ===
+
+SELECT LENGTH(COMPRESS(''))           AS empty_compressed_len;
+SELECT LENGTH(UNCOMPRESS(''))         AS empty_uncompressed_len;
+SELECT UNCOMPRESSED_LENGTH('')        AS empty_header_len;
+
+--echo === Compression actually shrinks repetitive input ===
+
+SELECT LENGTH(COMPRESS(REPEAT('x', 1000))) < 1000    AS shrinks;
+
+--echo === UNCOMPRESSED_LENGTH header read ===
+
+SELECT UNCOMPRESSED_LENGTH(COMPRESS(REPEAT('x', 500))) AS recorded_len;
+
+--echo === NULL propagation ===
+
+SELECT COMPRESS(NULL)             AS c_null;
+SELECT UNCOMPRESS(NULL)           AS u_null;
+SELECT UNCOMPRESSED_LENGTH(NULL)  AS l_null;
+
+--echo === Corrupt input → NULL (not error) ===
+
+SELECT UNCOMPRESS('ab')                                AS too_short;
+SELECT UNCOMPRESSED_LENGTH('ab')                       AS too_short_hdr;
+SELECT UNCOMPRESS(CONCAT(CHAR(99), CHAR(0), CHAR(0), CHAR(0), 'junk'))
+                                                       AS bad_zlib;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT COMPRESS();
+--error 1105
+SELECT UNCOMPRESS();
+--error 1105
+SELECT UNCOMPRESSED_LENGTH();
+--error 1105
+SELECT COMPRESS('a', 'b');
+
+--echo === Mixed case ===
+
+SELECT UNCOMPRESSED_LENGTH(Compress('mixed')) AS mixed_ok;

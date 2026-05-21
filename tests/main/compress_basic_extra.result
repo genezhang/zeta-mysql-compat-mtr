@@ -1,0 +1,57 @@
+=== Round-trip length ===
+SELECT UNCOMPRESSED_LENGTH(COMPRESS('hello world'))
+       = LENGTH('hello world')                       AS rt_len;
+rt_len
+1
+=== Empty-input identity ===
+SELECT LENGTH(COMPRESS(''))           AS empty_compressed_len;
+empty_compressed_len
+0
+SELECT LENGTH(UNCOMPRESS(''))         AS empty_uncompressed_len;
+empty_uncompressed_len
+0
+SELECT UNCOMPRESSED_LENGTH('')        AS empty_header_len;
+empty_header_len
+0
+=== Compression actually shrinks repetitive input ===
+SELECT LENGTH(COMPRESS(REPEAT('x', 1000))) < 1000    AS shrinks;
+shrinks
+1
+=== UNCOMPRESSED_LENGTH header read ===
+SELECT UNCOMPRESSED_LENGTH(COMPRESS(REPEAT('x', 500))) AS recorded_len;
+recorded_len
+500
+=== NULL propagation ===
+SELECT COMPRESS(NULL)             AS c_null;
+c_null
+NULL
+SELECT UNCOMPRESS(NULL)           AS u_null;
+u_null
+NULL
+SELECT UNCOMPRESSED_LENGTH(NULL)  AS l_null;
+l_null
+NULL
+=== Corrupt input → NULL (not error) ===
+SELECT UNCOMPRESS('ab')                                AS too_short;
+too_short
+NULL
+SELECT UNCOMPRESSED_LENGTH('ab')                       AS too_short_hdr;
+too_short_hdr
+NULL
+SELECT UNCOMPRESS(CONCAT(CHAR(99), CHAR(0), CHAR(0), CHAR(0), 'junk'))
+                                                       AS bad_zlib;
+bad_zlib
+NULL
+=== Arity errors ===
+SELECT COMPRESS();
+ERROR 1105: execution error: COMPRESS requires 1 argument
+SELECT UNCOMPRESS();
+ERROR 1105: execution error: UNCOMPRESS requires 1 argument
+SELECT UNCOMPRESSED_LENGTH();
+ERROR 1105: execution error: UNCOMPRESSED_LENGTH requires 1 argument
+SELECT COMPRESS('a', 'b');
+ERROR 1105: execution error: COMPRESS requires 1 argument
+=== Mixed case ===
+SELECT UNCOMPRESSED_LENGTH(Compress('mixed')) AS mixed_ok;
+mixed_ok
+5
