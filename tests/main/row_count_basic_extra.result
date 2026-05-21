@@ -1,0 +1,37 @@
+=== Fresh connection — ROW_COUNT() = -1 ===
+SELECT ROW_COUNT() AS fresh;
+ROW_COUNT()
+-1
+=== DDL resets to 0 (MySQL behavior) ===
+CREATE TABLE rc_t (id INT, v INT);
+SELECT ROW_COUNT() AS after_ddl;
+ROW_COUNT()
+0
+=== INSERT 3 rows → 3 ===
+INSERT INTO rc_t VALUES (1, 10), (2, 20), (3, 30);
+SELECT ROW_COUNT() AS after_insert;
+ROW_COUNT()
+3
+=== UPDATE 2 rows → 2 ===
+UPDATE rc_t SET v = v + 1 WHERE id <= 2;
+SELECT ROW_COUNT() AS after_update;
+ROW_COUNT()
+2
+=== DELETE 1 row → 1 ===
+DELETE FROM rc_t WHERE id = 3;
+SELECT ROW_COUNT() AS after_delete;
+ROW_COUNT()
+1
+=== A non-bare SELECT resets ROW_COUNT to 0 (MySQL) ===
+SELECT id FROM rc_t ORDER BY id;
+id
+1
+2
+SELECT ROW_COUNT() AS after_select;
+ROW_COUNT()
+0
+=== Mixed case ===
+SELECT Row_Count() AS mixed_case;
+ROW_COUNT()
+0
+DROP TABLE rc_t;
