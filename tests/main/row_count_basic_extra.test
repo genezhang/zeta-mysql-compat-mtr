@@ -18,16 +18,19 @@
 # Adaptation notes:
 #   # zeta-adapt: ROW_COUNT() — intercepted by the
 #     mysqlwire shim (zeta PR #1243), per-connection.
-#   # zeta-adapt: DDL (CREATE/DROP) does NOT bump the
-#     count — only ExecuteResult::Modified writes flip it.
-#   # zeta-adapt: SELECT also doesn't reset it — the
-#     last DML's value is sticky.
+#   # zeta-adapt: DDL (CREATE/DROP) resets to 0 — matching
+#     MySQL's "ROW_COUNT() returns 0 for non-row-affecting
+#     statements" rule.
+#   # zeta-adapt: A non-bare SELECT (one that doesn't hit
+#     the shim's SELECT ROW_COUNT() fast path) also resets
+#     to 0. A bare SELECT ROW_COUNT() reads the field
+#     without resetting it.
 
 --echo === Fresh connection — ROW_COUNT() = -1 ===
 
 SELECT ROW_COUNT() AS fresh;
 
---echo === DDL doesn't bump it ===
+--echo === DDL resets to 0 (MySQL behavior) ===
 
 CREATE TABLE rc_t (id INT, v INT);
 SELECT ROW_COUNT() AS after_ddl;
@@ -47,7 +50,10 @@ SELECT ROW_COUNT() AS after_update;
 DELETE FROM rc_t WHERE id = 3;
 SELECT ROW_COUNT() AS after_delete;
 
---echo === SELECT doesn't reset it — the last DML value is sticky ===
+--echo === A non-bare SELECT resets ROW_COUNT to 0 (MySQL) ===
+# The shim's fast path catches `SELECT ROW_COUNT()` before it
+# reaches the executor, so the bare probe doesn't reset.
+# Any other SELECT (real query path) does reset.
 
 SELECT id FROM rc_t ORDER BY id;
 SELECT ROW_COUNT() AS after_select;
