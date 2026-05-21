@@ -1,0 +1,62 @@
+# Independently authored MAKE_SET smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_str.test. MAKE_SET was missing in zeta
+# before zeta PR #1234 (errored "unknown function"); this
+# slice locks in the new behavior.
+#
+# MAKE_SET(bits, str1, str2, ...) returns a comma-joined
+# string of the variadic args whose corresponding bits
+# (LSB→MSB) are set in `bits`. NULL string args are
+# silently skipped even when their bit is set. NULL bits
+# → NULL. Negative bits → two's complement u64.
+#
+# Adaptation notes:
+#   # zeta-adapt: MAKE_SET — fully implemented in zeta
+#     PR #1234 with ≥2 args. Companion to EXPORT_SET.
+#   # zeta-adapt: Bit order LSB-first, matching MySQL
+#     ("bit 0 = first string after `bits`").
+#   # zeta-adapt: High bits beyond arg count silently
+#     ignored.
+#   # zeta-adapt: <2 args → errno 1105.
+
+--echo === Single bit, multi bit, all bits ===
+
+SELECT MAKE_SET(1, 'a', 'b', 'c') AS single;
+SELECT MAKE_SET(5, 'a', 'b', 'c') AS bits_0_2;
+SELECT MAKE_SET(7, 'a', 'b', 'c') AS all_three;
+
+--echo === Empty set (bits = 0) → empty string, not NULL ===
+
+SELECT MAKE_SET(0, 'a', 'b', 'c') AS empty;
+SELECT MAKE_SET(0, 'a', 'b', 'c') IS NULL AS is_null;
+
+--echo === NULL string arg is skipped (not output) ===
+
+SELECT MAKE_SET(7, 'a', NULL, 'c') AS skip_null;
+
+--echo === High bits beyond arg count are ignored ===
+
+SELECT MAKE_SET(15, 'a', 'b') AS truncated_to_args;
+
+--echo === NULL bits → NULL ===
+
+SELECT MAKE_SET(NULL, 'a', 'b') AS n_bits;
+
+--echo === Negative bits — two's complement (-1 = every bit) ===
+
+SELECT MAKE_SET(-1, 'x', 'y', 'z') AS neg_all;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT MAKE_SET();
+--error 1105
+SELECT MAKE_SET(1);
+
+--echo === Against an INT column ===
+
+DROP TABLE IF EXISTS ms_test;
+CREATE TABLE ms_test (id INT, mask INT);
+INSERT INTO ms_test VALUES (1, 0), (2, 1), (3, 3), (4, 7);
+SELECT id, MAKE_SET(mask, 'low', 'mid', 'high') AS rendered FROM ms_test ORDER BY id;
+DROP TABLE ms_test;

@@ -1,0 +1,49 @@
+=== Single bit, multi bit, all bits ===
+SELECT MAKE_SET(1, 'a', 'b', 'c') AS single;
+single
+a
+SELECT MAKE_SET(5, 'a', 'b', 'c') AS bits_0_2;
+bits_0_2
+a,c
+SELECT MAKE_SET(7, 'a', 'b', 'c') AS all_three;
+all_three
+a,b,c
+=== Empty set (bits = 0) → empty string, not NULL ===
+SELECT MAKE_SET(0, 'a', 'b', 'c') AS empty;
+empty
+
+SELECT MAKE_SET(0, 'a', 'b', 'c') IS NULL AS is_null;
+is_null
+0
+=== NULL string arg is skipped (not output) ===
+SELECT MAKE_SET(7, 'a', NULL, 'c') AS skip_null;
+skip_null
+a,c
+=== High bits beyond arg count are ignored ===
+SELECT MAKE_SET(15, 'a', 'b') AS truncated_to_args;
+truncated_to_args
+a,b
+=== NULL bits → NULL ===
+SELECT MAKE_SET(NULL, 'a', 'b') AS n_bits;
+n_bits
+NULL
+=== Negative bits — two's complement (-1 = every bit) ===
+SELECT MAKE_SET(-1, 'x', 'y', 'z') AS neg_all;
+neg_all
+x,y,z
+=== Arity errors ===
+SELECT MAKE_SET();
+ERROR 1105: execution error: MAKE_SET requires at least 2 arguments
+SELECT MAKE_SET(1);
+ERROR 1105: execution error: MAKE_SET requires at least 2 arguments
+=== Against an INT column ===
+DROP TABLE IF EXISTS ms_test;
+CREATE TABLE ms_test (id INT, mask INT);
+INSERT INTO ms_test VALUES (1, 0), (2, 1), (3, 3), (4, 7);
+SELECT id, MAKE_SET(mask, 'low', 'mid', 'high') AS rendered FROM ms_test ORDER BY id;
+id	rendered
+1	
+2	low
+3	low,mid
+4	low,mid,high
+DROP TABLE ms_test;
