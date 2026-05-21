@@ -1,0 +1,42 @@
+=== Anchor: 1970-01-01 00:00:00 = 62_167_219_200 ===
+SELECT TO_SECONDS('1970-01-01 00:00:00') AS anchor;
+anchor
+62167219200
+SELECT TO_SECONDS('1970-01-01')          AS date_form;
+date_form
+62167219200
+=== Time-of-day adds linearly ===
+SELECT TO_SECONDS('1970-01-01 12:00:00') - TO_SECONDS('1970-01-01') AS noon_offset;
+noon_offset
+43200
+SELECT TO_SECONDS('1970-01-01 23:59:59') - TO_SECONDS('1970-01-01') AS end_of_day;
+end_of_day
+86399
+=== Day-level deltas ===
+SELECT TO_SECONDS('1970-01-02') - TO_SECONDS('1970-01-01') AS one_day;
+one_day
+86400
+SELECT TO_SECONDS('2024-01-01') - TO_SECONDS('2023-01-01') AS one_year_2023;
+one_year_2023
+31536000
+=== Sub-second precision dropped ===
+SELECT TO_SECONDS('2024-03-15 13:00:00.999999')
+     - TO_SECONDS('2024-03-15 13:00:00')
+       AS subsec_zero;
+subsec_zero
+0
+=== DATE column source ===
+SELECT TO_SECONDS(CAST('1970-01-01' AS DATE)) AS from_date_col;
+from_date_col
+62167219200
+=== NULL propagation ===
+SELECT TO_SECONDS(NULL) AS n;
+n
+NULL
+=== Arity error ===
+SELECT TO_SECONDS();
+ERROR 1105: execution error: TO_SECONDS requires 1 argument
+=== Round-trip: TO_DAYS * 86400 matches TO_SECONDS for pure dates ===
+SELECT TO_DAYS('2024-03-15') * 86400 = TO_SECONDS('2024-03-15') AS day_sec_agree;
+day_sec_agree
+1
