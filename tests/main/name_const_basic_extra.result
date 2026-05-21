@@ -1,0 +1,46 @@
+=== Value pass-through ===
+SELECT NAME_CONST('id', 42)         AS int_val;
+int_val
+42
+SELECT NAME_CONST('greet', 'hi')    AS str_val;
+str_val
+hi
+SELECT NAME_CONST('x', NULL)        AS null_val;
+null_val
+NULL
+=== Column-label divergence (no AS alias) ===
+SELECT NAME_CONST('mylabel', 99);
+NAME_CONST
+99
+=== Fractional value ===
+SELECT NAME_CONST('pi', 3.14)       AS pi;
+pi
+3.14
+=== mysqldump idiom — NAME_CONST inside INSERT VALUES ===
+CREATE TABLE nc_t (id INT, name TEXT);
+INSERT INTO nc_t VALUES (NAME_CONST('id', 1), NAME_CONST('name', 'foo'));
+INSERT INTO nc_t VALUES (NAME_CONST('id', 2), NAME_CONST('name', 'bar'));
+SELECT id, name FROM nc_t;
+id	name
+1	foo
+2	bar
+DROP TABLE nc_t;
+=== Mixed case ===
+SELECT Name_Const('x', 7)           AS mixed;
+mixed
+7
+SELECT name_const('y', 8)           AS lower;
+lower
+8
+=== Arity errors ===
+SELECT NAME_CONST('x');
+ERROR 1105: execution error: NAME_CONST requires 2 arguments (name, value)
+SELECT NAME_CONST();
+ERROR 1105: execution error: NAME_CONST requires 2 arguments (name, value)
+SELECT NAME_CONST('x', 1, 2);
+ERROR 1105: execution error: NAME_CONST requires 2 arguments (name, value)
+=== Non-string first arg — error ===
+SELECT NAME_CONST(1, 2);
+ERROR 1105: execution error: NAME_CONST first argument must be a string
+SELECT NAME_CONST(NULL, 2);
+ERROR 1105: execution error: NAME_CONST first argument must be a string
