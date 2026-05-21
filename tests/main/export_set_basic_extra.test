@@ -1,0 +1,74 @@
+# Independently authored EXPORT_SET smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_str.test or mariadb test corpus.
+# EXPORT_SET was missing in zeta before zeta PR #1232
+# (errored "unknown function"); this slice locks in the new
+# behavior.
+#
+# EXPORT_SET(bits, on, off [, separator [, n_bits]]) renders
+# a 64-bit integer as a separator-joined string, scanning
+# bits LSB → MSB. `on` is emitted for set bits, `off` for
+# unset. Defaults: separator=',', n_bits=64. n_bits is
+# clamped to 0..=64 (MySQL behavior — no error).
+#
+# Adaptation notes:
+#   # zeta-adapt: EXPORT_SET — fully implemented in zeta
+#     PR #1232 with 3..=5 args and LSB-first scan.
+#   # zeta-adapt: Negative bits → reinterpreted as two's
+#     complement u64 (so EXPORT_SET(-1, ...) → all bits set).
+#   # zeta-adapt: NULL in any required arg → NULL.
+#   # zeta-adapt: <3 or >5 args → errno 1105.
+
+--echo === Canonical doc example — 5 = 0b0101, 4 bits ===
+
+SELECT EXPORT_SET(5, 'Y', 'N', ',', 4) AS canonical;
+
+--echo === All zero / all one ===
+
+SELECT EXPORT_SET(0, '1', '0', '|', 3) AS all_zero;
+SELECT EXPORT_SET(7, 'on', 'off', '/', 4) AS three_set;
+
+--echo === Default separator (',') and default n_bits (64) ===
+# 1 = 0b1 → bit 0 set; bits 1..63 unset. Result has 64 'Y'/'N'
+# tokens joined by 63 commas. Pin the prefix and the comma
+# count to avoid a 200-char literal.
+
+SELECT EXPORT_SET(1, 'Y', 'N') LIKE 'Y,N,N,N,N,%' AS default_prefix_ok;
+SELECT LENGTH(EXPORT_SET(1, 'Y', 'N')) - LENGTH(REPLACE(EXPORT_SET(1, 'Y', 'N'), ',', '')) AS comma_count;
+
+--echo === n_bits boundary: 0, 64, >64 (clamp), <0 (clamp) ===
+
+SELECT EXPORT_SET(255, 'Y', 'N', ',', 0) AS nbits_zero;
+SELECT LENGTH(EXPORT_SET(0, '1', '0', '', 100)) AS nbits_clamped_high;
+SELECT EXPORT_SET(255, 'Y', 'N', ',', -1) AS nbits_clamped_low;
+
+--echo === Negative bits — two's complement (-1 = all 64 bits set) ===
+
+SELECT EXPORT_SET(-1, '1', '0', '', 8) AS neg_all_set;
+
+--echo === NULL propagation in every arg slot ===
+
+SELECT EXPORT_SET(NULL, 'Y', 'N') AS n1;
+SELECT EXPORT_SET(5, NULL, 'N') AS n2;
+SELECT EXPORT_SET(5, 'Y', NULL) AS n3;
+SELECT EXPORT_SET(5, 'Y', 'N', NULL) AS n4;
+SELECT EXPORT_SET(5, 'Y', 'N', ',', NULL) AS n5;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT EXPORT_SET();
+--error 1105
+SELECT EXPORT_SET(1);
+--error 1105
+SELECT EXPORT_SET(1, 'a');
+--error 1105
+SELECT EXPORT_SET(1, 'a', 'b', ',', 4, 5);
+
+--echo === Against a TEXT/INT column ===
+
+DROP TABLE IF EXISTS es_test;
+CREATE TABLE es_test (id INT, mask INT);
+INSERT INTO es_test VALUES (1, 0), (2, 1), (3, 3), (4, 7);
+SELECT id, EXPORT_SET(mask, 'Y', 'N', '', 3) AS rendered FROM es_test ORDER BY id;
+DROP TABLE es_test;
