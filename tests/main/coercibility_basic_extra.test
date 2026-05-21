@@ -1,0 +1,58 @@
+# Independently authored COERCIBILITY smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. COERCIBILITY was missing in zeta before
+# zeta PR #1245 (errored "unknown function"); this slice
+# locks in the new approximation.
+#
+# MySQL COERCIBILITY(expr) returns the collation
+# coercibility level (0..=6, lower = stronger):
+#   0  explicit COLLATE
+#   1  none
+#   2  implicit column
+#   3  system constant (USER(), etc.)
+#   4  coercible (string literal)
+#   5  numeric
+#   6  ignorable (NULL)
+#
+# zeta doesn't track per-value collation, so the executor
+# approximates by Value kind (zeta PR #1245):
+#   NULL → 6, numeric → 5, everything else → 4
+#
+# Adaptation notes:
+#   # zeta-adapt: COERCIBILITY — approximation by Value
+#     kind; explicit COLLATE / column metadata not yet
+#     reflected (future work).
+#   # zeta-adapt: Arity != 1 → errno 1105.
+
+--echo === String literal → 4 (coercible) ===
+
+SELECT COERCIBILITY('hello') AS str_lit;
+
+--echo === Numeric literals → 5 ===
+
+SELECT COERCIBILITY(42)   AS int_lit;
+SELECT COERCIBILITY(3.14) AS dec_lit;
+SELECT COERCIBILITY(TRUE) AS bool_lit;
+
+--echo === NULL → 6 (ignorable) ===
+
+SELECT COERCIBILITY(NULL) AS null_lit;
+
+--echo === Mixed case ===
+
+SELECT Coercibility('x') AS mixed_case;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT COERCIBILITY();
+--error 1105
+SELECT COERCIBILITY('a', 'b');
+
+--echo === Against a TEXT column (still returns 4 — no column-collation tracking yet) ===
+
+DROP TABLE IF EXISTS coerc_t;
+CREATE TABLE coerc_t (id INT, s TEXT);
+INSERT INTO coerc_t VALUES (1, 'hello'), (2, NULL);
+SELECT id, COERCIBILITY(s) AS lvl FROM coerc_t ORDER BY id;
+DROP TABLE coerc_t;
