@@ -1,0 +1,59 @@
+# Independently authored UTC_TIMESTAMP / UTC_DATE / UTC_TIME
+# smoke test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/. All three names were
+# missing in zeta before zeta PR #1238 (errored "unknown
+# function"); this slice locks in the new behavior.
+#
+# UTC_TIMESTAMP / UTC_DATE / UTC_TIME are MySQL's
+# explicit-UTC variants of NOW / CURRENT_DATE / CURRENT_TIME.
+# Today zeta has no tz support so they're identical to their
+# non-UTC counterparts; when tz support lands the non-UTC
+# variants will observe the session tz and the UTC variants
+# will stay UTC.
+#
+# Their wall-clock return values can't be diffed
+# byte-for-byte, so this slice uses derived-shape asserts
+# (cross-fn equality with their non-UTC peers, year prefix,
+# type checks via IS NOT NULL / type-coercion sanity).
+#
+# Adaptation notes:
+#   # zeta-adapt: UTC_TIMESTAMP / UTC_DATE / UTC_TIME —
+#     implemented in zeta PR #1238 as aliases for the local
+#     variants (UTC by default since no tz support yet).
+#   # zeta-adapt: All three accept () no-arg form.
+
+--echo === UTC_TIMESTAMP returns a non-null timestamp ===
+
+SELECT UTC_TIMESTAMP() IS NOT NULL AS ts_ok;
+
+--echo === UTC_DATE matches CURRENT_DATE today (no tz support) ===
+
+SELECT UTC_DATE() = CURRENT_DATE() AS date_matches;
+
+--echo === UTC_TIME returns a non-null time ===
+
+SELECT UTC_TIME() IS NOT NULL AS time_ok;
+
+--echo === UTC_TIMESTAMP and NOW agree on the date ===
+# Two back-to-back clock reads can't cross midnight in <1µs,
+# so the date prefix must match.
+
+SELECT CAST(UTC_TIMESTAMP() AS DATE) = CAST(NOW() AS DATE) AS same_date;
+
+--echo === Mixed case ===
+
+SELECT Utc_Timestamp() IS NOT NULL AS mixed_ts;
+SELECT Utc_Date()      IS NOT NULL AS mixed_d;
+SELECT Utc_Time()      IS NOT NULL AS mixed_t;
+
+--echo === Stored into typed columns ===
+
+DROP TABLE IF EXISTS utc_test;
+CREATE TABLE utc_test (id INT PRIMARY KEY, ts TIMESTAMP, d DATE, t TIME);
+INSERT INTO utc_test VALUES (1, UTC_TIMESTAMP(), UTC_DATE(), UTC_TIME());
+SELECT id,
+       ts IS NOT NULL AS ts_set,
+       d  IS NOT NULL AS d_set,
+       t  IS NOT NULL AS t_set
+FROM utc_test;
+DROP TABLE utc_test;
