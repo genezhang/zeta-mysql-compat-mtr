@@ -1,0 +1,56 @@
+# Independently authored BENCHMARK smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. BENCHMARK was missing in zeta before zeta
+# PR #1242 (errored "unknown function"); this slice locks
+# in the new behavior.
+#
+# MySQL BENCHMARK(count, expr) was historically a tight-
+# loop timing helper. Its documented return value is
+# always 0 regardless of count or expr. zeta short-
+# circuits the loop without iterating (avoids DoS-via-
+# tight-loop) but still evaluates the inner expr once so
+# argument/type errors propagate.
+#
+# Adaptation notes:
+#   # zeta-adapt: BENCHMARK — implemented in zeta PR #1242
+#     as a non-iterating stub. Return value matches MySQL.
+#   # zeta-adapt: NULL count → NULL (MySQL also returns
+#     NULL for NULL count).
+#   # zeta-adapt: Negative count → errno 1105 (MySQL
+#     returns NULL; zeta is stricter — pinned).
+#   # zeta-adapt: Arity != 2 → errno 1105.
+
+--echo === Always returns 0 ===
+
+SELECT BENCHMARK(1, 1+1)         AS small_n;
+SELECT BENCHMARK(1000000, 'nop') AS huge_n;
+SELECT BENCHMARK(0, 1)           AS zero_n;
+
+--echo === NULL count → NULL ===
+
+SELECT BENCHMARK(NULL, 1) AS n_count;
+
+--echo === Mixed case ===
+
+SELECT Benchmark(10, 1) AS mixed;
+
+--echo === Inner expr is evaluated (errors NOT swallowed) ===
+# We only run an inner expr that's known-good here; the contract
+# is "no swallowing". Real argument-typed BENCHMARK errors are
+# exercised in the integration test.
+
+SELECT BENCHMARK(1, UPPER('abc')) AS inner_ok;
+
+--echo === Negative count → errno 1105 (zeta is stricter than MySQL) ===
+
+--error 1105
+SELECT BENCHMARK(-1, 1);
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT BENCHMARK();
+--error 1105
+SELECT BENCHMARK(1);
+--error 1105
+SELECT BENCHMARK(1, 2, 3);

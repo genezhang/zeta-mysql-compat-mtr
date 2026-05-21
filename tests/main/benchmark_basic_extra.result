@@ -1,0 +1,32 @@
+=== Always returns 0 ===
+SELECT BENCHMARK(1, 1+1)         AS small_n;
+small_n
+0
+SELECT BENCHMARK(1000000, 'nop') AS huge_n;
+huge_n
+0
+SELECT BENCHMARK(0, 1)           AS zero_n;
+zero_n
+0
+=== NULL count → NULL ===
+SELECT BENCHMARK(NULL, 1) AS n_count;
+n_count
+NULL
+=== Mixed case ===
+SELECT Benchmark(10, 1) AS mixed;
+mixed
+0
+=== Inner expr is evaluated (errors NOT swallowed) ===
+SELECT BENCHMARK(1, UPPER('abc')) AS inner_ok;
+inner_ok
+0
+=== Negative count → errno 1105 (zeta is stricter than MySQL) ===
+SELECT BENCHMARK(-1, 1);
+ERROR 1105: execution error: BENCHMARK count must be non-negative
+=== Arity errors ===
+SELECT BENCHMARK();
+ERROR 1105: execution error: BENCHMARK requires 2 arguments (count, expr)
+SELECT BENCHMARK(1);
+ERROR 1105: execution error: BENCHMARK requires 2 arguments (count, expr)
+SELECT BENCHMARK(1, 2, 3);
+ERROR 1105: execution error: BENCHMARK requires 2 arguments (count, expr)
