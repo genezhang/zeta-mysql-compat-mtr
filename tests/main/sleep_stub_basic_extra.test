@@ -1,0 +1,62 @@
+# Independently authored SLEEP smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. SLEEP was missing in zeta before zeta PR
+# #1249 (errored "unknown function"); this slice locks in
+# the new fail-safe stub.
+#
+# SLEEP is a stub: it returns 0 immediately without actually
+# sleeping. Rationale:
+#
+#   1. zeta evaluates scalars synchronously on executor
+#      threads. A real blocking sleep would tie up a thread
+#      for the requested duration and let one client hold a
+#      slot across the whole pool with `SELECT SLEEP(60)`.
+#   2. The BENCHMARK precedent (zeta PR #1242) already
+#      elides timing-side-effects and returns the canonical
+#      success value.
+#   3. Apps that probe SLEEP for capability detection see
+#      success. Apps that depend on real timing for pacing
+#      get their work done faster — wrong in a narrow sense
+#      but never harmful.
+#
+# Adaptation notes:
+#   # zeta-adapt: SLEEP does NOT actually sleep (zeta PR
+#     #1249); always returns 0 immediately.
+#   # zeta-adapt: NULL arg → NULL.
+#   # zeta-adapt: non-numeric arg → errno 1105.
+#   # zeta-adapt: wrong arity → errno 1105.
+
+--echo === SLEEP(positive seconds) — returns 0, does NOT block ===
+
+SELECT SLEEP(0)       AS zero;
+SELECT SLEEP(1)       AS one;
+
+--echo === SLEEP(0) and negative seconds — immediate return ===
+
+SELECT SLEEP(0)       AS zero_again;
+SELECT SLEEP(-5)      AS negative;
+
+--echo === Fractional seconds — accepted ===
+
+SELECT SLEEP(0.5)     AS half;
+
+--echo === NULL propagation ===
+
+SELECT SLEEP(NULL)    AS n;
+
+--echo === Mixed case ===
+
+SELECT Sleep(0)       AS mixed;
+SELECT sleep(0)       AS lower;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT SLEEP();
+--error 1105
+SELECT SLEEP(1, 2);
+
+--echo === Non-numeric arg — error ===
+
+--error 1105
+SELECT SLEEP('abc');
