@@ -1,0 +1,67 @@
+# Independently authored TIME_FORMAT smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_time.test. TIME_FORMAT was missing in
+# zeta before zeta PR #1236 (errored "unknown function");
+# this slice locks in the new behavior.
+#
+# TIME_FORMAT(time, format) is DATE_FORMAT restricted to
+# the time-component specifiers: %H %h %I %i %k %l %p %r
+# %S %s %T %f. The first arg may be a TIME literal, a
+# TIMESTAMP (only its time slice is consulted), or a
+# parseable string. Date specifiers in the format resolve
+# against the synthetic date 1970-01-01 (a sentinel —
+# MySQL is similarly undefined here).
+#
+# Adaptation notes:
+#   # zeta-adapt: TIME_FORMAT — implemented in zeta
+#     PR #1236, strict 2-arg arity.
+#   # zeta-adapt: TIMESTAMP input — time slice is used,
+#     date is ignored.
+#   # zeta-adapt: Unparseable string → errno 1105.
+#   # zeta-adapt: NULL in either arg → NULL.
+
+--echo === 24-hour and 12-hour formats ===
+
+SELECT TIME_FORMAT('13:45:09', '%H:%i:%s') AS h24;
+SELECT TIME_FORMAT('13:45:09', '%h:%i %p') AS h12;
+
+--echo === Composite specifiers %r (12h) and %T (24h) ===
+
+SELECT TIME_FORMAT('00:30:00', '%r') AS midnight_30_12h;
+SELECT TIME_FORMAT('23:59:59', '%T') AS end_of_day_24h;
+
+--echo === Midnight / noon 12-hour edge cases ===
+
+SELECT TIME_FORMAT('00:00:00', '%h %p') AS midnight;
+SELECT TIME_FORMAT('12:00:00', '%h %p') AS noon;
+
+--echo === From a TIMESTAMP literal — only the time slice is used ===
+
+SELECT TIME_FORMAT(CAST('2024-03-15 18:30:45' AS TIMESTAMP), '%H:%i:%s') AS from_ts;
+
+--echo === NULL propagation ===
+
+SELECT TIME_FORMAT(NULL, '%H:%i:%s')   AS n_val;
+SELECT TIME_FORMAT('13:00:00', NULL)   AS n_fmt;
+
+--echo === Mixed case ===
+
+SELECT Time_Format('07:08:09', '%H:%i:%s') AS mixed_case;
+
+--echo === Arity + unparseable input → errno 1105 ===
+
+--error 1105
+SELECT TIME_FORMAT('13:00:00');
+--error 1105
+SELECT TIME_FORMAT('not-a-time', '%H:%i');
+
+--echo === Against a TIME column ===
+
+DROP TABLE IF EXISTS tf_test;
+CREATE TABLE tf_test (id INT, t TIME);
+INSERT INTO tf_test VALUES
+  (1, '06:15:30'),
+  (2, '14:00:00'),
+  (3, '23:45:00');
+SELECT id, TIME_FORMAT(t, '%h:%i %p') AS pretty FROM tf_test ORDER BY id;
+DROP TABLE tf_test;
