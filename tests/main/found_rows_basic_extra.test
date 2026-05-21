@@ -1,0 +1,41 @@
+# Independently authored FOUND_ROWS() smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. FOUND_ROWS was missing in zeta before zeta
+# PR #1244 (errored "unknown function"); this slice locks
+# in the new executor stub.
+#
+# MySQL FOUND_ROWS() returns the number of rows that would
+# have been returned by the most recent SELECT if there
+# had been no LIMIT clause (used with the deprecated
+# SQL_CALC_FOUND_ROWS hint). zeta doesn't track the
+# SQL_CALC_FOUND_ROWS semantic today, so the executor
+# returns 0 as a non-erroring placeholder. Apps that probe
+# FOUND_ROWS for capability detection see a sane value.
+#
+# LAST_INSERT_ID() and CONNECTION_ID() have working per-
+# connection implementations served by the mysqlwire shim
+# fast path; the executor arm is only the fallback for
+# non-shim callers (PG wire, direct API).
+#
+# Adaptation notes:
+#   # zeta-adapt: FOUND_ROWS() — executor stub returning 0
+#     (zeta PR #1244). Real SQL_CALC_FOUND_ROWS support is
+#     a separate future workstream.
+#   # zeta-adapt: Any argument → errno 1105.
+
+--echo === FOUND_ROWS() returns 0 (executor stub) ===
+
+SELECT FOUND_ROWS() AS frv;
+
+--echo === FOUND_ROWS in an expression ===
+
+SELECT FOUND_ROWS() + 100 AS expr;
+
+--echo === Mixed case ===
+
+SELECT Found_Rows() AS mixed_case;
+
+--echo === Arity error ===
+
+--error 1105
+SELECT FOUND_ROWS(1);

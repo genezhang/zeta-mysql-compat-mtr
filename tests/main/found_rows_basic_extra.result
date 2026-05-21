@@ -1,0 +1,15 @@
+=== FOUND_ROWS() returns 0 (executor stub) ===
+SELECT FOUND_ROWS() AS frv;
+frv
+0
+=== FOUND_ROWS in an expression ===
+SELECT FOUND_ROWS() + 100 AS expr;
+expr
+100
+=== Mixed case ===
+SELECT Found_Rows() AS mixed_case;
+mixed_case
+0
+=== Arity error ===
+SELECT FOUND_ROWS(1);
+ERROR 1105: execution error: FOUND_ROWS takes no arguments
