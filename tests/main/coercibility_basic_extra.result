@@ -1,0 +1,36 @@
+=== String literal → 4 (coercible) ===
+SELECT COERCIBILITY('hello') AS str_lit;
+str_lit
+4
+=== Numeric literals → 5 ===
+SELECT COERCIBILITY(42)   AS int_lit;
+int_lit
+5
+SELECT COERCIBILITY(3.14) AS dec_lit;
+dec_lit
+5
+SELECT COERCIBILITY(TRUE) AS bool_lit;
+bool_lit
+5
+=== NULL → 6 (ignorable) ===
+SELECT COERCIBILITY(NULL) AS null_lit;
+null_lit
+6
+=== Mixed case ===
+SELECT Coercibility('x') AS mixed_case;
+mixed_case
+4
+=== Arity errors ===
+SELECT COERCIBILITY();
+ERROR 1105: execution error: COERCIBILITY requires 1 argument
+SELECT COERCIBILITY('a', 'b');
+ERROR 1105: execution error: COERCIBILITY requires 1 argument
+=== Against a TEXT column (still returns 4 — no column-collation tracking yet) ===
+DROP TABLE IF EXISTS coerc_t;
+CREATE TABLE coerc_t (id INT, s TEXT);
+INSERT INTO coerc_t VALUES (1, 'hello'), (2, NULL);
+SELECT id, COERCIBILITY(s) AS lvl FROM coerc_t ORDER BY id;
+id	lvl
+1	4
+2	6
+DROP TABLE coerc_t;
