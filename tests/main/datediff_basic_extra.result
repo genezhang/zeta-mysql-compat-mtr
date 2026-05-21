@@ -1,0 +1,53 @@
+=== Forward and backward day diffs ===
+SELECT DATEDIFF('2024-03-15', '2024-03-10') AS fwd;
+fwd
+5
+SELECT DATEDIFF('2024-03-10', '2024-03-15') AS bwd;
+bwd
+-5
+=== Equal dates → 0 ===
+SELECT DATEDIFF('2024-03-15', '2024-03-15') AS same;
+same
+0
+=== Year boundary — 2024 is a leap year (366 days) ===
+SELECT DATEDIFF('2025-01-01', '2024-01-01') AS leap_year;
+leap_year
+366
+SELECT DATEDIFF('2024-01-01', '2024-12-31') AS minus_365;
+minus_365
+-365
+=== Time slice is ignored — same day → 0 ===
+SELECT DATEDIFF('2024-03-15 23:59:59', '2024-03-15 00:00:00') AS time_ignored;
+time_ignored
+0
+=== Mixed DATE column + string ===
+SELECT DATEDIFF(CAST('2024-03-15' AS DATE), '2024-03-10') AS mixed_types;
+mixed_types
+5
+=== NULL propagation ===
+SELECT DATEDIFF(NULL, '2024-03-15') AS n_left;
+n_left
+NULL
+SELECT DATEDIFF('2024-03-15', NULL) AS n_right;
+n_right
+NULL
+=== Mixed case ===
+SELECT DateDiff('2024-03-15', '2024-03-10') AS mixed_case;
+mixed_case
+5
+=== Arity error ===
+SELECT DATEDIFF('2024-03-15');
+ERROR 1105: execution error: DATEDIFF requires 2 arguments
+=== Against a DATE column ===
+DROP TABLE IF EXISTS dd_test;
+CREATE TABLE dd_test (id INT, d DATE);
+INSERT INTO dd_test VALUES
+  (1, '2024-01-01'),
+  (2, '2024-06-15'),
+  (3, '2024-12-31');
+SELECT id, DATEDIFF(d, '2024-01-01') AS days_from_start FROM dd_test ORDER BY id;
+id	days_from_start
+1	0
+2	166
+3	365
+DROP TABLE dd_test;
