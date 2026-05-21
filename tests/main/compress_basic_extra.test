@@ -28,11 +28,15 @@
 #     identity via wire decoding rather than `=`.
 #   # zeta-adapt: wrong arity → errno 1105.
 
---echo === Round-trip length ===
+--echo === Round-trip identity and length ===
 # We don't compare the compressed BYTES across MySQL/zeta
 # (zlib level differences make that fragile), but the
-# uncompressed length must equal LENGTH of the original.
+# uncompressed output MUST be bit-identical to the original.
+# Use HEX() to get a wire-stable comparison since zeta's
+# BYTEA-vs-TEXT `=` doesn't auto-coerce.
 
+SELECT HEX(UNCOMPRESS(COMPRESS('hello world')))
+       = HEX('hello world')                          AS rt_identity;
 SELECT UNCOMPRESSED_LENGTH(COMPRESS('hello world'))
        = LENGTH('hello world')                       AS rt_len;
 
@@ -60,8 +64,10 @@ SELECT UNCOMPRESSED_LENGTH(NULL)  AS l_null;
 
 SELECT UNCOMPRESS('ab')                                AS too_short;
 SELECT UNCOMPRESSED_LENGTH('ab')                       AS too_short_hdr;
-SELECT UNCOMPRESS(CONCAT(CHAR(99), CHAR(0), CHAR(0), CHAR(0), 'junk'))
-                                                       AS bad_zlib;
+# Header says "63 bytes uncompressed" (UNHEX('63000000') is
+# the 4-byte LE prefix), followed by bytes that aren't a
+# valid zlib stream.
+SELECT UNCOMPRESS(CONCAT(UNHEX('63000000'), 'junk'))   AS bad_zlib;
 
 --echo === Arity errors ===
 

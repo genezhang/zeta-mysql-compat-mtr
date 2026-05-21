@@ -1,4 +1,8 @@
-=== Round-trip length ===
+=== Round-trip identity and length ===
+SELECT HEX(UNCOMPRESS(COMPRESS('hello world')))
+       = HEX('hello world')                          AS rt_identity;
+rt_identity
+1
 SELECT UNCOMPRESSED_LENGTH(COMPRESS('hello world'))
        = LENGTH('hello world')                       AS rt_len;
 rt_len
@@ -38,8 +42,7 @@ NULL
 SELECT UNCOMPRESSED_LENGTH('ab')                       AS too_short_hdr;
 too_short_hdr
 NULL
-SELECT UNCOMPRESS(CONCAT(CHAR(99), CHAR(0), CHAR(0), CHAR(0), 'junk'))
-                                                       AS bad_zlib;
+SELECT UNCOMPRESS(CONCAT(UNHEX('63000000'), 'junk'))   AS bad_zlib;
 bad_zlib
 NULL
 === Arity errors ===
