@@ -1,0 +1,28 @@
+# Independently authored DATABASE / SCHEMA smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. SCHEMA() was missing in zeta before
+# zeta PR #1241 (errored "unknown function"); DATABASE()
+# already worked. This slice locks in the parity.
+#
+# MySQL DATABASE() / SCHEMA() — aliases that return the
+# currently selected database name (per-connection state).
+# zeta's mysqlwire shim intercepts both and reads from the
+# connection's tracked current_database.
+#
+# Adaptation notes:
+#   # zeta-adapt: DATABASE() / SCHEMA() — both intercepted
+#     by the mysqlwire shim's fast path (zeta PR #1241
+#     added the SCHEMA() form alongside DATABASE()).
+#   # zeta-adapt: The value is the per-connection
+#     `current_database` (set via the connect URL's
+#     /<db> suffix or `USE <db>`).
+
+--echo === Both names return the runner's connection database ===
+
+SELECT DATABASE() AS db;
+SELECT SCHEMA()   AS schema_name;
+
+--echo === Mixed case (shim's case-insensitive match) ===
+
+SELECT Database() AS db_mixed;
+SELECT Schema()   AS schema_mixed;
