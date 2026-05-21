@@ -1,0 +1,60 @@
+# Independently authored IS_UUID smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. IS_UUID was missing in zeta before zeta
+# PR #1247 (errored "unknown function"); this slice locks
+# in the new behavior.
+#
+# MySQL IS_UUID(str) returns 1 if `str` parses as a
+# canonical UUID, 0 otherwise, NULL if `str` is NULL.
+# Accepts the dashed 8-4-4-4-12 form, the bare 32-hex
+# form, and optional surrounding curly braces.
+#
+# Adaptation notes:
+#   # zeta-adapt: IS_UUID — implemented in zeta PR #1247
+#     with strict 1-arg arity.
+#   # zeta-adapt: Strips one pair of `{}` if present
+#     (matches MySQL's lenient parsing).
+#   # zeta-adapt: Uppercase hex digits are accepted.
+#   # zeta-adapt: NULL → NULL.
+
+--echo === Valid UUID forms — return 1 ===
+
+SELECT IS_UUID('123e4567-e89b-12d3-a456-426614174000') AS dashed;
+SELECT IS_UUID('123e4567e89b12d3a456426614174000')     AS dashless;
+SELECT IS_UUID('{123e4567-e89b-12d3-a456-426614174000}') AS braced;
+SELECT IS_UUID('ABCDEF12-3456-7890-ABCD-EF1234567890') AS upper_hex;
+
+--echo === Invalid input — return 0 ===
+
+SELECT IS_UUID('')                                  AS empty;
+SELECT IS_UUID('not-a-uuid')                        AS junk;
+SELECT IS_UUID('123e4567-e89b-12d3-a456')           AS short;
+SELECT IS_UUID('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx') AS non_hex;
+SELECT IS_UUID('123e4567-e89b-12d3-a456-426614174000-extra') AS too_long;
+
+--echo === NULL → NULL ===
+
+SELECT IS_UUID(NULL) AS n;
+
+--echo === Mixed case for the function name ===
+
+SELECT Is_Uuid('123e4567-e89b-12d3-a456-426614174000') AS mixed_case;
+
+--echo === Arity error ===
+
+--error 1105
+SELECT IS_UUID();
+--error 1105
+SELECT IS_UUID('a', 'b');
+
+--echo === Filter a TEXT column on validity ===
+
+DROP TABLE IF EXISTS uu_test;
+CREATE TABLE uu_test (id INT, s TEXT);
+INSERT INTO uu_test VALUES
+  (1, '123e4567-e89b-12d3-a456-426614174000'),
+  (2, 'not-uuid'),
+  (3, NULL);
+SELECT id, IS_UUID(s) AS valid FROM uu_test ORDER BY id;
+SELECT id FROM uu_test WHERE IS_UUID(s) = 1 ORDER BY id;
+DROP TABLE uu_test;
