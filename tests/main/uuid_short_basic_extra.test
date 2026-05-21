@@ -1,0 +1,68 @@
+# Independently authored UUID_SHORT smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_misc.test or PG regress. UUID_SHORT was
+# missing in zeta before zeta PR #1231 (errored "unknown
+# function"); this slice locks in the new behavior.
+#
+# UUID_SHORT() returns a BIGINT UNSIGNED that increases
+# monotonically within a process. The byte layout is:
+#   bits 56..63  server_id (8 bits — zeta uses 0)
+#   bits 24..55  startup_seconds (32 bits, captured once)
+#   bits  0..23  counter (24 bits, wraps mod 16M)
+#
+# The value is wall-clock-dependent so the runner's
+# byte-for-byte diff can't pin the raw integer. Instead this
+# slice stores values in a table and asserts on derived
+# shape — positivity, monotonicity, distinctness.
+#
+# Adaptation notes:
+#   # zeta-adapt: UUID_SHORT() — zero-arg scalar, BIGINT
+#     UNSIGNED return.
+#   # zeta-adapt: Monotonic per process (counter wraps on
+#     overflow, restart resets startup_seconds and re-zeroes
+#     the counter; not tested here).
+#   # zeta-adapt: Any args → errno 1105.
+
+--echo === UUID_SHORT — basic shape ===
+
+CREATE TABLE us (id INT PRIMARY KEY, v BIGINT UNSIGNED);
+INSERT INTO us VALUES (1, UUID_SHORT());
+INSERT INTO us VALUES (2, UUID_SHORT());
+INSERT INTO us VALUES (3, UUID_SHORT());
+
+SELECT id, v IS NOT NULL AS got_value FROM us ORDER BY id;
+
+--echo === Monotonic across consecutive calls ===
+
+SELECT (SELECT v FROM us WHERE id = 2) > (SELECT v FROM us WHERE id = 1) AS m_2_gt_1;
+SELECT (SELECT v FROM us WHERE id = 3) > (SELECT v FROM us WHERE id = 2) AS m_3_gt_2;
+
+--echo === All three values are distinct ===
+
+SELECT COUNT(DISTINCT v) AS distinct_count FROM us;
+
+--echo === Each per-row evaluation ticks the counter ===
+
+SELECT COUNT(DISTINCT v) AS row_distinct FROM (
+  SELECT UUID_SHORT() AS v FROM (
+    SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+  ) t
+) x;
+
+--echo === Consecutive insert ticks are close (no time jump) ===
+# Three back-to-back inserts happen in well under a second, so the
+# total span across them stays bounded by the per-call counter
+# increment alone — pinning the "counter is the only thing that
+# changes within a wall-clock second" contract.
+
+SELECT (SELECT v FROM us WHERE id = 3) - (SELECT v FROM us WHERE id = 1) < 1000
+       AS span_small;
+
+--echo === Arity — any arg is an error ===
+
+--error 1105
+SELECT UUID_SHORT(1);
+--error 1105
+SELECT UUID_SHORT(0, 0);
+
+DROP TABLE us;
