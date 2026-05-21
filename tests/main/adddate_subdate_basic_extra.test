@@ -1,0 +1,72 @@
+# Independently authored ADDDATE / SUBDATE smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. Both functions were missing in zeta
+# before zeta PR #1239 (errored "unknown function"); this
+# slice locks in the new behavior.
+#
+# ADDDATE / SUBDATE are MySQL's date arithmetic aliases
+# for DATE_ADD / DATE_SUB. They accept TWO forms:
+#   1) (date, INTERVAL expr unit) — same as DATE_ADD.
+#   2) (date, days)  — integer shorthand for INTERVAL DAY.
+#
+# Adaptation notes:
+#   # zeta-adapt: ADDDATE / SUBDATE — implemented in zeta
+#     PR #1239 as a thin extension of the DATE_ADD /
+#     DATE_SUB arm with integer-days shorthand support.
+#   # zeta-adapt: SUBDATE(d, 7) == DATE_SUB(d, INTERVAL 7 DAY).
+#   # zeta-adapt: NULL in either arg → NULL.
+#   # zeta-adapt: <2 args or > 2 args → errno 1105.
+
+--echo === ADDDATE — INTERVAL form ===
+
+SELECT CAST(ADDDATE('2024-03-15', INTERVAL 7 DAY)  AS DATE) AS plus_7d;
+SELECT CAST(ADDDATE('2024-03-15', INTERVAL 1 MONTH) AS DATE) AS plus_1m;
+SELECT CAST(ADDDATE('2024-01-31', INTERVAL 1 MONTH) AS DATE) AS feb_clamp;
+
+--echo === ADDDATE — integer-days shorthand ===
+
+SELECT CAST(ADDDATE('2024-03-15', 7)   AS DATE) AS shorthand_7;
+SELECT CAST(ADDDATE('2024-03-15', 0)   AS DATE) AS shorthand_0;
+SELECT CAST(ADDDATE('2024-03-15', -10) AS DATE) AS shorthand_neg;
+
+--echo === SUBDATE — INTERVAL form and integer shorthand ===
+
+SELECT CAST(SUBDATE('2024-03-15', INTERVAL 10 DAY) AS DATE) AS sub_iv;
+SELECT CAST(SUBDATE('2024-03-15', 10)              AS DATE) AS sub_int;
+SELECT CAST(SUBDATE('2024-03-31', INTERVAL 1 MONTH) AS DATE) AS sub_iv_month;
+
+--echo === Equivalence with DATE_ADD / DATE_SUB ===
+# Both forms must yield the same instant as the canonical INTERVAL form.
+
+SELECT ADDDATE('2024-03-15', 7)
+     = DATE_ADD('2024-03-15', INTERVAL 7 DAY)  AS add_equiv;
+SELECT SUBDATE('2024-03-15', 7)
+     = DATE_SUB('2024-03-15', INTERVAL 7 DAY)  AS sub_equiv;
+
+--echo === NULL propagation ===
+
+SELECT ADDDATE(NULL, 1)         AS n_left;
+SELECT ADDDATE('2024-03-15', NULL) AS n_right_int;
+SELECT SUBDATE(NULL, INTERVAL 1 DAY) AS n_left_iv;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT ADDDATE('2024-03-15');
+--error 1105
+SELECT SUBDATE('2024-03-15', 1, 1);
+
+--echo === Against a DATE column ===
+
+DROP TABLE IF EXISTS add_sub_test;
+CREATE TABLE add_sub_test (id INT, d DATE);
+INSERT INTO add_sub_test VALUES
+  (1, '2024-01-01'),
+  (2, '2024-06-15'),
+  (3, '2024-12-31');
+SELECT id,
+       CAST(ADDDATE(d, 5)  AS DATE) AS plus_5d,
+       CAST(SUBDATE(d, 5)  AS DATE) AS minus_5d
+FROM add_sub_test
+ORDER BY id;
+DROP TABLE add_sub_test;

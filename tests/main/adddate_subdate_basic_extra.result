@@ -1,0 +1,71 @@
+=== ADDDATE — INTERVAL form ===
+SELECT CAST(ADDDATE('2024-03-15', INTERVAL 7 DAY)  AS DATE) AS plus_7d;
+plus_7d
+2024-03-22
+SELECT CAST(ADDDATE('2024-03-15', INTERVAL 1 MONTH) AS DATE) AS plus_1m;
+plus_1m
+2024-04-15
+SELECT CAST(ADDDATE('2024-01-31', INTERVAL 1 MONTH) AS DATE) AS feb_clamp;
+feb_clamp
+2024-02-29
+=== ADDDATE — integer-days shorthand ===
+SELECT CAST(ADDDATE('2024-03-15', 7)   AS DATE) AS shorthand_7;
+shorthand_7
+2024-03-22
+SELECT CAST(ADDDATE('2024-03-15', 0)   AS DATE) AS shorthand_0;
+shorthand_0
+2024-03-15
+SELECT CAST(ADDDATE('2024-03-15', -10) AS DATE) AS shorthand_neg;
+shorthand_neg
+2024-03-05
+=== SUBDATE — INTERVAL form and integer shorthand ===
+SELECT CAST(SUBDATE('2024-03-15', INTERVAL 10 DAY) AS DATE) AS sub_iv;
+sub_iv
+2024-03-05
+SELECT CAST(SUBDATE('2024-03-15', 10)              AS DATE) AS sub_int;
+sub_int
+2024-03-05
+SELECT CAST(SUBDATE('2024-03-31', INTERVAL 1 MONTH) AS DATE) AS sub_iv_month;
+sub_iv_month
+2024-02-29
+=== Equivalence with DATE_ADD / DATE_SUB ===
+SELECT ADDDATE('2024-03-15', 7)
+     = DATE_ADD('2024-03-15', INTERVAL 7 DAY)  AS add_equiv;
+add_equiv
+1
+SELECT SUBDATE('2024-03-15', 7)
+     = DATE_SUB('2024-03-15', INTERVAL 7 DAY)  AS sub_equiv;
+sub_equiv
+1
+=== NULL propagation ===
+SELECT ADDDATE(NULL, 1)         AS n_left;
+n_left
+NULL
+SELECT ADDDATE('2024-03-15', NULL) AS n_right_int;
+n_right_int
+NULL
+SELECT SUBDATE(NULL, INTERVAL 1 DAY) AS n_left_iv;
+n_left_iv
+NULL
+=== Arity errors ===
+SELECT ADDDATE('2024-03-15');
+ERROR 1105: execution error: ADDDATE requires exactly 2 arguments (date/timestamp, interval)
+SELECT SUBDATE('2024-03-15', 1, 1);
+ERROR 1105: execution error: SUBDATE requires exactly 2 arguments (date/timestamp, interval)
+=== Against a DATE column ===
+DROP TABLE IF EXISTS add_sub_test;
+CREATE TABLE add_sub_test (id INT, d DATE);
+INSERT INTO add_sub_test VALUES
+  (1, '2024-01-01'),
+  (2, '2024-06-15'),
+  (3, '2024-12-31');
+SELECT id,
+       CAST(ADDDATE(d, 5)  AS DATE) AS plus_5d,
+       CAST(SUBDATE(d, 5)  AS DATE) AS minus_5d
+FROM add_sub_test
+ORDER BY id;
+id	plus_5d	minus_5d
+1	2024-01-06	2023-12-27
+2	2024-06-20	2024-06-10
+3	2025-01-05	2024-12-26
+DROP TABLE add_sub_test;
