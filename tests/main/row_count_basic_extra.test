@@ -1,0 +1,59 @@
+# Independently authored ROW_COUNT() smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. ROW_COUNT() was missing in zeta
+# before zeta PR #1243 (errored "unknown function");
+# this slice locks in the new behavior.
+#
+# MySQL ROW_COUNT() returns the number of rows affected
+# by the most recent INSERT / UPDATE / DELETE on this
+# connection. The value persists across non-DML
+# statements (SELECT does NOT reset it; the affected-
+# row count from the last DML stays).
+#
+# MySQL convention: seeded at -1 ("no affected-row info
+# yet") on a fresh connection. zeta's mysqlwire shim
+# tracks this in per-session state and intercepts
+# `SELECT ROW_COUNT()` to surface it.
+#
+# Adaptation notes:
+#   # zeta-adapt: ROW_COUNT() — intercepted by the
+#     mysqlwire shim (zeta PR #1243), per-connection.
+#   # zeta-adapt: DDL (CREATE/DROP) does NOT bump the
+#     count — only ExecuteResult::Modified writes flip it.
+#   # zeta-adapt: SELECT also doesn't reset it — the
+#     last DML's value is sticky.
+
+--echo === Fresh connection — ROW_COUNT() = -1 ===
+
+SELECT ROW_COUNT() AS fresh;
+
+--echo === DDL doesn't bump it ===
+
+CREATE TABLE rc_t (id INT, v INT);
+SELECT ROW_COUNT() AS after_ddl;
+
+--echo === INSERT 3 rows → 3 ===
+
+INSERT INTO rc_t VALUES (1, 10), (2, 20), (3, 30);
+SELECT ROW_COUNT() AS after_insert;
+
+--echo === UPDATE 2 rows → 2 ===
+
+UPDATE rc_t SET v = v + 1 WHERE id <= 2;
+SELECT ROW_COUNT() AS after_update;
+
+--echo === DELETE 1 row → 1 ===
+
+DELETE FROM rc_t WHERE id = 3;
+SELECT ROW_COUNT() AS after_delete;
+
+--echo === SELECT doesn't reset it — the last DML value is sticky ===
+
+SELECT id FROM rc_t ORDER BY id;
+SELECT ROW_COUNT() AS after_select;
+
+--echo === Mixed case ===
+
+SELECT Row_Count() AS mixed_case;
+
+DROP TABLE rc_t;
