@@ -8,6 +8,10 @@ hi
 SELECT NAME_CONST('x', NULL)        AS null_val;
 null_val
 NULL
+=== Column-label divergence (no AS alias) ===
+SELECT NAME_CONST('mylabel', 99);
+NAME_CONST
+99
 === Fractional value ===
 SELECT NAME_CONST('pi', 3.14)       AS pi;
 pi

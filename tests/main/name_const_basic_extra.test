@@ -26,6 +26,14 @@ SELECT NAME_CONST('id', 42)         AS int_val;
 SELECT NAME_CONST('greet', 'hi')    AS str_val;
 SELECT NAME_CONST('x', NULL)        AS null_val;
 
+--echo === Column-label divergence (no AS alias) ===
+# MySQL would label this column `mylabel`; zeta echoes the
+# parser's `NAME_CONST(...)` form. Recording this in `.result`
+# makes the divergence visible — if zeta ever starts
+# propagating the rewrite, this slice will break loudly.
+
+SELECT NAME_CONST('mylabel', 99);
+
 --echo === Fractional value ===
 
 SELECT NAME_CONST('pi', 3.14)       AS pi;
