@@ -50,6 +50,19 @@ SELECT PERIOD_ADD(200001, NULL)    AS n2;
 SELECT PERIOD_DIFF(NULL, 200001)   AS n3;
 SELECT PERIOD_DIFF(200001, NULL)   AS n4;
 
+--echo === Invalid period (month=0 or >12) → NULL ===
+# MySQL returns NULL for malformed periods rather than producing
+# a wrap-around result; pin that contract.
+
+SELECT PERIOD_ADD(202000, 1)        AS month_zero;
+SELECT PERIOD_ADD(202013, 1)        AS month_thirteen;
+SELECT PERIOD_DIFF(202013, 202001)  AS p1_bad;
+SELECT PERIOD_DIFF(202001, 202000)  AS p2_bad;
+
+--echo === Zero diff for equal periods ===
+
+SELECT PERIOD_DIFF(202001, 202001)  AS zero_diff;
+
 --echo === Arity errors ===
 
 --error 1105

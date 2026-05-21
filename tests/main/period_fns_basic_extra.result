@@ -48,6 +48,23 @@ NULL
 SELECT PERIOD_DIFF(200001, NULL)   AS n4;
 n4
 NULL
+=== Invalid period (month=0 or >12) → NULL ===
+SELECT PERIOD_ADD(202000, 1)        AS month_zero;
+month_zero
+NULL
+SELECT PERIOD_ADD(202013, 1)        AS month_thirteen;
+month_thirteen
+NULL
+SELECT PERIOD_DIFF(202013, 202001)  AS p1_bad;
+p1_bad
+NULL
+SELECT PERIOD_DIFF(202001, 202000)  AS p2_bad;
+p2_bad
+NULL
+=== Zero diff for equal periods ===
+SELECT PERIOD_DIFF(202001, 202001)  AS zero_diff;
+zero_diff
+0
 === Arity errors ===
 SELECT PERIOD_ADD();
 ERROR 1105: execution error: PERIOD_ADD requires 2 arguments
