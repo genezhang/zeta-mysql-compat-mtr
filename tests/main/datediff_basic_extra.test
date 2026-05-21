@@ -1,0 +1,67 @@
+# Independently authored DATEDIFF smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/func_time.test. DATEDIFF was missing in
+# zeta before zeta PR #1237 (errored "unknown function");
+# this slice locks in the new behavior.
+#
+# DATEDIFF(d1, d2) returns an integer number of days
+# computed as days(d1) - days(d2). Only the date portion
+# of each argument is considered (any time slice is
+# discarded before the subtraction). Each arg may be a
+# DATE, TIMESTAMP, or parseable string. NULL → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: DATEDIFF — implemented in zeta PR #1237
+#     with strict 2-arg arity.
+#   # zeta-adapt: TIMESTAMP source — time slice ignored.
+#   # zeta-adapt: Unparseable string → errno 1105 (either
+#     "cannot parse" from DATEDIFF directly or "cannot
+#     cast" from a planner-side pre-coercion to DATE).
+#   # zeta-adapt: NULL in either arg → NULL.
+
+--echo === Forward and backward day diffs ===
+
+SELECT DATEDIFF('2024-03-15', '2024-03-10') AS fwd;
+SELECT DATEDIFF('2024-03-10', '2024-03-15') AS bwd;
+
+--echo === Equal dates → 0 ===
+
+SELECT DATEDIFF('2024-03-15', '2024-03-15') AS same;
+
+--echo === Year boundary — 2024 is a leap year (366 days) ===
+
+SELECT DATEDIFF('2025-01-01', '2024-01-01') AS leap_year;
+SELECT DATEDIFF('2024-01-01', '2024-12-31') AS minus_365;
+
+--echo === Time slice is ignored — same day → 0 ===
+
+SELECT DATEDIFF('2024-03-15 23:59:59', '2024-03-15 00:00:00') AS time_ignored;
+
+--echo === Mixed DATE column + string ===
+
+SELECT DATEDIFF(CAST('2024-03-15' AS DATE), '2024-03-10') AS mixed_types;
+
+--echo === NULL propagation ===
+
+SELECT DATEDIFF(NULL, '2024-03-15') AS n_left;
+SELECT DATEDIFF('2024-03-15', NULL) AS n_right;
+
+--echo === Mixed case ===
+
+SELECT DateDiff('2024-03-15', '2024-03-10') AS mixed_case;
+
+--echo === Arity error ===
+
+--error 1105
+SELECT DATEDIFF('2024-03-15');
+
+--echo === Against a DATE column ===
+
+DROP TABLE IF EXISTS dd_test;
+CREATE TABLE dd_test (id INT, d DATE);
+INSERT INTO dd_test VALUES
+  (1, '2024-01-01'),
+  (2, '2024-06-15'),
+  (3, '2024-12-31');
+SELECT id, DATEDIFF(d, '2024-01-01') AS days_from_start FROM dd_test ORDER BY id;
+DROP TABLE dd_test;
