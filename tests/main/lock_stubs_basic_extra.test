@@ -1,0 +1,67 @@
+# Independently authored named-mutex stubs smoke test for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. GET_LOCK / RELEASE_LOCK /
+# IS_FREE_LOCK / IS_USED_LOCK / RELEASE_ALL_LOCKS were
+# missing in zeta before zeta PR #1248 (errored "unknown
+# function"); this slice locks in the new fail-safe stubs.
+#
+# zeta has no cross-session lock facility (per-connection
+# advisory locks are not implemented), so these are stubs:
+#
+#   GET_LOCK(name, timeout)   → NULL  (treats as "error")
+#   RELEASE_LOCK(name)        → NULL  (no such lock)
+#   IS_FREE_LOCK(name)        → 1     (always free)
+#   IS_USED_LOCK(name)        → NULL  (no holder)
+#   RELEASE_ALL_LOCKS()       → 0     (no locks released)
+#
+# Apps that probe these for capability detection see a
+# sane value instead of "unknown function". Apps that
+# REQUIRE GET_LOCK semantics get NULL (not a stale 1) so
+# they fail loudly.
+#
+# Adaptation notes:
+#   # zeta-adapt: All five fns are stubs (zeta PR #1248);
+#     real advisory-lock coordination is future work.
+#   # zeta-adapt: NULL in any arg → NULL.
+#   # zeta-adapt: Wrong arity → errno 1105.
+
+--echo === GET_LOCK / RELEASE_LOCK — return NULL ===
+
+SELECT GET_LOCK('mylock', 5)    AS got_lock;
+SELECT RELEASE_LOCK('mylock')   AS released;
+
+--echo === IS_FREE_LOCK — always 1 ===
+
+SELECT IS_FREE_LOCK('any-name') AS is_free;
+
+--echo === IS_USED_LOCK — NULL ===
+
+SELECT IS_USED_LOCK('mylock')   AS is_used;
+
+--echo === RELEASE_ALL_LOCKS — 0 ===
+
+SELECT RELEASE_ALL_LOCKS()      AS released_all;
+
+--echo === NULL propagation ===
+
+SELECT GET_LOCK(NULL, 5)        AS n_name;
+SELECT GET_LOCK('mylock', NULL) AS n_timeout;
+SELECT RELEASE_LOCK(NULL)       AS rl_n;
+SELECT IS_FREE_LOCK(NULL)       AS if_n;
+SELECT IS_USED_LOCK(NULL)       AS iu_n;
+
+--echo === Mixed case ===
+
+SELECT Get_Lock('x', 1)         AS mixed_get;
+SELECT Is_Free_Lock('x')        AS mixed_free;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT GET_LOCK('x');
+--error 1105
+SELECT RELEASE_LOCK();
+--error 1105
+SELECT IS_FREE_LOCK();
+--error 1105
+SELECT RELEASE_ALL_LOCKS(1);
