@@ -1,0 +1,40 @@
+=== UUID_SHORT — basic shape ===
+CREATE TABLE us (id INT PRIMARY KEY, v BIGINT UNSIGNED);
+INSERT INTO us VALUES (1, UUID_SHORT());
+INSERT INTO us VALUES (2, UUID_SHORT());
+INSERT INTO us VALUES (3, UUID_SHORT());
+SELECT id, v IS NOT NULL AS got_value FROM us ORDER BY id;
+id	got_value
+1	1
+2	1
+3	1
+=== Monotonic across consecutive calls ===
+SELECT (SELECT v FROM us WHERE id = 2) > (SELECT v FROM us WHERE id = 1) AS m_2_gt_1;
+m_2_gt_1
+1
+SELECT (SELECT v FROM us WHERE id = 3) > (SELECT v FROM us WHERE id = 2) AS m_3_gt_2;
+m_3_gt_2
+1
+=== All three values are distinct ===
+SELECT COUNT(DISTINCT v) AS distinct_count FROM us;
+distinct_count
+3
+=== Each per-row evaluation ticks the counter ===
+SELECT COUNT(DISTINCT v) AS row_distinct FROM (
+  SELECT UUID_SHORT() AS v FROM (
+    SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+  ) t
+) x;
+row_distinct
+4
+=== Consecutive insert ticks are close (no time jump) ===
+SELECT (SELECT v FROM us WHERE id = 3) - (SELECT v FROM us WHERE id = 1) < 1000
+       AS span_small;
+span_small
+1
+=== Arity — any arg is an error ===
+SELECT UUID_SHORT(1);
+ERROR 1105: execution error: UUID_SHORT takes no arguments
+SELECT UUID_SHORT(0, 0);
+ERROR 1105: execution error: UUID_SHORT takes no arguments
+DROP TABLE us;
