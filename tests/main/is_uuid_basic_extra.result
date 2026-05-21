@@ -1,0 +1,68 @@
+=== Valid UUID forms — return 1 ===
+SELECT IS_UUID('123e4567-e89b-12d3-a456-426614174000') AS dashed;
+dashed
+1
+SELECT IS_UUID('123e4567e89b12d3a456426614174000')     AS dashless;
+dashless
+1
+SELECT IS_UUID('{123e4567-e89b-12d3-a456-426614174000}') AS braced;
+braced
+1
+SELECT IS_UUID('ABCDEF12-3456-7890-ABCD-EF1234567890') AS upper_hex;
+upper_hex
+1
+=== Invalid input — return 0 ===
+SELECT IS_UUID('')                                  AS empty;
+empty
+0
+SELECT IS_UUID('not-a-uuid')                        AS junk;
+junk
+0
+SELECT IS_UUID('123e4567-e89b-12d3-a456')           AS short;
+short
+0
+SELECT IS_UUID('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx') AS non_hex;
+non_hex
+0
+SELECT IS_UUID('123e4567-e89b-12d3-a456-426614174000-extra') AS too_long;
+too_long
+0
+=== Brace handling — at most ONE matched pair stripped ===
+SELECT IS_UUID('{{123e4567-e89b-12d3-a456-426614174000}}') AS doubled;
+doubled
+0
+SELECT IS_UUID('{123e4567-e89b-12d3-a456-426614174000')   AS open_only;
+open_only
+0
+SELECT IS_UUID('123e4567-e89b-12d3-a456-426614174000}')   AS close_only;
+close_only
+0
+=== NULL → NULL ===
+SELECT IS_UUID(NULL) AS n;
+n
+NULL
+=== Mixed case for the function name ===
+SELECT Is_Uuid('123e4567-e89b-12d3-a456-426614174000') AS mixed_case;
+mixed_case
+1
+=== Arity error ===
+SELECT IS_UUID();
+ERROR 1105: execution error: IS_UUID requires 1 argument
+SELECT IS_UUID('a', 'b');
+ERROR 1105: execution error: IS_UUID requires 1 argument
+=== Filter a TEXT column on validity ===
+DROP TABLE IF EXISTS uu_test;
+CREATE TABLE uu_test (id INT, s TEXT);
+INSERT INTO uu_test VALUES
+  (1, '123e4567-e89b-12d3-a456-426614174000'),
+  (2, 'not-uuid'),
+  (3, NULL);
+SELECT id, IS_UUID(s) AS valid FROM uu_test ORDER BY id;
+id	valid
+1	1
+2	0
+3	NULL
+SELECT id FROM uu_test WHERE IS_UUID(s) = 1 ORDER BY id;
+id
+1
+DROP TABLE uu_test;
