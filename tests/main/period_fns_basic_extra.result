@@ -1,0 +1,86 @@
+=== PERIOD_ADD — month and year boundaries ===
+SELECT PERIOD_ADD(198001, 2)  AS basic;
+basic
+198003
+SELECT PERIOD_ADD(200012, 1)  AS year_wrap;
+year_wrap
+200101
+SELECT PERIOD_ADD(200001, 14) AS multi_year;
+multi_year
+200103
+SELECT PERIOD_ADD(200101, -1) AS neg_n;
+neg_n
+200012
+=== PERIOD_ADD — two-digit year pivot (00..69 → 2000s, 70..99 → 1900s) ===
+SELECT PERIOD_ADD(6912, 1)  AS yy_69_wraps_to_2070;
+yy_69_wraps_to_2070
+207001
+SELECT PERIOD_ADD(7001, -1) AS yy_70_wraps_back_to_1969;
+yy_70_wraps_back_to_1969
+196912
+=== PERIOD_DIFF — basic and reversed ===
+SELECT PERIOD_DIFF(200802, 200703) AS pos_diff;
+pos_diff
+11
+SELECT PERIOD_DIFF(200703, 200802) AS neg_diff;
+neg_diff
+-11
+SELECT PERIOD_DIFF(202001, 201901) AS twelve_months;
+twelve_months
+12
+=== PERIOD_DIFF — pivot crossing exposes the 99-year gap ===
+SELECT PERIOD_DIFF(7001, 6912) AS pivot_gap;
+pivot_gap
+-1199
+SELECT PERIOD_DIFF(7002, 7001) AS within_bucket;
+within_bucket
+1
+=== NULL propagation ===
+SELECT PERIOD_ADD(NULL, 1)         AS n1;
+n1
+NULL
+SELECT PERIOD_ADD(200001, NULL)    AS n2;
+n2
+NULL
+SELECT PERIOD_DIFF(NULL, 200001)   AS n3;
+n3
+NULL
+SELECT PERIOD_DIFF(200001, NULL)   AS n4;
+n4
+NULL
+=== Invalid period (month=0 or >12) → NULL ===
+SELECT PERIOD_ADD(202000, 1)        AS month_zero;
+month_zero
+NULL
+SELECT PERIOD_ADD(202013, 1)        AS month_thirteen;
+month_thirteen
+NULL
+SELECT PERIOD_DIFF(202013, 202001)  AS p1_bad;
+p1_bad
+NULL
+SELECT PERIOD_DIFF(202001, 202000)  AS p2_bad;
+p2_bad
+NULL
+=== Zero diff for equal periods ===
+SELECT PERIOD_DIFF(202001, 202001)  AS zero_diff;
+zero_diff
+0
+=== Arity errors ===
+SELECT PERIOD_ADD();
+ERROR 1105: execution error: PERIOD_ADD requires 2 arguments
+SELECT PERIOD_ADD(1);
+ERROR 1105: execution error: PERIOD_ADD requires 2 arguments
+SELECT PERIOD_DIFF(1);
+ERROR 1105: execution error: PERIOD_DIFF requires 2 arguments
+SELECT PERIOD_DIFF(1, 2, 3);
+ERROR 1105: execution error: PERIOD_DIFF requires 2 arguments
+=== Against an INT column ===
+DROP TABLE IF EXISTS pf_test;
+CREATE TABLE pf_test (id INT, period INT);
+INSERT INTO pf_test VALUES (1, 202001), (2, 202012), (3, 202101);
+SELECT id, PERIOD_ADD(period, 1) AS next_month FROM pf_test ORDER BY id;
+id	next_month
+1	202002
+2	202101
+3	202102
+DROP TABLE pf_test;

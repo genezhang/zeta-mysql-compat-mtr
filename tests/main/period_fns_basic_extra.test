@@ -1,0 +1,83 @@
+# Independently authored PERIOD_ADD / PERIOD_DIFF smoke
+# test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/t/func_time.test. Both
+# functions were missing in zeta before zeta PR #1235
+# (errored "unknown function"); this slice locks in the
+# new behavior.
+#
+# PERIOD_ADD(P, N): adds N months to period P (YYMM or
+# YYYYMM form). PERIOD_DIFF(P1, P2): P1 - P2 in months.
+# Two-digit year mapping (MySQL pivot):
+#   00..69 → 2000..2069
+#   70..99 → 1970..1999
+#
+# Adaptation notes:
+#   # zeta-adapt: PERIOD_ADD / PERIOD_DIFF — both
+#     implemented in zeta PR #1235 with strict 2-arg arity.
+#   # zeta-adapt: Pivot exactly matches MySQL (cutoff 70).
+#   # zeta-adapt: Negative N is allowed in PERIOD_ADD.
+#   # zeta-adapt: NULL in any arg → NULL.
+
+--echo === PERIOD_ADD — month and year boundaries ===
+
+SELECT PERIOD_ADD(198001, 2)  AS basic;
+SELECT PERIOD_ADD(200012, 1)  AS year_wrap;
+SELECT PERIOD_ADD(200001, 14) AS multi_year;
+SELECT PERIOD_ADD(200101, -1) AS neg_n;
+
+--echo === PERIOD_ADD — two-digit year pivot (00..69 → 2000s, 70..99 → 1900s) ===
+
+SELECT PERIOD_ADD(6912, 1)  AS yy_69_wraps_to_2070;
+SELECT PERIOD_ADD(7001, -1) AS yy_70_wraps_back_to_1969;
+
+--echo === PERIOD_DIFF — basic and reversed ===
+
+SELECT PERIOD_DIFF(200802, 200703) AS pos_diff;
+SELECT PERIOD_DIFF(200703, 200802) AS neg_diff;
+SELECT PERIOD_DIFF(202001, 201901) AS twelve_months;
+
+--echo === PERIOD_DIFF — pivot crossing exposes the 99-year gap ===
+# 7001 (yy=70 → 1970-01) is 1199 months BEFORE 6912 (yy=69 → 2069-12).
+# This pins the pivot behavior at the boundary.
+
+SELECT PERIOD_DIFF(7001, 6912) AS pivot_gap;
+SELECT PERIOD_DIFF(7002, 7001) AS within_bucket;
+
+--echo === NULL propagation ===
+
+SELECT PERIOD_ADD(NULL, 1)         AS n1;
+SELECT PERIOD_ADD(200001, NULL)    AS n2;
+SELECT PERIOD_DIFF(NULL, 200001)   AS n3;
+SELECT PERIOD_DIFF(200001, NULL)   AS n4;
+
+--echo === Invalid period (month=0 or >12) → NULL ===
+# MySQL returns NULL for malformed periods rather than producing
+# a wrap-around result; pin that contract.
+
+SELECT PERIOD_ADD(202000, 1)        AS month_zero;
+SELECT PERIOD_ADD(202013, 1)        AS month_thirteen;
+SELECT PERIOD_DIFF(202013, 202001)  AS p1_bad;
+SELECT PERIOD_DIFF(202001, 202000)  AS p2_bad;
+
+--echo === Zero diff for equal periods ===
+
+SELECT PERIOD_DIFF(202001, 202001)  AS zero_diff;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT PERIOD_ADD();
+--error 1105
+SELECT PERIOD_ADD(1);
+--error 1105
+SELECT PERIOD_DIFF(1);
+--error 1105
+SELECT PERIOD_DIFF(1, 2, 3);
+
+--echo === Against an INT column ===
+
+DROP TABLE IF EXISTS pf_test;
+CREATE TABLE pf_test (id INT, period INT);
+INSERT INTO pf_test VALUES (1, 202001), (2, 202012), (3, 202101);
+SELECT id, PERIOD_ADD(period, 1) AS next_month FROM pf_test ORDER BY id;
+DROP TABLE pf_test;
