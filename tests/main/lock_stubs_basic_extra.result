@@ -1,0 +1,51 @@
+=== GET_LOCK / RELEASE_LOCK — return NULL ===
+SELECT GET_LOCK('mylock', 5)    AS got_lock;
+got_lock
+NULL
+SELECT RELEASE_LOCK('mylock')   AS released;
+released
+NULL
+=== IS_FREE_LOCK — always 1 ===
+SELECT IS_FREE_LOCK('any-name') AS is_free;
+is_free
+1
+=== IS_USED_LOCK — NULL ===
+SELECT IS_USED_LOCK('mylock')   AS is_used;
+is_used
+NULL
+=== RELEASE_ALL_LOCKS — 0 ===
+SELECT RELEASE_ALL_LOCKS()      AS released_all;
+released_all
+0
+=== NULL propagation ===
+SELECT GET_LOCK(NULL, 5)        AS n_name;
+n_name
+NULL
+SELECT GET_LOCK('mylock', NULL) AS n_timeout;
+n_timeout
+NULL
+SELECT RELEASE_LOCK(NULL)       AS rl_n;
+rl_n
+NULL
+SELECT IS_FREE_LOCK(NULL)       AS if_n;
+if_n
+NULL
+SELECT IS_USED_LOCK(NULL)       AS iu_n;
+iu_n
+NULL
+=== Mixed case ===
+SELECT Get_Lock('x', 1)         AS mixed_get;
+mixed_get
+NULL
+SELECT Is_Free_Lock('x')        AS mixed_free;
+mixed_free
+1
+=== Arity errors ===
+SELECT GET_LOCK('x');
+ERROR 1105: execution error: GET_LOCK requires 2 arguments (name, timeout)
+SELECT RELEASE_LOCK();
+ERROR 1105: execution error: RELEASE_LOCK requires 1 argument
+SELECT IS_FREE_LOCK();
+ERROR 1105: execution error: IS_FREE_LOCK requires 1 argument
+SELECT RELEASE_ALL_LOCKS(1);
+ERROR 1105: execution error: RELEASE_ALL_LOCKS takes no arguments
