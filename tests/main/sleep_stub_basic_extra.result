@@ -1,0 +1,37 @@
+=== SLEEP(positive seconds) — returns 0, does NOT block ===
+SELECT SLEEP(0)       AS zero;
+zero
+0
+SELECT SLEEP(1)       AS one;
+one
+0
+=== SLEEP(0) and negative seconds — immediate return ===
+SELECT SLEEP(0)       AS zero_again;
+zero_again
+0
+SELECT SLEEP(-5)      AS negative;
+negative
+0
+=== Fractional seconds — accepted ===
+SELECT SLEEP(0.5)     AS half;
+half
+0
+=== NULL propagation ===
+SELECT SLEEP(NULL)    AS n;
+n
+NULL
+=== Mixed case ===
+SELECT Sleep(0)       AS mixed;
+mixed
+0
+SELECT sleep(0)       AS lower;
+lower
+0
+=== Arity errors ===
+SELECT SLEEP();
+ERROR 1105: execution error: SLEEP requires 1 argument (seconds)
+SELECT SLEEP(1, 2);
+ERROR 1105: execution error: SLEEP requires 1 argument (seconds)
+=== Non-numeric arg — error ===
+SELECT SLEEP('abc');
+ERROR 1105: execution error: SLEEP seconds must be numeric
