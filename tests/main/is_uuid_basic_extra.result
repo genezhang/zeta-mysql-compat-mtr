@@ -27,6 +27,16 @@ non_hex
 SELECT IS_UUID('123e4567-e89b-12d3-a456-426614174000-extra') AS too_long;
 too_long
 0
+=== Brace handling — at most ONE matched pair stripped ===
+SELECT IS_UUID('{{123e4567-e89b-12d3-a456-426614174000}}') AS doubled;
+doubled
+0
+SELECT IS_UUID('{123e4567-e89b-12d3-a456-426614174000')   AS open_only;
+open_only
+0
+SELECT IS_UUID('123e4567-e89b-12d3-a456-426614174000}')   AS close_only;
+close_only
+0
 === NULL → NULL ===
 SELECT IS_UUID(NULL) AS n;
 n
