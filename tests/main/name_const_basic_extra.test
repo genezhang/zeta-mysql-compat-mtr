@@ -1,0 +1,63 @@
+# Independently authored NAME_CONST smoke test for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. NAME_CONST was missing in zeta before zeta PR
+# #1250 (errored "unknown function"); this slice locks in the
+# pass-through stub.
+#
+# NAME_CONST(name, value) is a labeling primitive emitted by
+# mysqldump and some replication tooling. zeta returns the
+# value unchanged; the MySQL behavior of also rewriting the
+# result column-label is NOT preserved (column comes back as
+# `NAME_CONST(...)` from the parser). That's fine for the
+# round-trip use case — INSERT takes positional values.
+#
+# Adaptation notes:
+#   # zeta-adapt: returns value as-is (zeta PR #1250). MySQL
+#     also rewrites the column label to `name`; zeta does
+#     not (column shows as `NAME_CONST(...)`).
+#   # zeta-adapt: first arg validated as string at eval time;
+#     MySQL enforces literal-only at parse time (errno 1210).
+#     The error message differs but the rejection is the same.
+#   # zeta-adapt: wrong arity → errno 1105.
+
+--echo === Value pass-through ===
+
+SELECT NAME_CONST('id', 42)         AS int_val;
+SELECT NAME_CONST('greet', 'hi')    AS str_val;
+SELECT NAME_CONST('x', NULL)        AS null_val;
+
+--echo === Fractional value ===
+
+SELECT NAME_CONST('pi', 3.14)       AS pi;
+
+--echo === mysqldump idiom — NAME_CONST inside INSERT VALUES ===
+
+CREATE TABLE nc_t (id INT, name TEXT);
+INSERT INTO nc_t VALUES (NAME_CONST('id', 1), NAME_CONST('name', 'foo'));
+INSERT INTO nc_t VALUES (NAME_CONST('id', 2), NAME_CONST('name', 'bar'));
+
+--sorted_result
+SELECT id, name FROM nc_t;
+
+DROP TABLE nc_t;
+
+--echo === Mixed case ===
+
+SELECT Name_Const('x', 7)           AS mixed;
+SELECT name_const('y', 8)           AS lower;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT NAME_CONST('x');
+--error 1105
+SELECT NAME_CONST();
+--error 1105
+SELECT NAME_CONST('x', 1, 2);
+
+--echo === Non-string first arg — error ===
+
+--error 1105
+SELECT NAME_CONST(1, 2);
+--error 1105
+SELECT NAME_CONST(NULL, 2);
