@@ -1,0 +1,94 @@
+=== Root path: append vs autowrap ===
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1,2]', '$', 3))      AS root_append_len;
+root_append_len
+3
+SELECT JSON_EXTRACT(JSON_ARRAY_APPEND('[1,2]', '$', 3),
+                    '$[0]', '$[1]', '$[2]')                 AS root_append_vals;
+root_append_vals
+[1,2,3]
+SELECT JSON_TYPE(JSON_ARRAY_APPEND('42', '$', 7))           AS scalar_root_becomes_array;
+scalar_root_becomes_array
+ARRAY
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('42', '$', 7))         AS scalar_root_pair_len;
+scalar_root_pair_len
+2
+SELECT JSON_TYPE(JSON_ARRAY_APPEND('{"a":1}', '$', 2))      AS obj_root_becomes_array;
+obj_root_becomes_array
+ARRAY
+=== Single-key path: array push vs scalar autowrap ===
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('{"a":[1,2]}', '$.a', 3),
+  '$.a'
+)) AS inner_arr_pushed;
+inner_arr_pushed
+3
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('{"a":1}', '$.a', 2),
+  '$.a'
+)) AS inner_scalar_becomes_array;
+inner_scalar_becomes_array
+ARRAY
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('{"a":1}', '$.a', 2),
+  '$.a'
+)) AS inner_scalar_pair_len;
+inner_scalar_pair_len
+2
+=== Single-index path on top-level array ===
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[[1,2],[3,4]]', '$[0]', 9),
+  '$[0]'
+)) AS nested_arr_pushed;
+nested_arr_pushed
+3
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[1,2]', '$[0]', 9),
+  '$[0]'
+)) AS index_scalar_becomes_array;
+index_scalar_becomes_array
+ARRAY
+=== Silent no-op cases (MySQL semantics, NOT error) ===
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('{"a":1}', '$.missing', 9)) AS missing_key_unchanged;
+missing_key_unchanged
+1
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1,2]', '$[99]', 9))       AS oob_index_unchanged;
+oob_index_unchanged
+2
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1,2]', '$.a', 9))         AS container_mismatch_unchanged;
+container_mismatch_unchanged
+2
+=== Multi-pair: left-to-right chain ===
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1]', '$', 2, '$', 3)) AS chain_len;
+chain_len
+3
+=== SQL string val becomes JSON string (NOT re-parsed) ===
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_ARRAY_APPEND('[]', '$', 'hi'),
+                              '$[0]')) AS str_kept_as_string;
+str_kept_as_string
+STRING
+=== Nested path (>1 step) → NULL (under-claim) ===
+SELECT JSON_ARRAY_APPEND('{"a":{"b":[1]}}', '$.a.b', 2) IS NULL AS nested_under_claim;
+nested_under_claim
+1
+=== SQL NULL anywhere → SQL NULL ===
+SELECT JSON_ARRAY_APPEND(NULL, '$', 1)    IS NULL AS null_target;
+null_target
+1
+SELECT JSON_ARRAY_APPEND('[1]', NULL, 2)  IS NULL AS null_path;
+null_path
+1
+SELECT JSON_ARRAY_APPEND('[1]', '$', NULL) IS NULL AS null_val;
+null_val
+1
+=== Arity errors (odd ≥ 3) ===
+SELECT JSON_ARRAY_APPEND();
+ERROR 1105: execution error: JSON_ARRAY_APPEND requires doc and at least one (path, val) pair (odd arity ≥ 3)
+SELECT JSON_ARRAY_APPEND('[1]');
+ERROR 1105: execution error: JSON_ARRAY_APPEND requires doc and at least one (path, val) pair (odd arity ≥ 3)
+SELECT JSON_ARRAY_APPEND('[1]', '$');
+ERROR 1105: execution error: JSON_ARRAY_APPEND requires doc and at least one (path, val) pair (odd arity ≥ 3)
+=== Invalid JSON / wildcard path rejected ===
+SELECT JSON_ARRAY_APPEND('not json', '$', 1);
+ERROR 1105: execution error: JSON_ARRAY_APPEND target is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_ARRAY_APPEND('[1,2]', '$.*', 9);
+ERROR 1105: execution error: JSON_ARRAY_APPEND invalid path: $.*
