@@ -1,0 +1,70 @@
+=== Object key removal ===
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2}', '$.a')) AS after_remove_one;
+after_remove_one
+1
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1}', '$.a'))        AS after_remove_only;
+after_remove_only
+0
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2,"c":3}', '$.a', '$.c')) AS after_remove_two;
+after_remove_two
+1
+=== Survivor key still present ===
+SELECT JSON_EXTRACT(JSON_REMOVE('{"a":1,"b":2}', '$.a'), '$.b') AS b_val;
+b_val
+2
+=== Missing path → unchanged ===
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1}', '$.missing'))  AS unchanged;
+unchanged
+1
+SELECT JSON_EXTRACT(JSON_REMOVE('{"a":1}', '$.missing'), '$.a') AS a_still_there;
+a_still_there
+1
+=== Top-level array index removal ===
+SELECT JSON_LENGTH(JSON_REMOVE('[1,2,3]', '$[1]'))  AS arr_after_one;
+arr_after_one
+2
+SELECT JSON_EXTRACT(JSON_REMOVE('[1,2,3]', '$[1]'), '$[0]') AS first;
+first
+1
+SELECT JSON_EXTRACT(JSON_REMOVE('[1,2,3]', '$[1]'), '$[1]') AS second;
+second
+3
+=== Out-of-range index → unchanged ===
+SELECT JSON_LENGTH(JSON_REMOVE('[1,2,3]', '$[10]')) AS arr_unchanged;
+arr_unchanged
+3
+=== NULL propagation ===
+SELECT JSON_REMOVE(NULL, '$.a')        IS NULL AS null_target;
+null_target
+1
+SELECT JSON_REMOVE('{"a":1}', NULL)    IS NULL AS null_path;
+null_path
+1
+=== Nested path → NULL (first-pass scope) ===
+SELECT JSON_REMOVE('{"a":{"b":1}}', '$.a.b') IS NULL AS nested_null;
+nested_null
+1
+=== Removing root $ is an error ===
+SELECT JSON_REMOVE('{"a":1}', '$');
+ERROR 1105: execution error: JSON_REMOVE: path expression $ is not allowed (removes root)
+=== Invalid JSON target → error ===
+SELECT JSON_REMOVE('not json', '$.a');
+ERROR 1105: execution error: JSON_REMOVE target is not valid JSON: JSONB error: expected 'null' at position 1
+=== Arity errors ===
+SELECT JSON_REMOVE();
+ERROR 1105: execution error: JSON_REMOVE requires target and at least one path
+SELECT JSON_REMOVE('{"a":1}');
+ERROR 1105: execution error: JSON_REMOVE requires target and at least one path
+=== On TEXT column ===
+DROP TABLE IF EXISTS jd;
+CREATE TABLE jd (id INT, doc TEXT);
+INSERT INTO jd VALUES
+  (1, '{"a":1,"b":2}'),
+  (2, '{"a":10,"b":20,"c":30}'),
+  (3, '[1,2,3]');
+SELECT id, JSON_LENGTH(JSON_REMOVE(doc, '$.a')) AS after FROM jd ORDER BY id;
+id	after
+1	1
+2	2
+3	3
+DROP TABLE jd;
