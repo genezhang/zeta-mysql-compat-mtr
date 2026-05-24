@@ -35,6 +35,9 @@ not_mapped_compat
 SELECT IS_IPV4_MAPPED(INET6_ATON('::1'))            AS not_mapped_lo;
 not_mapped_lo
 0
+SELECT IS_IPV4_MAPPED(INET6_ATON('::'))             AS not_mapped_unspec;
+not_mapped_unspec
+0
 SELECT IS_IPV4_MAPPED(INET6_ATON('2001:db8::1'))    AS not_mapped_doc;
 not_mapped_doc
 0

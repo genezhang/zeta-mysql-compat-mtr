@@ -24,7 +24,13 @@
 #     4-byte BINARY, which is NOT a valid IPv6 layout —
 #     both functions return 0 on that path (matches MySQL,
 #     which documents "Returns 0 if length is not 16").
-#   # zeta-adapt: Arity != 1 → errno 1105.
+#   # zeta-adapt: Arity != 1 → errno 1105. zeta's arity error
+#     text reads "IS_IPV4_COMPAT requires 1 argument" rather
+#     than MySQL's "Incorrect parameter count in the call to
+#     native function 'IS_IPV4_COMPAT'". Same errno class (1105
+#     in zeta vs 1582 in MySQL native-function path), so .test
+#     slices that pattern on text aren't portable across the
+#     two engines.
 
 --echo === IS_IPV4_COMPAT — 1 branch ===
 
@@ -51,9 +57,12 @@ SELECT IS_IPV4_MAPPED(INET6_ATON('::ffff:255.255.255.255')) AS mapped_max;
 
 --echo === IS_IPV4_MAPPED — 0 branch ===
 
-# Compat-form (no 0xffff) → not mapped.
+# Compat-form (no 0xffff) → not mapped. Symmetric with the
+# COMPAT 1-branch tests above — verify the unspec address `::`
+# is also rejected since bytes 10..12 are zero, not 0xff,0xff.
 SELECT IS_IPV4_MAPPED(INET6_ATON('::192.168.1.1'))  AS not_mapped_compat;
 SELECT IS_IPV4_MAPPED(INET6_ATON('::1'))            AS not_mapped_lo;
+SELECT IS_IPV4_MAPPED(INET6_ATON('::'))             AS not_mapped_unspec;
 SELECT IS_IPV4_MAPPED(INET6_ATON('2001:db8::1'))    AS not_mapped_doc;
 
 --echo === 4-byte (pure-v4) BINARY → 0 for both ===
