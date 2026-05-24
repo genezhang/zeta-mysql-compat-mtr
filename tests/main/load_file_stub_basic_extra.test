@@ -1,0 +1,77 @@
+# Independently authored LOAD_FILE smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. LOAD_FILE errored "unknown function" in zeta
+# before zeta PR #1258; this slice locks in the post-fix
+# behavior — which is "always NULL, never touch the host
+# filesystem".
+#
+# Big-picture finding: zeta's LOAD_FILE is a SECURITY STUB.
+# MySQL itself returns NULL on missing-file / unreadable /
+# unprivileged paths, so any caller that already handles
+# NULL is portable across both engines. Apps that rely on
+# LOAD_FILE actually reading data won't be migrating to a
+# Postgres-shaped engine in any case.
+#
+# Adaptation notes:
+#   # zeta-adapt: LOAD_FILE is a stub — always returns NULL,
+#     regardless of whether the path exists or is readable.
+#     This is intentional and security-motivated; reading
+#     attacker-controlled paths from the host filesystem is
+#     never the right move for a SQL engine.
+#   # zeta-adapt: MySQL's NULL-on-failure contract is
+#     preserved — `LOAD_FILE(p) IS NULL` is always TRUE in
+#     zeta, and is TRUE in MySQL whenever the file is missing
+#     or unreadable. Callers that branch on IS NULL are
+#     portable.
+#   # zeta-adapt: non-string arg → 1105 (MySQL would coerce
+#     and return NULL).
+#   # zeta-adapt: arity != 1 → 1105.
+
+--echo === Stub returns NULL for any path ===
+
+# All four MUST be NULL — that's the safety contract.
+SELECT LOAD_FILE('/etc/hostname') IS NULL AS hostname_null;
+SELECT LOAD_FILE('/tmp/whatever') IS NULL AS tmp_null;
+SELECT LOAD_FILE('/etc/passwd')   IS NULL AS passwd_null;
+SELECT LOAD_FILE('relative/path') IS NULL AS rel_null;
+
+--echo === NULL propagation ===
+
+SELECT LOAD_FILE(NULL) IS NULL AS null_in;
+
+--echo === Non-string arg rejected ===
+
+--error 1105
+SELECT LOAD_FILE(42);
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT LOAD_FILE();
+--error 1105
+SELECT LOAD_FILE('/a', '/b');
+
+--echo === COALESCE pattern (apps that handle NULL stay portable) ===
+
+# This is the migration-friendly idiom for apps coming from
+# MySQL: COALESCE the read into a default. Under zeta the
+# default always wins (because the read returns NULL); under
+# MySQL the default wins whenever the file is unreadable.
+SELECT COALESCE(LOAD_FILE('/etc/hostname'), 'fallback') AS hostval;
+
+--echo === Filter on TEXT column of paths ===
+
+DROP TABLE IF EXISTS files;
+CREATE TABLE files (id INT, path TEXT);
+INSERT INTO files VALUES
+  (1, '/etc/hostname'),
+  (2, '/tmp/x'),
+  (3, '/etc/passwd');
+# Under zeta every row's LOAD_FILE is NULL, so the WHERE
+# yields the empty set. Under MySQL it yields any rows whose
+# path is actually readable. Test asserts the all-NULL
+# contract on the zeta side.
+SELECT COUNT(*) AS readable_files
+FROM files
+WHERE LOAD_FILE(path) IS NOT NULL;
+DROP TABLE files;
