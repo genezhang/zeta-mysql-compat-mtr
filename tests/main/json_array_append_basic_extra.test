@@ -1,0 +1,106 @@
+# Independently authored JSON_ARRAY_APPEND smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_ARRAY_APPEND errored "unknown function"
+# in zeta before zeta PR #1263; this slice locks in MySQL's
+# array-append-with-autowrap behavior.
+#
+# Big-picture finding:
+#   For each (path, val) pair, applied left-to-right:
+#     - target at path is an array → push val
+#     - target at path is non-array → wrap as [old, val]
+#     - path matches no value → silently no-op
+#                                (NOT an error in MySQL)
+#   SQL NULL anywhere → SQL NULL.
+#   SQL string val is appended as JSON string (not re-parsed);
+#   callers must use CAST(... AS JSON) to inject JSON.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta supports only TOP-LEVEL paths in this
+#     first pass: $, $.key, $[N]. Nested paths under-claim to
+#     NULL (matches zeta's JSON_SET / JSON_REMOVE precedent).
+#     MySQL supports arbitrarily deep paths; that gap is
+#     tracked separately.
+#   # zeta-adapt: zeta's JSON binary encoding sorts object
+#     keys alphabetically when re-emitting; MySQL preserves
+#     insertion order. Tests use already-alpha keys + JSON
+#     wrappers where shape matters.
+#   # zeta-adapt: zeta emits compact JSON ({"a":1}); MySQL
+#     uses "key: val" spacing. Same wrapper strategy.
+#   # zeta-adapt: Invalid JSON / wildcard path / arity → 1105
+#     (MySQL: 3141 / 3143 / 1582). Same direction (rejects).
+
+--echo === Root path: append vs autowrap ===
+
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1,2]', '$', 3))      AS root_append_len;
+SELECT JSON_EXTRACT(JSON_ARRAY_APPEND('[1,2]', '$', 3),
+                    '$[0]', '$[1]', '$[2]')                 AS root_append_vals;
+SELECT JSON_TYPE(JSON_ARRAY_APPEND('42', '$', 7))           AS scalar_root_becomes_array;
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('42', '$', 7))         AS scalar_root_pair_len;
+SELECT JSON_TYPE(JSON_ARRAY_APPEND('{"a":1}', '$', 2))      AS obj_root_becomes_array;
+
+--echo === Single-key path: array push vs scalar autowrap ===
+
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('{"a":[1,2]}', '$.a', 3),
+  '$.a'
+)) AS inner_arr_pushed;
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('{"a":1}', '$.a', 2),
+  '$.a'
+)) AS inner_scalar_becomes_array;
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('{"a":1}', '$.a', 2),
+  '$.a'
+)) AS inner_scalar_pair_len;
+
+--echo === Single-index path on top-level array ===
+
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[[1,2],[3,4]]', '$[0]', 9),
+  '$[0]'
+)) AS nested_arr_pushed;
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[1,2]', '$[0]', 9),
+  '$[0]'
+)) AS index_scalar_becomes_array;
+
+--echo === Silent no-op cases (MySQL semantics, NOT error) ===
+
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('{"a":1}', '$.missing', 9)) AS missing_key_unchanged;
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1,2]', '$[99]', 9))       AS oob_index_unchanged;
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1,2]', '$.a', 9))         AS container_mismatch_unchanged;
+
+--echo === Multi-pair: left-to-right chain ===
+
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND('[1]', '$', 2, '$', 3)) AS chain_len;
+
+--echo === SQL string val becomes JSON string (NOT re-parsed) ===
+
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_ARRAY_APPEND('[]', '$', 'hi'),
+                              '$[0]')) AS str_kept_as_string;
+
+--echo === Nested path (>1 step) → NULL (under-claim) ===
+
+SELECT JSON_ARRAY_APPEND('{"a":{"b":[1]}}', '$.a.b', 2) IS NULL AS nested_under_claim;
+
+--echo === SQL NULL anywhere → SQL NULL ===
+
+SELECT JSON_ARRAY_APPEND(NULL, '$', 1)    IS NULL AS null_target;
+SELECT JSON_ARRAY_APPEND('[1]', NULL, 2)  IS NULL AS null_path;
+SELECT JSON_ARRAY_APPEND('[1]', '$', NULL) IS NULL AS null_val;
+
+--echo === Arity errors (odd ≥ 3) ===
+
+--error 1105
+SELECT JSON_ARRAY_APPEND();
+--error 1105
+SELECT JSON_ARRAY_APPEND('[1]');
+--error 1105
+SELECT JSON_ARRAY_APPEND('[1]', '$');
+
+--echo === Invalid JSON / wildcard path rejected ===
+
+--error 1105
+SELECT JSON_ARRAY_APPEND('not json', '$', 1);
+--error 1105
+SELECT JSON_ARRAY_APPEND('[1,2]', '$.*', 9);
