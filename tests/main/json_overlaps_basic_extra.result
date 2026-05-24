@@ -1,0 +1,87 @@
+=== Array+array: shared / no-shared / type-strict ===
+SELECT JSON_OVERLAPS('[1,2,3]', '[3,4,5]') AS arr_shared;
+arr_shared
+1
+SELECT JSON_OVERLAPS('[1,2,3]', '[4,5,6]') AS arr_disjoint;
+arr_disjoint
+0
+SELECT JSON_OVERLAPS('[1,2,3]', '["1","2","3"]') AS int_vs_str;
+int_vs_str
+0
+=== Object+object: shared (k,v) / shared-k-only / disjoint ===
+SELECT JSON_OVERLAPS('{"a":1,"b":2}', '{"a":3,"b":2}') AS obj_shared_b;
+obj_shared_b
+1
+SELECT JSON_OVERLAPS('{"a":1}', '{"a":2}')             AS obj_key_only;
+obj_key_only
+0
+SELECT JSON_OVERLAPS('{"a":1}', '{"b":1}')             AS obj_no_keys;
+obj_no_keys
+0
+=== Array+scalar (either order) ===
+SELECT JSON_OVERLAPS('1', '[1,2,3]') AS scalar_in_arr;
+scalar_in_arr
+1
+SELECT JSON_OVERLAPS('[1,2,3]', '2') AS arr_has_scalar;
+arr_has_scalar
+1
+SELECT JSON_OVERLAPS('[1,2,3]', '9') AS arr_lacks_scalar;
+arr_lacks_scalar
+0
+=== Scalar+scalar ===
+SELECT JSON_OVERLAPS('5', '5') AS scalars_eq;
+scalars_eq
+1
+SELECT JSON_OVERLAPS('5', '6') AS scalars_neq;
+scalars_neq
+0
+SELECT JSON_OVERLAPS('"hi"', '"hi"')   AS strings_eq;
+strings_eq
+1
+SELECT JSON_OVERLAPS('"hi"', '"bye"')  AS strings_neq;
+strings_neq
+0
+=== Object vs array / scalar → never overlap ===
+SELECT JSON_OVERLAPS('{"a":1}', '[1,2,3]') AS obj_arr;
+obj_arr
+0
+SELECT JSON_OVERLAPS('{"a":1}', '1')       AS obj_scalar;
+obj_scalar
+0
+=== Nested element overlap (deep equality, order sensitive) ===
+SELECT JSON_OVERLAPS('[1,[2,3]]', '[[2,3],4]') AS nested_arr_shared;
+nested_arr_shared
+1
+SELECT JSON_OVERLAPS('[1,[2,3]]', '[[3,2],4]') AS nested_arr_order_matters;
+nested_arr_order_matters
+0
+=== Booleans / null self-overlap ===
+SELECT JSON_OVERLAPS('true', '[true,false]') AS bool_in_arr;
+bool_in_arr
+1
+SELECT JSON_OVERLAPS('null', '[null,1]')     AS null_in_arr;
+null_in_arr
+1
+=== Empty containers ===
+SELECT JSON_OVERLAPS('[]', '[1,2]')      AS empty_arr;
+empty_arr
+0
+SELECT JSON_OVERLAPS('{}', '{"a":1}')    AS empty_obj;
+empty_obj
+0
+=== SQL NULL → NULL ===
+SELECT JSON_OVERLAPS(NULL, '[1,2]') IS NULL AS null_left;
+null_left
+1
+SELECT JSON_OVERLAPS('[1,2]', NULL) IS NULL AS null_right;
+null_right
+1
+=== Arity / invalid JSON ===
+SELECT JSON_OVERLAPS();
+ERROR 1105: execution error: JSON_OVERLAPS requires exactly 2 arguments
+SELECT JSON_OVERLAPS('[1]');
+ERROR 1105: execution error: JSON_OVERLAPS requires exactly 2 arguments
+SELECT JSON_OVERLAPS('[1]', '[2]', '[3]');
+ERROR 1105: execution error: JSON_OVERLAPS requires exactly 2 arguments
+SELECT JSON_OVERLAPS('not json', '[1]');
+ERROR 1105: execution error: JSON_OVERLAPS argument is not valid JSON: JSONB error: expected 'null' at position 1

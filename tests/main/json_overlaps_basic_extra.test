@@ -1,0 +1,90 @@
+# Independently authored JSON_OVERLAPS smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_OVERLAPS errored "unknown function" in
+# zeta before zeta PR #1271; this slice locks in the set-overlap
+# predicate behavior.
+#
+# Big-picture finding:
+#   JSON_OVERLAPS(doc1, doc2) returns 1/0/NULL.
+#   By-shape rules (per MySQL):
+#     - array  + array  → share any element
+#     - object + object → share any (key, value) pair
+#     - array  + scalar → scalar appears in array
+#     - scalar + scalar → equal
+#     - object vs non-object → never overlap
+#   SQL NULL anywhere → SQL NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta uses STRICT type equality on element
+#     comparisons: JSON 1 (Integer) ≠ 1.0 (Numeric); JSON `true`
+#     ≠ `1`. MySQL is more lenient on numeric coercion across
+#     int/decimal. Tests use same-type literals to be wire-stable
+#     on both engines; the zeta-strict cases (1 vs 1.0, true vs
+#     1) are NOT tested here since they'd diverge.
+#   # zeta-adapt: zeta sorts object keys alphabetically; MySQL
+#     preserves insertion order. SET semantics of overlap are
+#     order-independent so this divergence doesn't affect the
+#     0/1 result.
+#   # zeta-adapt: Invalid JSON → 1105 (MySQL: 3141). Same
+#     direction (rejects).
+
+--echo === Array+array: shared / no-shared / type-strict ===
+
+SELECT JSON_OVERLAPS('[1,2,3]', '[3,4,5]') AS arr_shared;
+SELECT JSON_OVERLAPS('[1,2,3]', '[4,5,6]') AS arr_disjoint;
+SELECT JSON_OVERLAPS('[1,2,3]', '["1","2","3"]') AS int_vs_str;
+
+--echo === Object+object: shared (k,v) / shared-k-only / disjoint ===
+
+SELECT JSON_OVERLAPS('{"a":1,"b":2}', '{"a":3,"b":2}') AS obj_shared_b;
+SELECT JSON_OVERLAPS('{"a":1}', '{"a":2}')             AS obj_key_only;
+SELECT JSON_OVERLAPS('{"a":1}', '{"b":1}')             AS obj_no_keys;
+
+--echo === Array+scalar (either order) ===
+
+SELECT JSON_OVERLAPS('1', '[1,2,3]') AS scalar_in_arr;
+SELECT JSON_OVERLAPS('[1,2,3]', '2') AS arr_has_scalar;
+SELECT JSON_OVERLAPS('[1,2,3]', '9') AS arr_lacks_scalar;
+
+--echo === Scalar+scalar ===
+
+SELECT JSON_OVERLAPS('5', '5') AS scalars_eq;
+SELECT JSON_OVERLAPS('5', '6') AS scalars_neq;
+SELECT JSON_OVERLAPS('"hi"', '"hi"')   AS strings_eq;
+SELECT JSON_OVERLAPS('"hi"', '"bye"')  AS strings_neq;
+
+--echo === Object vs array / scalar → never overlap ===
+
+SELECT JSON_OVERLAPS('{"a":1}', '[1,2,3]') AS obj_arr;
+SELECT JSON_OVERLAPS('{"a":1}', '1')       AS obj_scalar;
+
+--echo === Nested element overlap (deep equality, order sensitive) ===
+
+SELECT JSON_OVERLAPS('[1,[2,3]]', '[[2,3],4]') AS nested_arr_shared;
+SELECT JSON_OVERLAPS('[1,[2,3]]', '[[3,2],4]') AS nested_arr_order_matters;
+
+--echo === Booleans / null self-overlap ===
+
+SELECT JSON_OVERLAPS('true', '[true,false]') AS bool_in_arr;
+SELECT JSON_OVERLAPS('null', '[null,1]')     AS null_in_arr;
+
+--echo === Empty containers ===
+
+SELECT JSON_OVERLAPS('[]', '[1,2]')      AS empty_arr;
+SELECT JSON_OVERLAPS('{}', '{"a":1}')    AS empty_obj;
+
+--echo === SQL NULL → NULL ===
+
+SELECT JSON_OVERLAPS(NULL, '[1,2]') IS NULL AS null_left;
+SELECT JSON_OVERLAPS('[1,2]', NULL) IS NULL AS null_right;
+
+--echo === Arity / invalid JSON ===
+
+--error 1105
+SELECT JSON_OVERLAPS();
+--error 1105
+SELECT JSON_OVERLAPS('[1]');
+--error 1105
+SELECT JSON_OVERLAPS('[1]', '[2]', '[3]');
+--error 1105
+SELECT JSON_OVERLAPS('not json', '[1]');
