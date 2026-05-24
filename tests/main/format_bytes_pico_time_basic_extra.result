@@ -1,0 +1,93 @@
+=== FORMAT_BYTES — rung ladder ===
+SELECT FORMAT_BYTES(0)              AS zero;
+zero
+0 bytes
+SELECT FORMAT_BYTES(1023)           AS sub_kib;
+sub_kib
+1023 bytes
+SELECT FORMAT_BYTES(1024)           AS one_kib;
+one_kib
+1.00 KiB
+SELECT FORMAT_BYTES(1536)           AS half_above_kib;
+half_above_kib
+1.50 KiB
+SELECT FORMAT_BYTES(1048576)        AS one_mib;
+one_mib
+1.00 MiB
+SELECT FORMAT_BYTES(1073741824)     AS one_gib;
+one_gib
+1.00 GiB
+SELECT FORMAT_BYTES(1099511627776)  AS one_tib;
+one_tib
+1.00 TiB
+=== FORMAT_BYTES — sign and NULL ===
+SELECT FORMAT_BYTES(-2048) AS neg;
+neg
+-2.00 KiB
+SELECT FORMAT_BYTES(NULL)  AS n;
+n
+NULL
+=== FORMAT_PICO_TIME — rung ladder ===
+SELECT FORMAT_PICO_TIME(0)                  AS zero;
+zero
+0 ps
+SELECT FORMAT_PICO_TIME(999)                AS sub_ns;
+sub_ns
+999 ps
+SELECT FORMAT_PICO_TIME(1000)               AS one_ns;
+one_ns
+1.00 ns
+SELECT FORMAT_PICO_TIME(1500000)            AS one_half_us;
+one_half_us
+1.50 us
+SELECT FORMAT_PICO_TIME(1500000000)         AS one_half_ms;
+one_half_ms
+1.50 ms
+SELECT FORMAT_PICO_TIME(1500000000000)      AS one_half_s;
+one_half_s
+1.50 s
+SELECT FORMAT_PICO_TIME(90000000000000)     AS minute_and_a_half;
+minute_and_a_half
+1.50 min
+SELECT FORMAT_PICO_TIME(5400000000000000)   AS hour_and_a_half;
+hour_and_a_half
+1.50 h
+SELECT FORMAT_PICO_TIME(129600000000000000) AS day_and_a_half;
+day_and_a_half
+1.50 d
+=== FORMAT_PICO_TIME — sign and NULL ===
+SELECT FORMAT_PICO_TIME(-1500000) AS neg;
+neg
+-1.50 us
+SELECT FORMAT_PICO_TIME(NULL)     AS n;
+n
+NULL
+=== Arity errors ===
+SELECT FORMAT_BYTES();
+ERROR 1105: execution error: FORMAT_BYTES requires 1 argument
+SELECT FORMAT_PICO_TIME();
+ERROR 1105: execution error: FORMAT_PICO_TIME requires 1 argument
+SELECT FORMAT_BYTES(1, 2);
+ERROR 1105: execution error: FORMAT_BYTES requires 1 argument
+SELECT FORMAT_PICO_TIME(1, 2);
+ERROR 1105: execution error: FORMAT_PICO_TIME requires 1 argument
+=== Non-numeric input rejected ===
+SELECT FORMAT_BYTES('not a number');
+ERROR 1105: execution error: FORMAT_BYTES argument must be numeric
+SELECT FORMAT_PICO_TIME('not a number');
+ERROR 1105: execution error: FORMAT_PICO_TIME argument must be numeric
+=== Inside a SELECT over a numeric column ===
+DROP TABLE IF EXISTS sizes;
+CREATE TABLE sizes (id INT, b BIGINT);
+INSERT INTO sizes VALUES
+  (1, 0),
+  (2, 1023),
+  (3, 4096),
+  (4, 10485760);
+SELECT id, FORMAT_BYTES(b) AS pretty FROM sizes ORDER BY id;
+id	pretty
+1	0 bytes
+2	1023 bytes
+3	4.00 KiB
+4	10.00 MiB
+DROP TABLE sizes;

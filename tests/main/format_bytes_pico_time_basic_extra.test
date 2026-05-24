@@ -1,0 +1,84 @@
+# Independently authored FORMAT_BYTES / FORMAT_PICO_TIME
+# smoke test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/. Both functions were
+# missing in zeta before zeta PR #1257 (errored "unknown
+# function"); this slice locks in the new behavior.
+#
+# Big-picture finding:
+#   FORMAT_BYTES(n)      — humanize byte count (KiB/MiB/...)
+#   FORMAT_PICO_TIME(ps) — humanize ps duration (ns/us/ms/.../d)
+#   Both: integer at the smallest rung (no decimal), "N.NN UNIT"
+#   above; NULL → NULL; negative input keeps the leading "-".
+#
+# Adaptation notes:
+#   # zeta-adapt: Unit names match MySQL — KiB / MiB / GiB / TiB /
+#     PiB / EiB for bytes; ps / ns / us / ms / s / min / h / d for
+#     picotime. (Tests assert exact unit strings.)
+#   # zeta-adapt: Smallest rung is integer ("0 bytes", "999 ps")
+#     with no decimal. The "N.NN" format is applied at and above
+#     KiB / ns.
+#   # zeta-adapt: Negative input → leading "-" then absolute-value
+#     format. Matches Performance Schema convention.
+#   # zeta-adapt: Non-numeric arg → 1105. Arity != 1 → 1105.
+
+--echo === FORMAT_BYTES — rung ladder ===
+
+SELECT FORMAT_BYTES(0)              AS zero;
+SELECT FORMAT_BYTES(1023)           AS sub_kib;
+SELECT FORMAT_BYTES(1024)           AS one_kib;
+SELECT FORMAT_BYTES(1536)           AS half_above_kib;
+SELECT FORMAT_BYTES(1048576)        AS one_mib;
+SELECT FORMAT_BYTES(1073741824)     AS one_gib;
+SELECT FORMAT_BYTES(1099511627776)  AS one_tib;
+
+--echo === FORMAT_BYTES — sign and NULL ===
+
+SELECT FORMAT_BYTES(-2048) AS neg;
+SELECT FORMAT_BYTES(NULL)  AS n;
+
+--echo === FORMAT_PICO_TIME — rung ladder ===
+
+SELECT FORMAT_PICO_TIME(0)                  AS zero;
+SELECT FORMAT_PICO_TIME(999)                AS sub_ns;
+SELECT FORMAT_PICO_TIME(1000)               AS one_ns;
+SELECT FORMAT_PICO_TIME(1500000)            AS one_half_us;
+SELECT FORMAT_PICO_TIME(1500000000)         AS one_half_ms;
+SELECT FORMAT_PICO_TIME(1500000000000)      AS one_half_s;
+SELECT FORMAT_PICO_TIME(90000000000000)     AS minute_and_a_half;
+SELECT FORMAT_PICO_TIME(5400000000000000)   AS hour_and_a_half;
+SELECT FORMAT_PICO_TIME(129600000000000000) AS day_and_a_half;
+
+--echo === FORMAT_PICO_TIME — sign and NULL ===
+
+SELECT FORMAT_PICO_TIME(-1500000) AS neg;
+SELECT FORMAT_PICO_TIME(NULL)     AS n;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT FORMAT_BYTES();
+--error 1105
+SELECT FORMAT_PICO_TIME();
+--error 1105
+SELECT FORMAT_BYTES(1, 2);
+--error 1105
+SELECT FORMAT_PICO_TIME(1, 2);
+
+--echo === Non-numeric input rejected ===
+
+--error 1105
+SELECT FORMAT_BYTES('not a number');
+--error 1105
+SELECT FORMAT_PICO_TIME('not a number');
+
+--echo === Inside a SELECT over a numeric column ===
+
+DROP TABLE IF EXISTS sizes;
+CREATE TABLE sizes (id INT, b BIGINT);
+INSERT INTO sizes VALUES
+  (1, 0),
+  (2, 1023),
+  (3, 4096),
+  (4, 10485760);
+SELECT id, FORMAT_BYTES(b) AS pretty FROM sizes ORDER BY id;
+DROP TABLE sizes;
