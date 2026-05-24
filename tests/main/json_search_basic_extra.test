@@ -1,0 +1,101 @@
+# Independently authored JSON_SEARCH smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_SEARCH errored "unknown function" in
+# zeta before zeta PR #1267; this slice locks in the
+# recursive-descent path-finder behavior.
+#
+# Big-picture finding:
+#   JSON_SEARCH(doc, one_or_all, search_str, [escape])
+#   - Walks every JSON string value; tests against search_str
+#     with LIKE-style matching (% / _ wildcards). Numbers,
+#     booleans, JSON null are NOT searched.
+#   - 'one' returns first matching path as JSON string; 'all'
+#     returns array of paths — but if exactly ONE match, returns
+#     single JSON string (MySQL quirk, NOT wrapped in array).
+#   - No matches → NULL (both modes).
+#   - SQL NULL anywhere → SQL NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta's JSONB encoding sorts object keys
+#     alphabetically when re-emitting; MySQL preserves insertion
+#     order. SET of returned paths is identical, but 'all' may
+#     emit them in different order. Tests use already-alpha key
+#     order so .result is wire-stable on both engines, or use
+#     JSON_LENGTH / JSON_CONTAINS wrappers where shape matters.
+#   # zeta-adapt: first-pass scope is NO path-limiting args
+#     (5th+ args). MySQL allows them to scope the search;
+#     zeta errors 1105 for now. Separate gap.
+#   # zeta-adapt: zeta emits compact JSON ({"a":1}); MySQL uses
+#     "key: val" spacing. Path-string outputs ("$.a") are
+#     identical so the .result holds.
+#   # zeta-adapt: Invalid JSON / bad mode / arity → 1105
+#     (MySQL: 3141 / 3145 / 1582). Same direction (rejects).
+
+--echo === 'one' on top-level object / array / scalar root ===
+
+SELECT JSON_SEARCH('{"a":"hello","b":"world"}', 'one', 'hello') AS object_path;
+SELECT JSON_SEARCH('["x","y","z"]', 'one', 'y')                  AS array_path;
+SELECT JSON_SEARCH('"hello"', 'one', 'hello')                    AS root_string;
+
+--echo === Nested paths (object & array) ===
+
+SELECT JSON_SEARCH('{"a":[{"b":"hit"}]}', 'one', 'hit') AS obj_arr_obj_path;
+SELECT JSON_SEARCH('{"a":["foo","bar"]}', 'one', 'bar') AS obj_arr_path;
+SELECT JSON_SEARCH('{"a":{"b":{"c":"hit"}}}', 'one', 'hit') AS deep_obj_path;
+
+--echo === LIKE wildcards + custom escape ===
+
+SELECT JSON_SEARCH('{"a":"hello"}', 'one', 'h%o')              AS pct_wild;
+SELECT JSON_SEARCH('{"a":"abc"}', 'one', 'a_c')                AS underscore_wild;
+SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100!%', '!')        AS custom_escape;
+
+--echo === 'all' multi-match: JSON array of paths ===
+
+# zeta sorts keys alpha → result is ["$.a","$.b","$.c"]
+SELECT JSON_LENGTH(JSON_SEARCH('{"a":"x","b":"x","c":"x"}', 'all', 'x')) AS all_count;
+SELECT JSON_TYPE(JSON_SEARCH('{"a":"x","b":"x","c":"x"}', 'all', 'x'))   AS all_is_array;
+
+--echo === 'all' single match: JSON string (MySQL quirk, NOT array) ===
+
+SELECT JSON_TYPE(JSON_SEARCH('{"a":"hello","b":"world"}', 'all', 'hello')) AS single_is_string;
+SELECT JSON_SEARCH('{"a":"hello","b":"world"}', 'all', 'hello')             AS single_path;
+
+--echo === No matches → NULL ===
+
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 'missing') IS NULL AS one_no_match;
+SELECT JSON_SEARCH('{"a":"x"}', 'all', 'missing') IS NULL AS all_no_match;
+
+--echo === Non-string scalars NOT searched ===
+
+SELECT JSON_SEARCH('[1,2,3,true,null]', 'all', '%') IS NULL AS no_strings_skipped;
+
+--echo === Case-insensitive mode ===
+
+SELECT JSON_SEARCH('{"a":"x"}', 'ONE', 'x') AS upper_one;
+SELECT JSON_SEARCH('{"a":"x"}', 'AlL', 'x') AS mixed_all;
+
+--echo === SQL NULL anywhere → NULL ===
+
+SELECT JSON_SEARCH(NULL, 'one', 'x')      IS NULL AS null_doc;
+SELECT JSON_SEARCH('{}', NULL, 'x')       IS NULL AS null_mode;
+SELECT JSON_SEARCH('{}', 'one', NULL)     IS NULL AS null_search;
+SELECT JSON_SEARCH('{}', 'one', 'x', NULL) IS NULL AS null_escape;
+
+--echo === Invalid mode rejected ===
+
+--error 1105
+SELECT JSON_SEARCH('{}', 'foo', 'x');
+
+--echo === Multi-char escape rejected ===
+
+--error 1105
+SELECT JSON_SEARCH('{}', 'one', 'x', 'xy');
+
+--echo === Arity / unsupported-path-args / invalid-JSON ===
+
+--error 1105
+SELECT JSON_SEARCH('{}', 'one');
+--error 1105
+SELECT JSON_SEARCH('{}', 'one', 'x', '\\', '$.a');
+--error 1105
+SELECT JSON_SEARCH('not json', 'one', 'x');
