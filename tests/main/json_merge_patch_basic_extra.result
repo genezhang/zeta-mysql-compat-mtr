@@ -1,0 +1,93 @@
+=== Two-object merge: patch overrides + preserved keys ===
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":99,"c":3}'),
+  '$.a', '$.b', '$.c'
+) AS abc;
+abc
+[1,99,3]
+SELECT JSON_LENGTH(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":99,"c":3}')
+) AS keys_after;
+keys_after
+3
+=== Patch null deletes the key ===
+SELECT JSON_LENGTH(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":null}')
+) AS keys_after_delete;
+keys_after_delete
+1
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":null}'),
+  '$.a'
+) AS a_preserved;
+a_preserved
+1
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":null}'),
+  '$.b'
+) AS b_gone;
+b_gone
+NULL
+=== Recursive merge on nested objects ===
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a'
+)) AS nested_keys;
+nested_keys
+3
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a.x', '$.a.y', '$.a.z'
+) AS nested_xyz;
+nested_xyz
+[1,99,3]
+=== Non-object patch replaces target entirely ===
+SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', '[1,2,3]')) AS becomes_array;
+becomes_array
+ARRAY
+SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', '42'))      AS becomes_int;
+becomes_int
+INTEGER
+SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', '"s"'))     AS becomes_string;
+becomes_string
+STRING
+=== Object patch on non-object target → start from {} ===
+SELECT JSON_TYPE(JSON_MERGE_PATCH('42', '{"a":1}'))   AS becomes_object;
+becomes_object
+OBJECT
+SELECT JSON_LENGTH(JSON_MERGE_PATCH('42', '{"a":1}')) AS one_key;
+one_key
+1
+=== Multi-arg fold left-to-right ===
+SELECT JSON_LENGTH(
+  JSON_MERGE_PATCH('{"a":1}', '{"b":2}', '{"c":3}')
+) AS three_keys;
+three_keys
+3
+=== SQL NULL in any position → NULL ===
+SELECT JSON_MERGE_PATCH(NULL, '{"a":1}') IS NULL          AS first_null;
+first_null
+1
+SELECT JSON_MERGE_PATCH('{"a":1}', NULL) IS NULL          AS second_null;
+second_null
+1
+SELECT JSON_MERGE_PATCH('{"a":1}', '{"b":2}', NULL) IS NULL AS mid_null;
+mid_null
+1
+=== Empty patch is identity ===
+SELECT JSON_LENGTH(JSON_MERGE_PATCH('{"a":1}', '{}')) AS unchanged;
+unchanged
+1
+SELECT JSON_EXTRACT(JSON_MERGE_PATCH('{"a":1}', '{}'), '$.a') AS a_still;
+a_still
+1
+=== Arity errors ===
+SELECT JSON_MERGE_PATCH();
+ERROR 1105: execution error: JSON_MERGE_PATCH requires at least 2 arguments
+SELECT JSON_MERGE_PATCH('{"a":1}');
+ERROR 1105: execution error: JSON_MERGE_PATCH requires at least 2 arguments
+=== Invalid JSON rejected ===
+SELECT JSON_MERGE_PATCH('not json', '{}');
+ERROR 1105: execution error: JSON_MERGE_PATCH argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_MERGE_PATCH('{}', 'not json');
+ERROR 1105: execution error: JSON_MERGE_PATCH argument is not valid JSON: JSONB error: expected 'null' at position 1
