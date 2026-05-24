@@ -1,0 +1,42 @@
+=== Stub returns NULL for any path ===
+SELECT LOAD_FILE('/etc/hostname') IS NULL AS hostname_null;
+hostname_null
+1
+SELECT LOAD_FILE('/tmp/whatever') IS NULL AS tmp_null;
+tmp_null
+1
+SELECT LOAD_FILE('/etc/passwd')   IS NULL AS passwd_null;
+passwd_null
+1
+SELECT LOAD_FILE('relative/path') IS NULL AS rel_null;
+rel_null
+1
+=== NULL propagation ===
+SELECT LOAD_FILE(NULL) IS NULL AS null_in;
+null_in
+1
+=== Non-string arg rejected ===
+SELECT LOAD_FILE(42);
+ERROR 1105: execution error: LOAD_FILE path must be a string
+=== Arity errors ===
+SELECT LOAD_FILE();
+ERROR 1105: execution error: LOAD_FILE requires 1 argument
+SELECT LOAD_FILE('/a', '/b');
+ERROR 1105: execution error: LOAD_FILE requires 1 argument
+=== COALESCE pattern (apps that handle NULL stay portable) ===
+SELECT COALESCE(LOAD_FILE('/etc/hostname'), 'fallback') AS hostval;
+hostval
+fallback
+=== Filter on TEXT column of paths ===
+DROP TABLE IF EXISTS files;
+CREATE TABLE files (id INT, path TEXT);
+INSERT INTO files VALUES
+  (1, '/etc/hostname'),
+  (2, '/tmp/x'),
+  (3, '/etc/passwd');
+SELECT COUNT(*) AS readable_files
+FROM files
+WHERE LOAD_FILE(path) IS NOT NULL;
+readable_files
+0
+DROP TABLE files;
