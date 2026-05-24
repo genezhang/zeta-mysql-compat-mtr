@@ -1,0 +1,100 @@
+# Independently authored IS_IPV4_COMPAT / IS_IPV4_MAPPED
+# smoke test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/. Both functions were
+# missing in zeta before zeta PR #1254 (errored "unknown
+# function"); this slice locks in the new behavior.
+# Companion to inet6_fns_basic_extra (which covers
+# INET6_ATON / INET6_NTOA) and rounds out the INET6 family.
+#
+# Big-picture finding: both functions inspect the 16-byte
+# VARBINARY form of an IPv6 address (the output of
+# INET6_ATON for a v6 input):
+#   IS_IPV4_COMPAT(b) → 1 iff first 12 bytes of b are zero
+#                       (the `::a.b.c.d` form)
+#   IS_IPV4_MAPPED(b) → 1 iff first 10 bytes are zero AND
+#                       bytes 10..12 are 0xff,0xff
+#                       (the `::ffff:a.b.c.d` form)
+# Any non-16-byte input → 0. NULL → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: Both return Int32 (0 or 1), not the
+#     TINYINT(1) MySQL uses; values compare equal on the
+#     wire so .result lines match.
+#   # zeta-adapt: INET6_ATON on a pure-v4 string returns a
+#     4-byte BINARY, which is NOT a valid IPv6 layout —
+#     both functions return 0 on that path (matches MySQL,
+#     which documents "Returns 0 if length is not 16").
+#   # zeta-adapt: Arity != 1 → errno 1105. zeta's arity error
+#     text reads "IS_IPV4_COMPAT requires 1 argument" rather
+#     than MySQL's "Incorrect parameter count in the call to
+#     native function 'IS_IPV4_COMPAT'". Same errno class (1105
+#     in zeta vs 1582 in MySQL native-function path), so .test
+#     slices that pattern on text aren't portable across the
+#     two engines.
+
+--echo === IS_IPV4_COMPAT — 1 branch ===
+
+# `::a.b.c.d` (first 12 bytes zero, last 4 carry the v4 addr)
+SELECT IS_IPV4_COMPAT(INET6_ATON('::192.168.1.1'))  AS compat_v4;
+# `::1` = all zeros except byte 15 = 0x01 → still first-12-zero.
+SELECT IS_IPV4_COMPAT(INET6_ATON('::1'))            AS compat_lo;
+# `::` = all zeros → first 12 also zero.
+SELECT IS_IPV4_COMPAT(INET6_ATON('::'))             AS compat_unspec;
+
+--echo === IS_IPV4_COMPAT — 0 branch ===
+
+# Mapped form has 0xffff in bytes 10..12 → not compat.
+SELECT IS_IPV4_COMPAT(INET6_ATON('::ffff:1.2.3.4')) AS not_compat_mapped;
+# Documentation-prefix IPv6 has bytes outside the leading 12 zero.
+SELECT IS_IPV4_COMPAT(INET6_ATON('2001:db8::1'))    AS not_compat_doc;
+SELECT IS_IPV4_COMPAT(INET6_ATON('fe80::1'))        AS not_compat_link;
+
+--echo === IS_IPV4_MAPPED — 1 branch ===
+
+SELECT IS_IPV4_MAPPED(INET6_ATON('::ffff:1.2.3.4'))    AS mapped_v4;
+SELECT IS_IPV4_MAPPED(INET6_ATON('::ffff:0.0.0.0'))    AS mapped_zero;
+SELECT IS_IPV4_MAPPED(INET6_ATON('::ffff:255.255.255.255')) AS mapped_max;
+
+--echo === IS_IPV4_MAPPED — 0 branch ===
+
+# Compat-form (no 0xffff) → not mapped. Symmetric with the
+# COMPAT 1-branch tests above — verify the unspec address `::`
+# is also rejected since bytes 10..12 are zero, not 0xff,0xff.
+SELECT IS_IPV4_MAPPED(INET6_ATON('::192.168.1.1'))  AS not_mapped_compat;
+SELECT IS_IPV4_MAPPED(INET6_ATON('::1'))            AS not_mapped_lo;
+SELECT IS_IPV4_MAPPED(INET6_ATON('::'))             AS not_mapped_unspec;
+SELECT IS_IPV4_MAPPED(INET6_ATON('2001:db8::1'))    AS not_mapped_doc;
+
+--echo === 4-byte (pure-v4) BINARY → 0 for both ===
+
+SELECT IS_IPV4_COMPAT(INET6_ATON('192.168.1.1')) AS compat_v4bin;
+SELECT IS_IPV4_MAPPED(INET6_ATON('192.168.1.1')) AS mapped_v4bin;
+
+--echo === NULL propagation ===
+
+SELECT IS_IPV4_COMPAT(NULL) AS c_null;
+SELECT IS_IPV4_MAPPED(NULL) AS m_null;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT IS_IPV4_COMPAT();
+--error 1105
+SELECT IS_IPV4_COMPAT(INET6_ATON('::1'), INET6_ATON('::2'));
+--error 1105
+SELECT IS_IPV4_MAPPED();
+--error 1105
+SELECT IS_IPV4_MAPPED(INET6_ATON('::1'), INET6_ATON('::2'));
+
+--echo === Filter on TEXT column of v6 strings ===
+
+DROP TABLE IF EXISTS hosts6;
+CREATE TABLE hosts6 (id INT, ip TEXT);
+INSERT INTO hosts6 VALUES
+  (1, '::192.168.1.1'),
+  (2, '::ffff:10.0.0.2'),
+  (3, '2001:db8::1'),
+  (4, '::1');
+SELECT id FROM hosts6 WHERE IS_IPV4_COMPAT(INET6_ATON(ip)) = 1 ORDER BY id;
+SELECT id FROM hosts6 WHERE IS_IPV4_MAPPED(INET6_ATON(ip)) = 1 ORDER BY id;
+DROP TABLE hosts6;

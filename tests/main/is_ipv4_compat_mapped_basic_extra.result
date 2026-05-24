@@ -1,0 +1,82 @@
+=== IS_IPV4_COMPAT — 1 branch ===
+SELECT IS_IPV4_COMPAT(INET6_ATON('::192.168.1.1'))  AS compat_v4;
+compat_v4
+1
+SELECT IS_IPV4_COMPAT(INET6_ATON('::1'))            AS compat_lo;
+compat_lo
+1
+SELECT IS_IPV4_COMPAT(INET6_ATON('::'))             AS compat_unspec;
+compat_unspec
+1
+=== IS_IPV4_COMPAT — 0 branch ===
+SELECT IS_IPV4_COMPAT(INET6_ATON('::ffff:1.2.3.4')) AS not_compat_mapped;
+not_compat_mapped
+0
+SELECT IS_IPV4_COMPAT(INET6_ATON('2001:db8::1'))    AS not_compat_doc;
+not_compat_doc
+0
+SELECT IS_IPV4_COMPAT(INET6_ATON('fe80::1'))        AS not_compat_link;
+not_compat_link
+0
+=== IS_IPV4_MAPPED — 1 branch ===
+SELECT IS_IPV4_MAPPED(INET6_ATON('::ffff:1.2.3.4'))    AS mapped_v4;
+mapped_v4
+1
+SELECT IS_IPV4_MAPPED(INET6_ATON('::ffff:0.0.0.0'))    AS mapped_zero;
+mapped_zero
+1
+SELECT IS_IPV4_MAPPED(INET6_ATON('::ffff:255.255.255.255')) AS mapped_max;
+mapped_max
+1
+=== IS_IPV4_MAPPED — 0 branch ===
+SELECT IS_IPV4_MAPPED(INET6_ATON('::192.168.1.1'))  AS not_mapped_compat;
+not_mapped_compat
+0
+SELECT IS_IPV4_MAPPED(INET6_ATON('::1'))            AS not_mapped_lo;
+not_mapped_lo
+0
+SELECT IS_IPV4_MAPPED(INET6_ATON('::'))             AS not_mapped_unspec;
+not_mapped_unspec
+0
+SELECT IS_IPV4_MAPPED(INET6_ATON('2001:db8::1'))    AS not_mapped_doc;
+not_mapped_doc
+0
+=== 4-byte (pure-v4) BINARY → 0 for both ===
+SELECT IS_IPV4_COMPAT(INET6_ATON('192.168.1.1')) AS compat_v4bin;
+compat_v4bin
+0
+SELECT IS_IPV4_MAPPED(INET6_ATON('192.168.1.1')) AS mapped_v4bin;
+mapped_v4bin
+0
+=== NULL propagation ===
+SELECT IS_IPV4_COMPAT(NULL) AS c_null;
+c_null
+NULL
+SELECT IS_IPV4_MAPPED(NULL) AS m_null;
+m_null
+NULL
+=== Arity errors ===
+SELECT IS_IPV4_COMPAT();
+ERROR 1105: execution error: IS_IPV4_COMPAT requires 1 argument
+SELECT IS_IPV4_COMPAT(INET6_ATON('::1'), INET6_ATON('::2'));
+ERROR 1105: execution error: IS_IPV4_COMPAT requires 1 argument
+SELECT IS_IPV4_MAPPED();
+ERROR 1105: execution error: IS_IPV4_MAPPED requires 1 argument
+SELECT IS_IPV4_MAPPED(INET6_ATON('::1'), INET6_ATON('::2'));
+ERROR 1105: execution error: IS_IPV4_MAPPED requires 1 argument
+=== Filter on TEXT column of v6 strings ===
+DROP TABLE IF EXISTS hosts6;
+CREATE TABLE hosts6 (id INT, ip TEXT);
+INSERT INTO hosts6 VALUES
+  (1, '::192.168.1.1'),
+  (2, '::ffff:10.0.0.2'),
+  (3, '2001:db8::1'),
+  (4, '::1');
+SELECT id FROM hosts6 WHERE IS_IPV4_COMPAT(INET6_ATON(ip)) = 1 ORDER BY id;
+id
+1
+4
+SELECT id FROM hosts6 WHERE IS_IPV4_MAPPED(INET6_ATON(ip)) = 1 ORDER BY id;
+id
+2
+DROP TABLE hosts6;
