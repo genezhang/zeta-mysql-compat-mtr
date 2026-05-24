@@ -1,0 +1,50 @@
+=== Length contract ===
+SELECT LENGTH(RANDOM_BYTES(1))    AS len_1;
+len_1
+1
+SELECT LENGTH(RANDOM_BYTES(16))   AS len_16;
+len_16
+16
+SELECT LENGTH(RANDOM_BYTES(64))   AS len_64;
+len_64
+64
+SELECT LENGTH(RANDOM_BYTES(1024)) AS len_max;
+len_max
+1024
+=== Two calls differ ===
+SELECT RANDOM_BYTES(16) <> RANDOM_BYTES(16) AS differ;
+differ
+1
+=== Output is non-null on valid input ===
+SELECT RANDOM_BYTES(1)   IS NOT NULL AS non_null_1;
+non_null_1
+1
+SELECT RANDOM_BYTES(256) IS NOT NULL AS non_null_256;
+non_null_256
+1
+=== NULL propagation ===
+SELECT RANDOM_BYTES(NULL) IS NULL AS null_in;
+null_in
+1
+=== Range checks ===
+SELECT RANDOM_BYTES(0);
+ERROR 1105: execution error: RANDOM_BYTES length out of range: 0 (must be 1..=1024)
+SELECT RANDOM_BYTES(-1);
+ERROR 1105: execution error: RANDOM_BYTES length out of range: -1 (must be 1..=1024)
+SELECT RANDOM_BYTES(1025);
+ERROR 1105: execution error: RANDOM_BYTES length out of range: 1025 (must be 1..=1024)
+=== Non-integer arg rejected ===
+SELECT RANDOM_BYTES('not a number');
+ERROR 1105: execution error: RANDOM_BYTES length must be an integer
+=== Arity errors ===
+SELECT RANDOM_BYTES();
+ERROR 1105: execution error: RANDOM_BYTES requires 1 argument
+SELECT RANDOM_BYTES(1, 2);
+ERROR 1105: execution error: RANDOM_BYTES requires 1 argument
+=== Used inside expressions ===
+SELECT LENGTH(HEX(RANDOM_BYTES(8))) AS hex_len;
+hex_len
+16
+SELECT LENGTH(HEX(RANDOM_BYTES(16))) AS uuid_hex_len;
+uuid_hex_len
+32

@@ -1,0 +1,77 @@
+# Independently authored RANDOM_BYTES smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. RANDOM_BYTES errored "unknown function" in
+# zeta before zeta PR #1259; this slice locks in the new
+# CSPRNG-backed behavior.
+#
+# Big-picture finding:
+#   RANDOM_BYTES(n) returns n cryptographically-random bytes.
+#   n ∈ [1, 1024]. NULL → NULL. Out-of-range / non-integer
+#   / wrong arity → error. The bytes are unpredictable, so
+#   tests assert size / non-null / divergence-from-prior-call
+#   rather than literal content.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta routes through `rand::thread_rng()`
+#     (ChaCha20 reseeded from OsRng — Rust rand's standard
+#     CSPRNG). MySQL uses OpenSSL's RAND_bytes. Both are
+#     CSPRNGs; output is unpredictable in both, but the
+#     individual bytes will obviously differ.
+#   # zeta-adapt: Out-of-range / non-integer → errno 1105.
+#     MySQL uses 1690 (ER_DATA_OUT_OF_RANGE). Same direction
+#     (rejects), different errno class.
+#   # zeta-adapt: Arity != 1 → errno 1105.
+#   # zeta-adapt: tests compare via LENGTH() / IS NULL /
+#     inequality so the .result stays wire-stable across
+#     RNG output divergence.
+
+--echo === Length contract ===
+
+SELECT LENGTH(RANDOM_BYTES(1))    AS len_1;
+SELECT LENGTH(RANDOM_BYTES(16))   AS len_16;
+SELECT LENGTH(RANDOM_BYTES(64))   AS len_64;
+SELECT LENGTH(RANDOM_BYTES(1024)) AS len_max;
+
+--echo === Two calls differ ===
+
+# Collision probability for 16-byte reads is 2^-128 — this is
+# a sanity check that the function isn't returning constant
+# data, not a statistical test.
+SELECT RANDOM_BYTES(16) <> RANDOM_BYTES(16) AS differ;
+
+--echo === Output is non-null on valid input ===
+
+SELECT RANDOM_BYTES(1)   IS NOT NULL AS non_null_1;
+SELECT RANDOM_BYTES(256) IS NOT NULL AS non_null_256;
+
+--echo === NULL propagation ===
+
+SELECT RANDOM_BYTES(NULL) IS NULL AS null_in;
+
+--echo === Range checks ===
+
+--error 1105
+SELECT RANDOM_BYTES(0);
+--error 1105
+SELECT RANDOM_BYTES(-1);
+--error 1105
+SELECT RANDOM_BYTES(1025);
+
+--echo === Non-integer arg rejected ===
+
+--error 1105
+SELECT RANDOM_BYTES('not a number');
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT RANDOM_BYTES();
+--error 1105
+SELECT RANDOM_BYTES(1, 2);
+
+--echo === Used inside expressions ===
+
+# Common idiom: HEX(RANDOM_BYTES(n)) for a 2n-char hex token.
+SELECT LENGTH(HEX(RANDOM_BYTES(8))) AS hex_len;
+# A 16-byte read converted to UUID-like length.
+SELECT LENGTH(HEX(RANDOM_BYTES(16))) AS uuid_hex_len;
