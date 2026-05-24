@@ -1,0 +1,89 @@
+# Independently authored JSON_REMOVE smoke test for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_REMOVE was missing in zeta before zeta
+# PR #1256 (errored "unknown function"); this slice locks in
+# the new behavior.
+#
+# Big-picture finding:
+#   JSON_REMOVE(target, path1, [path2, ...]) strips each path
+#   from target. Paths that don't identify a value leave the
+#   doc unchanged. NULL target / NULL path → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: First-pass scope — top-level paths only
+#     (`$.key`, `$[N]`). Nested paths (`$.a.b`) return NULL
+#     instead of MySQL's recursive removal. Matches the
+#     JSON_SET precedent in zeta (under-claim rather than
+#     silently mis-write).
+#   # zeta-adapt: Compact JSON output (no space after colon).
+#     MySQL prints `{"b": 2}`; zeta prints `{"b":2}`. Tests
+#     compare via JSON_EXTRACT / JSON_LENGTH / etc. to stay
+#     wire-stable across that whitespace difference.
+#   # zeta-adapt: Removing `$` itself → errno 1105.
+#     MySQL errno is 3153 (ER_JSON_VACUOUS_PATH); zeta uses
+#     its generic 1105 with the message "$ is not allowed".
+#   # zeta-adapt: Arity errors → 1105.
+
+--echo === Object key removal ===
+
+# Compare via JSON_LENGTH so the result is one int per row —
+# avoids the {"b": 2} vs {"b":2} whitespace divergence.
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2}', '$.a')) AS after_remove_one;
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1}', '$.a'))        AS after_remove_only;
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2,"c":3}', '$.a', '$.c')) AS after_remove_two;
+
+--echo === Survivor key still present ===
+
+SELECT JSON_EXTRACT(JSON_REMOVE('{"a":1,"b":2}', '$.a'), '$.b') AS b_val;
+
+--echo === Missing path → unchanged ===
+
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1}', '$.missing'))  AS unchanged;
+SELECT JSON_EXTRACT(JSON_REMOVE('{"a":1}', '$.missing'), '$.a') AS a_still_there;
+
+--echo === Top-level array index removal ===
+
+SELECT JSON_LENGTH(JSON_REMOVE('[1,2,3]', '$[1]'))  AS arr_after_one;
+SELECT JSON_EXTRACT(JSON_REMOVE('[1,2,3]', '$[1]'), '$[0]') AS first;
+SELECT JSON_EXTRACT(JSON_REMOVE('[1,2,3]', '$[1]'), '$[1]') AS second;
+
+--echo === Out-of-range index → unchanged ===
+
+SELECT JSON_LENGTH(JSON_REMOVE('[1,2,3]', '$[10]')) AS arr_unchanged;
+
+--echo === NULL propagation ===
+
+SELECT JSON_REMOVE(NULL, '$.a')        IS NULL AS null_target;
+SELECT JSON_REMOVE('{"a":1}', NULL)    IS NULL AS null_path;
+
+--echo === Nested path → NULL (first-pass scope) ===
+
+SELECT JSON_REMOVE('{"a":{"b":1}}', '$.a.b') IS NULL AS nested_null;
+
+--echo === Removing root $ is an error ===
+
+--error 1105
+SELECT JSON_REMOVE('{"a":1}', '$');
+
+--echo === Invalid JSON target → error ===
+
+--error 1105
+SELECT JSON_REMOVE('not json', '$.a');
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT JSON_REMOVE();
+--error 1105
+SELECT JSON_REMOVE('{"a":1}');
+
+--echo === On TEXT column ===
+
+DROP TABLE IF EXISTS jd;
+CREATE TABLE jd (id INT, doc TEXT);
+INSERT INTO jd VALUES
+  (1, '{"a":1,"b":2}'),
+  (2, '{"a":10,"b":20,"c":30}'),
+  (3, '[1,2,3]');
+SELECT id, JSON_LENGTH(JSON_REMOVE(doc, '$.a')) AS after FROM jd ORDER BY id;
+DROP TABLE jd;
