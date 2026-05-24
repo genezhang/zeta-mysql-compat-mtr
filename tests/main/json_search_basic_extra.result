@@ -1,0 +1,88 @@
+=== 'one' on top-level object / array / scalar root ===
+SELECT JSON_SEARCH('{"a":"hello","b":"world"}', 'one', 'hello') AS object_path;
+object_path
+"$.a"
+SELECT JSON_SEARCH('["x","y","z"]', 'one', 'y')                  AS array_path;
+array_path
+"$[1]"
+SELECT JSON_SEARCH('"hello"', 'one', 'hello')                    AS root_string;
+root_string
+"$"
+=== Nested paths (object & array) ===
+SELECT JSON_SEARCH('{"a":[{"b":"hit"}]}', 'one', 'hit') AS obj_arr_obj_path;
+obj_arr_obj_path
+"$.a[0].b"
+SELECT JSON_SEARCH('{"a":["foo","bar"]}', 'one', 'bar') AS obj_arr_path;
+obj_arr_path
+"$.a[1]"
+SELECT JSON_SEARCH('{"a":{"b":{"c":"hit"}}}', 'one', 'hit') AS deep_obj_path;
+deep_obj_path
+"$.a.b.c"
+=== LIKE wildcards + custom escape ===
+SELECT JSON_SEARCH('{"a":"hello"}', 'one', 'h%o')              AS pct_wild;
+pct_wild
+"$.a"
+SELECT JSON_SEARCH('{"a":"abc"}', 'one', 'a_c')                AS underscore_wild;
+underscore_wild
+"$.a"
+SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100!%', '!')        AS custom_escape;
+custom_escape
+"$.a"
+=== 'all' multi-match: JSON array of paths ===
+SELECT JSON_LENGTH(JSON_SEARCH('{"a":"x","b":"x","c":"x"}', 'all', 'x')) AS all_count;
+all_count
+3
+SELECT JSON_TYPE(JSON_SEARCH('{"a":"x","b":"x","c":"x"}', 'all', 'x'))   AS all_is_array;
+all_is_array
+ARRAY
+=== 'all' single match: JSON string (MySQL quirk, NOT array) ===
+SELECT JSON_TYPE(JSON_SEARCH('{"a":"hello","b":"world"}', 'all', 'hello')) AS single_is_string;
+single_is_string
+STRING
+SELECT JSON_SEARCH('{"a":"hello","b":"world"}', 'all', 'hello')             AS single_path;
+single_path
+"$.a"
+=== No matches → NULL ===
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 'missing') IS NULL AS one_no_match;
+one_no_match
+1
+SELECT JSON_SEARCH('{"a":"x"}', 'all', 'missing') IS NULL AS all_no_match;
+all_no_match
+1
+=== Non-string scalars NOT searched ===
+SELECT JSON_SEARCH('[1,2,3,true,null]', 'all', '%') IS NULL AS no_strings_skipped;
+no_strings_skipped
+1
+=== Case-insensitive mode ===
+SELECT JSON_SEARCH('{"a":"x"}', 'ONE', 'x') AS upper_one;
+upper_one
+"$.a"
+SELECT JSON_SEARCH('{"a":"x"}', 'AlL', 'x') AS mixed_all;
+mixed_all
+"$.a"
+=== SQL NULL anywhere → NULL ===
+SELECT JSON_SEARCH(NULL, 'one', 'x')      IS NULL AS null_doc;
+null_doc
+1
+SELECT JSON_SEARCH('{}', NULL, 'x')       IS NULL AS null_mode;
+null_mode
+1
+SELECT JSON_SEARCH('{}', 'one', NULL)     IS NULL AS null_search;
+null_search
+1
+SELECT JSON_SEARCH('{}', 'one', 'x', NULL) IS NULL AS null_escape;
+null_escape
+1
+=== Invalid mode rejected ===
+SELECT JSON_SEARCH('{}', 'foo', 'x');
+ERROR 1105: execution error: JSON_SEARCH one_or_all must be 'one' or 'all'
+=== Multi-char escape rejected ===
+SELECT JSON_SEARCH('{}', 'one', 'x', 'xy');
+ERROR 1105: execution error: JSON_SEARCH escape_char must be a single character
+=== Arity / unsupported-path-args / invalid-JSON ===
+SELECT JSON_SEARCH('{}', 'one');
+ERROR 1105: execution error: JSON_SEARCH requires (doc, one_or_all, search_str, [escape])
+SELECT JSON_SEARCH('{}', 'one', 'x', '\\', '$.a');
+ERROR 1105: execution error: JSON_SEARCH path-limiting args (5th+) not supported in this scope
+SELECT JSON_SEARCH('not json', 'one', 'x');
+ERROR 1105: execution error: JSON_SEARCH target is not valid JSON: JSONB error: expected 'null' at position 1
