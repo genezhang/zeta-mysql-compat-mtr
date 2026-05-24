@@ -1,0 +1,87 @@
+=== DIGEST_TEXT: literal replacement ===
+SELECT STATEMENT_DIGEST_TEXT('SELECT 1') AS int_lit;
+int_lit
+SELECT ?
+SELECT STATEMENT_DIGEST_TEXT('SELECT ''hi''') AS str_lit;
+str_lit
+SELECT ?
+SELECT STATEMENT_DIGEST_TEXT('SELECT 0x1A') AS hex_lit;
+hex_lit
+SELECT ?
+SELECT STATEMENT_DIGEST_TEXT('SELECT 1.5') AS dec_lit;
+dec_lit
+SELECT ?
+SELECT STATEMENT_DIGEST_TEXT('SELECT 2e-3') AS sci_lit;
+sci_lit
+SELECT ?
+=== DIGEST_TEXT: comment stripping ===
+SELECT STATEMENT_DIGEST_TEXT('SELECT /* skip */ 1') AS block_stripped;
+block_stripped
+SELECT ?
+SELECT STATEMENT_DIGEST_TEXT(CONCAT('SELECT 1 -- ignored', CHAR(10), 'FROM t')) AS line_dashdash;
+line_dashdash
+SELECT ? FROM t
+SELECT STATEMENT_DIGEST_TEXT(CONCAT('SELECT 1 # ignored', CHAR(10), 'FROM t')) AS line_hash;
+line_hash
+SELECT ? FROM t
+=== DIGEST_TEXT: whitespace collapse + trim ===
+SELECT STATEMENT_DIGEST_TEXT('SELECT   *   FROM   t') AS collapsed;
+collapsed
+SELECT * FROM t
+SELECT STATEMENT_DIGEST_TEXT('   SELECT 1   ') AS trimmed;
+trimmed
+SELECT ?
+=== DIGEST: same shape → same hash (collision) ===
+SELECT STATEMENT_DIGEST('SELECT * FROM t WHERE a = 1')
+     = STATEMENT_DIGEST('SELECT * FROM t WHERE a = 2') AS int_collide;
+int_collide
+1
+SELECT STATEMENT_DIGEST('SELECT * FROM t WHERE a = ''x''')
+     = STATEMENT_DIGEST('SELECT * FROM t WHERE a = ''y''') AS str_collide;
+str_collide
+1
+SELECT STATEMENT_DIGEST('SELECT /* note A */ 1')
+     = STATEMENT_DIGEST('SELECT /* note B */ 1') AS comment_collide;
+comment_collide
+1
+=== DIGEST: different shape → different hash ===
+SELECT STATEMENT_DIGEST('SELECT a FROM t')
+    != STATEMENT_DIGEST('SELECT b FROM t') AS ident_differ;
+ident_differ
+1
+SELECT STATEMENT_DIGEST('SELECT * FROM t')
+    != STATEMENT_DIGEST('SELECT * FROM u') AS table_differ;
+table_differ
+1
+=== DIGEST: format = 64 lowercase hex chars ===
+SELECT LENGTH(STATEMENT_DIGEST('SELECT 1')) AS hex_len;
+hex_len
+64
+SELECT STATEMENT_DIGEST('SELECT 1') REGEXP '^[0-9a-f]{64}$' AS hex_format;
+hex_format
+1
+=== DIGEST = SHA2(DIGEST_TEXT, 256) ===
+SELECT STATEMENT_DIGEST('SELECT 1')
+     = SHA2(STATEMENT_DIGEST_TEXT('SELECT 1'), 256) AS digest_eq_sha2_text;
+digest_eq_sha2_text
+1
+=== NULL propagation ===
+SELECT STATEMENT_DIGEST_TEXT(NULL) IS NULL AS dt_null;
+dt_null
+1
+SELECT STATEMENT_DIGEST(NULL)      IS NULL AS d_null;
+d_null
+1
+=== Empty string: empty text, SHA2('', 256) digest ===
+SELECT STATEMENT_DIGEST_TEXT('') AS empty_text;
+empty_text
+
+SELECT STATEMENT_DIGEST('')
+     = SHA2('', 256) AS empty_digest_consistent;
+empty_digest_consistent
+1
+=== Arity errors ===
+SELECT STATEMENT_DIGEST();
+ERROR 1105: execution error: STATEMENT_DIGEST requires exactly 1 argument
+SELECT STATEMENT_DIGEST_TEXT('a', 'b');
+ERROR 1105: execution error: STATEMENT_DIGEST_TEXT requires exactly 1 argument
