@@ -1,0 +1,62 @@
+=== 1-arg form (preserved behavior) ===
+SELECT JSON_KEYS('{"a":1,"b":2,"c":3}')  AS three_keys;
+three_keys
+["a","b","c"]
+SELECT JSON_LENGTH(JSON_KEYS('{}'))      AS empty_object_zero;
+empty_object_zero
+0
+SELECT JSON_KEYS('[1,2,3]') IS NULL      AS array_root_null;
+array_root_null
+1
+=== 2-arg form: root path equivalent to 1-arg ===
+SELECT JSON_KEYS('{"a":1,"b":2}', '$')   AS root_path;
+root_path
+["a","b"]
+=== 2-arg form: drill into nested object via $.key ===
+SELECT JSON_KEYS('{"a":1,"b":{"x":1,"y":2}}', '$.b') AS via_key;
+via_key
+["x","y"]
+=== 2-arg form: drill into array-of-objects via $[N] ===
+SELECT JSON_KEYS('[{"a":1},{"b":2,"c":3}]', '$[1]') AS via_index;
+via_index
+["b","c"]
+=== Non-object value at path → NULL ===
+SELECT JSON_KEYS('{"a":[1,2,3]}', '$.a') IS NULL AS arr_at_path_null;
+arr_at_path_null
+1
+SELECT JSON_KEYS('{"a":1}', '$.a')       IS NULL AS scalar_at_path_null;
+scalar_at_path_null
+1
+=== Path doesn't resolve → NULL ===
+SELECT JSON_KEYS('{"a":1}', '$.missing')  IS NULL AS missing_key_null;
+missing_key_null
+1
+SELECT JSON_KEYS('[{"a":1}]', '$[99]')    IS NULL AS oob_index_null;
+oob_index_null
+1
+SELECT JSON_KEYS('[1,2,3]', '$.a')        IS NULL AS type_mismatch_null;
+type_mismatch_null
+1
+=== Nested path (>1 step) → NULL (under-claim) ===
+SELECT JSON_KEYS('{"a":{"b":{"x":1}}}', '$.a.b') IS NULL AS nested_under_claim;
+nested_under_claim
+1
+=== SQL NULL anywhere → NULL ===
+SELECT JSON_KEYS(NULL)         IS NULL AS null_doc_one_arg;
+null_doc_one_arg
+1
+SELECT JSON_KEYS(NULL, '$')    IS NULL AS null_doc_two_arg;
+null_doc_two_arg
+1
+SELECT JSON_KEYS('{}', NULL)   IS NULL AS null_path;
+null_path
+1
+=== Invalid JSON / wildcard / arity ===
+SELECT JSON_KEYS('not json');
+ERROR 1105: execution error: JSON_KEYS first argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_KEYS();
+ERROR 1105: execution error: JSON_KEYS requires 1 or 2 arguments
+SELECT JSON_KEYS('{}', '$', 'extra');
+ERROR 1105: execution error: JSON_KEYS requires 1 or 2 arguments
+SELECT JSON_KEYS('{}', '$.*');
+ERROR 1105: execution error: JSON_KEYS invalid path: $.*

@@ -1,0 +1,81 @@
+# Independently authored JSON_KEYS(doc, path) smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. The 1-arg form already shipped in an earlier zeta
+# slice; this slice locks in the 2-arg form added by zeta PR
+# #1269.
+#
+# Big-picture finding:
+#   JSON_KEYS(doc, [path])
+#     - 1-arg: keys of root object
+#     - 2-arg: keys of object at path
+#     - non-object target → NULL (in either form)
+#     - missing key / OOB index / container-type mismatch → NULL
+#     - SQL NULL in doc / path → NULL
+#   Returns a JSONB array of strings.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta's JSONB encoding sorts object keys
+#     alphabetically when re-emitting; MySQL preserves insertion
+#     order. SET of returned keys is identical; only the array
+#     element order differs. Tests use already-alpha key order
+#     in payloads, or use JSON_LENGTH / JSON_CONTAINS wrappers
+#     where the array shape matters, NOT the element order.
+#   # zeta-adapt: first-pass path scope is top-level only
+#     ($, $.key, $[N]). Nested paths under-claim to NULL —
+#     matches JSON_REMOVE / JSON_ARRAY_APPEND precedent. MySQL
+#     supports arbitrary depth; separate gap.
+#   # zeta-adapt: zeta emits compact JSON ({"a":1}); MySQL uses
+#     "key: val" spacing. Key array output (["a","b"]) is
+#     identical between engines so .result is stable.
+#   # zeta-adapt: Invalid JSON / wildcard path / arity → 1105
+#     (MySQL: 3141 / 3143 / 1582). Same direction (rejects).
+
+--echo === 1-arg form (preserved behavior) ===
+
+SELECT JSON_KEYS('{"a":1,"b":2,"c":3}')  AS three_keys;
+SELECT JSON_LENGTH(JSON_KEYS('{}'))      AS empty_object_zero;
+SELECT JSON_KEYS('[1,2,3]') IS NULL      AS array_root_null;
+
+--echo === 2-arg form: root path equivalent to 1-arg ===
+
+SELECT JSON_KEYS('{"a":1,"b":2}', '$')   AS root_path;
+
+--echo === 2-arg form: drill into nested object via $.key ===
+
+SELECT JSON_KEYS('{"a":1,"b":{"x":1,"y":2}}', '$.b') AS via_key;
+
+--echo === 2-arg form: drill into array-of-objects via $[N] ===
+
+SELECT JSON_KEYS('[{"a":1},{"b":2,"c":3}]', '$[1]') AS via_index;
+
+--echo === Non-object value at path → NULL ===
+
+SELECT JSON_KEYS('{"a":[1,2,3]}', '$.a') IS NULL AS arr_at_path_null;
+SELECT JSON_KEYS('{"a":1}', '$.a')       IS NULL AS scalar_at_path_null;
+
+--echo === Path doesn't resolve → NULL ===
+
+SELECT JSON_KEYS('{"a":1}', '$.missing')  IS NULL AS missing_key_null;
+SELECT JSON_KEYS('[{"a":1}]', '$[99]')    IS NULL AS oob_index_null;
+SELECT JSON_KEYS('[1,2,3]', '$.a')        IS NULL AS type_mismatch_null;
+
+--echo === Nested path (>1 step) → NULL (under-claim) ===
+
+SELECT JSON_KEYS('{"a":{"b":{"x":1}}}', '$.a.b') IS NULL AS nested_under_claim;
+
+--echo === SQL NULL anywhere → NULL ===
+
+SELECT JSON_KEYS(NULL)         IS NULL AS null_doc_one_arg;
+SELECT JSON_KEYS(NULL, '$')    IS NULL AS null_doc_two_arg;
+SELECT JSON_KEYS('{}', NULL)   IS NULL AS null_path;
+
+--echo === Invalid JSON / wildcard / arity ===
+
+--error 1105
+SELECT JSON_KEYS('not json');
+--error 1105
+SELECT JSON_KEYS();
+--error 1105
+SELECT JSON_KEYS('{}', '$', 'extra');
+--error 1105
+SELECT JSON_KEYS('{}', '$.*');
