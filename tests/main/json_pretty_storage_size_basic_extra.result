@@ -1,0 +1,101 @@
+=== JSON_PRETTY — object ===
+SELECT JSON_PRETTY('{"a":1,"b":2}') AS obj;
+obj
+{
+  "a": 1,
+  "b": 2
+}
+=== JSON_PRETTY — array ===
+SELECT JSON_PRETTY('[1,2,3]')       AS arr;
+arr
+[
+  1,
+  2,
+  3
+]
+=== JSON_PRETTY — nested ===
+SELECT JSON_PRETTY('{"a":[1,2],"b":{"c":3}}') AS nested;
+nested
+{
+  "a": [
+    1,
+    2
+  ],
+  "b": {
+    "c": 3
+  }
+}
+=== JSON_PRETTY — scalars ===
+SELECT JSON_PRETTY('42')    AS num;
+num
+42
+SELECT JSON_PRETTY('"hi"')  AS str;
+str
+"hi"
+SELECT JSON_PRETTY('true')  AS b;
+b
+true
+SELECT JSON_PRETTY('null')  AS n;
+n
+null
+=== JSON_PRETTY — NULL ===
+SELECT JSON_PRETTY(NULL) AS x;
+x
+NULL
+=== JSON_STORAGE_SIZE — monotonic w/ payload size ===
+SELECT JSON_STORAGE_SIZE('[1,2,3,4,5,6,7,8,9,10]')
+       > JSON_STORAGE_SIZE('[1]')
+       AS grows;
+grows
+1
+=== JSON_STORAGE_SIZE — non-empty containers ===
+SELECT JSON_STORAGE_SIZE('{}') > 0 AS empty_obj_pos;
+empty_obj_pos
+1
+SELECT JSON_STORAGE_SIZE('[]') > 0 AS empty_arr_pos;
+empty_arr_pos
+1
+=== JSON_STORAGE_SIZE — scalars are non-empty too ===
+SELECT JSON_STORAGE_SIZE('1')       > 0 AS num_pos;
+num_pos
+1
+SELECT JSON_STORAGE_SIZE('"x"')     > 0 AS str_pos;
+str_pos
+1
+SELECT JSON_STORAGE_SIZE('null')    > 0 AS null_pos;
+null_pos
+1
+=== JSON_STORAGE_SIZE — NULL ===
+SELECT JSON_STORAGE_SIZE(NULL) AS x;
+x
+NULL
+=== Arity errors ===
+SELECT JSON_PRETTY();
+ERROR 1105: execution error: JSON_PRETTY requires 1 argument
+SELECT JSON_PRETTY('{"a":1}', '{"b":2}');
+ERROR 1105: execution error: JSON_PRETTY requires 1 argument
+SELECT JSON_STORAGE_SIZE();
+ERROR 1105: execution error: JSON_STORAGE_SIZE requires 1 argument
+SELECT JSON_STORAGE_SIZE('{"a":1}', '{"b":2}');
+ERROR 1105: execution error: JSON_STORAGE_SIZE requires 1 argument
+=== Invalid JSON rejected ===
+SELECT JSON_PRETTY('not json');
+ERROR 1105: execution error: JSON_PRETTY first argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_STORAGE_SIZE('not json');
+ERROR 1105: execution error: JSON_STORAGE_SIZE first argument is not valid JSON: JSONB error: expected 'null' at position 1
+=== Filter on a TEXT column of stored JSON strings ===
+DROP TABLE IF EXISTS j;
+CREATE TABLE j (id INT, doc TEXT);
+INSERT INTO j VALUES
+  (1, '[1]'),
+  (2, '[1,2,3,4,5]'),
+  (3, '{}'),
+  (4, '{"x":1,"y":2,"z":3}');
+SELECT id
+FROM j
+WHERE JSON_STORAGE_SIZE(doc) > JSON_STORAGE_SIZE('[1]')
+ORDER BY id;
+id
+2
+4
+DROP TABLE j;
