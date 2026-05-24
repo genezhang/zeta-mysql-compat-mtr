@@ -1,0 +1,104 @@
+# Independently authored JSON_ARRAY_INSERT smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_ARRAY_INSERT errored "unknown function"
+# in zeta before zeta PR #1265; this slice locks in MySQL's
+# insert-at-array-index semantics.
+#
+# Big-picture finding:
+#   Path MUST terminate in an array index. Root $ and key-only
+#   paths ($.a) error — they don't identify a cell in an array.
+#   For each (path, val) pair, applied left-to-right:
+#     - target at $[N] is an array → insert at min(N, len);
+#       OOB clamps to append
+#     - target at $[N] is not an array → silent no-op
+#   Multi-pair: subsequent pairs see shifted indices.
+#   SQL NULL anywhere → SQL NULL.
+#   SQL string val is inserted as JSON string (not re-parsed).
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta first-pass supports only top-level
+#     $[N]. Nested paths ($.a[N], $[0][1]) under-claim to NULL
+#     (matches JSON_ARRAY_APPEND / JSON_SET / JSON_REMOVE
+#     precedent). MySQL supports arbitrary depth; separate gap.
+#   # zeta-adapt: zeta emits compact JSON, MySQL uses spacing.
+#     Tests use JSON_EXTRACT / JSON_LENGTH / JSON_TYPE wrappers
+#     where shape matters.
+#   # zeta-adapt: zeta sorts object keys alphabetically. Test
+#     payloads with objects use already-alpha keys.
+#   # zeta-adapt: Invalid JSON / non-array-cell path / wildcard
+#     / arity → 1105 (MySQL: 3141 / 3147 / 3143 / 1582).
+#     Same direction (rejects).
+
+--echo === Insert at index (shift right) ===
+
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('[1,2,3]', '$[1]', 9))   AS mid_len;
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[1]', 9),
+                    '$[0]', '$[1]', '$[2]', '$[3]')           AS mid_vals;
+
+--echo === Prepend (index 0) ===
+
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[0]', 9),
+                    '$[0]') AS prepended_head;
+
+--echo === Append at length / OOB clamp ===
+
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[3]', 9),
+                    '$[3]') AS append_at_len;
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[99]', 9),
+                    '$[3]') AS oob_clamped_to_append;
+
+--echo === Empty array → insert at 0 ===
+
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('[]', '$[0]', 9)) AS empty_after;
+
+--echo === Non-array target → silent no-op ===
+
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('{"a":1}', '$[0]', 9)) AS obj_unchanged;
+SELECT JSON_TYPE(JSON_ARRAY_INSERT('42', '$[0]', 9))        AS scalar_unchanged;
+
+--echo === Multi-pair chain (second pair sees shifted indices) ===
+
+# [1,2,3] -> $[0]=9 -> [9,1,2,3] -> $[2]=8 -> [9,1,8,2,3]
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('[1,2,3]', '$[0]', 9, '$[2]', 8)) AS chain_len;
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[0]', 9, '$[2]', 8),
+                    '$[2]') AS chain_third_elem;
+
+--echo === SQL string val → JSON string (NOT re-parsed) ===
+
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', 'hi'),
+  '$[1]'
+)) AS str_kept_as_string;
+
+--echo === Path errors: root and key-only are NOT array cells ===
+
+--error 1105
+SELECT JSON_ARRAY_INSERT('[1,2]', '$', 9);
+--error 1105
+SELECT JSON_ARRAY_INSERT('{"a":1}', '$.a', 9);
+
+--echo === Nested path (>1 step) → NULL (under-claim) ===
+
+SELECT JSON_ARRAY_INSERT('{"a":[1,2]}', '$.a[0]', 9) IS NULL AS nested_under_claim;
+
+--echo === SQL NULL anywhere → SQL NULL ===
+
+SELECT JSON_ARRAY_INSERT(NULL, '$[0]', 1)     IS NULL AS null_target;
+SELECT JSON_ARRAY_INSERT('[1]', NULL, 2)      IS NULL AS null_path;
+SELECT JSON_ARRAY_INSERT('[1]', '$[0]', NULL) IS NULL AS null_val;
+
+--echo === Arity errors (odd ≥ 3) ===
+
+--error 1105
+SELECT JSON_ARRAY_INSERT();
+--error 1105
+SELECT JSON_ARRAY_INSERT('[1]');
+--error 1105
+SELECT JSON_ARRAY_INSERT('[1]', '$[0]');
+
+--echo === Invalid JSON / wildcard path rejected ===
+
+--error 1105
+SELECT JSON_ARRAY_INSERT('not json', '$[0]', 1);
+--error 1105
+SELECT JSON_ARRAY_INSERT('[1,2]', '$[*]', 9);

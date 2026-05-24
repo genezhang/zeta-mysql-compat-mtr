@@ -1,0 +1,79 @@
+=== Insert at index (shift right) ===
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('[1,2,3]', '$[1]', 9))   AS mid_len;
+mid_len
+4
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[1]', 9),
+                    '$[0]', '$[1]', '$[2]', '$[3]')           AS mid_vals;
+mid_vals
+[1,9,2,3]
+=== Prepend (index 0) ===
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[0]', 9),
+                    '$[0]') AS prepended_head;
+prepended_head
+9
+=== Append at length / OOB clamp ===
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[3]', 9),
+                    '$[3]') AS append_at_len;
+append_at_len
+9
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[99]', 9),
+                    '$[3]') AS oob_clamped_to_append;
+oob_clamped_to_append
+9
+=== Empty array → insert at 0 ===
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('[]', '$[0]', 9)) AS empty_after;
+empty_after
+1
+=== Non-array target → silent no-op ===
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('{"a":1}', '$[0]', 9)) AS obj_unchanged;
+obj_unchanged
+1
+SELECT JSON_TYPE(JSON_ARRAY_INSERT('42', '$[0]', 9))        AS scalar_unchanged;
+scalar_unchanged
+INTEGER
+=== Multi-pair chain (second pair sees shifted indices) ===
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT('[1,2,3]', '$[0]', 9, '$[2]', 8)) AS chain_len;
+chain_len
+5
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT('[1,2,3]', '$[0]', 9, '$[2]', 8),
+                    '$[2]') AS chain_third_elem;
+chain_third_elem
+8
+=== SQL string val → JSON string (NOT re-parsed) ===
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', 'hi'),
+  '$[1]'
+)) AS str_kept_as_string;
+str_kept_as_string
+STRING
+=== Path errors: root and key-only are NOT array cells ===
+SELECT JSON_ARRAY_INSERT('[1,2]', '$', 9);
+ERROR 1105: execution error: JSON_ARRAY_INSERT path '$' is not a path to a cell in an array (must end with [N])
+SELECT JSON_ARRAY_INSERT('{"a":1}', '$.a', 9);
+ERROR 1105: execution error: JSON_ARRAY_INSERT path '$.a' is not a path to a cell in an array (must end with [N])
+=== Nested path (>1 step) → NULL (under-claim) ===
+SELECT JSON_ARRAY_INSERT('{"a":[1,2]}', '$.a[0]', 9) IS NULL AS nested_under_claim;
+nested_under_claim
+1
+=== SQL NULL anywhere → SQL NULL ===
+SELECT JSON_ARRAY_INSERT(NULL, '$[0]', 1)     IS NULL AS null_target;
+null_target
+1
+SELECT JSON_ARRAY_INSERT('[1]', NULL, 2)      IS NULL AS null_path;
+null_path
+1
+SELECT JSON_ARRAY_INSERT('[1]', '$[0]', NULL) IS NULL AS null_val;
+null_val
+1
+=== Arity errors (odd ≥ 3) ===
+SELECT JSON_ARRAY_INSERT();
+ERROR 1105: execution error: JSON_ARRAY_INSERT requires doc and at least one (path, val) pair (odd arity ≥ 3)
+SELECT JSON_ARRAY_INSERT('[1]');
+ERROR 1105: execution error: JSON_ARRAY_INSERT requires doc and at least one (path, val) pair (odd arity ≥ 3)
+SELECT JSON_ARRAY_INSERT('[1]', '$[0]');
+ERROR 1105: execution error: JSON_ARRAY_INSERT requires doc and at least one (path, val) pair (odd arity ≥ 3)
+=== Invalid JSON / wildcard path rejected ===
+SELECT JSON_ARRAY_INSERT('not json', '$[0]', 1);
+ERROR 1105: execution error: JSON_ARRAY_INSERT target is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_ARRAY_INSERT('[1,2]', '$[*]', 9);
+ERROR 1105: execution error: JSON_ARRAY_INSERT invalid path: $[*]
