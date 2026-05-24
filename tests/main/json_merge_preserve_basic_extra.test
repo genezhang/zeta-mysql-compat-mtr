@@ -1,0 +1,115 @@
+# Independently authored JSON_MERGE_PRESERVE smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_MERGE_PRESERVE errored "unknown function"
+# in zeta before zeta PR #1262; this slice locks in MySQL's
+# concatenating-merge behavior (distinct from RFC-7396
+# MERGE_PATCH which replaces).
+#
+# Big-picture finding:
+#   Pairwise rules, applied left-to-right:
+#     object + object → union of keys; shared keys recurse
+#                       (NOT replace)
+#     array  + array  → concatenate
+#     array  + non-array (either side) → autowrap non-array
+#                                         as [x], then concat
+#     scalar + scalar → [a, b]
+#   JSON null is a regular scalar here (NOT delete — that's
+#   MERGE_PATCH). Multi-arg folds left-to-right; any SQL NULL
+#   anywhere → SQL NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta's JSON binary encoding sorts object
+#     keys alphabetically when re-emitting; MySQL preserves
+#     insertion order. Tests use object payloads whose keys
+#     are already in alphabetical order so the .result is
+#     wire-stable across both engines, and rely on
+#     JSON_EXTRACT / JSON_LENGTH / JSON_TYPE / IS NULL
+#     wrappers where shape matters.
+#   # zeta-adapt: zeta emits compact JSON ({"a":1}), MySQL
+#     emits "key: val" spacing. Same wrapper strategy.
+#   # zeta-adapt: Invalid JSON → 1105 (MySQL: 3141
+#     ER_INVALID_JSON_TEXT). Same direction (rejects).
+#   # zeta-adapt: Arity < 2 → 1105.
+
+--echo === Object+object: shared scalar key wraps in array ===
+
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1,"b":2}', '{"b":99,"c":3}'),
+  '$.a', '$.b', '$.c'
+) AS abc;
+SELECT JSON_LENGTH(
+  JSON_MERGE_PRESERVE('{"a":1,"b":2}', '{"b":99,"c":3}')
+) AS three_keys;
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1,"b":2}', '{"b":99,"c":3}'),
+  '$.b'
+)) AS b_pair_len;
+
+--echo === Array+array: concatenate ===
+
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('[1,2]', '[3,4]')) AS concat_len;
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('[1,2]', '[3,4]'),
+  '$[0]', '$[1]', '$[2]', '$[3]'
+) AS concat_vals;
+
+--echo === Scalar+scalar: pair into 2-element array ===
+
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('1', '2')) AS becomes_array;
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('1', '2')) AS two_elements;
+
+--echo === Array+scalar / object+array: autowrap non-array ===
+
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('[1,2]', '3')) AS arr_plus_scalar;
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('{"a":1}', '[2,3]')) AS obj_arr_is_array;
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{"a":1}', '[2,3]')) AS obj_arr_len;
+
+--echo === Nested object: shared inner key recurses ===
+
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a'
+)) AS inner_keys;
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a.y'
+)) AS inner_y_pair;
+
+--echo === JSON null is a regular scalar (NOT delete) ===
+
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1}', '{"a":null}'),
+  '$.a'
+)) AS a_pair_with_null;
+
+--echo === Multi-arg fold left-to-right ===
+
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1}', '{"a":2}', '{"a":3}'),
+  '$.a'
+)) AS a_three_long;
+
+--echo === SQL NULL in any position → NULL ===
+
+SELECT JSON_MERGE_PRESERVE(NULL, '{"a":1}') IS NULL          AS first_null;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', NULL) IS NULL          AS second_null;
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '{"b":2}', NULL) IS NULL AS mid_null;
+
+--echo === Empty patch object: keys-only-in-target survive ===
+
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{"a":1}', '{}')) AS unchanged;
+SELECT JSON_EXTRACT(JSON_MERGE_PRESERVE('{"a":1}', '{}'), '$.a') AS a_still;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT JSON_MERGE_PRESERVE();
+--error 1105
+SELECT JSON_MERGE_PRESERVE('{"a":1}');
+
+--echo === Invalid JSON rejected ===
+
+--error 1105
+SELECT JSON_MERGE_PRESERVE('not json', '{}');
+--error 1105
+SELECT JSON_MERGE_PRESERVE('{}', 'not json');

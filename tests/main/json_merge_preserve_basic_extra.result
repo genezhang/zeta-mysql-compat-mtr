@@ -1,0 +1,99 @@
+=== Object+object: shared scalar key wraps in array ===
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1,"b":2}', '{"b":99,"c":3}'),
+  '$.a', '$.b', '$.c'
+) AS abc;
+abc
+[1,[2,99],3]
+SELECT JSON_LENGTH(
+  JSON_MERGE_PRESERVE('{"a":1,"b":2}', '{"b":99,"c":3}')
+) AS three_keys;
+three_keys
+3
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1,"b":2}', '{"b":99,"c":3}'),
+  '$.b'
+)) AS b_pair_len;
+b_pair_len
+2
+=== Array+array: concatenate ===
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('[1,2]', '[3,4]')) AS concat_len;
+concat_len
+4
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('[1,2]', '[3,4]'),
+  '$[0]', '$[1]', '$[2]', '$[3]'
+) AS concat_vals;
+concat_vals
+[1,2,3,4]
+=== Scalar+scalar: pair into 2-element array ===
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('1', '2')) AS becomes_array;
+becomes_array
+ARRAY
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('1', '2')) AS two_elements;
+two_elements
+2
+=== Array+scalar / object+array: autowrap non-array ===
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('[1,2]', '3')) AS arr_plus_scalar;
+arr_plus_scalar
+3
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('{"a":1}', '[2,3]')) AS obj_arr_is_array;
+obj_arr_is_array
+ARRAY
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{"a":1}', '[2,3]')) AS obj_arr_len;
+obj_arr_len
+3
+=== Nested object: shared inner key recurses ===
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a'
+)) AS inner_keys;
+inner_keys
+3
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a.y'
+)) AS inner_y_pair;
+inner_y_pair
+2
+=== JSON null is a regular scalar (NOT delete) ===
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1}', '{"a":null}'),
+  '$.a'
+)) AS a_pair_with_null;
+a_pair_with_null
+2
+=== Multi-arg fold left-to-right ===
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PRESERVE('{"a":1}', '{"a":2}', '{"a":3}'),
+  '$.a'
+)) AS a_three_long;
+a_three_long
+3
+=== SQL NULL in any position → NULL ===
+SELECT JSON_MERGE_PRESERVE(NULL, '{"a":1}') IS NULL          AS first_null;
+first_null
+1
+SELECT JSON_MERGE_PRESERVE('{"a":1}', NULL) IS NULL          AS second_null;
+second_null
+1
+SELECT JSON_MERGE_PRESERVE('{"a":1}', '{"b":2}', NULL) IS NULL AS mid_null;
+mid_null
+1
+=== Empty patch object: keys-only-in-target survive ===
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{"a":1}', '{}')) AS unchanged;
+unchanged
+1
+SELECT JSON_EXTRACT(JSON_MERGE_PRESERVE('{"a":1}', '{}'), '$.a') AS a_still;
+a_still
+1
+=== Arity errors ===
+SELECT JSON_MERGE_PRESERVE();
+ERROR 1105: execution error: JSON_MERGE_PRESERVE requires at least 2 arguments
+SELECT JSON_MERGE_PRESERVE('{"a":1}');
+ERROR 1105: execution error: JSON_MERGE_PRESERVE requires at least 2 arguments
+=== Invalid JSON rejected ===
+SELECT JSON_MERGE_PRESERVE('not json', '{}');
+ERROR 1105: execution error: JSON_MERGE_PRESERVE argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_MERGE_PRESERVE('{}', 'not json');
+ERROR 1105: execution error: JSON_MERGE_PRESERVE argument is not valid JSON: JSONB error: expected 'null' at position 1
