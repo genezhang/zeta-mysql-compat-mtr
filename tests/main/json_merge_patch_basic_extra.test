@@ -1,0 +1,106 @@
+# Independently authored JSON_MERGE_PATCH smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_MERGE_PATCH errored "unknown function"
+# in zeta before zeta PR #1260; this slice locks in the
+# RFC-7396 recursive-merge behavior.
+#
+# Big-picture finding:
+#   RFC 7396 pairwise rules, applied left-to-right:
+#     - patch is not object → result is patch
+#     - patch object, target not → start from {} and merge
+#     - both objects → for each key in patch:
+#         null → delete   /   object & object → recurse   /   else → replace
+#     - keys only in target survive
+#   Multi-arg fold; any SQL NULL anywhere → SQL NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta's JSON binary encoding sorts keys
+#     alphabetically when re-emitting. MySQL preserves
+#     insertion order. Tests use object payloads whose keys
+#     are already in alphabetical order so the .result is
+#     wire-stable across both engines; multi-key tests put
+#     keys in alpha order in the JSON literal too.
+#   # zeta-adapt: zeta emits compact JSON ({"a":1}), MySQL
+#     emits "key: val" spacing. Tests use JSON_EXTRACT /
+#     JSON_LENGTH / IS NULL wrappers where shape matters so
+#     the .result doesn't depend on the whitespace.
+#   # zeta-adapt: Invalid JSON → 1105 (MySQL: 3141
+#     ER_INVALID_JSON_TEXT). Same direction (rejects).
+#   # zeta-adapt: Arity < 2 → 1105.
+
+--echo === Two-object merge: patch overrides + preserved keys ===
+
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":99,"c":3}'),
+  '$.a', '$.b', '$.c'
+) AS abc;
+SELECT JSON_LENGTH(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":99,"c":3}')
+) AS keys_after;
+
+--echo === Patch null deletes the key ===
+
+SELECT JSON_LENGTH(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":null}')
+) AS keys_after_delete;
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":null}'),
+  '$.a'
+) AS a_preserved;
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":null}'),
+  '$.b'
+) AS b_gone;
+
+--echo === Recursive merge on nested objects ===
+
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a'
+)) AS nested_keys;
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":{"x":1,"y":2}}', '{"a":{"y":99,"z":3}}'),
+  '$.a.x', '$.a.y', '$.a.z'
+) AS nested_xyz;
+
+--echo === Non-object patch replaces target entirely ===
+
+SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', '[1,2,3]')) AS becomes_array;
+SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', '42'))      AS becomes_int;
+SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', '"s"'))     AS becomes_string;
+
+--echo === Object patch on non-object target → start from {} ===
+
+SELECT JSON_TYPE(JSON_MERGE_PATCH('42', '{"a":1}'))   AS becomes_object;
+SELECT JSON_LENGTH(JSON_MERGE_PATCH('42', '{"a":1}')) AS one_key;
+
+--echo === Multi-arg fold left-to-right ===
+
+SELECT JSON_LENGTH(
+  JSON_MERGE_PATCH('{"a":1}', '{"b":2}', '{"c":3}')
+) AS three_keys;
+
+--echo === SQL NULL in any position → NULL ===
+
+SELECT JSON_MERGE_PATCH(NULL, '{"a":1}') IS NULL          AS first_null;
+SELECT JSON_MERGE_PATCH('{"a":1}', NULL) IS NULL          AS second_null;
+SELECT JSON_MERGE_PATCH('{"a":1}', '{"b":2}', NULL) IS NULL AS mid_null;
+
+--echo === Empty patch is identity ===
+
+SELECT JSON_LENGTH(JSON_MERGE_PATCH('{"a":1}', '{}')) AS unchanged;
+SELECT JSON_EXTRACT(JSON_MERGE_PATCH('{"a":1}', '{}'), '$.a') AS a_still;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT JSON_MERGE_PATCH();
+--error 1105
+SELECT JSON_MERGE_PATCH('{"a":1}');
+
+--echo === Invalid JSON rejected ===
+
+--error 1105
+SELECT JSON_MERGE_PATCH('not json', '{}');
+--error 1105
+SELECT JSON_MERGE_PATCH('{}', 'not json');
