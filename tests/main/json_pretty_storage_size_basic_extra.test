@@ -1,0 +1,114 @@
+# Independently authored JSON_PRETTY / JSON_STORAGE_SIZE
+# smoke test for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/. Both functions were
+# missing in zeta before zeta PR #1255 (errored "unknown
+# function"); this slice locks in the new behavior.
+#
+# Big-picture finding:
+#   JSON_PRETTY(j) → 2-space-indented JSON text
+#                    (value-per-line, child indented w.r.t. parent)
+#   JSON_STORAGE_SIZE(j) → byte length of the binary form
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON_PRETTY routes through serde_json so the
+#     output uses Unicode-safe escapes and 2-space indent.
+#     MySQL emits the same 2-space layout but its exact escape
+#     policy and trailing-newline behavior aren't standardized;
+#     these tests stick to ASCII payloads to keep the .result
+#     wire-stable.
+#   # zeta-adapt: JSON_STORAGE_SIZE returns the bytes in zeta's
+#     binary JSON encoding, which is its own format (not byte-
+#     compatible with MySQL's `JSON` column encoding). The
+#     absolute number differs from MySQL — these tests use
+#     monotonic comparisons (large > small, non-empty > 0)
+#     instead of bare values to stay portable.
+#   # zeta-adapt: For TEXT input, zeta parses to its binary form
+#     first and then reports the size of that. Matches MySQL's
+#     "JSON columns store binary, JSON_STORAGE_SIZE reports
+#     that binary's size" contract in spirit.
+#   # zeta-adapt: Invalid JSON → execution error (errno 1105 in
+#     zeta vs 3141 in MySQL's `ER_INVALID_JSON_TEXT`). Same
+#     direction (rejects), different errno class.
+#   # zeta-adapt: Arity != 1 → errno 1105.
+
+--echo === JSON_PRETTY — object ===
+
+SELECT JSON_PRETTY('{"a":1,"b":2}') AS obj;
+
+--echo === JSON_PRETTY — array ===
+
+SELECT JSON_PRETTY('[1,2,3]')       AS arr;
+
+--echo === JSON_PRETTY — nested ===
+
+SELECT JSON_PRETTY('{"a":[1,2],"b":{"c":3}}') AS nested;
+
+--echo === JSON_PRETTY — scalars ===
+
+SELECT JSON_PRETTY('42')    AS num;
+SELECT JSON_PRETTY('"hi"')  AS str;
+SELECT JSON_PRETTY('true')  AS b;
+SELECT JSON_PRETTY('null')  AS n;
+
+--echo === JSON_PRETTY — NULL ===
+
+SELECT JSON_PRETTY(NULL) AS x;
+
+--echo === JSON_STORAGE_SIZE — monotonic w/ payload size ===
+
+# Use comparison instead of bare values so this stays
+# portable across binary-encoding differences. A larger doc
+# MUST take more bytes than a smaller one of the same shape.
+SELECT JSON_STORAGE_SIZE('[1,2,3,4,5,6,7,8,9,10]')
+       > JSON_STORAGE_SIZE('[1]')
+       AS grows;
+
+--echo === JSON_STORAGE_SIZE — non-empty containers ===
+
+# An empty object or array still carries a header + zero-
+# element directory, so the storage size is > 0.
+SELECT JSON_STORAGE_SIZE('{}') > 0 AS empty_obj_pos;
+SELECT JSON_STORAGE_SIZE('[]') > 0 AS empty_arr_pos;
+
+--echo === JSON_STORAGE_SIZE — scalars are non-empty too ===
+
+SELECT JSON_STORAGE_SIZE('1')       > 0 AS num_pos;
+SELECT JSON_STORAGE_SIZE('"x"')     > 0 AS str_pos;
+SELECT JSON_STORAGE_SIZE('null')    > 0 AS null_pos;
+
+--echo === JSON_STORAGE_SIZE — NULL ===
+
+SELECT JSON_STORAGE_SIZE(NULL) AS x;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT JSON_PRETTY();
+--error 1105
+SELECT JSON_PRETTY('{"a":1}', '{"b":2}');
+--error 1105
+SELECT JSON_STORAGE_SIZE();
+--error 1105
+SELECT JSON_STORAGE_SIZE('{"a":1}', '{"b":2}');
+
+--echo === Invalid JSON rejected ===
+
+--error 1105
+SELECT JSON_PRETTY('not json');
+--error 1105
+SELECT JSON_STORAGE_SIZE('not json');
+
+--echo === Filter on a TEXT column of stored JSON strings ===
+
+DROP TABLE IF EXISTS j;
+CREATE TABLE j (id INT, doc TEXT);
+INSERT INTO j VALUES
+  (1, '[1]'),
+  (2, '[1,2,3,4,5]'),
+  (3, '{}'),
+  (4, '{"x":1,"y":2,"z":3}');
+SELECT id
+FROM j
+WHERE JSON_STORAGE_SIZE(doc) > JSON_STORAGE_SIZE('[1]')
+ORDER BY id;
+DROP TABLE j;
