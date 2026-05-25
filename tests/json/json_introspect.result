@@ -4,29 +4,43 @@ INSERT INTO t1 VALUES
   (1, '{"a": 1, "b": [10, 20, 30], "c": {"nested": true}}'),
   (2, '[1, 2, [3, 4, [5]]]'),
   (3, '{"x": "y"}');
-# ---- JSON_KEYS — top-level keys as a JSON array ----   zeta #1063
-# MySQL: ["a", "b", "c"]
+# ---- JSON_KEYS — top-level keys as a JSON array ----   IMPLEMENTED
+# MySQL: ["a", "b", "c"] (insertion order).
+# zeta:  ["a", "b", "c"] (alphabetic — happens to coincide here).
 SELECT JSON_KEYS(j) AS k FROM t1 WHERE i = 1;
-ERROR 1105: execution error: unknown function: JSON_KEYS
-# ---- JSON_LENGTH — count top-level elements ----   zeta #1063
-# MySQL: 3 for the object, 3 for the array (top-level count).
+k
+["a","b","c"]
+# ---- JSON_LENGTH — count top-level elements ----   IMPLEMENTED
+# MySQL / zeta: 3 for the object, 3 for the array (top-level count).
 SELECT JSON_LENGTH(j) AS len FROM t1 WHERE i = 1;
-ERROR 1105: execution error: unknown function: JSON_LENGTH
-# ---- JSON_DEPTH — max nesting depth ----   zeta #1063
-# MySQL: 3 for row 1 (root -> b/c -> nested), 4 for row 2.
+len
+3
+SELECT JSON_LENGTH(j) AS len FROM t1 WHERE i = 2;
+len
+3
+# ---- JSON_DEPTH — max nesting depth ----   IMPLEMENTED
+# MySQL / zeta: 3 for row 1 (root -> c -> bool, max over
+# siblings); 4 for row 2 (root -> arr -> arr -> scalar).
+SELECT JSON_DEPTH(j) AS d FROM t1 WHERE i = 1;
+d
+3
 SELECT JSON_DEPTH(j) AS d FROM t1 WHERE i = 2;
-ERROR 1105: execution error: unknown function: JSON_DEPTH
-# ---- JSON_CONTAINS — does haystack contain needle? ----   zeta #1063
-# MySQL: 1 (true) when {"a":1} is contained in row 1.
+d
+4
+# ---- JSON_CONTAINS — does haystack contain needle? ----   IMPLEMENTED
+# MySQL / zeta: 1 (true) when {"a":1} is contained in row 1.
 SELECT JSON_CONTAINS(j, '{"a": 1}') AS yes FROM t1 WHERE i = 1;
-ERROR 1105: execution error: unknown function: JSON_CONTAINS
-# ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   zeta #1063
+yes
+1
+# ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   GAP (not implemented)
 # MySQL: 1 when "one" of the listed paths resolves.
+# zeta:  errors `unknown function: JSON_CONTAINS_PATH`.
 SELECT JSON_CONTAINS_PATH(j, 'one', '$.a', '$.missing') AS yes FROM t1 WHERE i = 1;
 ERROR 1105: execution error: unknown function: JSON_CONTAINS_PATH
-# ---- JSON_OVERLAPS — any element in common ----   zeta #1063
-# MySQL 8.0.17+: 1 when any element of two arrays / any key+val
-# of two objects matches.
+# ---- JSON_OVERLAPS — any element in common ----   IMPLEMENTED
+# MySQL 8.0.17+ / zeta: 1 when any element of two arrays /
+# any key+val of two objects matches.
 SELECT JSON_OVERLAPS(j, '[2, 3]') AS yes FROM t1 WHERE i = 2;
-ERROR 1105: execution error: unknown function: JSON_OVERLAPS
+yes
+1
 DROP TABLE t1;
