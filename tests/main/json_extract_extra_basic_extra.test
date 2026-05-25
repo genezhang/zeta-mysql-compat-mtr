@@ -1,0 +1,136 @@
+# Independently authored JSON_EXTRACT smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. JSON_EXTRACT has minimal coverage in json_basic
+# (3 uses); this slice pins the single-path-vs-multi-path
+# behavior split and the various path-shape edges.
+#
+# Big-picture finding:
+#   JSON_EXTRACT(doc, p1, p2, ...) — variadic in path args.
+#       - 1 path: returns the matched VALUE directly (or NULL).
+#       - 2+ paths: wraps all matches in a JSON ARRAY (MySQL
+#                   semantic).
+#       - Single path with no match: NULL.
+#       - Multi-path with all misses: NULL.
+#       - Multi-path mixed hits + misses: array of hits only
+#         (missing paths silently dropped).
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta supports object-key and array-index path
+#     steps. JSONPath wildcards (`$.*`, `$[*]`) and the dot-dot
+#     descendant (`$..`) are NOT supported in the first-pass
+#     scope. Pinned via negative tests.
+#   # zeta-adapt: NULL doc OR NULL path → NULL result (path NULL
+#     short-circuits mid-iteration).
+#   # zeta-adapt: Invalid path syntax → 1105 ERROR (NOT NULL).
+#     MySQL would NULL. Documented divergence.
+#   # zeta-adapt: zeta's JSONB sorts object keys alphabetically;
+#     wrapped-multi-path output is in path-argument order, NOT
+#     sorted.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Single-path: returns the VALUE directly ===
+
+SELECT JSON_EXTRACT('{"a":1,"b":2}', '$.a')      AS single_int;
+SELECT JSON_EXTRACT('{"a":"hi"}', '$.a')         AS single_string;
+SELECT JSON_EXTRACT('{"a":[1,2,3]}', '$.a')      AS single_array;
+SELECT JSON_EXTRACT('{"a":{"b":99}}', '$.a')     AS single_object;
+SELECT JSON_EXTRACT('{"a":true}', '$.a')         AS single_bool;
+SELECT JSON_EXTRACT('{"a":null}', '$.a')         AS single_json_null;
+
+--echo === Single-path: no match → SQL NULL (NOT JSON null) ===
+
+SELECT JSON_EXTRACT('{"a":1}', '$.missing') IS NULL AS no_match;
+# The distinction matters: JSON null is a JSON value; SQL NULL
+# is "no row/no value". JSON_EXTRACT of a missing path returns
+# SQL NULL, not JSON null.
+SELECT JSON_EXTRACT('{"a":null}', '$.a')   IS NULL AS json_null_is_not_sql_null;
+
+--echo === Array index paths ===
+
+SELECT JSON_EXTRACT('[10,20,30]', '$[0]')        AS arr_first;
+SELECT JSON_EXTRACT('[10,20,30]', '$[2]')        AS arr_last;
+SELECT JSON_EXTRACT('[10,20,30]', '$[99]') IS NULL AS arr_out_of_bounds;
+
+--echo === Nested object + array paths ===
+
+SELECT JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c') AS nested_obj;
+SELECT JSON_EXTRACT('{"a":[10,20]}', '$.a[0]')         AS obj_then_arr;
+SELECT JSON_EXTRACT('[[1,2],[3,4]]', '$[1][0]')        AS arr_then_arr;
+
+--echo === Multi-path: wraps in JSON array ===
+
+# All paths hit: result is [val1, val2] in path order.
+SELECT JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.a', '$.c') AS multi_hit_2;
+SELECT JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.c', '$.a') AS multi_hit_2_order;
+# Validate the JSON-array wrap shape via JSON_LENGTH.
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.a', '$.b', '$.c')) = 3
+       AS multi_hit_3_length;
+
+--echo === Multi-path: missing paths silently dropped from wrap ===
+
+# 2 paths but only 1 matches → array of just the 1 hit.
+SELECT JSON_EXTRACT('{"a":1}', '$.a', '$.missing') AS multi_one_miss;
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":1}', '$.a', '$.missing')) = 1
+       AS multi_one_miss_length;
+# 2 paths, both miss → SQL NULL (not an empty array).
+SELECT JSON_EXTRACT('{"a":1}', '$.x', '$.y') IS NULL AS multi_all_miss;
+
+--echo === NULL doc / NULL path ===
+
+SELECT JSON_EXTRACT(NULL, '$.a')  IS NULL        AS null_doc;
+SELECT JSON_EXTRACT('{"a":1}', NULL) IS NULL     AS null_path;
+# NULL path mid-list also short-circuits.
+SELECT JSON_EXTRACT('{"a":1}', '$.a', NULL) IS NULL AS null_path_mid;
+
+--echo === Invalid path syntax → ERROR (zeta divergence; MySQL would NULL) ===
+
+--error 1105
+SELECT JSON_EXTRACT('{"a":1}', 'not-a-path');
+--error 1105
+SELECT JSON_EXTRACT('{"a":1}', '');
+
+--echo === JSONPath unsupported features (wildcards / descendant) ===
+
+# Header documents zeta's first-pass scope: no wildcards, no
+# dot-dot descendant. Pin the rejection contract.
+--error 1105
+SELECT JSON_EXTRACT('{"a":1,"b":2}', '$.*');
+--error 1105
+SELECT JSON_EXTRACT('[10,20]',       '$[*]');
+--error 1105
+SELECT JSON_EXTRACT('{"a":{"b":1}}', '$..b');
+
+--echo === Mixed array + multi-path ===
+
+# Array elements survive the multi-path wrap.
+SELECT JSON_EXTRACT('[10,20]', '$[0]', '$[1]') AS arr_multi_path;
+SELECT JSON_LENGTH(JSON_EXTRACT('[10,20]', '$[0]', '$[1]')) = 2 AS arr_multi_len;
+
+--echo === Quoted-key path: $."weird key" ===
+
+# parse_mysql_json_path implements quoted-key support.
+SELECT JSON_EXTRACT('{"weird key":99}', '$."weird key"') AS quoted_key;
+
+--echo === Deeply-nested multi-path: nested objects survive wrap ===
+
+SELECT JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b') AS nested_multi;
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b')) = 2
+       AS nested_multi_len;
+
+--echo === Invalid JSON doc → ERROR (zeta strict) ===
+
+--error 1105
+SELECT JSON_EXTRACT('not json at all', '$.a');
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT JSON_EXTRACT();
+--error 1105
+SELECT JSON_EXTRACT('{"a":1}');
+
+--echo === Determinism ===
+
+SELECT JSON_EXTRACT('{"a":1}', '$.a')
+     = JSON_EXTRACT('{"a":1}', '$.a')            AS deterministic;

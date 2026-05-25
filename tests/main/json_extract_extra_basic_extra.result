@@ -1,0 +1,122 @@
+=== Single-path: returns the VALUE directly ===
+SELECT JSON_EXTRACT('{"a":1,"b":2}', '$.a')      AS single_int;
+single_int
+1
+SELECT JSON_EXTRACT('{"a":"hi"}', '$.a')         AS single_string;
+single_string
+"hi"
+SELECT JSON_EXTRACT('{"a":[1,2,3]}', '$.a')      AS single_array;
+single_array
+[1,2,3]
+SELECT JSON_EXTRACT('{"a":{"b":99}}', '$.a')     AS single_object;
+single_object
+{"b":99}
+SELECT JSON_EXTRACT('{"a":true}', '$.a')         AS single_bool;
+single_bool
+true
+SELECT JSON_EXTRACT('{"a":null}', '$.a')         AS single_json_null;
+single_json_null
+null
+=== Single-path: no match → SQL NULL (NOT JSON null) ===
+SELECT JSON_EXTRACT('{"a":1}', '$.missing') IS NULL AS no_match;
+no_match
+1
+SELECT JSON_EXTRACT('{"a":null}', '$.a')   IS NULL AS json_null_is_not_sql_null;
+json_null_is_not_sql_null
+0
+=== Array index paths ===
+SELECT JSON_EXTRACT('[10,20,30]', '$[0]')        AS arr_first;
+arr_first
+10
+SELECT JSON_EXTRACT('[10,20,30]', '$[2]')        AS arr_last;
+arr_last
+30
+SELECT JSON_EXTRACT('[10,20,30]', '$[99]') IS NULL AS arr_out_of_bounds;
+arr_out_of_bounds
+1
+=== Nested object + array paths ===
+SELECT JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c') AS nested_obj;
+nested_obj
+42
+SELECT JSON_EXTRACT('{"a":[10,20]}', '$.a[0]')         AS obj_then_arr;
+obj_then_arr
+10
+SELECT JSON_EXTRACT('[[1,2],[3,4]]', '$[1][0]')        AS arr_then_arr;
+arr_then_arr
+3
+=== Multi-path: wraps in JSON array ===
+SELECT JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.a', '$.c') AS multi_hit_2;
+multi_hit_2
+[1,3]
+SELECT JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.c', '$.a') AS multi_hit_2_order;
+multi_hit_2_order
+[3,1]
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.a', '$.b', '$.c')) = 3
+       AS multi_hit_3_length;
+multi_hit_3_length
+1
+=== Multi-path: missing paths silently dropped from wrap ===
+SELECT JSON_EXTRACT('{"a":1}', '$.a', '$.missing') AS multi_one_miss;
+multi_one_miss
+[1]
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":1}', '$.a', '$.missing')) = 1
+       AS multi_one_miss_length;
+multi_one_miss_length
+1
+SELECT JSON_EXTRACT('{"a":1}', '$.x', '$.y') IS NULL AS multi_all_miss;
+multi_all_miss
+1
+=== NULL doc / NULL path ===
+SELECT JSON_EXTRACT(NULL, '$.a')  IS NULL        AS null_doc;
+null_doc
+1
+SELECT JSON_EXTRACT('{"a":1}', NULL) IS NULL     AS null_path;
+null_path
+1
+SELECT JSON_EXTRACT('{"a":1}', '$.a', NULL) IS NULL AS null_path_mid;
+null_path_mid
+1
+=== Invalid path syntax → ERROR (zeta divergence; MySQL would NULL) ===
+SELECT JSON_EXTRACT('{"a":1}', 'not-a-path');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "not-a-path"
+SELECT JSON_EXTRACT('{"a":1}', '');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path ""
+=== JSONPath unsupported features (wildcards / descendant) ===
+SELECT JSON_EXTRACT('{"a":1,"b":2}', '$.*');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$.*"
+SELECT JSON_EXTRACT('[10,20]',       '$[*]');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$[*]"
+SELECT JSON_EXTRACT('{"a":{"b":1}}', '$..b');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$..b"
+=== Mixed array + multi-path ===
+SELECT JSON_EXTRACT('[10,20]', '$[0]', '$[1]') AS arr_multi_path;
+arr_multi_path
+[10,20]
+SELECT JSON_LENGTH(JSON_EXTRACT('[10,20]', '$[0]', '$[1]')) = 2 AS arr_multi_len;
+arr_multi_len
+1
+=== Quoted-key path: $."weird key" ===
+SELECT JSON_EXTRACT('{"weird key":99}', '$."weird key"') AS quoted_key;
+quoted_key
+99
+=== Deeply-nested multi-path: nested objects survive wrap ===
+SELECT JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b') AS nested_multi;
+nested_multi
+[42,{"c":42}]
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b')) = 2
+       AS nested_multi_len;
+nested_multi_len
+1
+=== Invalid JSON doc → ERROR (zeta strict) ===
+SELECT JSON_EXTRACT('not json at all', '$.a');
+ERROR 1105: execution error: JSON_EXTRACT first argument is not valid JSON: JSONB error: expected 'null' at position 1
+=== Arity errors ===
+SELECT JSON_EXTRACT();
+ERROR 1105: execution error: JSON_EXTRACT requires at least 2 arguments
+SELECT JSON_EXTRACT('{"a":1}');
+ERROR 1105: execution error: JSON_EXTRACT requires at least 2 arguments
+=== Determinism ===
+SELECT JSON_EXTRACT('{"a":1}', '$.a')
+     = JSON_EXTRACT('{"a":1}', '$.a')            AS deterministic;
+deterministic
+1
