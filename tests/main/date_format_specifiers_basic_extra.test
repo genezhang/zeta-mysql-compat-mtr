@@ -102,6 +102,34 @@ SELECT DATE_FORMAT('2024-01-01', '%j')           AS doy_1;
 SELECT DATE_FORMAT('2024-02-29', '%j')           AS doy_leap_feb_29;
 SELECT DATE_FORMAT('2024-12-31', '%j')           AS doy_leap_year_end;
 
+--echo === Weekday boundary days (%w 0=Sun..6=Sat) ===
+
+# Anchor 2024-03-15 = Fri (%w=5) is in basic tests; pin the
+# endpoints: Sunday → 0, Saturday → 6.
+SELECT DATE_FORMAT('2024-01-07', '%w')           AS wday_sunday_0;
+SELECT DATE_FORMAT('2024-01-13', '%w')           AS wday_saturday_6;
+
+--echo === ISO week-year (%X, %v vs %X, %V) — year-boundary ===
+
+# 2024-12-30 is a Monday. Under ISO (Mon-first), it belongs to
+# week 1 of 2025 (Jan 1 2025 falls on Wed; the first ISO week
+# of 2025 starts Mon Dec 30 2024).
+#   %x = ISO week-year (Mon-first); %v = ISO week-num (Mon-first)
+#   %X = Sun-first week-year;       %V = Sun-first week-num
+SELECT DATE_FORMAT('2024-12-30', '%x')           AS iso_week_year_2025;
+SELECT DATE_FORMAT('2024-12-30', '%v')           AS iso_week_num_1;
+SELECT DATE_FORMAT('2024-12-30', '%X')           AS sunday_week_year;
+SELECT DATE_FORMAT('2024-12-30', '%V')           AS sunday_week_num;
+
+--echo === Pre-1970 date (negative-days path) ===
+
+# mysql_dow_index uses rem_euclid so negative total_days
+# (pre-epoch dates) are handled correctly. 1900-01-01 was a
+# Monday → %w = 1, %W = 'Monday'.
+SELECT DATE_FORMAT('1900-01-01', '%W')           AS pre_1970_weekday_name;
+SELECT DATE_FORMAT('1900-01-01', '%w')           AS pre_1970_weekday_num;
+SELECT DATE_FORMAT('1900-01-01', '%Y-%m-%d')     AS pre_1970_roundtrip;
+
 --echo === Combined format strings ===
 
 # ISO 8601 date.

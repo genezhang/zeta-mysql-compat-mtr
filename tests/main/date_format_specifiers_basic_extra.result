@@ -131,6 +131,36 @@ doy_leap_feb_29
 SELECT DATE_FORMAT('2024-12-31', '%j')           AS doy_leap_year_end;
 doy_leap_year_end
 366
+=== Weekday boundary days (%w 0=Sun..6=Sat) ===
+SELECT DATE_FORMAT('2024-01-07', '%w')           AS wday_sunday_0;
+wday_sunday_0
+0
+SELECT DATE_FORMAT('2024-01-13', '%w')           AS wday_saturday_6;
+wday_saturday_6
+6
+=== ISO week-year (%X, %v vs %X, %V) — year-boundary ===
+SELECT DATE_FORMAT('2024-12-30', '%x')           AS iso_week_year_2025;
+iso_week_year_2025
+2025
+SELECT DATE_FORMAT('2024-12-30', '%v')           AS iso_week_num_1;
+iso_week_num_1
+01
+SELECT DATE_FORMAT('2024-12-30', '%X')           AS sunday_week_year;
+sunday_week_year
+2025
+SELECT DATE_FORMAT('2024-12-30', '%V')           AS sunday_week_num;
+sunday_week_num
+01
+=== Pre-1970 date (negative-days path) ===
+SELECT DATE_FORMAT('1900-01-01', '%W')           AS pre_1970_weekday_name;
+pre_1970_weekday_name
+Monday
+SELECT DATE_FORMAT('1900-01-01', '%w')           AS pre_1970_weekday_num;
+pre_1970_weekday_num
+1
+SELECT DATE_FORMAT('1900-01-01', '%Y-%m-%d')     AS pre_1970_roundtrip;
+pre_1970_roundtrip
+1900-01-01
 === Combined format strings ===
 SELECT DATE_FORMAT('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S') AS iso_8601;
 iso_8601
