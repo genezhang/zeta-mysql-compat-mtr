@@ -42,12 +42,16 @@
 #   # zeta-adapt: Empty escape char → 1105 'must be a single
 #     character' (distinct from multi-char also rejected).
 
---echo === Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
-
-SELECT JSON_TYPE(CAST('{"a":"hi"}' AS JSONB))                 AS jsonb_cast_lands_as_object;
-
 --echo === JSON_SEARCH on already-typed JSONB doc ===
 
+# Exercises the Value::Jsonb arm of the doc-coerce block.
+# (The CAST itself producing a typed Value::Jsonb is implicit
+# here — if CAST regressed to a string-typed expression the
+# typed_doc_path row would still pass, but the typed arm
+# coverage would silently regress to the String arm. The
+# json_set_extras / json_modify_extras / json_merge_extras
+# slices include a standalone routing-proof row; not
+# duplicated here since they share the same CAST plumbing.)
 SELECT JSON_SEARCH(CAST('{"a":"hello","b":"world"}' AS JSONB),
                    'one', 'world')                            AS typed_doc_path;
 SELECT JSON_TYPE(JSON_SEARCH(CAST('["x","y"]' AS JSONB),
@@ -106,6 +110,22 @@ SELECT JSON_SEARCH('{"k\"ey":"hit"}', 'one', 'hit')           AS quoted_key_inne
 # the path string).
 SELECT JSON_SEARCH('{"a\\b":"hit"}', 'one', 'hit')            AS quoted_key_backslash;
 
+--echo === Bare-identifier vs must-quote key emission edge cases ===
+
+# format_json_path_key uses identifier-char classification:
+# leading _ + ASCII alphanumeric is bare; leading digit forces
+# quoting. Pin both branches.
+SELECT JSON_SEARCH('{"_a":"hit"}', 'one', 'hit')              AS bare_underscore_leading;
+SELECT JSON_SEARCH('{"1a":"hit"}', 'one', 'hit')              AS digit_leading_quoted;
+
+--echo === Compositional path: quoted key INSIDE array ===
+
+# Array containing object with non-identifier key — path
+# emitter should compose: $[0]."weird key". Exercises the
+# index + quoted-key combination that no single existing row
+# covers.
+SELECT JSON_SEARCH('[{"weird key":"hit"}]', 'one', 'hit')     AS arr_then_quoted_key;
+
 --echo === Default escape char is backslash when 4th arg omitted ===
 
 # Pattern source string is '100\%' — under PG string semantics
@@ -115,9 +135,11 @@ SELECT JSON_SEARCH('{"a\\b":"hit"}', 'one', 'hit')            AS quoted_key_back
 # custom-escape pin in the existing slice (which uses '!').
 SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100\%')             AS default_escape_backslash;
 # Companion: a 6-char input '100\\%' becomes pattern
-# 1,0,0,\,\,% under PG. With backslash escape, that's literal
-# '100\' + wildcard '%' → matches anything starting with
-# '100\'. Doc value is '100%' (no backslash) → NULL.
+# 1,0,0,\,\,% under PG. With backslash escape, that parses
+# as literal '100', escaped '\\' → literal '\', then '%'
+# wildcard → matches '100\<anything>'. Doc value is '100%'
+# (no backslash) → no match → NULL. Pattern is well-formed;
+# it just requires a literal backslash the doc doesn't have.
 SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100\\%') IS NULL    AS default_escape_extra_bs_no_match;
 
 --echo === Empty search string semantics ===

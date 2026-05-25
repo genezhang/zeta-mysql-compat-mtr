@@ -1,7 +1,3 @@
-=== Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
-SELECT JSON_TYPE(CAST('{"a":"hi"}' AS JSONB))                 AS jsonb_cast_lands_as_object;
-jsonb_cast_lands_as_object
-OBJECT
 === JSON_SEARCH on already-typed JSONB doc ===
 SELECT JSON_SEARCH(CAST('{"a":"hello","b":"world"}' AS JSONB),
                    'one', 'world')                            AS typed_doc_path;
@@ -40,6 +36,17 @@ quoted_key_inner_dquote
 SELECT JSON_SEARCH('{"a\\b":"hit"}', 'one', 'hit')            AS quoted_key_backslash;
 quoted_key_backslash
 "$.\"a\\\\b\""
+=== Bare-identifier vs must-quote key emission edge cases ===
+SELECT JSON_SEARCH('{"_a":"hit"}', 'one', 'hit')              AS bare_underscore_leading;
+bare_underscore_leading
+"$._a"
+SELECT JSON_SEARCH('{"1a":"hit"}', 'one', 'hit')              AS digit_leading_quoted;
+digit_leading_quoted
+"$.\"1a\""
+=== Compositional path: quoted key INSIDE array ===
+SELECT JSON_SEARCH('[{"weird key":"hit"}]', 'one', 'hit')     AS arr_then_quoted_key;
+arr_then_quoted_key
+"$[0].\"weird key\""
 === Default escape char is backslash when 4th arg omitted ===
 SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100\%')             AS default_escape_backslash;
 default_escape_backslash
