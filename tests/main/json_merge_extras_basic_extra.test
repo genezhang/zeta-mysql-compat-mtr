@@ -1,0 +1,179 @@
+# Independently authored combined extras smoke for the two
+# JSON merge functions — JSON_MERGE_PATCH (RFC 7396) and
+# JSON_MERGE_PRESERVE (concat) — for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_merge_patch_basic_extra.test: 2-obj merge, null
+#     delete, recurse, non-obj patch, multi-arg fold, NULL,
+#     empty patch, arity, invalid JSON.
+#   - json_merge_preserve_basic_extra.test: 2-obj shared-key
+#     wrap, array concat, scalar pair, array+scalar autowrap,
+#     nested recurse, NULL-scalar, multi-arg fold, NULL, empty,
+#     arity, invalid JSON.
+#
+# This slice pins what those slices DO NOT:
+#   - Already-typed JSONB args (CAST AS JSONB) for both —
+#     exercises the Value::Jsonb arm of each merge fn's coerce
+#     block (currently unreached).
+#   - Mixed typed+string args: typed on left, raw on right, and
+#     vice versa.
+#   - Wrong-type arg (INT, FLOAT, BOOLEAN) → 1105 for both.
+#   - PRESERVE on empty+empty containers (empty-array, empty-
+#     object cases).
+#   - PRESERVE object+scalar (under-explored): which of the
+#     by-shape rules applies?
+#   - PATCH deeply-nested null delete (3+ levels).
+#   - PATCH on JSON null target (target is JSON null, not SQL).
+#   - Non-commutativity sanity: both fns are SHAPE-sensitive
+#     and order-dependent in shared-key cases.
+#
+# Big-picture finding:
+#   Both merge functions share a common coerce pattern (Value::
+#   Null short-circuit, Value::Jsonb pass-through, Value::String
+#   parse, `_` reject). Existing slices only ever pass STRING
+#   args; this slice closes the typed-arm and wrong-type-arm
+#   gaps and pins a handful of edge-shape combinations.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON and JSONB are PARSER ALIASES (zeta-
+#     parser/src/datatype.rs); CAST AS JSON and CAST AS JSONB
+#     are interchangeable. The runtime distinction tested here
+#     is between raw SQL STRING (parse-on-fly) and Value::Jsonb
+#     (typed pass-through).
+#   # zeta-adapt: Wrong-type arg (INT, FLOAT, BOOLEAN, etc.)
+#     → 1105 with the per-function 'requires JSON-typed
+#     arguments' message.
+#   # zeta-adapt: zeta's JSON binary encoding sorts object
+#     keys alphabetically; MySQL preserves insertion order.
+#     Tests use already-alpha keys + wrappers where shape
+#     matters.
+
+--echo === Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+
+SELECT JSON_TYPE(CAST('{"a":1}' AS JSONB))                  AS jsonb_cast_lands_as_object;
+
+--echo === JSON_MERGE_PATCH on already-typed JSONB args ===
+
+SELECT JSON_LENGTH(JSON_MERGE_PATCH(
+  CAST('{"a":1,"b":2}' AS JSONB),
+  CAST('{"b":99,"c":3}' AS JSONB)))                          AS patch_both_typed_len;
+SELECT JSON_EXTRACT(JSON_MERGE_PATCH(
+  CAST('{"a":1,"b":2}' AS JSONB),
+  CAST('{"b":99,"c":3}' AS JSONB)),
+  '$.b')                                                     AS patch_both_typed_b;
+
+--echo === JSON_MERGE_PRESERVE on already-typed JSONB args ===
+
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE(
+  CAST('[1,2]' AS JSONB),
+  CAST('[3,4]' AS JSONB)))                                   AS preserve_both_typed_len;
+
+--echo === Mixed typed + string args (Value::Jsonb on one side, String on the other) ===
+
+# Typed-left, string-right.
+SELECT JSON_LENGTH(JSON_MERGE_PATCH(
+  CAST('{"a":1}' AS JSONB),
+  '{"b":2}'))                                                AS patch_typed_left_str_right;
+# String-left, typed-right.
+SELECT JSON_LENGTH(JSON_MERGE_PATCH(
+  '{"a":1}',
+  CAST('{"b":2}' AS JSONB)))                                 AS patch_str_left_typed_right;
+# Same for PRESERVE.
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE(
+  CAST('[1]' AS JSONB),
+  '[2,3]'))                                                  AS preserve_typed_left_str_right;
+
+--echo === Wrong-type arg (INT) → ERROR for both ===
+
+--error 1105
+SELECT JSON_MERGE_PATCH(42, '{"a":1}');
+--error 1105
+SELECT JSON_MERGE_PATCH('{"a":1}', 42);
+--error 1105
+SELECT JSON_MERGE_PRESERVE(42, '[1]');
+--error 1105
+SELECT JSON_MERGE_PRESERVE('[1]', 42);
+
+--echo === Wrong-type arg (FLOAT, BOOLEAN) → ERROR for both ===
+
+--error 1105
+SELECT JSON_MERGE_PATCH(3.14, '{"a":1}');
+--error 1105
+SELECT JSON_MERGE_PRESERVE(TRUE, '[1]');
+
+--echo === PRESERVE on empty+empty containers ===
+
+# Two empty arrays concatenate to an empty array.
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('[]', '[]'))           AS preserve_empty_arr_arr_type;
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('[]', '[]'))         AS preserve_empty_arr_arr_len;
+# Two empty objects union to an empty object.
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('{}', '{}'))           AS preserve_empty_obj_obj_type;
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{}', '{}'))         AS preserve_empty_obj_obj_len;
+# Empty array + populated array: just the populated one.
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('[]', '[1,2,3]'))    AS preserve_empty_plus_arr;
+# Empty object + populated object: just the populated keys.
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{}', '{"a":1,"b":2}'))
+                                                            AS preserve_empty_plus_obj;
+
+--echo === PRESERVE object+scalar (under-explored shape rule) ===
+
+# obj+scalar isn't object+object, isn't array+array, isn't
+# array+anything (neither side is array) — falls to "both
+# scalars → [a, b]" by elimination. Probe the actual output
+# shape; the impl's by-shape coverage of "object + non-array
+# non-object" matters here.
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('{"a":1}', '5'))       AS preserve_obj_scalar_type;
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{"a":1}', '5'))     AS preserve_obj_scalar_len;
+# Scalar+object (reversed).
+SELECT JSON_TYPE(JSON_MERGE_PRESERVE('5', '{"a":1}'))       AS preserve_scalar_obj_type;
+SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('5', '{"a":1}'))     AS preserve_scalar_obj_len;
+
+--echo === PATCH deeply-nested null delete (3 levels) ===
+
+# Patch null at a leaf 3 levels deep deletes only that leaf;
+# the surrounding objects survive.
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":{"b":{"c":1,"d":2}}}',
+                   '{"a":{"b":{"c":null}}}'),
+  '$.a.b')) AS deep_delete_inner_len;
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":{"b":{"c":1,"d":2}}}',
+                   '{"a":{"b":{"c":null}}}'),
+  '$.a.b.d') AS deep_delete_survivor;
+# Confirm the deleted leaf is gone.
+SELECT JSON_EXTRACT(
+  JSON_MERGE_PATCH('{"a":{"b":{"c":1,"d":2}}}',
+                   '{"a":{"b":{"c":null}}}'),
+  '$.a.b.c') IS NULL AS deep_delete_leaf_gone;
+
+--echo === PATCH on JSON null target (not SQL NULL) ===
+
+# JSON 'null' as target is a non-object per RFC 7396 rule
+# "patch object, target not → start from {} and merge".
+# So {"a":1} patch over JSON 'null' → {"a":1}.
+SELECT JSON_TYPE(JSON_MERGE_PATCH('null', '{"a":1}'))       AS patch_json_null_target_type;
+SELECT JSON_LENGTH(JSON_MERGE_PATCH('null', '{"a":1}'))     AS patch_json_null_target_len;
+# JSON 'null' as PATCH replaces target entirely (patch is not
+# an object → result IS patch).
+SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', 'null'))       AS patch_json_null_as_patch_type;
+
+--echo === Non-commutativity sanity (PATCH is order-dependent) ===
+
+# Shared-key value mismatch:
+#   PATCH({a:1}, {a:2}) = {a:2}
+#   PATCH({a:2}, {a:1}) = {a:1}
+# They MUST differ on the key value.
+SELECT JSON_EXTRACT(JSON_MERGE_PATCH('{"a":1}', '{"a":2}'), '$.a')
+     = JSON_EXTRACT(JSON_MERGE_PATCH('{"a":2}', '{"a":1}'), '$.a')
+                                                            AS patch_shared_key_not_commutative;
+
+--echo === Non-commutativity sanity (PRESERVE shared-key wraps in input order) ===
+
+# Shared-key wrap is order-sensitive:
+#   PRESERVE({a:1}, {a:2}).a = [1,2]
+#   PRESERVE({a:2}, {a:1}).a = [2,1]
+# The element ORDER differs even though the SET is the same.
+SELECT JSON_EXTRACT(JSON_MERGE_PRESERVE('{"a":1}', '{"a":2}'), '$.a[0]')
+     = JSON_EXTRACT(JSON_MERGE_PRESERVE('{"a":2}', '{"a":1}'), '$.a[0]')
+                                                            AS preserve_shared_key_not_commutative;
