@@ -1,43 +1,4 @@
-=== PI: zero-arg, returns std::f64::consts::PI ===
-SELECT PI() > 3.141 AND PI() < 3.142                          AS pi_range;
-pi_range
-1
-SELECT PI() > 3.14159265 AND PI() < 3.14159266                AS pi_high_precision;
-pi_high_precision
-1
-=== PI: rejects any arg ===
-SELECT PI(1);
-ERROR 1105: execution error: PI() takes no arguments
-SELECT PI('foo');
-ERROR 1105: execution error: PI() takes no arguments
-=== DEGREES / RADIANS: round-trip + known vectors ===
-SELECT RADIANS(180) > 3.141 AND RADIANS(180) < 3.142          AS rad_180_is_pi;
-rad_180_is_pi
-1
-SELECT DEGREES(PI())  > 179.99 AND DEGREES(PI())  < 180.01    AS deg_pi_is_180;
-deg_pi_is_180
-1
-SELECT ROUND(DEGREES(RADIANS(45)), 6) > 44.999
-   AND ROUND(DEGREES(RADIANS(45)), 6) < 45.001                AS round_trip_45;
-round_trip_45
-1
-SELECT ROUND(DEGREES(RADIANS(360)), 6) > 359.999
-   AND ROUND(DEGREES(RADIANS(360)), 6) < 360.001              AS round_trip_360;
-round_trip_360
-1
-=== SIN / COS / TAN: known angles ===
-SELECT ROUND(SIN(0), 10) > -0.001 AND ROUND(SIN(0), 10) < 0.001
-                                                              AS sin_0_is_0;
-sin_0_is_0
-1
-SELECT ROUND(COS(0), 10) > 0.999 AND ROUND(COS(0), 10) < 1.001
-                                                              AS cos_0_is_1;
-cos_0_is_1
-1
-SELECT ROUND(TAN(0), 10) > -0.001 AND ROUND(TAN(0), 10) < 0.001
-                                                              AS tan_0_is_0;
-tan_0_is_0
-1
+=== SIN/COS at the harder angles (π/2, π) ===
 SELECT ROUND(SIN(PI()/2), 10) > 0.999
    AND ROUND(SIN(PI()/2), 10) < 1.001                         AS sin_pi_2_is_1;
 sin_pi_2_is_1
@@ -52,37 +13,30 @@ SELECT ROUND(COS(PI()), 10) > -1.001
    AND ROUND(COS(PI()), 10) < -0.999                          AS cos_pi_is_neg_1;
 cos_pi_is_neg_1
 1
-=== TAN(π/2): undefined → very large number (not Inf, fp precision) ===
+=== TAN(π/2): undefined → very-large-but-finite (fp imprecision) ===
 SELECT TAN(PI()/2) > 1e10                                     AS tan_pi_2_very_large;
 tan_pi_2_very_large
 1
 SELECT TAN(PI()/2) < 1e308                                    AS tan_pi_2_finite;
 tan_pi_2_finite
 1
-=== COT(0) = 1 / TAN(0) = +Infinity (zeta divergence; MySQL errors) ===
-SELECT COT(0) > 1e308                                         AS cot_0_is_inf;
-cot_0_is_inf
+=== COT(0) = +Infinity (divergence; MySQL errors) ===
+SELECT 1.0/COT(0) < 1e-300                                    AS cot_0_is_inf_via_recip;
+cot_0_is_inf_via_recip
 1
-=== ASIN / ACOS: domain [-1, 1] in-range ===
-SELECT ABS(ASIN(0)) < 1e-10                                   AS asin_0_is_0;
-asin_0_is_0
+SELECT COT(0) > 1e308                                         AS cot_0_above_max;
+cot_0_above_max
 1
-SELECT ROUND(ASIN(1), 10) > 1.570
-   AND ROUND(ASIN(1), 10) < 1.572                             AS asin_1_is_pi_2;
-asin_1_is_pi_2
-1
-SELECT ABS(ACOS(1)) < 1e-10                                   AS acos_1_is_0;
-acos_1_is_0
+=== ACOS at additional value (-1 = π) ===
+SELECT ROUND(ACOS(-1), 10) > 3.141
+   AND ROUND(ACOS(-1), 10) < 3.142                            AS acos_neg_1_is_pi;
+acos_neg_1_is_pi
 1
 SELECT ROUND(ACOS(0), 10) > 1.570
    AND ROUND(ACOS(0), 10) < 1.572                             AS acos_0_is_pi_2;
 acos_0_is_pi_2
 1
-SELECT ROUND(ACOS(-1), 10) > 3.141
-   AND ROUND(ACOS(-1), 10) < 3.142                            AS acos_neg_1_is_pi;
-acos_neg_1_is_pi
-1
-=== ASIN / ACOS: out-of-domain → NaN (zeta divergence; MySQL NULL) ===
+=== ASIN / ACOS: out-of-domain → NaN (divergence; MySQL NULL) ===
 SELECT ASIN(2)  <> ASIN(2)                                    AS asin_2_is_nan;
 asin_2_is_nan
 1
@@ -92,25 +46,14 @@ acos_2_is_nan
 SELECT ASIN(-2) <> ASIN(-2)                                   AS asin_neg_2_is_nan;
 asin_neg_2_is_nan
 1
-=== ATAN single-arg and ATAN(y, x) = ATAN2(y, x) ===
-SELECT ABS(ATAN(0)) < 1e-10                                   AS atan_0_is_0;
-atan_0_is_0
-1
-SELECT ROUND(ATAN(1), 10) > 0.785
-   AND ROUND(ATAN(1), 10) < 0.786                             AS atan_1_is_pi_4;
-atan_1_is_pi_4
-1
+=== ATAN(y, x) = ATAN2(y, x) overload equivalence ===
 SELECT ATAN(1, 1)  = ATAN2(1, 1)                              AS atan_2arg_eq_atan2;
 atan_2arg_eq_atan2
 1
 SELECT ATAN(-1, 1) = ATAN2(-1, 1)                             AS atan_2arg_neg_eq;
 atan_2arg_neg_eq
 1
-=== ATAN2: quadrant matrix ===
-SELECT ROUND(ATAN2(1, 1), 10)   > 0.785
-   AND ROUND(ATAN2(1, 1), 10)   < 0.786                       AS atan2_q1;
-atan2_q1
-1
+=== ATAN2: quadrants Q2/Q3/Q4 + axes (numeric_func_basic has Q1) ===
 SELECT ROUND(ATAN2(1, -1), 10)  > 2.356
    AND ROUND(ATAN2(1, -1), 10)  < 2.357                       AS atan2_q2;
 atan2_q2
@@ -130,12 +73,11 @@ SELECT ROUND(ATAN2(1, 0), 10) > 1.570
    AND ROUND(ATAN2(1, 0), 10) < 1.572                         AS atan2_y_axis;
 atan2_y_axis
 1
-=== Hyperbolic family: known vectors ===
+=== Hyperbolic family (full coverage — net-new) ===
 SELECT ABS(SINH(0)) < 1e-10                                   AS sinh_0_is_0;
 sinh_0_is_0
 1
-SELECT ROUND(COSH(0), 10) > 0.999
-   AND ROUND(COSH(0), 10) < 1.001                             AS cosh_0_is_1;
+SELECT ABS(COSH(0) - 1) < 1e-10                               AS cosh_0_is_1;
 cosh_0_is_1
 1
 SELECT ABS(TANH(0)) < 1e-10                                   AS tanh_0_is_0;
@@ -147,7 +89,6 @@ tanh_large_pos_near_1
 SELECT TANH(-20) < -0.999 AND TANH(-20) >= -1.0               AS tanh_large_neg_near_neg_1;
 tanh_large_neg_near_neg_1
 1
-=== Inverse hyperbolic: known vectors + out-of-domain NaN ===
 SELECT ABS(ASINH(0)) < 1e-10                                  AS asinh_0_is_0;
 asinh_0_is_0
 1
@@ -157,6 +98,7 @@ acosh_1_is_0
 SELECT ABS(ATANH(0)) < 1e-10                                  AS atanh_0_is_0;
 atanh_0_is_0
 1
+=== Inverse hyperbolic out-of-domain (NaN) + boundary (±Inf) ===
 SELECT ACOSH(0)  <> ACOSH(0)                                  AS acosh_below_1_is_nan;
 acosh_below_1_is_nan
 1
@@ -166,30 +108,18 @@ acosh_neg_is_nan
 SELECT ATANH(2)  <> ATANH(2)                                  AS atanh_above_1_is_nan;
 atanh_above_1_is_nan
 1
-=== LOG2 / LOG10: known vectors and strict-error on <=0 ===
-SELECT ABS(LOG2(1))  < 1e-10                                  AS log2_1_is_0;
-log2_1_is_0
+SELECT  1.0/ATANH(1)  < 1e-300                                AS atanh_1_is_pos_inf;
+atanh_1_is_pos_inf
 1
-SELECT ROUND(LOG2(8), 10)  > 2.999
-   AND ROUND(LOG2(8), 10)  < 3.001                            AS log2_8_is_3;
-log2_8_is_3
+SELECT -1.0/ATANH(-1) < 1e-300                                AS atanh_neg_1_is_neg_inf;
+atanh_neg_1_is_neg_inf
 1
-SELECT ABS(LOG10(1)) < 1e-10                                  AS log10_1_is_0;
-log10_1_is_0
-1
-SELECT ROUND(LOG10(1000), 10) > 2.999
-   AND ROUND(LOG10(1000), 10) < 3.001                         AS log10_1000_is_3;
-log10_1000_is_3
-1
-SELECT LOG2(0);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
-SELECT LOG2(-1);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
-SELECT LOG10(0);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
-SELECT LOG10(-1);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
-=== NULL passthrough (representative across the family) ===
+=== PI() rejects ANY arg ===
+SELECT PI(1);
+ERROR 1105: execution error: PI() takes no arguments
+SELECT PI('foo');
+ERROR 1105: execution error: PI() takes no arguments
+=== NULL passthrough across the family ===
 SELECT SIN(NULL)      IS NULL                                 AS sin_null;
 sin_null
 1
@@ -198,6 +128,9 @@ cos_null
 1
 SELECT TAN(NULL)      IS NULL                                 AS tan_null;
 tan_null
+1
+SELECT COT(NULL)      IS NULL                                 AS cot_null;
+cot_null
 1
 SELECT ASIN(NULL)     IS NULL                                 AS asin_null;
 asin_null
@@ -223,6 +156,15 @@ cosh_null
 SELECT TANH(NULL)     IS NULL                                 AS tanh_null;
 tanh_null
 1
+SELECT ASINH(NULL)    IS NULL                                 AS asinh_null;
+asinh_null
+1
+SELECT ACOSH(NULL)    IS NULL                                 AS acosh_null;
+acosh_null
+1
+SELECT ATANH(NULL)    IS NULL                                 AS atanh_null;
+atanh_null
+1
 SELECT DEGREES(NULL)  IS NULL                                 AS degrees_null;
 degrees_null
 1
@@ -235,14 +177,19 @@ log2_null
 SELECT LOG10(NULL)    IS NULL                                 AS log10_null;
 log10_null
 1
-SELECT COT(NULL)      IS NULL                                 AS cot_null;
-cot_null
-1
-=== Arity errors ===
+=== Arity errors (representatives across the shared arm) ===
 SELECT SIN();
 ERROR 1105: execution error: SIN requires 1 argument
 SELECT SIN(1, 2);
 ERROR 1105: execution error: SIN requires 1 argument
+SELECT COSH();
+ERROR 1105: execution error: COSH requires 1 argument
+SELECT LOG2();
+ERROR 1105: execution error: LOG2 requires 1 argument
+SELECT LOG2(1, 2);
+ERROR 1105: execution error: LOG2 requires 1 argument
+SELECT DEGREES();
+ERROR 1105: execution error: DEGREES requires 1 argument
 SELECT ATAN();
 ERROR 1105: execution error: ATAN requires 1 argument
 SELECT ATAN(1, 2, 3);
