@@ -86,6 +86,20 @@ SELECT JSON_OBJECT('outer',
                    JSON_ARRAY(JSON_OBJECT('inner', 42)))       AS doubly_nested;
 doubly_nested
 {"outer":[{"inner":42}]}
+=== sql_value_to_jsonb fallback arm (Date/Timestamp/UUID) ===
+SELECT JSON_ARRAY(DATE '2024-03-15')                           AS date_via_fallback;
+date_via_fallback
+["2024-03-15"]
+SELECT JSON_ARRAY(TIMESTAMP '2024-03-15 14:30:45')             AS timestamp_via_fallback;
+timestamp_via_fallback
+["2024-03-15 14:30:45.000000"]
+SELECT JSON_ARRAY(CAST('11111111-2222-3333-4444-555555555555' AS UUID))
+                                                                AS uuid_via_fallback;
+uuid_via_fallback
+["11111111-2222-3333-4444-555555555555"]
+SELECT JSON_TYPE(JSON_ARRAY(DATE '2024-03-15') -> '$[0]')      AS date_tag_is_string;
+date_tag_is_string
+STRING
 === JSONB element passthrough (CAST AS JSONB) ===
 SELECT JSON_ARRAY(CAST('{"a":1}' AS JSONB),
                   CAST('[1,2,3]' AS JSONB))                    AS jsonb_passthrough_arr;

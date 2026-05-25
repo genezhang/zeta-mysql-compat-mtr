@@ -133,6 +133,21 @@ SELECT JSON_ARRAY(JSON_OBJECT('a', 1), JSON_OBJECT('b', 2))    AS arr_of_obj;
 SELECT JSON_OBJECT('outer',
                    JSON_ARRAY(JSON_OBJECT('inner', 42)))       AS doubly_nested;
 
+--echo === sql_value_to_jsonb fallback arm (Date/Timestamp/UUID) ===
+
+# Types not in the explicit arms of sql_value_to_jsonb fall
+# through to the `_ => Ok(JsonbValue::from_str_value(&format!
+# ("{}", v)))` branch — they get stringified via Display and
+# embedded as JSON STRING values, NOT as typed dates/etc.
+# Pin one of each major fallback-arm type so a refactor that
+# adds a typed JSON arm for Date is caught.
+SELECT JSON_ARRAY(DATE '2024-03-15')                           AS date_via_fallback;
+SELECT JSON_ARRAY(TIMESTAMP '2024-03-15 14:30:45')             AS timestamp_via_fallback;
+SELECT JSON_ARRAY(CAST('11111111-2222-3333-4444-555555555555' AS UUID))
+                                                                AS uuid_via_fallback;
+# Verify the typing — these are JSON STRINGs, not typed values.
+SELECT JSON_TYPE(JSON_ARRAY(DATE '2024-03-15') -> '$[0]')      AS date_tag_is_string;
+
 --echo === JSONB element passthrough (CAST AS JSONB) ===
 
 # Pre-typed JSONB passes through sql_value_to_jsonb's Value::Jsonb
