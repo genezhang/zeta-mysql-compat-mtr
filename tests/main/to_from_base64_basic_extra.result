@@ -52,6 +52,15 @@ bad_chars
 SELECT FROM_BASE64('TWFu====') IS NULL AS bad_padding;
 bad_padding
 1
+SELECT FROM_BASE64('PDw_Pz4-') IS NULL AS url_safe_rejected;
+url_safe_rejected
+1
+SELECT FROM_BASE64('TWE')      IS NULL AS unpadded_two;
+unpadded_two
+1
+SELECT FROM_BASE64('TQ')       IS NULL AS unpadded_one;
+unpadded_one
+1
 === FROM_BASE64: NULL passthrough ===
 SELECT FROM_BASE64(NULL) IS NULL AS null_passes;
 null_passes

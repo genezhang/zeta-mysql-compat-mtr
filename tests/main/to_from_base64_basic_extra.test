@@ -83,6 +83,15 @@ SELECT HEX(FROM_BASE64('T W F u')) = '4D616E'   AS strip_multi_space;
 # not an error.
 SELECT FROM_BASE64('!!!@@@')  IS NULL AS bad_chars;
 SELECT FROM_BASE64('TWFu====') IS NULL AS bad_padding;
+# URL-safe base64 alphabet (`-` and `_` instead of `+` and `/`)
+# must be rejected — pins zeta to RFC 4648 §4 STANDARD, not §5
+# URL_SAFE. Guards against a future switch of the base64 engine.
+SELECT FROM_BASE64('PDw_Pz4-') IS NULL AS url_safe_rejected;
+# Standard base64 requires `=` padding to a 4-char boundary.
+# Unpadded variants must reject — pins to STANDARD, not
+# STANDARD_NO_PAD.
+SELECT FROM_BASE64('TWE')      IS NULL AS unpadded_two;
+SELECT FROM_BASE64('TQ')       IS NULL AS unpadded_one;
 
 --echo === FROM_BASE64: NULL passthrough ===
 
