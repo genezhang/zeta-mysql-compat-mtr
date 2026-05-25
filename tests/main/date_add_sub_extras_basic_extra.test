@@ -23,8 +23,11 @@
 #     DATE literal).
 #   - ADDDATE Int64 overflow → 1105 ('day count out of i32
 #     range').
-#   - Unit-variant walk: YEAR/QUARTER/MONTH/WEEK/HOUR/MINUTE/
-#     SECOND/MICROSECOND. Existing slices mostly use DAY/MONTH.
+#   - Unit-variant walk: YEAR/MONTH/WEEK/DAY/HOUR/MINUTE/
+#     SECOND. (QUARTER/MICROSECOND parser-gap sentinels below;
+#     they duplicate temporal_arithmetic_basic_extra.test:166-
+#     172 deliberately as sentinels for the DATE_ADD-wrapped
+#     path.) Existing slices mostly use DAY/MONTH.
 #   - Pre-1970 date arithmetic.
 #   - Symmetry: DATE_ADD(d, INTERVAL -n unit) = DATE_SUB(d,
 #     INTERVAL n unit).
@@ -64,7 +67,10 @@
 #   # zeta-adapt: ADDDATE/SUBDATE wrong second arg → 1105
 #     'second argument must be an INTERVAL or integer days'.
 #   # zeta-adapt: ADDDATE Int64 overflow (> i32::MAX days) →
-#     1105 'day count out of i32 range'.
+#     1105 'integer overflow in date arithmetic: <value>'.
+#     The named-function impl arm at lib.rs:52400 would emit
+#     'day count out of i32 range' but is unreachable (parser
+#     rewrite intercepts).
 
 --echo === DATE_ADD value-coercive equality across DATE / TIMESTAMP ===
 
@@ -171,8 +177,10 @@ SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 45 SECOND)
 --echo === Unit-variant GAPS: QUARTER + MICROSECOND parser-rejected ===
 
 # Both MySQL INTERVAL units rejected at the parser layer
-# (1064, not 1105). Pinned as sentinels so a future fix
-# would re-record cleanly.
+# (1064, not 1105). temporal_arithmetic_basic_extra.test:166-
+# 172 already pins the bare-INTERVAL variants; these wrap them
+# in DATE_ADD as sentinels for the rewrite path so a future
+# fix that lands one but not the other is caught.
 --error 1064
 SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 QUARTER);
 --error 1064
