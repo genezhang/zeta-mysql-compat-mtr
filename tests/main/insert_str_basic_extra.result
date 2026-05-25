@@ -1,0 +1,99 @@
+=== Basic 4-arg splice ===
+SELECT INSERT('Quadratic', 3, 4, 'What') AS middle;
+middle
+QuWhattic
+SELECT INSERT('Quadratic', 1, 4, 'XXXX') AS replace_start;
+replace_start
+XXXXratic
+SELECT INSERT('Quadratic', 6, 4, 'tic')  AS shorter_replacement;
+shorter_replacement
+Quadrtic
+SELECT INSERT('Hello World', 7, 5, 'Earth') AS replace_word;
+replace_word
+Hello Earth
+=== Position past length: return str unchanged ===
+SELECT INSERT('Quadratic', 11, 3, 'X')   AS pos_past_end;
+pos_past_end
+Quadratic
+SELECT INSERT('Quadratic',  0, 3, 'X')   AS pos_zero;
+pos_zero
+Quadratic
+SELECT INSERT('Quadratic', -1, 3, 'X')   AS pos_negative;
+pos_negative
+Quadratic
+=== Position == strlen+1: append (in-range boundary) ===
+SELECT INSERT('abc', 4, 0, 'X')          AS append_at_strlen_plus_one;
+append_at_strlen_plus_one
+abcX
+SELECT INSERT('',    1, 0, 'X')          AS append_into_empty;
+append_into_empty
+X
+=== Length zero: pure insertion at pos ===
+SELECT INSERT('Quadratic', 2, 0, '__')   AS insert_only_pos2;
+insert_only_pos2
+Q__uadratic
+SELECT INSERT('abc',       1, 0, 'X')    AS insert_only_pos1;
+insert_only_pos1
+Xabc
+=== Length == 1: pure single-char removal ===
+SELECT INSERT('abc', 2, 1, '')           AS remove_one_char;
+remove_one_char
+ac
+=== Length too large or negative: splice to end ===
+SELECT INSERT('Quadratic', 3, 100, 'XYZ') AS len_too_big;
+len_too_big
+QuXYZ
+SELECT INSERT('Quadratic', 3, -1,  'XYZ') AS len_negative;
+len_negative
+QuXYZ
+SELECT INSERT('Quadratic', 3, 9223372036854775807, 'XYZ') AS len_intmax;
+len_intmax
+QuXYZ
+=== Replacement is empty: substring removal ===
+SELECT INSERT('Quadratic', 3, 4, '')     AS empty_replace;
+empty_replace
+Qutic
+=== NULL propagation on any arg ===
+SELECT INSERT(NULL,        3, 4, 'X')    IS NULL AS null_str;
+null_str
+1
+SELECT INSERT('Quadratic', NULL, 4, 'X') IS NULL AS null_pos;
+null_pos
+1
+SELECT INSERT('Quadratic', 3, NULL, 'X') IS NULL AS null_len;
+null_len
+1
+SELECT INSERT('Quadratic', 3, 4, NULL)   IS NULL AS null_newstr;
+null_newstr
+1
+=== Multi-byte UTF-8 char-position semantics ===
+SELECT INSERT('café', 3, 1, 'F')         AS utf8_middle;
+utf8_middle
+caFé
+SELECT INSERT('café', 4, 1, 'e')         AS utf8_replace_multibyte;
+utf8_replace_multibyte
+cafe
+=== Type strictness (zeta-specific) ===
+SELECT INSERT('abc', 'two', 1, 'X');
+ERROR 1105: execution error: INSERT pos must be integer
+SELECT INSERT('abc', 2, 'three', 'X');
+ERROR 1105: execution error: INSERT len must be integer
+SELECT INSERT('abc', 2.0, 1, 'X');
+ERROR 1105: execution error: INSERT pos must be integer
+SELECT INSERT('abc', 2, 1.0, 'X');
+ERROR 1105: execution error: INSERT len must be integer
+=== Determinism ===
+SELECT INSERT('hello', 2, 2, 'XY') = INSERT('hello', 2, 2, 'XY') AS deterministic;
+deterministic
+1
+=== Arity errors ===
+SELECT INSERT();
+ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+SELECT INSERT('a');
+ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+SELECT INSERT('a', 1);
+ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+SELECT INSERT('a', 1, 1);
+ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+SELECT INSERT('a', 1, 1, 'X', 'extra');
+ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
