@@ -1,0 +1,93 @@
+=== TO_BASE64: known vectors ===
+SELECT TO_BASE64('Man')   AS three_byte;
+three_byte
+TWFu
+SELECT TO_BASE64('Ma')    AS two_byte;
+two_byte
+TWE=
+SELECT TO_BASE64('M')     AS one_byte;
+one_byte
+TQ==
+SELECT TO_BASE64('hello') AS five_byte;
+five_byte
+aGVsbG8=
+SELECT TO_BASE64('')      AS empty;
+empty
+
+=== TO_BASE64: binary input via UNHEX ===
+SELECT TO_BASE64(UNHEX('00FFEEDD')) AS binary_bytes;
+binary_bytes
+AP/u3Q==
+=== TO_BASE64: NULL passthrough ===
+SELECT TO_BASE64(NULL) IS NULL AS null_passes;
+null_passes
+1
+=== FROM_BASE64: known vectors ===
+SELECT FROM_BASE64('TWFu')     AS decode_three;
+decode_three
+Man
+SELECT FROM_BASE64('TWE=')     AS decode_two;
+decode_two
+Ma
+SELECT FROM_BASE64('TQ==')     AS decode_one;
+decode_one
+M
+SELECT FROM_BASE64('aGVsbG8=') AS decode_hello;
+decode_hello
+hello
+=== FROM_BASE64: whitespace tolerance ===
+SELECT HEX(FROM_BASE64('TWF u'))  = '4D616E'   AS strip_space_inline;
+strip_space_inline
+1
+SELECT HEX(FROM_BASE64(' TWFu '))  = '4D616E'   AS strip_around;
+strip_around
+1
+SELECT HEX(FROM_BASE64('T W F u')) = '4D616E'   AS strip_multi_space;
+strip_multi_space
+1
+=== FROM_BASE64: invalid input → NULL ===
+SELECT FROM_BASE64('!!!@@@')  IS NULL AS bad_chars;
+bad_chars
+1
+SELECT FROM_BASE64('TWFu====') IS NULL AS bad_padding;
+bad_padding
+1
+SELECT FROM_BASE64('PDw_Pz4-') IS NULL AS url_safe_rejected;
+url_safe_rejected
+1
+SELECT FROM_BASE64('TWE')      IS NULL AS unpadded_two;
+unpadded_two
+1
+SELECT FROM_BASE64('TQ')       IS NULL AS unpadded_one;
+unpadded_one
+1
+=== FROM_BASE64: NULL passthrough ===
+SELECT FROM_BASE64(NULL) IS NULL AS null_passes;
+null_passes
+1
+=== Inverse round-trip: FROM_BASE64(TO_BASE64(s)) = s ===
+SELECT LENGTH(FROM_BASE64(TO_BASE64('hello')))         = 5    AS rt_plain_len;
+rt_plain_len
+1
+SELECT LENGTH(FROM_BASE64(TO_BASE64('')))              = 0    AS rt_empty_len;
+rt_empty_len
+1
+SELECT LENGTH(FROM_BASE64(TO_BASE64('Man')))           = 3    AS rt_three_byte_len;
+rt_three_byte_len
+1
+SELECT HEX(FROM_BASE64(TO_BASE64('hello'))) = '68656C6C6F'    AS rt_plain_bytes;
+rt_plain_bytes
+1
+=== Inverse round-trip: binary bytes ===
+SELECT HEX(FROM_BASE64(TO_BASE64(UNHEX('00FFEEDD')))) = '00FFEEDD' AS rt_binary;
+rt_binary
+1
+=== Arity errors ===
+SELECT TO_BASE64();
+ERROR 1105: execution error: TO_BASE64 requires 1 argument
+SELECT TO_BASE64('a', 'b');
+ERROR 1105: execution error: TO_BASE64 requires 1 argument
+SELECT FROM_BASE64();
+ERROR 1105: execution error: FROM_BASE64 requires 1 argument
+SELECT FROM_BASE64('TWFu', 'extra');
+ERROR 1105: execution error: FROM_BASE64 requires 1 argument
