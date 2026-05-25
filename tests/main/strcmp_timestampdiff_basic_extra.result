@@ -1,0 +1,170 @@
+=== STRCMP: basic lex compare ===
+SELECT STRCMP('a', 'a')                  AS equal_zero;
+equal_zero
+0
+SELECT STRCMP('a', 'b')                  AS less_neg_one;
+less_neg_one
+-1
+SELECT STRCMP('b', 'a')                  AS greater_one;
+greater_one
+1
+SELECT STRCMP('abc', 'abd')              AS less_at_third;
+less_at_third
+-1
+SELECT STRCMP('abc', 'abc')              AS equal_three;
+equal_three
+0
+=== STRCMP: length-based ordering ===
+SELECT STRCMP('abc', 'abcd')             AS prefix_shorter_neg;
+prefix_shorter_neg
+-1
+SELECT STRCMP('abcd', 'abc')             AS prefix_longer_pos;
+prefix_longer_pos
+1
+=== STRCMP: case sensitivity (zeta byte-equal divergence) ===
+SELECT STRCMP('a', 'A')                  AS case_byte_equal;
+case_byte_equal
+1
+SELECT STRCMP('hello', 'Hello')          AS case_mixed;
+case_mixed
+1
+=== STRCMP: empty + NULL ===
+SELECT STRCMP('', '')                    AS both_empty;
+both_empty
+0
+SELECT STRCMP('', 'a')                   AS empty_less;
+empty_less
+-1
+SELECT STRCMP('a', '')                   AS empty_greater;
+empty_greater
+1
+SELECT STRCMP(NULL, 'a') IS NULL         AS null_a;
+null_a
+1
+SELECT STRCMP('a', NULL) IS NULL         AS null_b;
+null_b
+1
+SELECT STRCMP(NULL, NULL) IS NULL        AS null_both;
+null_both
+1
+=== STRCMP: numeric coercion ===
+SELECT STRCMP(1, 1)                      AS int_equal;
+int_equal
+0
+SELECT STRCMP(1, 2)                      AS int_less;
+int_less
+-1
+SELECT STRCMP('10', 10)                  AS string_vs_int;
+string_vs_int
+0
+SELECT STRCMP(1.5, '1.5')                AS float_str_format;
+float_str_format
+0
+=== STRCMP: multi-byte UTF-8 byte-level compare ===
+SELECT STRCMP('é', 'e')                  AS utf8_byte_cmp;
+utf8_byte_cmp
+1
+=== STRCMP: arity ===
+SELECT STRCMP();
+ERROR 1105: execution error: STRCMP requires 2 arguments
+SELECT STRCMP('a');
+ERROR 1105: execution error: STRCMP requires 2 arguments
+SELECT STRCMP('a', 'b', 'c');
+ERROR 1105: execution error: STRCMP requires 2 arguments
+=== TIMESTAMPDIFF: MICROSECOND / SECOND / MINUTE / HOUR ===
+SELECT TIMESTAMPDIFF(MICROSECOND, '2024-01-01 00:00:00', '2024-01-01 00:00:01') AS us_one_sec;
+us_one_sec
+1000000
+SELECT TIMESTAMPDIFF(SECOND,      '2024-01-01 00:00:00', '2024-01-01 00:01:00') AS sec_one_min;
+sec_one_min
+60
+SELECT TIMESTAMPDIFF(MINUTE,      '2024-01-01 00:00:00', '2024-01-01 01:00:00') AS min_one_hr;
+min_one_hr
+60
+SELECT TIMESTAMPDIFF(HOUR,        '2024-01-01 00:00:00', '2024-01-02 00:00:00') AS hr_one_day;
+hr_one_day
+24
+SELECT TIMESTAMPDIFF(MICROSECOND, '2024-01-01 00:00:00.000000',
+                                  '2024-01-01 00:00:00.500000')        AS us_half_sec;
+us_half_sec
+500000
+=== TIMESTAMPDIFF: DAY / WEEK ===
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', '2024-01-08')                 AS day_one_week;
+day_one_week
+7
+SELECT TIMESTAMPDIFF(WEEK, '2024-01-01', '2024-01-15')                 AS week_two;
+week_two
+2
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', '2024-12-31')                 AS day_leap_year;
+day_leap_year
+365
+=== TIMESTAMPDIFF: MONTH / QUARTER / YEAR (calendar arithmetic) ===
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-01', '2024-04-01')                AS month_three;
+month_three
+3
+SELECT TIMESTAMPDIFF(QUARTER, '2024-01-01', '2024-12-31')              AS quarter_three;
+quarter_three
+3
+SELECT TIMESTAMPDIFF(YEAR, '2020-06-01', '2024-06-01')                 AS year_four_exact;
+year_four_exact
+4
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-15', '2024-02-14')                AS month_one_day_short;
+month_one_day_short
+0
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-15', '2024-02-15')                AS month_exactly_one;
+month_exactly_one
+1
+SELECT TIMESTAMPDIFF(YEAR, '2020-03-01', '2024-02-29')                 AS year_three_short;
+year_three_short
+3
+=== TIMESTAMPDIFF: negative direction (start > end) ===
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-08', '2024-01-01')                 AS neg_day;
+neg_day
+-7
+SELECT TIMESTAMPDIFF(MONTH, '2024-04-01', '2024-01-01')                AS neg_month;
+neg_month
+-3
+=== TIMESTAMPDIFF: unit case-insensitive ===
+SELECT TIMESTAMPDIFF(day,  '2024-01-01', '2024-01-02')                 AS unit_lower;
+unit_lower
+1
+SELECT TIMESTAMPDIFF(Day,  '2024-01-01', '2024-01-02')                 AS unit_mixed;
+unit_mixed
+1
+=== TIMESTAMPDIFF: invalid unit identifier ===
+SELECT TIMESTAMPDIFF(FOOBAR, '2024-01-01', '2024-01-02');
+ERROR 1054: column not found: FOOBAR
+=== TIMESTAMPDIFF: cross-year reverse ===
+SELECT TIMESTAMPDIFF(MONTH, '2024-02-01', '2022-11-01')              AS cross_year_reverse;
+cross_year_reverse
+-15
+SELECT TIMESTAMPDIFF(YEAR,  '2024-02-01', '2022-11-01')              AS cross_year_reverse_year;
+cross_year_reverse_year
+-1
+=== TIMESTAMPDIFF: NULL on any arg ===
+SELECT TIMESTAMPDIFF(NULL, '2024-01-01', '2024-01-02') IS NULL         AS null_unit;
+null_unit
+1
+SELECT TIMESTAMPDIFF(DAY,  NULL,         '2024-01-02') IS NULL         AS null_start;
+null_start
+1
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', NULL)         IS NULL         AS null_end;
+null_end
+1
+=== TIMESTAMPDIFF: arity ===
+SELECT TIMESTAMPDIFF();
+ERROR 1105: execution error: TIMESTAMPDIFF requires 3 arguments
+SELECT TIMESTAMPDIFF(DAY);
+ERROR 1054: column not found: DAY
+SELECT TIMESTAMPDIFF(DAY, '2024-01-01');
+ERROR 1054: column not found: DAY
+SELECT TIMESTAMPDIFF(DAY, '2024-01-01', '2024-01-02', 'extra');
+ERROR 1054: column not found: DAY
+=== Determinism ===
+SELECT STRCMP('a', 'b')     = STRCMP('a', 'b')               AS strcmp_det;
+strcmp_det
+1
+SELECT TIMESTAMPDIFF(DAY, '2024-01-01', '2024-01-02')
+     = TIMESTAMPDIFF(DAY, '2024-01-01', '2024-01-02')        AS tsdiff_det;
+tsdiff_det
+1
