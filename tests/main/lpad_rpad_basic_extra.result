@@ -1,0 +1,116 @@
+=== LPAD: pad short to length ===
+SELECT LPAD('abc', 6, '*')      AS basic;
+basic
+***abc
+SELECT LPAD('abc', 5)           AS default_space;
+default_space
+  abc
+=== LPAD: truncate long to length ===
+SELECT LPAD('abcdef', 3, '*')   AS truncate;
+truncate
+abc
+SELECT LPAD('abcdef', 0, '*')   AS truncate_zero;
+truncate_zero
+
+=== LPAD: multi-char fill cycles ===
+SELECT LPAD('x', 5, 'ab')        AS cycle_ab;
+cycle_ab
+ababx
+SELECT LPAD('xy', 7, 'abc')      AS cycle_abc;
+cycle_abc
+abcabxy
+=== RPAD: pad short to length ===
+SELECT RPAD('abc', 6, '*')      AS basic;
+basic
+abc***
+SELECT RPAD('abc', 5)           AS default_space;
+default_space
+abc  
+=== RPAD: truncate long to length ===
+SELECT RPAD('abcdef', 3, '*')   AS truncate;
+truncate
+abc
+SELECT RPAD('abcdef', 0, '*')   AS truncate_zero;
+truncate_zero
+
+=== RPAD: multi-char fill cycles ===
+SELECT RPAD('x', 5, 'ab')        AS cycle_ab;
+cycle_ab
+xabab
+SELECT RPAD('xy', 7, 'abc')      AS cycle_abc;
+cycle_abc
+xyabcab
+=== Output shape (length pin) ===
+SELECT LENGTH(LPAD('abc', 6, '*'))       = 6 AS lpad_len;
+lpad_len
+1
+SELECT LENGTH(RPAD('abc', 6, '*'))       = 6 AS rpad_len;
+rpad_len
+1
+SELECT LENGTH(LPAD('abcdef', 3, '*'))    = 3 AS lpad_trunc_len;
+lpad_trunc_len
+1
+SELECT LENGTH(RPAD('abcdef', 3, '*'))    = 3 AS rpad_trunc_len;
+rpad_trunc_len
+1
+=== Negative length → empty string ===
+SELECT LENGTH(LPAD('abc', -1, '*')) = 0 AS lpad_neg_empty;
+lpad_neg_empty
+1
+SELECT LENGTH(RPAD('abc', -1, '*')) = 0 AS rpad_neg_empty;
+rpad_neg_empty
+1
+=== Empty fill returns input (zeta divergence from MySQL) ===
+SELECT LPAD('abc', 6, '') = 'abc' AS lpad_empty_fill;
+lpad_empty_fill
+1
+SELECT RPAD('abc', 6, '') = 'abc' AS rpad_empty_fill;
+rpad_empty_fill
+1
+SELECT LPAD('abcdef', 3, '')      AS lpad_empty_fill_no_pad_needed;
+lpad_empty_fill_no_pad_needed
+abc
+SELECT RPAD('abcdef', 3, '')      AS rpad_empty_fill_no_pad_needed;
+rpad_empty_fill_no_pad_needed
+abc
+=== Multi-byte UTF-8 counted as 1 char per code point ===
+SELECT LPAD('café', 6, '*')             AS lpad_utf8;
+lpad_utf8
+**café
+SELECT RPAD('café', 6, '*')             AS rpad_utf8;
+rpad_utf8
+café**
+SELECT LPAD('café', 3, '*')             AS lpad_utf8_trunc;
+lpad_utf8_trunc
+caf
+SELECT RPAD('café', 3, '*')             AS rpad_utf8_trunc;
+rpad_utf8_trunc
+caf
+=== NULL propagation on any arg ===
+SELECT LPAD(NULL, 6, '*')      IS NULL AS lpad_null_s;
+lpad_null_s
+1
+SELECT LPAD('abc', NULL, '*')  IS NULL AS lpad_null_len;
+lpad_null_len
+1
+SELECT LPAD('abc', 6, NULL)    IS NULL AS lpad_null_fill;
+lpad_null_fill
+1
+SELECT RPAD(NULL, 6, '*')      IS NULL AS rpad_null_s;
+rpad_null_s
+1
+SELECT RPAD('abc', NULL, '*')  IS NULL AS rpad_null_len;
+rpad_null_len
+1
+SELECT RPAD('abc', 6, NULL)    IS NULL AS rpad_null_fill;
+rpad_null_fill
+1
+=== Arity errors (0-arg + 4-arg only; see header note on 1-arg gap) ===
+SELECT LPAD();
+ERROR 1105: execution error: LPAD requires 2 or 3 arguments
+SELECT LPAD('a', 5, '*', 'extra');
+ERROR 1105: execution error: LPAD requires 2 or 3 arguments
+SELECT RPAD();
+ERROR 1105: execution error: RPAD requires 2 or 3 arguments
+SELECT RPAD('a', 5, '*', 'extra');
+ERROR 1105: execution error: RPAD requires 2 or 3 arguments

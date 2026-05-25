@@ -1,0 +1,121 @@
+# Independently authored LPAD / RPAD smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+# Both functions are implemented in zeta but had no compat-mtr
+# coverage yet — this slice locks in the padding pair.
+#
+# Big-picture finding:
+#   LPAD(s, len[, fill]) — left-pad `s` with `fill` to `len`
+#       characters. Default fill is a single space. If `s` is
+#       already ≥ `len`, truncate to first `len` chars.
+#   RPAD(s, len[, fill]) — same but right-padded.
+#
+# Both share semantics:
+#   - len is character count (NOT bytes); multi-byte UTF-8 chars
+#     count as 1.
+#   - fill is cycled when longer than 1 char.
+#   - Empty fill returns `s` unchanged (avoids infinite loop).
+#   - Negative len → empty string (clamped to 0, PostgreSQL-style).
+#   - NULL on any arg → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta's len is character-count via .chars().
+#     MySQL's len is also character-count (per the docs); matches.
+#   # zeta-adapt: zeta returns input unchanged when fill is the
+#     empty string and padding would be needed. MySQL returns
+#     NULL in this case. Documented divergence.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes differ,
+#     behavior (reject) matches.
+#
+# Gap surfaced during recording (file separately):
+#   - LPAD/RPAD with a single argument (e.g. `LPAD('a')`) does
+#     NOT return a clean 1105 — it panics in the evaluator and
+#     drops the connection. The arity guard is
+#     `args.is_empty() || args.len() > 3`; it should also reject
+#     args.len() < 2. The 0-arg and 4-arg cases are exercised
+#     below; 1-arg is intentionally omitted until the underlying
+#     panic is fixed.
+
+--echo === LPAD: pad short to length ===
+
+SELECT LPAD('abc', 6, '*')      AS basic;
+SELECT LPAD('abc', 5)           AS default_space;
+
+--echo === LPAD: truncate long to length ===
+
+SELECT LPAD('abcdef', 3, '*')   AS truncate;
+SELECT LPAD('abcdef', 0, '*')   AS truncate_zero;
+
+--echo === LPAD: multi-char fill cycles ===
+
+SELECT LPAD('x', 5, 'ab')        AS cycle_ab;
+SELECT LPAD('xy', 7, 'abc')      AS cycle_abc;
+
+--echo === RPAD: pad short to length ===
+
+SELECT RPAD('abc', 6, '*')      AS basic;
+SELECT RPAD('abc', 5)           AS default_space;
+
+--echo === RPAD: truncate long to length ===
+
+SELECT RPAD('abcdef', 3, '*')   AS truncate;
+SELECT RPAD('abcdef', 0, '*')   AS truncate_zero;
+
+--echo === RPAD: multi-char fill cycles ===
+
+SELECT RPAD('x', 5, 'ab')        AS cycle_ab;
+SELECT RPAD('xy', 7, 'abc')      AS cycle_abc;
+
+--echo === Output shape (length pin) ===
+
+SELECT LENGTH(LPAD('abc', 6, '*'))       = 6 AS lpad_len;
+SELECT LENGTH(RPAD('abc', 6, '*'))       = 6 AS rpad_len;
+# Truncation also lands exactly at target length.
+SELECT LENGTH(LPAD('abcdef', 3, '*'))    = 3 AS lpad_trunc_len;
+SELECT LENGTH(RPAD('abcdef', 3, '*'))    = 3 AS rpad_trunc_len;
+
+--echo === Negative length → empty string ===
+
+# Negative length clamps to 0; LENGTH=0 means empty result.
+SELECT LENGTH(LPAD('abc', -1, '*')) = 0 AS lpad_neg_empty;
+SELECT LENGTH(RPAD('abc', -1, '*')) = 0 AS rpad_neg_empty;
+
+--echo === Empty fill returns input (zeta divergence from MySQL) ===
+
+# zeta: pad needed but fill is empty → return input as-is.
+# MySQL: would return NULL.
+SELECT LPAD('abc', 6, '') = 'abc' AS lpad_empty_fill;
+SELECT RPAD('abc', 6, '') = 'abc' AS rpad_empty_fill;
+# When no pad is needed, behavior agrees (truncate to len).
+SELECT LPAD('abcdef', 3, '')      AS lpad_empty_fill_no_pad_needed;
+SELECT RPAD('abcdef', 3, '')      AS rpad_empty_fill_no_pad_needed;
+
+--echo === Multi-byte UTF-8 counted as 1 char per code point ===
+
+# 'café' is 4 chars / 5 bytes. Padding to 6 chars adds 2 fill
+# chars; resulting byte length depends on fill (5 + 2*1 = 7).
+SELECT LPAD('café', 6, '*')             AS lpad_utf8;
+SELECT RPAD('café', 6, '*')             AS rpad_utf8;
+# Truncation must respect char boundaries: first 3 chars of
+# 'café' is 'caf', NOT 'ca' + half-of-é.
+SELECT LPAD('café', 3, '*')             AS lpad_utf8_trunc;
+SELECT RPAD('café', 3, '*')             AS rpad_utf8_trunc;
+
+--echo === NULL propagation on any arg ===
+
+SELECT LPAD(NULL, 6, '*')      IS NULL AS lpad_null_s;
+SELECT LPAD('abc', NULL, '*')  IS NULL AS lpad_null_len;
+SELECT LPAD('abc', 6, NULL)    IS NULL AS lpad_null_fill;
+SELECT RPAD(NULL, 6, '*')      IS NULL AS rpad_null_s;
+SELECT RPAD('abc', NULL, '*')  IS NULL AS rpad_null_len;
+SELECT RPAD('abc', 6, NULL)    IS NULL AS rpad_null_fill;
+
+--echo === Arity errors (0-arg + 4-arg only; see header note on 1-arg gap) ===
+
+--error 1105
+SELECT LPAD();
+--error 1105
+SELECT LPAD('a', 5, '*', 'extra');
+--error 1105
+SELECT RPAD();
+--error 1105
+SELECT RPAD('a', 5, '*', 'extra');
