@@ -1,0 +1,76 @@
+=== Round-trip: DECRYPT(ENCRYPT(data, key), key) = data ===
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT('hello world', 'mykey'), 'mykey'))
+     = '68656C6C6F20776F726C64'                  AS rt_ascii_hex;
+rt_ascii_hex
+1
+SELECT LENGTH(AES_DECRYPT(AES_ENCRYPT('', 'mykey'), 'mykey')) = 0
+       AS rt_empty_zero_len;
+rt_empty_zero_len
+1
+SELECT LENGTH(AES_DECRYPT(AES_ENCRYPT('café', 'mykey'), 'mykey')) = 5
+       AS rt_utf8_byte_len;
+rt_utf8_byte_len
+1
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT('café', 'mykey'), 'mykey'))
+     = '636166C3A9'                              AS rt_utf8_hex;
+rt_utf8_hex
+1
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT(UNHEX('DEADBEEF'), 'mykey'), 'mykey'))
+     = 'DEADBEEF'                                AS rt_binary;
+rt_binary
+1
+=== Ciphertext is non-trivial (NOT the plaintext) ===
+SELECT AES_ENCRYPT('hello world', 'mykey') <> 'hello world' AS ciphertext_changed;
+ciphertext_changed
+1
+SELECT LENGTH(AES_ENCRYPT('hello world', 'mykey')) > 0      AS ciphertext_has_bytes;
+ciphertext_has_bytes
+1
+=== Wrong key → garbage OR PKCS7 unpad error (mode-dependent) ===
+SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'key1'), 'key2');
+ERROR 1105: execution error: AES-CBC decrypt error: Unpad Error
+=== NULL passthrough ===
+SELECT AES_ENCRYPT(NULL, 'key')  IS NULL         AS enc_null_data;
+enc_null_data
+1
+SELECT AES_ENCRYPT('data', NULL) IS NULL         AS enc_null_key;
+enc_null_key
+1
+SELECT AES_DECRYPT(NULL, 'key')  IS NULL         AS dec_null_data;
+dec_null_data
+1
+SELECT AES_DECRYPT('data', NULL) IS NULL         AS dec_null_key;
+dec_null_key
+1
+=== Arity errors ===
+SELECT AES_ENCRYPT();
+ERROR 1105: execution error: aes_encrypt() requires 2 arguments (data, key)
+SELECT AES_ENCRYPT('data');
+ERROR 1105: execution error: aes_encrypt() requires 2 arguments (data, key)
+SELECT AES_ENCRYPT('data', 'key', 'extra');
+ERROR 1105: execution error: aes_encrypt() requires 2 arguments (data, key)
+SELECT AES_DECRYPT();
+ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
+SELECT AES_DECRYPT('data');
+ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
+SELECT AES_DECRYPT('data', 'key', 'extra');
+ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
+=== Determinism: same plaintext+key → DIFFERENT (random IV) ===
+SELECT AES_ENCRYPT('repeat', 'mykey') = AES_ENCRYPT('repeat', 'mykey')
+       AS same_data_same_key_eq;
+same_data_same_key_eq
+0
+=== Multi-block plaintext (CBC chaining beyond 16 bytes) ===
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT(REPEAT('A', 32), 'mykey'), 'mykey'))
+     = REPEAT('41', 32)                        AS multi_block_rt;
+multi_block_rt
+1
+SELECT LENGTH(AES_DECRYPT(AES_ENCRYPT(REPEAT('A', 32), 'mykey'), 'mykey')) = 32
+       AS multi_block_len;
+multi_block_len
+1
+=== Key normalization: SHA-256 hashes any key length to 32 bytes ===
+SELECT AES_ENCRYPT('data', 'k') <> AES_ENCRYPT('data', REPEAT('k', 100))
+       AS short_vs_long_key_differs;
+short_vs_long_key_differs
+1

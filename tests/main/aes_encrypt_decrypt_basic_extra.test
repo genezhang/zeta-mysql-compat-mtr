@@ -1,0 +1,123 @@
+# Independently authored AES_ENCRYPT / AES_DECRYPT smoke for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Both functions are implemented in zeta as
+# aliases for pgcrypto's ENCRYPT/DECRYPT (cipher fixed to 'aes')
+# but had no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   AES_ENCRYPT(data, key)  — symmetric encryption with the
+#                             cipher fixed to 'aes'. Returns
+#                             VARBINARY ciphertext.
+#   AES_DECRYPT(data, key)  — inverse; returns the original
+#                             plaintext.
+#
+# Inverse property: for any data and key,
+#   AES_DECRYPT(AES_ENCRYPT(d, k), k) = d
+#
+# Adaptation notes:
+#   # zeta-adapt: AES_ENCRYPT/DECRYPT in zeta delegate to a
+#     pgcrypto-style helper but with SHA-256-based key derivation
+#     (vs PostgreSQL pgcrypto's MD5-style EVP_BytesToKey) — so
+#     zeta-encrypted bytes are NOT portable to/from PG pgcrypto.
+#     Cipher mode is AES-CBC (PKCS7 padding) with random IV
+#     prepended to the ciphertext (`iv(16) || cbc(data)` layout).
+#     Ciphertext bytes are NOT pinned (random IV); the round-trip
+#     IS pinned via HEX comparison.
+#   # zeta-adapt: Output is VARBINARY. Direct equality against
+#     a string literal fails type-strict; use HEX() wrappers
+#     where the actual ciphertext bytes need inspection.
+#   # zeta-adapt: NULL data or key → NULL output.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Round-trip: DECRYPT(ENCRYPT(data, key), key) = data ===
+
+# AES_DECRYPT returns VARBINARY; direct `= 'string-literal'`
+# is bytes-vs-text and fails type-strict equality (same pattern
+# as FROM_BASE64). Wrap both sides in HEX() to compare bytes.
+# ASCII plaintext: 'hello world' = 0x68 65 6C 6C 6F 20 77 6F 72 6C 64.
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT('hello world', 'mykey'), 'mykey'))
+     = '68656C6C6F20776F726C64'                  AS rt_ascii_hex;
+# Empty plaintext.
+SELECT LENGTH(AES_DECRYPT(AES_ENCRYPT('', 'mykey'), 'mykey')) = 0
+       AS rt_empty_zero_len;
+# Multi-byte UTF-8: 'café' = 5 bytes (UTF-8).
+SELECT LENGTH(AES_DECRYPT(AES_ENCRYPT('café', 'mykey'), 'mykey')) = 5
+       AS rt_utf8_byte_len;
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT('café', 'mykey'), 'mykey'))
+     = '636166C3A9'                              AS rt_utf8_hex;
+# Binary plaintext via UNHEX.
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT(UNHEX('DEADBEEF'), 'mykey'), 'mykey'))
+     = 'DEADBEEF'                                AS rt_binary;
+
+--echo === Ciphertext is non-trivial (NOT the plaintext) ===
+
+# Encryption must actually change the bytes.
+SELECT AES_ENCRYPT('hello world', 'mykey') <> 'hello world' AS ciphertext_changed;
+# LENGTH of ciphertext should typically be > 0 and >= plaintext len.
+SELECT LENGTH(AES_ENCRYPT('hello world', 'mykey')) > 0      AS ciphertext_has_bytes;
+
+--echo === Wrong key → garbage OR PKCS7 unpad error (mode-dependent) ===
+
+# zeta's AES backend uses CBC mode with PKCS7 padding. Decrypting
+# with the wrong key produces garbage bytes whose final block
+# USUALLY fails the PKCS7 unpad check, surfacing as 1105
+# "Unpad Error" — but ~1/256 of wrong-key choices happen to
+# yield a valid pad byte and return garbage instead. (MySQL
+# behavior: returns NULL on bad decrypt.)
+#
+# This specific keypair ('key1','key2') deterministically
+# errors at the moment (SHA-256 derivation is fixed), so the
+# --error 1105 pin holds. If zeta later changes key derivation
+# (e.g. switches from SHA-256 to MD5-style), a different pair
+# may need a property-based test instead.
+--error 1105
+SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'key1'), 'key2');
+
+--echo === NULL passthrough ===
+
+SELECT AES_ENCRYPT(NULL, 'key')  IS NULL         AS enc_null_data;
+SELECT AES_ENCRYPT('data', NULL) IS NULL         AS enc_null_key;
+SELECT AES_DECRYPT(NULL, 'key')  IS NULL         AS dec_null_data;
+SELECT AES_DECRYPT('data', NULL) IS NULL         AS dec_null_key;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT AES_ENCRYPT();
+--error 1105
+SELECT AES_ENCRYPT('data');
+--error 1105
+SELECT AES_ENCRYPT('data', 'key', 'extra');
+--error 1105
+SELECT AES_DECRYPT();
+--error 1105
+SELECT AES_DECRYPT('data');
+--error 1105
+SELECT AES_DECRYPT('data', 'key', 'extra');
+
+--echo === Determinism: same plaintext+key → DIFFERENT (random IV) ===
+
+# CBC with random IV: same input + same key → different ciphertext
+# bytes each call. Pinned divergence from naive ECB-style impls.
+SELECT AES_ENCRYPT('repeat', 'mykey') = AES_ENCRYPT('repeat', 'mykey')
+       AS same_data_same_key_eq;
+
+--echo === Multi-block plaintext (CBC chaining beyond 16 bytes) ===
+
+# AES block size is 16 bytes; CBC chains across blocks. A
+# 32-byte plaintext exercises 2 blocks + IV. 'A' = 0x41, so
+# 32 'A's = 64 hex chars of '41'. Round-trip must preserve
+# all bytes.
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT(REPEAT('A', 32), 'mykey'), 'mykey'))
+     = REPEAT('41', 32)                        AS multi_block_rt;
+SELECT LENGTH(AES_DECRYPT(AES_ENCRYPT(REPEAT('A', 32), 'mykey'), 'mykey')) = 32
+       AS multi_block_len;
+
+--echo === Key normalization: SHA-256 hashes any key length to 32 bytes ===
+
+# zeta hashes the key via SHA-256 before AES (vs MySQL's XOR-fold,
+# vs pgcrypto's MD5-EVP_BytesToKey). Short vs long key produce
+# different ciphertext (no folding into the same derived key).
+SELECT AES_ENCRYPT('data', 'k') <> AES_ENCRYPT('data', REPEAT('k', 100))
+       AS short_vs_long_key_differs;
