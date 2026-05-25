@@ -85,6 +85,14 @@ SELECT INSTR('abc', NULL) IS NULL        AS null_needle;
 SELECT LOCATE('b', 'abc')                AS hit_middle;
 SELECT LOCATE('a', 'abc')                AS hit_first;
 SELECT LOCATE('z', 'abc')                AS miss;
+# Empty-needle pins for the 2-arg form (the 3-arg cases below
+# only exercise the start-bounds path). LOCATE('','') = 1
+# completes the three-way divergence picture:
+#   POSITION('' IN '') = 0
+#   INSTR('', '')      = 1
+#   LOCATE('', '')     = 1
+SELECT LOCATE('', 'abc')                 AS empty_needle_nonempty_hay;
+SELECT LOCATE('', '')                    AS empty_needle_empty_hay;
 # Three-way parity: POSITION, INSTR, LOCATE all agree.
 SELECT LOCATE('b', 'abc') = INSTR('abc', 'b')
    AND LOCATE('b', 'abc') = POSITION('b' IN 'abc')
@@ -129,6 +137,27 @@ SELECT LOCATE('é', 'café')               AS locate_utf8;
 SELECT POSITION('x' IN 'caféx')          AS pos_after_utf8;
 SELECT INSTR('caféx', 'x')               AS instr_after_utf8;
 SELECT LOCATE('x', 'caféx')              AS locate_after_utf8;
+
+--echo === LOCATE 3-arg with start inside multi-byte haystack ===
+
+# 3-arg path uses char_indices().nth(start_idx) — different
+# branch than the 2-arg path. Pin that char-position math
+# correctly counts past the multi-byte 'é'.
+# 'café' chars = [c, a, f, é]. Start=2 ('a'), search for 'é'
+# → found at char position 4.
+SELECT LOCATE('é', 'café', 2)            AS locate_3arg_start_finds_utf8;
+# Start past the multi-byte char: start=5 in a 4-char string
+# → start_idx 4 is past end → 0.
+SELECT LOCATE('é', 'café', 5)            AS locate_3arg_start_past_end;
+
+--echo === Case sensitivity (zeta byte-equal divergence) ===
+
+# zeta uses byte-equal `str::find` / `starts_with`, NOT MySQL's
+# default case-insensitive collation. POSITION('B' IN 'abc') = 0
+# in zeta; would be 2 in MySQL default. Pin each function.
+SELECT POSITION('B' IN 'abc')            AS pos_case_byte_equal;
+SELECT INSTR('abc', 'B')                 AS instr_case_byte_equal;
+SELECT LOCATE('B', 'abc')                AS locate_case_byte_equal;
 
 --echo === Determinism ===
 

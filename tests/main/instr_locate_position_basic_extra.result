@@ -75,6 +75,12 @@ hit_first
 SELECT LOCATE('z', 'abc')                AS miss;
 miss
 0
+SELECT LOCATE('', 'abc')                 AS empty_needle_nonempty_hay;
+empty_needle_nonempty_hay
+1
+SELECT LOCATE('', '')                    AS empty_needle_empty_hay;
+empty_needle_empty_hay
+1
 SELECT LOCATE('b', 'abc') = INSTR('abc', 'b')
    AND LOCATE('b', 'abc') = POSITION('b' IN 'abc')
        AS three_way_parity;
@@ -136,6 +142,23 @@ instr_after_utf8
 SELECT LOCATE('x', 'caféx')              AS locate_after_utf8;
 locate_after_utf8
 5
+=== LOCATE 3-arg with start inside multi-byte haystack ===
+SELECT LOCATE('é', 'café', 2)            AS locate_3arg_start_finds_utf8;
+locate_3arg_start_finds_utf8
+4
+SELECT LOCATE('é', 'café', 5)            AS locate_3arg_start_past_end;
+locate_3arg_start_past_end
+0
+=== Case sensitivity (zeta byte-equal divergence) ===
+SELECT POSITION('B' IN 'abc')            AS pos_case_byte_equal;
+pos_case_byte_equal
+0
+SELECT INSTR('abc', 'B')                 AS instr_case_byte_equal;
+instr_case_byte_equal
+0
+SELECT LOCATE('B', 'abc')                AS locate_case_byte_equal;
+locate_case_byte_equal
+0
 === Determinism ===
 SELECT POSITION('a' IN 'abc') = POSITION('a' IN 'abc') AS pos_det;
 pos_det
