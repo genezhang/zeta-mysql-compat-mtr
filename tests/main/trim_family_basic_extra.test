@@ -1,0 +1,162 @@
+# Independently authored TRIM / LTRIM / RTRIM smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. All three trimming functions are implemented
+# in zeta but had no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   TRIM(s)            — strip leading + trailing whitespace
+#   TRIM(s, chars)     — strip leading + trailing chars in `chars`
+#   LTRIM(s[, chars])  — leading only
+#   RTRIM(s[, chars])  — trailing only
+#
+# Whitespace definition: zeta uses Rust's str::trim() which is
+# Unicode-aware (matches char::is_whitespace). This includes
+# ASCII space/tab/CR/LF AND Unicode whitespace (NBSP, EM SPACE,
+# etc.) — broader than MySQL's "space chars only" default.
+#
+# Adaptation notes:
+#   # zeta-adapt: Default-whitespace forms (1-arg) strip Unicode
+#     whitespace too (Rust char::is_whitespace). MySQL only
+#     strips ASCII space (0x20). Documented divergence.
+#   # zeta-adapt: 2-arg form treats `chars` as a SET of code
+#     points (any char in `chars` is trimmable in any position).
+#     Matches MySQL behavior for ASCII; UTF-8 chars work the
+#     same way.
+#   # zeta-adapt: Arity errors split by code: TRIM() is a
+#     SQL-standard keyword with its own grammar, so the parser
+#     rejects with 1064. LTRIM()/RTRIM() are regular function
+#     calls, so the executor arity guard rejects with 1105.
+#     MySQL would use 1582 for both, but the behavior (reject)
+#     matches in all cases.
+
+--echo === TRIM: default whitespace (both ends) ===
+
+SELECT TRIM('   hello   ')               AS basic;
+SELECT TRIM(' hello ')                   AS single_space;
+SELECT TRIM('hello')                     AS no_trim_needed;
+SELECT TRIM('')                          AS empty;
+SELECT TRIM('     ')                     AS only_whitespace;
+SELECT LENGTH(TRIM('     '))   = 0       AS only_ws_zero_len;
+
+--echo === TRIM: tabs / newlines / mixed whitespace ===
+
+# Tab (\t), newline (\n), CR (\r) all stripped.
+SELECT LENGTH(TRIM(CHR(9) || 'hello' || CHR(9)))   = 5 AS tab;
+SELECT LENGTH(TRIM(CHR(10) || 'hello' || CHR(10))) = 5 AS lf;
+SELECT LENGTH(TRIM(CHR(13) || 'hello' || CHR(13))) = 5 AS cr;
+SELECT TRIM(CHR(9) || ' ' || CHR(10) || 'x' || CHR(10) || ' ' || CHR(9)) = 'x'
+       AS mixed_ws;
+
+--echo === TRIM: Unicode whitespace (zeta divergence from MySQL) ===
+
+# NBSP (U+00A0) is Unicode whitespace per Rust's char::is_whitespace.
+# zeta will strip it; MySQL would NOT (MySQL only strips ASCII space).
+# Pin the zeta behavior.
+SELECT TRIM(CHR(160) || 'hello' || CHR(160)) = 'hello' AS nbsp_stripped;
+# EM SPACE (U+2003) — same story.
+SELECT TRIM(CHR(8195) || 'hello' || CHR(8195)) = 'hello' AS em_space_stripped;
+
+--echo === TRIM: 2-arg form via standard `TRIM(chars FROM s)` ===
+
+# Note: zeta's SQL parser does NOT accept the MySQL comma syntax
+# `TRIM(str, chars)` for TRIM — only the SQL-standard
+# `TRIM(chars FROM str)` form. (LTRIM/RTRIM DO accept commas;
+# see below.) Pinned here using the standard form.
+SELECT TRIM('x' FROM 'xxhelloxx')         AS basic_set;
+SELECT TRIM('xy' FROM 'xyhelloxy')        AS multi_char_set;
+SELECT TRIM('.' FROM '....hello....')     AS dot_set;
+# Char NOT in set → no trim.
+SELECT TRIM('x' FROM 'hello')             AS no_match;
+# All chars in set: full removal.
+SELECT TRIM('x' FROM 'xxxxx')             AS all_match;
+SELECT LENGTH(TRIM('x' FROM 'xxxxx')) = 0 AS all_match_zero_len;
+
+--echo === Empty char-set is a silent no-op (all three) ===
+
+# Vec<char>::contains over an empty vec is always false, so
+# nothing matches the trimmer — input passes through unchanged.
+SELECT TRIM('' FROM 'hello')              AS trim_empty_set;
+SELECT LTRIM('hello', '')                 AS ltrim_empty_set;
+SELECT RTRIM('hello', '')                 AS rtrim_empty_set;
+SELECT LENGTH(TRIM('' FROM '   hello   '))  = 11 AS trim_empty_set_keeps_ws;
+
+--echo === LTRIM / RTRIM: directionality (default whitespace) ===
+
+SELECT LTRIM('   hello   ')               AS ltrim_basic;
+SELECT RTRIM('   hello   ')               AS rtrim_basic;
+# Only-whitespace input for LTRIM/RTRIM (TRIM has the analog
+# above). Each side strips its end → empty regardless.
+SELECT LENGTH(LTRIM('     '))   = 0       AS ltrim_only_ws_zero_len;
+SELECT LENGTH(RTRIM('     '))   = 0       AS rtrim_only_ws_zero_len;
+# Length pins so we know exactly how much was stripped.
+SELECT LENGTH(LTRIM('   hello   '))   = 8 AS ltrim_keeps_trailing;
+SELECT LENGTH(RTRIM('   hello   '))   = 8 AS rtrim_keeps_leading;
+# LTRIM does NOT strip trailing; RTRIM does NOT strip leading.
+SELECT LTRIM('   x   ') = 'x   '          AS ltrim_only_leading;
+SELECT RTRIM('   x   ') = '   x'          AS rtrim_only_trailing;
+
+--echo === LTRIM / RTRIM: 2-arg form ===
+
+SELECT LTRIM('xxxhellox', 'x')            AS ltrim_set;
+SELECT RTRIM('xhelloxxx', 'x')            AS rtrim_set;
+SELECT LTRIM('xyzabcxyz', 'xyz')          AS ltrim_multi;
+SELECT RTRIM('xyzabcxyz', 'xyz')          AS rtrim_multi;
+
+--echo === Multi-byte UTF-8 in 2-arg form ===
+
+# Trim 'é' (multi-byte) from both ends. 'éhelloé' has 7 chars;
+# trimming 'é' yields 'hello' (5 chars).
+SELECT TRIM('é' FROM 'éhelloé')           AS utf8_trim_set;
+SELECT CHAR_LENGTH(TRIM('é' FROM 'éhelloé')) = 5 AS utf8_trim_char_len;
+SELECT LTRIM('ééhello', 'é')              AS utf8_ltrim;
+SELECT RTRIM('helloéé', 'é')              AS utf8_rtrim;
+
+--echo === Composition: trimmable char appearing in middle stays ===
+
+# Middle 'x' is NOT trimmed even though it's in the set.
+SELECT TRIM('x' FROM 'xhellxoxx')         AS middle_intact;
+SELECT LTRIM('xhellxoxx', 'x')            AS ltrim_middle_intact;
+SELECT RTRIM('xhellxoxx', 'x')            AS rtrim_middle_intact;
+
+--echo === NULL propagation ===
+
+SELECT TRIM(NULL)              IS NULL    AS trim_null_s;
+SELECT TRIM(NULL FROM 'hello') IS NULL    AS trim_null_chars;
+SELECT LTRIM(NULL)             IS NULL    AS ltrim_null_s;
+SELECT LTRIM('hello', NULL)    IS NULL    AS ltrim_null_chars;
+SELECT RTRIM(NULL)             IS NULL    AS rtrim_null_s;
+SELECT RTRIM('hello', NULL)    IS NULL    AS rtrim_null_chars;
+
+--echo === Determinism ===
+
+SELECT TRIM('  x  ')  = TRIM('  x  ')     AS trim_det;
+SELECT LTRIM('  x  ') = LTRIM('  x  ')    AS ltrim_det;
+SELECT RTRIM('  x  ') = RTRIM('  x  ')    AS rtrim_det;
+
+--echo === Idempotency ===
+
+# Trimming a trimmed string is a no-op (all three).
+SELECT TRIM(TRIM('  hello  '))   = TRIM('  hello  ')   AS trim_idem;
+SELECT LTRIM(LTRIM('  hello  ')) = LTRIM('  hello  ')  AS ltrim_idem;
+SELECT RTRIM(RTRIM('  hello  ')) = RTRIM('  hello  ')  AS rtrim_idem;
+
+--echo === Arity errors ===
+
+--error 1064
+SELECT TRIM();
+# Note: TRIM rejection codes diverge from LTRIM/RTRIM:
+#   - TRIM() — parser-level 1064 (TRIM is a SQL-standard
+#     keyword with its own grammar; the parser requires an
+#     expression after `(`).
+#   - LTRIM()/RTRIM() — executor-level 1105 (regular function-
+#     call form; arity guard inside the eval arm).
+# Both reject; the codes differ because they fire at different
+# layers.
+--error 1105
+SELECT LTRIM();
+--error 1105
+SELECT LTRIM('a', 'b', 'c');
+--error 1105
+SELECT RTRIM();
+--error 1105
+SELECT RTRIM('a', 'b', 'c');

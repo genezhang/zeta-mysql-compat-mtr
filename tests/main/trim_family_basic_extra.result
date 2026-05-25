@@ -1,0 +1,183 @@
+=== TRIM: default whitespace (both ends) ===
+SELECT TRIM('   hello   ')               AS basic;
+basic
+hello
+SELECT TRIM(' hello ')                   AS single_space;
+single_space
+hello
+SELECT TRIM('hello')                     AS no_trim_needed;
+no_trim_needed
+hello
+SELECT TRIM('')                          AS empty;
+empty
+
+SELECT TRIM('     ')                     AS only_whitespace;
+only_whitespace
+
+SELECT LENGTH(TRIM('     '))   = 0       AS only_ws_zero_len;
+only_ws_zero_len
+1
+=== TRIM: tabs / newlines / mixed whitespace ===
+SELECT LENGTH(TRIM(CHR(9) || 'hello' || CHR(9)))   = 5 AS tab;
+tab
+1
+SELECT LENGTH(TRIM(CHR(10) || 'hello' || CHR(10))) = 5 AS lf;
+lf
+1
+SELECT LENGTH(TRIM(CHR(13) || 'hello' || CHR(13))) = 5 AS cr;
+cr
+1
+SELECT TRIM(CHR(9) || ' ' || CHR(10) || 'x' || CHR(10) || ' ' || CHR(9)) = 'x'
+       AS mixed_ws;
+mixed_ws
+1
+=== TRIM: Unicode whitespace (zeta divergence from MySQL) ===
+SELECT TRIM(CHR(160) || 'hello' || CHR(160)) = 'hello' AS nbsp_stripped;
+nbsp_stripped
+1
+SELECT TRIM(CHR(8195) || 'hello' || CHR(8195)) = 'hello' AS em_space_stripped;
+em_space_stripped
+1
+=== TRIM: 2-arg form via standard `TRIM(chars FROM s)` ===
+SELECT TRIM('x' FROM 'xxhelloxx')         AS basic_set;
+basic_set
+hello
+SELECT TRIM('xy' FROM 'xyhelloxy')        AS multi_char_set;
+multi_char_set
+hello
+SELECT TRIM('.' FROM '....hello....')     AS dot_set;
+dot_set
+hello
+SELECT TRIM('x' FROM 'hello')             AS no_match;
+no_match
+hello
+SELECT TRIM('x' FROM 'xxxxx')             AS all_match;
+all_match
+
+SELECT LENGTH(TRIM('x' FROM 'xxxxx')) = 0 AS all_match_zero_len;
+all_match_zero_len
+1
+=== Empty char-set is a silent no-op (all three) ===
+SELECT TRIM('' FROM 'hello')              AS trim_empty_set;
+trim_empty_set
+hello
+SELECT LTRIM('hello', '')                 AS ltrim_empty_set;
+ltrim_empty_set
+hello
+SELECT RTRIM('hello', '')                 AS rtrim_empty_set;
+rtrim_empty_set
+hello
+SELECT LENGTH(TRIM('' FROM '   hello   '))  = 11 AS trim_empty_set_keeps_ws;
+trim_empty_set_keeps_ws
+1
+=== LTRIM / RTRIM: directionality (default whitespace) ===
+SELECT LTRIM('   hello   ')               AS ltrim_basic;
+ltrim_basic
+hello   
+SELECT RTRIM('   hello   ')               AS rtrim_basic;
+rtrim_basic
+   hello
+SELECT LENGTH(LTRIM('     '))   = 0       AS ltrim_only_ws_zero_len;
+ltrim_only_ws_zero_len
+1
+SELECT LENGTH(RTRIM('     '))   = 0       AS rtrim_only_ws_zero_len;
+rtrim_only_ws_zero_len
+1
+SELECT LENGTH(LTRIM('   hello   '))   = 8 AS ltrim_keeps_trailing;
+ltrim_keeps_trailing
+1
+SELECT LENGTH(RTRIM('   hello   '))   = 8 AS rtrim_keeps_leading;
+rtrim_keeps_leading
+1
+SELECT LTRIM('   x   ') = 'x   '          AS ltrim_only_leading;
+ltrim_only_leading
+1
+SELECT RTRIM('   x   ') = '   x'          AS rtrim_only_trailing;
+rtrim_only_trailing
+1
+=== LTRIM / RTRIM: 2-arg form ===
+SELECT LTRIM('xxxhellox', 'x')            AS ltrim_set;
+ltrim_set
+hellox
+SELECT RTRIM('xhelloxxx', 'x')            AS rtrim_set;
+rtrim_set
+xhello
+SELECT LTRIM('xyzabcxyz', 'xyz')          AS ltrim_multi;
+ltrim_multi
+abcxyz
+SELECT RTRIM('xyzabcxyz', 'xyz')          AS rtrim_multi;
+rtrim_multi
+xyzabc
+=== Multi-byte UTF-8 in 2-arg form ===
+SELECT TRIM('é' FROM 'éhelloé')           AS utf8_trim_set;
+utf8_trim_set
+hello
+SELECT CHAR_LENGTH(TRIM('é' FROM 'éhelloé')) = 5 AS utf8_trim_char_len;
+utf8_trim_char_len
+1
+SELECT LTRIM('ééhello', 'é')              AS utf8_ltrim;
+utf8_ltrim
+hello
+SELECT RTRIM('helloéé', 'é')              AS utf8_rtrim;
+utf8_rtrim
+hello
+=== Composition: trimmable char appearing in middle stays ===
+SELECT TRIM('x' FROM 'xhellxoxx')         AS middle_intact;
+middle_intact
+hellxo
+SELECT LTRIM('xhellxoxx', 'x')            AS ltrim_middle_intact;
+ltrim_middle_intact
+hellxoxx
+SELECT RTRIM('xhellxoxx', 'x')            AS rtrim_middle_intact;
+rtrim_middle_intact
+xhellxo
+=== NULL propagation ===
+SELECT TRIM(NULL)              IS NULL    AS trim_null_s;
+trim_null_s
+1
+SELECT TRIM(NULL FROM 'hello') IS NULL    AS trim_null_chars;
+trim_null_chars
+1
+SELECT LTRIM(NULL)             IS NULL    AS ltrim_null_s;
+ltrim_null_s
+1
+SELECT LTRIM('hello', NULL)    IS NULL    AS ltrim_null_chars;
+ltrim_null_chars
+1
+SELECT RTRIM(NULL)             IS NULL    AS rtrim_null_s;
+rtrim_null_s
+1
+SELECT RTRIM('hello', NULL)    IS NULL    AS rtrim_null_chars;
+rtrim_null_chars
+1
+=== Determinism ===
+SELECT TRIM('  x  ')  = TRIM('  x  ')     AS trim_det;
+trim_det
+1
+SELECT LTRIM('  x  ') = LTRIM('  x  ')    AS ltrim_det;
+ltrim_det
+1
+SELECT RTRIM('  x  ') = RTRIM('  x  ')    AS rtrim_det;
+rtrim_det
+1
+=== Idempotency ===
+SELECT TRIM(TRIM('  hello  '))   = TRIM('  hello  ')   AS trim_idem;
+trim_idem
+1
+SELECT LTRIM(LTRIM('  hello  ')) = LTRIM('  hello  ')  AS ltrim_idem;
+ltrim_idem
+1
+SELECT RTRIM(RTRIM('  hello  ')) = RTRIM('  hello  ')  AS rtrim_idem;
+rtrim_idem
+1
+=== Arity errors ===
+SELECT TRIM();
+ERROR 1064: SQL parse error: sql parser error: Expected: an expression, found: ) at Line: 1, Column: 13
+SELECT LTRIM();
+ERROR 1105: execution error: LTRIM requires 1-2 arguments
+SELECT LTRIM('a', 'b', 'c');
+ERROR 1105: execution error: LTRIM requires 1-2 arguments
+SELECT RTRIM();
+ERROR 1105: execution error: RTRIM requires 1-2 arguments
+SELECT RTRIM('a', 'b', 'c');
+ERROR 1105: execution error: RTRIM requires 1-2 arguments
