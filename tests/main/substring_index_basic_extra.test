@@ -1,0 +1,122 @@
+# Independently authored SUBSTRING_INDEX smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Implemented in zeta but had no compat-mtr
+# coverage yet.
+#
+# Big-picture finding:
+#   SUBSTRING_INDEX(str, delim, count):
+#     - Split `str` on `delim`.
+#     - count > 0: take the first `count` parts, re-joined.
+#     - count < 0: take the LAST `|count|` parts, re-joined.
+#     - count == 0 or empty delim: return ''.
+#     - count magnitude >= number of parts: return the whole
+#       original string (re-joined preserves the input exactly).
+#     - NULL on any arg → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta uses Rust's `str::split` under the hood.
+#     For an empty delim it returns '' (zeta has an explicit
+#     guard before calling split). MySQL behavior is the same.
+#   # zeta-adapt: count uses `value_to_i64_opt`; non-numeric
+#     count coerces to 0 → returns ''. MySQL would coerce
+#     differently (likely 0 too).
+#   # zeta-adapt: Negative count uses `unsigned_abs()` to avoid
+#     i64::MIN overflow. The zeta source comment calls this out.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Positive count: leftmost n parts ===
+
+# Classic example from MySQL docs.
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', 1)  AS left_1;
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', 2)  AS left_2;
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', 3)  AS left_3;
+# Count = total parts → return whole string.
+SELECT SUBSTRING_INDEX('a,b,c', ',', 3)          AS all_parts;
+SELECT SUBSTRING_INDEX('a,b,c', ',', 3)
+     = 'a,b,c'                                   AS all_parts_eq;
+# Count > total parts → still whole string.
+SELECT SUBSTRING_INDEX('a,b,c', ',', 99)         AS more_than_parts;
+
+--echo === Negative count: rightmost |n| parts ===
+
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', -1) AS right_1;
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', -2) AS right_2;
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', -3) AS right_3;
+SELECT SUBSTRING_INDEX('a,b,c', ',', -99)        AS neg_more_than_parts;
+
+--echo === Count == 0 → empty string ===
+
+SELECT SUBSTRING_INDEX('a,b,c', ',', 0)          AS zero_count;
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c', ',', 0)) = 0 AS zero_count_empty;
+
+--echo === Empty delimiter → empty string ===
+
+SELECT SUBSTRING_INDEX('a,b,c', '', 1)           AS empty_delim_pos;
+SELECT SUBSTRING_INDEX('a,b,c', '', -1)          AS empty_delim_neg;
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c', '', 1)) = 0 AS empty_delim_empty;
+
+--echo === No delimiter found in haystack ===
+
+# When delim doesn't match, split returns 1 part; either
+# direction returns the whole string.
+SELECT SUBSTRING_INDEX('abcdef', 'X', 1)         AS no_match_pos;
+SELECT SUBSTRING_INDEX('abcdef', 'X', -1)        AS no_match_neg;
+SELECT SUBSTRING_INDEX('abcdef', 'X', 5)         AS no_match_big_pos;
+
+--echo === Delimiter at start / end ===
+
+# Leading delim → first part is empty string.
+SELECT SUBSTRING_INDEX(',a,b', ',', 1)           AS lead_delim_first;
+SELECT SUBSTRING_INDEX(',a,b', ',', 2)           AS lead_delim_two;
+# Trailing delim → last part is empty.
+SELECT SUBSTRING_INDEX('a,b,', ',', -1)          AS trail_delim_last;
+SELECT SUBSTRING_INDEX('a,b,', ',', -2)          AS trail_delim_two;
+# Both: ',a,' → 3 parts ['', 'a', ''].
+SELECT SUBSTRING_INDEX(',a,', ',', 1)            AS both_lead;
+SELECT SUBSTRING_INDEX(',a,', ',', -1)           AS both_trail;
+
+--echo === Multi-char delimiter ===
+
+SELECT SUBSTRING_INDEX('foo::bar::baz', '::', 1)  AS multichar_left;
+SELECT SUBSTRING_INDEX('foo::bar::baz', '::', -1) AS multichar_right;
+SELECT SUBSTRING_INDEX('foo::bar::baz', '::', 2)  AS multichar_left_two;
+
+--echo === Multi-byte UTF-8 delimiter ===
+
+# Use 'é' (2 bytes) as the delimiter.
+SELECT SUBSTRING_INDEX('aéb éc', 'é', 1)         AS utf8_delim_left;
+SELECT SUBSTRING_INDEX('aéb éc', 'é', -1)        AS utf8_delim_right;
+SELECT SUBSTRING_INDEX('aéb éc', 'é', 2)         AS utf8_delim_two;
+
+--echo === Count boundary: ±1 vs total parts ===
+
+# n=1 takes first part; n=-1 takes last. For a 1-part string
+# (no delim), both return the whole string.
+SELECT SUBSTRING_INDEX('only', ',', 1)           AS single_part_pos;
+SELECT SUBSTRING_INDEX('only', ',', -1)          AS single_part_neg;
+# Empty haystack with non-empty delim.
+SELECT SUBSTRING_INDEX('', ',', 1)               AS empty_hay_pos;
+SELECT SUBSTRING_INDEX('', ',', -1)              AS empty_hay_neg;
+
+--echo === NULL propagation on any arg ===
+
+SELECT SUBSTRING_INDEX(NULL, ',', 1)  IS NULL    AS null_str;
+SELECT SUBSTRING_INDEX('a,b', NULL, 1) IS NULL    AS null_delim;
+SELECT SUBSTRING_INDEX('a,b', ',', NULL) IS NULL  AS null_count;
+
+--echo === Determinism ===
+
+SELECT SUBSTRING_INDEX('a,b,c', ',', 2) = SUBSTRING_INDEX('a,b,c', ',', 2)
+       AS deterministic;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT SUBSTRING_INDEX();
+--error 1105
+SELECT SUBSTRING_INDEX('a');
+--error 1105
+SELECT SUBSTRING_INDEX('a', ',');
+--error 1105
+SELECT SUBSTRING_INDEX('a', ',', 1, 'extra');

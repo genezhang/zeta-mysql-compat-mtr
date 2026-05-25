@@ -1,0 +1,136 @@
+=== Positive count: leftmost n parts ===
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', 1)  AS left_1;
+left_1
+www
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', 2)  AS left_2;
+left_2
+www.mysql
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', 3)  AS left_3;
+left_3
+www.mysql.com
+SELECT SUBSTRING_INDEX('a,b,c', ',', 3)          AS all_parts;
+all_parts
+a,b,c
+SELECT SUBSTRING_INDEX('a,b,c', ',', 3)
+     = 'a,b,c'                                   AS all_parts_eq;
+all_parts_eq
+1
+SELECT SUBSTRING_INDEX('a,b,c', ',', 99)         AS more_than_parts;
+more_than_parts
+a,b,c
+=== Negative count: rightmost |n| parts ===
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', -1) AS right_1;
+right_1
+com
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', -2) AS right_2;
+right_2
+mysql.com
+SELECT SUBSTRING_INDEX('www.mysql.com', '.', -3) AS right_3;
+right_3
+www.mysql.com
+SELECT SUBSTRING_INDEX('a,b,c', ',', -99)        AS neg_more_than_parts;
+neg_more_than_parts
+a,b,c
+=== Count == 0 → empty string ===
+SELECT SUBSTRING_INDEX('a,b,c', ',', 0)          AS zero_count;
+zero_count
+
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c', ',', 0)) = 0 AS zero_count_empty;
+zero_count_empty
+1
+=== Empty delimiter → empty string ===
+SELECT SUBSTRING_INDEX('a,b,c', '', 1)           AS empty_delim_pos;
+empty_delim_pos
+
+SELECT SUBSTRING_INDEX('a,b,c', '', -1)          AS empty_delim_neg;
+empty_delim_neg
+
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c', '', 1)) = 0 AS empty_delim_empty;
+empty_delim_empty
+1
+=== No delimiter found in haystack ===
+SELECT SUBSTRING_INDEX('abcdef', 'X', 1)         AS no_match_pos;
+no_match_pos
+abcdef
+SELECT SUBSTRING_INDEX('abcdef', 'X', -1)        AS no_match_neg;
+no_match_neg
+abcdef
+SELECT SUBSTRING_INDEX('abcdef', 'X', 5)         AS no_match_big_pos;
+no_match_big_pos
+abcdef
+=== Delimiter at start / end ===
+SELECT SUBSTRING_INDEX(',a,b', ',', 1)           AS lead_delim_first;
+lead_delim_first
+
+SELECT SUBSTRING_INDEX(',a,b', ',', 2)           AS lead_delim_two;
+lead_delim_two
+,a
+SELECT SUBSTRING_INDEX('a,b,', ',', -1)          AS trail_delim_last;
+trail_delim_last
+
+SELECT SUBSTRING_INDEX('a,b,', ',', -2)          AS trail_delim_two;
+trail_delim_two
+b,
+SELECT SUBSTRING_INDEX(',a,', ',', 1)            AS both_lead;
+both_lead
+
+SELECT SUBSTRING_INDEX(',a,', ',', -1)           AS both_trail;
+both_trail
+
+=== Multi-char delimiter ===
+SELECT SUBSTRING_INDEX('foo::bar::baz', '::', 1)  AS multichar_left;
+multichar_left
+foo
+SELECT SUBSTRING_INDEX('foo::bar::baz', '::', -1) AS multichar_right;
+multichar_right
+baz
+SELECT SUBSTRING_INDEX('foo::bar::baz', '::', 2)  AS multichar_left_two;
+multichar_left_two
+foo::bar
+=== Multi-byte UTF-8 delimiter ===
+SELECT SUBSTRING_INDEX('aéb éc', 'é', 1)         AS utf8_delim_left;
+utf8_delim_left
+a
+SELECT SUBSTRING_INDEX('aéb éc', 'é', -1)        AS utf8_delim_right;
+utf8_delim_right
+c
+SELECT SUBSTRING_INDEX('aéb éc', 'é', 2)         AS utf8_delim_two;
+utf8_delim_two
+aéb 
+=== Count boundary: ±1 vs total parts ===
+SELECT SUBSTRING_INDEX('only', ',', 1)           AS single_part_pos;
+single_part_pos
+only
+SELECT SUBSTRING_INDEX('only', ',', -1)          AS single_part_neg;
+single_part_neg
+only
+SELECT SUBSTRING_INDEX('', ',', 1)               AS empty_hay_pos;
+empty_hay_pos
+
+SELECT SUBSTRING_INDEX('', ',', -1)              AS empty_hay_neg;
+empty_hay_neg
+
+=== NULL propagation on any arg ===
+SELECT SUBSTRING_INDEX(NULL, ',', 1)  IS NULL    AS null_str;
+null_str
+1
+SELECT SUBSTRING_INDEX('a,b', NULL, 1) IS NULL    AS null_delim;
+null_delim
+1
+SELECT SUBSTRING_INDEX('a,b', ',', NULL) IS NULL  AS null_count;
+null_count
+1
+=== Determinism ===
+SELECT SUBSTRING_INDEX('a,b,c', ',', 2) = SUBSTRING_INDEX('a,b,c', ',', 2)
+       AS deterministic;
+deterministic
+1
+=== Arity errors ===
+SELECT SUBSTRING_INDEX();
+ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
+SELECT SUBSTRING_INDEX('a');
+ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
+SELECT SUBSTRING_INDEX('a', ',');
+ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
+SELECT SUBSTRING_INDEX('a', ',', 1, 'extra');
+ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
