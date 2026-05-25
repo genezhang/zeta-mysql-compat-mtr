@@ -1,0 +1,119 @@
+# Independently authored JSON_QUOTE / JSON_UNQUOTE smoke for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Both functions landed in zeta as part of #1063;
+# this slice locks them in as an inverse pair.
+#
+# Big-picture finding:
+#   JSON_QUOTE(s)   — wrap a text value as a JSON string literal:
+#                     escape ", \, control chars; surround with "...".
+#                     Non-string scalars are stringified first.
+#                     NULL → NULL.
+#   JSON_UNQUOTE(s) — strip outer quotes + unescape if `s` is a
+#                     JSON string literal; otherwise return the
+#                     canonicalized JSON text (object/array/etc.);
+#                     non-JSON input passes through unchanged.
+#                     NULL → NULL.
+#
+# The two functions form an (almost) round-trip: for any string
+# `s`,  JSON_UNQUOTE(JSON_QUOTE(s)) = s.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta's SQL parser uses PostgreSQL-style
+#     string-literal semantics — backslashes are LITERAL in
+#     plain '...' strings, not escape introducers as in MySQL.
+#     So `'a\nb'` is 4 chars (a, \, n, b) in zeta, 3 chars
+#     (a, NL, b) in MySQL. JSON_QUOTE then escapes the literal
+#     backslash, producing `"a\\nb"` rather than `"a\nb"`. The
+#     inverse round-trip (JSON_UNQUOTE(JSON_QUOTE(s)) = s) still
+#     holds — the property is engine-internal-consistent — but
+#     the literal escape output diverges from MySQL.
+#   # zeta-adapt: zeta's JSONB canonicalizer matches MySQL on
+#     simple ASCII strings and the basic escapes (\", \\, \/,
+#     \n, \t). Edge cases like \uXXXX surrogate pairs are not
+#     covered here — separate slice if/when they surface.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Same
+#     direction (rejects).
+
+--echo === JSON_QUOTE: plain ASCII ===
+
+SELECT JSON_QUOTE('hello')      AS plain;
+SELECT JSON_QUOTE('')           AS empty;
+
+--echo === JSON_QUOTE: escape semantics ===
+
+SELECT JSON_QUOTE('he"llo')     AS embedded_quote;
+SELECT JSON_QUOTE('back\\slash') AS embedded_backslash;
+SELECT JSON_QUOTE('a\nb')       AS embedded_newline;
+SELECT JSON_QUOTE('a\tb')       AS embedded_tab;
+# Forward slash is an OPTIONAL escape in the JSON spec — MySQL
+# leaves it unescaped; zeta matches.
+SELECT JSON_QUOTE('a/b')        AS forward_slash;
+# Multi-byte UTF-8: 'é' is 2 bytes (0xC3 0xA9). The JSONB encoder
+# must pass them through, not double-escape as Ã©.
+SELECT JSON_QUOTE('héllo')      AS multi_byte;
+
+--echo === JSON_QUOTE: non-string coercion ===
+
+# MySQL stringifies non-strings before quoting; zeta mirrors.
+SELECT JSON_QUOTE(123)          AS coerce_int;
+SELECT JSON_QUOTE(TRUE)         AS coerce_bool;
+
+--echo === JSON_QUOTE: NULL passthrough ===
+
+SELECT JSON_QUOTE(NULL) IS NULL AS null_passes;
+
+--echo === JSON_UNQUOTE: strip + unescape ===
+
+SELECT JSON_UNQUOTE('"hello"')      AS basic;
+SELECT JSON_UNQUOTE('""')           AS empty_str;
+# NOTE: PG-literal parsing makes `'"he\\"llo"'` the byte sequence
+# `"he\"llo"`, which is INVALID JSON (the `\"` mid-string ends the
+# string early). zeta's JSON_UNQUOTE falls through the
+# `Err(_) => Ok(input)` non-JSON passthrough branch — same byte
+# string back. This exercises the passthrough path; the actual
+# unescape branch is covered by `newline_unescape` below.
+SELECT JSON_UNQUOTE('"he\\"llo"')   AS quote_unescape_invalid_json_passthrough;
+SELECT JSON_UNQUOTE('"a\\nb"')      AS newline_unescape;
+
+--echo === JSON_UNQUOTE: non-string-shape returns JSON text ===
+
+# Object / array inputs are valid JSON but not JSON strings —
+# JSON_UNQUOTE returns their canonical JSON text rather than
+# erroring. Wrap in JSON_VALID to confirm shape is preserved.
+SELECT JSON_VALID(JSON_UNQUOTE('{"a":1}'))   AS unq_obj_still_json;
+SELECT JSON_VALID(JSON_UNQUOTE('[1,2,3]'))   AS unq_arr_still_json;
+SELECT JSON_UNQUOTE('123')                   AS unq_number;
+SELECT JSON_UNQUOTE('true')                  AS unq_bool;
+
+--echo === JSON_UNQUOTE: non-JSON input passes through ===
+
+SELECT JSON_UNQUOTE('plain text')   AS not_json;
+# Empty string isn't valid JSON either — hits the same passthrough
+# branch as `quote_unescape_invalid_json_passthrough` above.
+SELECT JSON_UNQUOTE('')             AS empty_input;
+
+--echo === JSON_UNQUOTE: NULL passthrough ===
+
+SELECT JSON_UNQUOTE(NULL) IS NULL AS null_passes;
+
+--echo === Inverse round-trip: JSON_UNQUOTE(JSON_QUOTE(s)) = s ===
+
+SELECT JSON_UNQUOTE(JSON_QUOTE('hello'))    = 'hello'    AS rt_plain;
+SELECT JSON_UNQUOTE(JSON_QUOTE(''))         = ''         AS rt_empty;
+SELECT JSON_UNQUOTE(JSON_QUOTE('he"llo'))   = 'he"llo'   AS rt_quote;
+SELECT JSON_UNQUOTE(JSON_QUOTE('a\nb'))     = 'a\nb'     AS rt_newline;
+# Independent round-trip check: don't rely on PG-literal parity
+# on both sides — pin the byte length. 'he"llo' is 6 chars, and a
+# correct round-trip must preserve it.
+SELECT LENGTH(JSON_UNQUOTE(JSON_QUOTE('he"llo'))) = 6 AS rt_len_independent;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT JSON_QUOTE();
+--error 1105
+SELECT JSON_QUOTE('a', 'b');
+--error 1105
+SELECT JSON_UNQUOTE();
+--error 1105
+SELECT JSON_UNQUOTE('"a"', '"b"');

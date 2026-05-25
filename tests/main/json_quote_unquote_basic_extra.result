@@ -1,0 +1,99 @@
+=== JSON_QUOTE: plain ASCII ===
+SELECT JSON_QUOTE('hello')      AS plain;
+plain
+"hello"
+SELECT JSON_QUOTE('')           AS empty;
+empty
+""
+=== JSON_QUOTE: escape semantics ===
+SELECT JSON_QUOTE('he"llo')     AS embedded_quote;
+embedded_quote
+"he\"llo"
+SELECT JSON_QUOTE('back\\slash') AS embedded_backslash;
+embedded_backslash
+"back\\\\slash"
+SELECT JSON_QUOTE('a\nb')       AS embedded_newline;
+embedded_newline
+"a\\nb"
+SELECT JSON_QUOTE('a\tb')       AS embedded_tab;
+embedded_tab
+"a\\tb"
+SELECT JSON_QUOTE('a/b')        AS forward_slash;
+forward_slash
+"a/b"
+SELECT JSON_QUOTE('héllo')      AS multi_byte;
+multi_byte
+"héllo"
+=== JSON_QUOTE: non-string coercion ===
+SELECT JSON_QUOTE(123)          AS coerce_int;
+coerce_int
+"123"
+SELECT JSON_QUOTE(TRUE)         AS coerce_bool;
+coerce_bool
+"true"
+=== JSON_QUOTE: NULL passthrough ===
+SELECT JSON_QUOTE(NULL) IS NULL AS null_passes;
+null_passes
+1
+=== JSON_UNQUOTE: strip + unescape ===
+SELECT JSON_UNQUOTE('"hello"')      AS basic;
+basic
+hello
+SELECT JSON_UNQUOTE('""')           AS empty_str;
+empty_str
+
+SELECT JSON_UNQUOTE('"he\\"llo"')   AS quote_unescape_invalid_json_passthrough;
+quote_unescape_invalid_json_passthrough
+"he\\"llo"
+SELECT JSON_UNQUOTE('"a\\nb"')      AS newline_unescape;
+newline_unescape
+a\nb
+=== JSON_UNQUOTE: non-string-shape returns JSON text ===
+SELECT JSON_VALID(JSON_UNQUOTE('{"a":1}'))   AS unq_obj_still_json;
+unq_obj_still_json
+1
+SELECT JSON_VALID(JSON_UNQUOTE('[1,2,3]'))   AS unq_arr_still_json;
+unq_arr_still_json
+1
+SELECT JSON_UNQUOTE('123')                   AS unq_number;
+unq_number
+123
+SELECT JSON_UNQUOTE('true')                  AS unq_bool;
+unq_bool
+true
+=== JSON_UNQUOTE: non-JSON input passes through ===
+SELECT JSON_UNQUOTE('plain text')   AS not_json;
+not_json
+plain text
+SELECT JSON_UNQUOTE('')             AS empty_input;
+empty_input
+
+=== JSON_UNQUOTE: NULL passthrough ===
+SELECT JSON_UNQUOTE(NULL) IS NULL AS null_passes;
+null_passes
+1
+=== Inverse round-trip: JSON_UNQUOTE(JSON_QUOTE(s)) = s ===
+SELECT JSON_UNQUOTE(JSON_QUOTE('hello'))    = 'hello'    AS rt_plain;
+rt_plain
+1
+SELECT JSON_UNQUOTE(JSON_QUOTE(''))         = ''         AS rt_empty;
+rt_empty
+1
+SELECT JSON_UNQUOTE(JSON_QUOTE('he"llo'))   = 'he"llo'   AS rt_quote;
+rt_quote
+1
+SELECT JSON_UNQUOTE(JSON_QUOTE('a\nb'))     = 'a\nb'     AS rt_newline;
+rt_newline
+1
+SELECT LENGTH(JSON_UNQUOTE(JSON_QUOTE('he"llo'))) = 6 AS rt_len_independent;
+rt_len_independent
+1
+=== Arity errors ===
+SELECT JSON_QUOTE();
+ERROR 1105: execution error: JSON_QUOTE requires 1 argument
+SELECT JSON_QUOTE('a', 'b');
+ERROR 1105: execution error: JSON_QUOTE requires 1 argument
+SELECT JSON_UNQUOTE();
+ERROR 1105: execution error: JSON_UNQUOTE requires 1 argument
+SELECT JSON_UNQUOTE('"a"', '"b"');
+ERROR 1105: execution error: JSON_UNQUOTE requires 1 argument
