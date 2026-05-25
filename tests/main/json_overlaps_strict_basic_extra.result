@@ -1,0 +1,80 @@
+=== Strict-type element equality — Bool vs Integer ===
+SELECT JSON_OVERLAPS('true', '[true,false]')  AS true_in_bool_arr;
+true_in_bool_arr
+1
+SELECT JSON_OVERLAPS('true', '[0,1]')         AS true_in_int_arr_zeta_strict;
+true_in_int_arr_zeta_strict
+0
+SELECT JSON_OVERLAPS('1',    '[true,false]')  AS int1_in_bool_arr_zeta_strict;
+int1_in_bool_arr_zeta_strict
+0
+SELECT JSON_OVERLAPS('false','[0,1]')         AS false_in_int_arr_zeta_strict;
+false_in_int_arr_zeta_strict
+0
+=== Strict-type element equality — Integer vs String ===
+SELECT JSON_OVERLAPS('1',    '["1","2"]')     AS int_vs_str_arr;
+int_vs_str_arr
+0
+SELECT JSON_OVERLAPS('"1"',  '[1,2]')         AS str_vs_int_arr;
+str_vs_int_arr
+0
+=== Integer-Numeric normalization equality (storage-driven) ===
+SELECT JSON_OVERLAPS('1',    '1.0')           AS int_eq_normalized_decimal;
+int_eq_normalized_decimal
+1
+SELECT JSON_OVERLAPS('1.0',  '[1]')           AS normalized_decimal_in_int_arr;
+normalized_decimal_in_int_arr
+1
+SELECT JSON_OVERLAPS('1e0',  '[1]')           AS normalized_exp_in_int_arr;
+normalized_exp_in_int_arr
+1
+SELECT JSON_OVERLAPS('1.5e2','[150]')         AS frac_exp_normalized_in_int_arr;
+frac_exp_normalized_in_int_arr
+1
+SELECT JSON_OVERLAPS('1',    '[1.5,2.5]')     AS int_vs_true_decimal_arr;
+int_vs_true_decimal_arr
+0
+SELECT JSON_OVERLAPS('1.5',  '[1,2,3]')       AS true_decimal_vs_int_arr;
+true_decimal_vs_int_arr
+0
+=== Typed JSONB inputs (Value::Jsonb arm) ===
+SELECT JSON_OVERLAPS(CAST('[1,2,3]' AS JSONB),
+                     CAST('[3,4,5]' AS JSONB))       AS both_typed;
+both_typed
+1
+SELECT JSON_OVERLAPS(CAST('[1,2,3]' AS JSONB),
+                     '[3,4,5]')                      AS left_typed;
+left_typed
+1
+SELECT JSON_OVERLAPS('[1,2,3]',
+                     CAST('[3,4,5]' AS JSONB))       AS right_typed;
+right_typed
+1
+=== Wrong-type arg → 1105 (rejects non-JSON, non-String) ===
+SELECT JSON_OVERLAPS(42, '[1,2,3]');
+ERROR 1105: execution error: JSON_OVERLAPS arguments must be JSON
+SELECT JSON_OVERLAPS('[1,2,3]', 42);
+ERROR 1105: execution error: JSON_OVERLAPS arguments must be JSON
+SELECT JSON_OVERLAPS(3.14, '[1,2,3]');
+ERROR 1105: execution error: JSON_OVERLAPS arguments must be JSON
+=== Symmetry: JSON_OVERLAPS(a,b) = JSON_OVERLAPS(b,a) ===
+SELECT JSON_OVERLAPS('[1,2,3]', '[3,4,5]')
+     = JSON_OVERLAPS('[3,4,5]', '[1,2,3]')           AS sym_arr_arr;
+sym_arr_arr
+1
+SELECT JSON_OVERLAPS('{"a":1,"b":2}', '{"a":3,"b":2}')
+     = JSON_OVERLAPS('{"a":3,"b":2}', '{"a":1,"b":2}') AS sym_obj_obj;
+sym_obj_obj
+1
+SELECT JSON_OVERLAPS('[1,2,3]', '2')
+     = JSON_OVERLAPS('2', '[1,2,3]')                 AS sym_arr_scalar;
+sym_arr_scalar
+1
+SELECT JSON_OVERLAPS('{"a":1}', '[1,2,3]')
+     = JSON_OVERLAPS('[1,2,3]', '{"a":1}')           AS sym_obj_arr;
+sym_obj_arr
+1
+SELECT JSON_OVERLAPS('{"a":1}', '5')
+     = JSON_OVERLAPS('5', '{"a":1}')                 AS sym_obj_scalar;
+sym_obj_scalar
+1

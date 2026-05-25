@@ -1,0 +1,113 @@
+# Independently authored JSON_OVERLAPS strict-type / typed-arm
+# / symmetry smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_overlaps_basic_extra.test: by-shape matrix (array+
+#     array, object+object, scalar/array, nested, NULL, empty,
+#     arity). EXPLICITLY punts on the strict-type Bool/Integer
+#     divergence (header note lines 18-23).
+#   - json/json_introspect.test: STALE — predates the impl;
+#     still expects `unknown function: JSON_OVERLAPS`. Separate
+#     cleanup; not addressed here.
+#
+# This slice pins what the existing one doesn't:
+#   - Bool/Integer strict-type divergence (zeta) vs MySQL's
+#     int-bool coercion in JSON_OVERLAPS.
+#   - Integer/Numeric normalization equality (1 vs 1.0 share
+#     type because from_decimal normalizes scale=0).
+#   - Integer/String strict-type rejection (matches MySQL).
+#   - Typed JSONB inputs (CAST AS JSONB) on all 3 permutations
+#     so the Value::Jsonb arm of the coerce helper is exercised.
+#   - Wrong-type rejection: non-JSON-typed arg (INT) → 1105.
+#   - Symmetry: JSON_OVERLAPS(a,b) = JSON_OVERLAPS(b,a) for
+#     all by-shape combinations.
+#
+# Big-picture finding:
+#   Element equality in JSON_OVERLAPS is STRICTLY TYPED. Two
+#   JSON values overlap only if they share JsonbType AND value.
+#   The one wrinkle: zeta-jsonb's from_decimal normalizes any
+#   number that fits i64 with scale 0 to JsonbType::Integer.
+#   So `1` and `1.0` share type (Integer) — they DO overlap —
+#   but `1` and `1.5` differ (Integer vs Numeric) and do NOT.
+#   (Already pinned in the JSON_TYPE slice as a value-driven
+#   storage divergence; here it manifests as overlap behavior.)
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON `true` (Bool) does NOT overlap with `1`
+#     (Integer). MySQL coerces and reports overlap. Documented
+#     divergence — pinned below.
+#   # zeta-adapt: JSON `1` and `1.0` DO overlap because zeta's
+#     JSONB parser collapses both to Integer scale=0. MySQL
+#     also reports overlap (lexical-form-blind), so this row
+#     matches by coincidence; pin so a future refactor that
+#     preserves lexical form is caught.
+#   # zeta-adapt: Wrong-type arg → 1105 ERROR (impl rejects
+#     non-Null/non-Jsonb/non-String inputs).
+
+--echo === Strict-type element equality — Bool vs Integer ===
+
+# zeta strict-typed: JSON `true` is NOT JSON `1`. MySQL would
+# coerce (true → 1) and report overlap. Documented divergence.
+SELECT JSON_OVERLAPS('true', '[true,false]')  AS true_in_bool_arr;
+SELECT JSON_OVERLAPS('true', '[0,1]')         AS true_in_int_arr_zeta_strict;
+SELECT JSON_OVERLAPS('1',    '[true,false]')  AS int1_in_bool_arr_zeta_strict;
+SELECT JSON_OVERLAPS('false','[0,1]')         AS false_in_int_arr_zeta_strict;
+
+--echo === Strict-type element equality — Integer vs String ===
+
+# Both zeta and MySQL agree: numeric scalar does NOT overlap
+# with the same-looking string. Pinned for parity-baseline.
+SELECT JSON_OVERLAPS('1',    '["1","2"]')     AS int_vs_str_arr;
+SELECT JSON_OVERLAPS('"1"',  '[1,2]')         AS str_vs_int_arr;
+
+--echo === Integer-Numeric normalization equality (storage-driven) ===
+
+# Both 1 and 1.0 collapse to Integer scale=0 via from_decimal,
+# so they share type and value → overlap = 1. Confirms the
+# storage-normalization quirk from the JSON_TYPE slice.
+SELECT JSON_OVERLAPS('1',    '1.0')           AS int_eq_normalized_decimal;
+SELECT JSON_OVERLAPS('1.0',  '[1]')           AS normalized_decimal_in_int_arr;
+SELECT JSON_OVERLAPS('1e0',  '[1]')           AS normalized_exp_in_int_arr;
+SELECT JSON_OVERLAPS('1.5e2','[150]')         AS frac_exp_normalized_in_int_arr;
+# True decimal (non-collapsible) — Integer vs Numeric
+# strict-type mismatch.
+SELECT JSON_OVERLAPS('1',    '[1.5,2.5]')     AS int_vs_true_decimal_arr;
+SELECT JSON_OVERLAPS('1.5',  '[1,2,3]')       AS true_decimal_vs_int_arr;
+
+--echo === Typed JSONB inputs (Value::Jsonb arm) ===
+
+# Without CAST, both sides route through from_json_str (String
+# arm). CAST AS JSONB exercises the Value::Jsonb branch of the
+# coerce helper on each position.
+SELECT JSON_OVERLAPS(CAST('[1,2,3]' AS JSONB),
+                     CAST('[3,4,5]' AS JSONB))       AS both_typed;
+SELECT JSON_OVERLAPS(CAST('[1,2,3]' AS JSONB),
+                     '[3,4,5]')                      AS left_typed;
+SELECT JSON_OVERLAPS('[1,2,3]',
+                     CAST('[3,4,5]' AS JSONB))       AS right_typed;
+
+--echo === Wrong-type arg → 1105 (rejects non-JSON, non-String) ===
+
+--error 1105
+SELECT JSON_OVERLAPS(42, '[1,2,3]');
+--error 1105
+SELECT JSON_OVERLAPS('[1,2,3]', 42);
+--error 1105
+SELECT JSON_OVERLAPS(3.14, '[1,2,3]');
+
+--echo === Symmetry: JSON_OVERLAPS(a,b) = JSON_OVERLAPS(b,a) ===
+
+# Set-overlap is a symmetric predicate. Pin one row for each
+# by-shape combination so a one-sided refactor (e.g. an early-
+# return that only checks one direction) is caught.
+SELECT JSON_OVERLAPS('[1,2,3]', '[3,4,5]')
+     = JSON_OVERLAPS('[3,4,5]', '[1,2,3]')           AS sym_arr_arr;
+SELECT JSON_OVERLAPS('{"a":1,"b":2}', '{"a":3,"b":2}')
+     = JSON_OVERLAPS('{"a":3,"b":2}', '{"a":1,"b":2}') AS sym_obj_obj;
+SELECT JSON_OVERLAPS('[1,2,3]', '2')
+     = JSON_OVERLAPS('2', '[1,2,3]')                 AS sym_arr_scalar;
+SELECT JSON_OVERLAPS('{"a":1}', '[1,2,3]')
+     = JSON_OVERLAPS('[1,2,3]', '{"a":1}')           AS sym_obj_arr;
+SELECT JSON_OVERLAPS('{"a":1}', '5')
+     = JSON_OVERLAPS('5', '{"a":1}')                 AS sym_obj_scalar;
