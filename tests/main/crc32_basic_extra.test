@@ -22,14 +22,21 @@
 --echo === Known IEEE CRC32 vectors ===
 
 # Industry-standard test string ('123456789') and a few common
-# strings — these values are stable across every IEEE-CRC32
-# implementation (zlib, MySQL, Python's zlib.crc32, Rust's
-# crc32fast). If zeta returns something else, something is wrong.
+# well-known reference strings (incl. the standard pangram) —
+# these values are stable across every IEEE-CRC32 implementation
+# (zlib, MySQL, Python's zlib.crc32, Rust's crc32fast). If zeta
+# returns something else, something is wrong.
 SELECT CRC32('123456789')   AS check_vector;
 SELECT CRC32('a')           AS single_a;
 SELECT CRC32('abc')         AS abc;
 SELECT CRC32('hello')       AS hello;
 SELECT CRC32('The quick brown fox jumps over the lazy dog') AS pangram;
+# Multi-byte UTF-8 input — the hash is over BYTES, so 'é' is two
+# bytes (0xC3 0xA9), not one. Asserting != CRC32 of any 1-byte
+# string locks in the byte-semantics claim in the header.
+SELECT CRC32('é') <> CRC32('a')   AS utf8_byte_semantics;
+# Numeric-input coercion path the header asserts.
+SELECT CRC32(12345)               AS int_coerced;
 
 --echo === Empty input → CRC32 of empty bytes (defined as 0) ===
 

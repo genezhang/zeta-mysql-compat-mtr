@@ -14,6 +14,12 @@ hello
 SELECT CRC32('The quick brown fox jumps over the lazy dog') AS pangram;
 pangram
 1095738169
+SELECT CRC32('é') <> CRC32('a')   AS utf8_byte_semantics;
+utf8_byte_semantics
+1
+SELECT CRC32(12345)               AS int_coerced;
+int_coerced
+3421846044
 === Empty input → CRC32 of empty bytes (defined as 0) ===
 SELECT CRC32('') AS empty;
 empty
