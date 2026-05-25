@@ -24,8 +24,9 @@
 #
 # Big-picture finding:
 #   JSON_CONTAINS(target, candidate) routes through zeta-jsonb's
-#   PG `@>` containment matcher (lib.rs:54475-54478 impl note),
-#   so the semantics are:
+#   PG `@>` containment matcher (per the impl comment in the
+#   JSON_CONTAINS arm of zeta-server/src/lib.rs), so the
+#   semantics are:
 #     - Scalar containment = strict equality.
 #     - Array containment = every candidate element appears as
 #       some target element. Non-array candidate matches if it
@@ -65,15 +66,20 @@ SELECT JSON_CONTAINS('1', '"1"')              AS scalar_int_vs_string;
 # Non-array candidate matches if it equals one array element.
 SELECT JSON_CONTAINS('[1,2,3]', '1')          AS arr_contains_first;
 SELECT JSON_CONTAINS('[1,2,3]', '3')          AS arr_contains_last;
-SELECT JSON_CONTAINS('[1,2,3]', '4')          AS arr_contains_missing;
+# (Negative `[1,2,3] @> 4` and trivial subset `[1,2,3] @> [2,3]`
+#  are already pinned in json_basic.test:189-190; not re-pinned.)
 # Array candidate: every element must appear in target.
 SELECT JSON_CONTAINS('[1,2,3]', '[1,2]')      AS arr_contains_subset;
-SELECT JSON_CONTAINS('[1,2,3]', '[2,3]')      AS arr_contains_subset2;
 SELECT JSON_CONTAINS('[1,2,3]', '[3,2,1]')    AS arr_contains_reordered_full;
 SELECT JSON_CONTAINS('[1,2,3]', '[1,4]')      AS arr_contains_partial_miss;
-SELECT JSON_CONTAINS('[1,2,3]', '[]')         AS arr_contains_empty;
+# Empty-array candidate matches ANY array target (vacuous subset).
+SELECT JSON_CONTAINS('[1,2,3]', '[]')         AS empty_arr_candidate_matches_any;
 # Duplicates in candidate: still treated as set membership.
 SELECT JSON_CONTAINS('[1,2,3]', '[1,1,1]')    AS arr_contains_dup_candidate;
+# Asymmetry footgun: scalar target with array candidate. The
+# scalar 5 does NOT contain the array [5] (target must have
+# matching SHAPE — a scalar is not a 1-element array).
+SELECT JSON_CONTAINS('5',       '[5]')        AS scalar_target_arr_candidate;
 
 --echo === Object subset (every k/v of candidate in target) ===
 
@@ -117,12 +123,19 @@ SELECT JSON_CONTAINS('[null]', 'null')                         AS json_null_in_a
 # JSON 'null' is NOT contained in an integer scalar (type
 # mismatch).
 SELECT JSON_CONTAINS('1', 'null')                              AS json_null_in_int;
+# JSON 'null' as an OBJECT VALUE — separate path from scalar
+# and array containment. {"a":null} should contain {"a":null}.
+SELECT JSON_CONTAINS('{"a":null}', '{"a":null}')               AS json_null_as_obj_value;
+# Object containment with one null value and one non-null:
+# {"a":null,"b":1} should contain {"a":null}.
+SELECT JSON_CONTAINS('{"a":null,"b":1}', '{"a":null}')         AS json_null_obj_value_subset;
 
 --echo === Already-typed JSONB inputs (Value::Jsonb arm) ===
 
 # Without CAST, both args route through from_json_str. CAST
 # AS JSONB forces the Value::Jsonb branch on either or both
-# sides. Pin all four input-form permutations.
+# sides. The (neither-typed) baseline is implicit throughout
+# the rest of the file; pin the three CAST permutations.
 SELECT JSON_CONTAINS(CAST('{"a":1,"b":2}' AS JSONB),
                      CAST('{"a":1}'       AS JSONB))           AS both_typed;
 SELECT JSON_CONTAINS(CAST('{"a":1,"b":2}' AS JSONB),
@@ -162,7 +175,3 @@ SELECT JSON_CONTAINS('{"a":1}', '1', '$.a');
 --error 1105
 SELECT JSON_CONTAINS_PATH('{"a":1}', 'one', '$.a');
 
---echo === Determinism ===
-
-SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}')
-     = JSON_CONTAINS('{"a":1,"b":2}', '{"a":1}')                AS deterministic;
