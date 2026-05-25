@@ -1,0 +1,129 @@
+=== FIELD: basic 1-based lookup ===
+SELECT FIELD('b', 'a', 'b', 'c')   AS hit_second;
+hit_second
+2
+SELECT FIELD('a', 'a', 'b', 'c')   AS hit_first;
+hit_first
+1
+SELECT FIELD('c', 'a', 'b', 'c')   AS hit_last;
+hit_last
+3
+SELECT FIELD('z', 'a', 'b', 'c')   AS miss;
+miss
+0
+=== FIELD: NULL handling ===
+SELECT FIELD(NULL, 'a', 'b')           AS null_needle;
+null_needle
+0
+SELECT FIELD('b', 'a', NULL, 'b')      AS skips_null;
+skips_null
+3
+=== FIELD: numeric coercion ===
+SELECT FIELD(2, '1', '2', '3')         AS int_needle;
+int_needle
+2
+SELECT FIELD('2', 1, 2, 3)             AS string_needle_int_hay;
+string_needle_int_hay
+2
+=== FIELD: case sensitivity (zeta byte-equal divergence) ===
+SELECT FIELD('B', 'a', 'b', 'c')       AS case_byte_equal;
+case_byte_equal
+0
+=== FIND_IN_SET: basic comma-split ===
+SELECT FIND_IN_SET('b', 'a,b,c')   AS hit_second;
+hit_second
+2
+SELECT FIND_IN_SET('a', 'a,b,c')   AS hit_first;
+hit_first
+1
+SELECT FIND_IN_SET('c', 'a,b,c')   AS hit_last;
+hit_last
+3
+SELECT FIND_IN_SET('z', 'a,b,c')   AS miss;
+miss
+0
+SELECT FIND_IN_SET('b', 'b')       AS single_member;
+single_member
+1
+=== FIND_IN_SET: empty / edge inputs ===
+SELECT FIND_IN_SET('',  '')        AS empty_both;
+empty_both
+0
+SELECT FIND_IN_SET('',  'a,b,c')   AS empty_needle;
+empty_needle
+0
+SELECT FIND_IN_SET('a', '')        AS empty_csv;
+empty_csv
+0
+SELECT FIND_IN_SET('a,b', 'a,b,c') AS comma_needle;
+comma_needle
+0
+=== FIND_IN_SET: NULL propagation ===
+SELECT FIND_IN_SET(NULL, 'a,b')    IS NULL AS null_needle;
+null_needle
+1
+SELECT FIND_IN_SET('a',  NULL)     IS NULL AS null_csv;
+null_csv
+1
+=== FIND_IN_SET: case sensitivity (zeta byte-equal divergence) ===
+SELECT FIND_IN_SET('B', 'a,b,c')   AS case_byte_equal;
+case_byte_equal
+0
+=== ELT: 1-based pick ===
+SELECT ELT(1, 'a', 'b', 'c')   AS pick_first;
+pick_first
+a
+SELECT ELT(2, 'a', 'b', 'c')   AS pick_second;
+pick_second
+b
+SELECT ELT(3, 'a', 'b', 'c')   AS pick_last;
+pick_last
+c
+=== ELT: out-of-bounds / NULL element / NULL N ===
+SELECT ELT(0, 'a', 'b')        IS NULL AS zero_n;
+zero_n
+1
+SELECT ELT(-1, 'a', 'b')       IS NULL AS neg_n;
+neg_n
+1
+SELECT ELT(99, 'a', 'b')       IS NULL AS overshoot;
+overshoot
+1
+SELECT ELT(NULL, 'a', 'b')     IS NULL AS null_n;
+null_n
+1
+SELECT ELT(2, 'a', NULL)       IS NULL AS null_element;
+null_element
+1
+=== ELT: non-integer N coerces to NULL (not error) ===
+SELECT ELT('abc', 'a', 'b')    IS NULL AS string_n_nonnum;
+string_n_nonnum
+1
+SELECT ELT('2',   'a', 'b')    IS NULL AS string_n_digits_zeta_null;
+string_n_digits_zeta_null
+1
+=== Determinism cross-check ===
+SELECT FIELD('b', 'a', 'b') = FIELD('b', 'a', 'b')       AS field_det;
+field_det
+1
+SELECT FIND_IN_SET('b', 'a,b') = FIND_IN_SET('b', 'a,b') AS fis_det;
+fis_det
+1
+SELECT ELT(1, 'a') = ELT(1, 'a')                         AS elt_det;
+elt_det
+1
+=== Arity errors ===
+SELECT FIELD();
+ERROR 1105: execution error: FIELD requires at least 2 arguments
+SELECT FIELD('a');
+ERROR 1105: execution error: FIELD requires at least 2 arguments
+SELECT FIND_IN_SET();
+ERROR 1105: execution error: FIND_IN_SET requires 2 arguments
+SELECT FIND_IN_SET('a');
+ERROR 1105: execution error: FIND_IN_SET requires 2 arguments
+SELECT FIND_IN_SET('a', 'b', 'c');
+ERROR 1105: execution error: FIND_IN_SET requires 2 arguments
+SELECT ELT();
+ERROR 1105: execution error: ELT requires at least 2 arguments
+SELECT ELT(1);
+ERROR 1105: execution error: ELT requires at least 2 arguments
