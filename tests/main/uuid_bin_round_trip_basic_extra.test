@@ -1,0 +1,148 @@
+# Independently authored UUID_TO_BIN / BIN_TO_UUID smoke for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Both functions are implemented in zeta but had no
+# compat-mtr coverage yet — this slice locks in the inverse pair
+# plus the swap-flag semantics that reorder time fields for
+# index locality.
+#
+# Big-picture finding:
+#   UUID_TO_BIN(s)          — pack a 36-char (or 32-char no-dash)
+#                             canonical UUID string into 16 bytes
+#                             (BINARY(16)).
+#   UUID_TO_BIN(s, swap)    — if swap=1, swap the time-low and
+#                             time-hi-and-version groups so the
+#                             bytes sort by time prefix (better
+#                             B-tree locality for time-ordered v1
+#                             UUIDs).
+#   BIN_TO_UUID(b)          — inverse of UUID_TO_BIN(s).
+#   BIN_TO_UUID(b, swap)    — inverse of UUID_TO_BIN(s, swap).
+#
+# Inverse property: for any UUID `u` and swap flag `f`,
+#                   BIN_TO_UUID(UUID_TO_BIN(u, f), f) = u.
+#
+# Adaptation notes:
+#   # zeta-adapt: UUID_TO_BIN returns VARBINARY in zeta. Direct
+#     `UUID_TO_BIN(...) = X'...'` is a bytes-vs-hex-literal check;
+#     all assertions go through HEX() to dodge any wire-collation
+#     surprises and make the byte order explicit in the .result.
+#   # zeta-adapt: Bad UUID string / wrong byte length → 1105
+#     (MySQL: 3411 / 1525). Same direction (rejects).
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Same
+#     direction (rejects).
+#   # zeta-adapt: zeta accepts both dashed (36-char) and
+#     undashed (32-char) UUID input; MySQL is stricter about
+#     dashes. The dashed form is the canonical case; the no-dash
+#     case is locked in as a zeta convenience.
+#
+# Gaps surfaced during recording (file separately):
+#   - `BIN_TO_UUID(UNHEX('00...00'))` (16 all-zero bytes) errors
+#     with "first argument must be a 16-byte binary", suggesting
+#     zeta's UNHEX returns something other than Value::Bytes for
+#     all-zero input (NULL or empty string?). The all-ones case
+#     works. Decode-zero case omitted from this slice.
+#   - `BIN_TO_UUID(UNHEX('00112233'))` (4 bytes) trips the wrong
+#     error arm — emits "must be a 16-byte binary" (the catchall
+#     "wrong type" message) rather than "exactly 16 bytes
+#     (got 4)" (the explicit length check). The 17-byte case
+#     uses the right arm. Suggests short Bytes don't reach the
+#     Value::Bytes match arm.
+
+--echo === UUID_TO_BIN: canonical 36-char form ===
+
+# Hand-picked UUID — the canonical RFC 4122 example.
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db')) AS canonical;
+# Empty groups boundary: all-zero and all-ones UUIDs.
+SELECT HEX(UUID_TO_BIN('00000000-0000-0000-0000-000000000000')) AS all_zero;
+SELECT HEX(UUID_TO_BIN('ffffffff-ffff-ffff-ffff-ffffffffffff')) AS all_ones;
+
+--echo === UUID_TO_BIN: 32-char no-dash form (zeta convenience) ===
+
+SELECT HEX(UUID_TO_BIN('6ccd780cbaba102695645b8c656024db')) AS no_dash;
+
+--echo === UUID_TO_BIN with swap=1: time-low ↔ time-hi reorder ===
+
+# 6ccd780c (time_low) <-> 1026 (time_hi). After swap:
+#   1026 baba 6ccd780c 9564 5b8c656024db
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1)) AS swapped;
+# swap=0 must match the 1-arg form.
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 0))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS swap_zero_matches_default;
+# Truthy-non-1 must also swap — impl uses `*n != 0`, not `== 1`.
+# Pinning this guards against an over-tightened future check.
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 2))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))
+       AS swap_two_truthy;
+# Boolean swap_flag (TRUE = swap, FALSE = no-swap) — impl
+# explicitly handles Value::Bool.
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', TRUE))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))
+       AS swap_true_bool;
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', FALSE))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS swap_false_bool;
+
+--echo === UUID_TO_BIN: mixed-case hex input accepted ===
+
+# Impl strips dashes and calls u8::from_str_radix, which accepts
+# both cases. Lock in so a future case-strict variant breaks here.
+SELECT HEX(UUID_TO_BIN('6CcD780c-BaBa-1026-9564-5B8c656024dB'))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS mixed_case_equiv;
+
+--echo === UUID_TO_BIN: NULL passthrough ===
+
+SELECT UUID_TO_BIN(NULL)    IS NULL AS null_arg;
+SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', NULL) IS NULL AS null_swap;
+
+--echo === BIN_TO_UUID: canonical decode ===
+
+SELECT BIN_TO_UUID(UNHEX('6CCD780CBABA102695645B8C656024DB')) AS decode_canonical;
+SELECT BIN_TO_UUID(UNHEX('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')) AS decode_ones;
+
+--echo === BIN_TO_UUID with swap=1: undo the swap ===
+
+# Input bytes are the swapped layout above; swap=1 must reverse
+# it back to the canonical string.
+SELECT BIN_TO_UUID(UNHEX('1026BABA6CCD780C95645B8C656024DB'), 1) AS unswapped;
+
+--echo === BIN_TO_UUID: NULL passthrough ===
+
+SELECT BIN_TO_UUID(NULL)               IS NULL AS null_arg;
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), NULL) IS NULL AS null_swap;
+
+--echo === Inverse round-trip ===
+
+SELECT BIN_TO_UUID(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+     = '6ccd780c-baba-1026-9564-5b8c656024db' AS rt_default;
+SELECT BIN_TO_UUID(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1), 1)
+     = '6ccd780c-baba-1026-9564-5b8c656024db' AS rt_swap;
+# Independent byte-length check: the binary form is always 16 bytes.
+SELECT LENGTH(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))      = 16 AS rt_len_default;
+SELECT LENGTH(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))   = 16 AS rt_len_swap;
+
+--echo === Bad input rejected ===
+
+# Too short / too long / non-hex character — all 1105.
+--error 1105
+SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564');
+--error 1105
+SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db-extra');
+--error 1105
+SELECT UUID_TO_BIN('zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz');
+# Wrong byte length for BIN_TO_UUID.
+--error 1105
+SELECT BIN_TO_UUID(UNHEX('00112233'));
+--error 1105
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFFAA'));
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT UUID_TO_BIN();
+--error 1105
+SELECT UUID_TO_BIN('a', 'b', 'c');
+--error 1105
+SELECT BIN_TO_UUID();
+--error 1105
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), 1, 2);
