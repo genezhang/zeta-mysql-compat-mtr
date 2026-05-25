@@ -1,0 +1,149 @@
+# Independently authored DATE_FORMAT specifier-matrix smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. DATE_FORMAT has minimal compat-mtr
+# coverage today (4 lines in datetime_format_basic); this slice
+# pins each MySQL format specifier zeta supports.
+#
+# Big-picture finding:
+#   DATE_FORMAT(d, fmt) — format a date/timestamp using MySQL's
+#       %-escape format specifiers. Returns a string.
+#
+# Supported specifiers (impl at zeta-server/src/lib.rs:45282+):
+#   Year:    %Y (4-digit), %y (2-digit)
+#   Month:   %m (zero-padded), %c (no-pad), %M (full name), %b (abbrev)
+#   Day:     %d (zero-padded), %e (no-pad), %D (ordinal "1st"/"2nd")
+#   Hour:    %H (24h pad), %k (24h no-pad), %h/%I (12h pad), %l (12h no-pad)
+#   Minute:  %i (zero-padded)
+#   Second:  %S, %s (both zero-padded)
+#   Time:    %T = HH:MM:SS, %r = HH:MM:SS AM/PM, %p = AM/PM
+#   Weekday: %W (full name), %a (abbrev), %w (0=Sunday..6)
+#   Year-day: %j (zero-padded 001..366)
+#   Microsecond: %f (zero-padded 000000..999999)
+#   Week:    %U/%u/%V/%v + %X/%x (week-year)
+#   Literal: %% → '%'
+#
+# Anchor date for most pins: 2024-03-15 14:30:45.123456
+#   Year=2024, Month=3, Day=15, Hour=14, Min=30, Sec=45, µs=123456
+#   Day-of-week: Friday (DAYOFWEEK=6, WEEKDAY=4, %w=5)
+#
+# Adaptation notes:
+#   # zeta-adapt: Unknown specifier (e.g. %z) → ERROR 1105 with
+#     message referencing zeta#1093. MySQL would emit the
+#     specifier verbatim. Documented divergence.
+#   # zeta-adapt: NULL date OR NULL format → NULL result.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Year and month specifiers ===
+
+SELECT DATE_FORMAT('2024-03-15', '%Y')           AS year_4digit;
+SELECT DATE_FORMAT('2024-03-15', '%y')           AS year_2digit;
+SELECT DATE_FORMAT('2024-03-15', '%m')           AS month_padded;
+SELECT DATE_FORMAT('2024-03-15', '%c')           AS month_nopad;
+SELECT DATE_FORMAT('2024-03-15', '%M')           AS month_name;
+SELECT DATE_FORMAT('2024-03-15', '%b')           AS month_abbrev;
+# 1-digit month: %m pads, %c doesn't.
+SELECT DATE_FORMAT('2024-09-01', '%m')           AS month_padded_sept;
+SELECT DATE_FORMAT('2024-09-01', '%c')           AS month_nopad_sept;
+
+--echo === Day specifiers ===
+
+SELECT DATE_FORMAT('2024-03-15', '%d')           AS day_padded;
+SELECT DATE_FORMAT('2024-03-15', '%e')           AS day_nopad;
+SELECT DATE_FORMAT('2024-03-01', '%d')           AS day_padded_first;
+SELECT DATE_FORMAT('2024-03-01', '%e')           AS day_nopad_first;
+# Ordinal suffix (1st, 2nd, 3rd, 4th).
+SELECT DATE_FORMAT('2024-03-01', '%D')           AS day_ordinal_first;
+SELECT DATE_FORMAT('2024-03-02', '%D')           AS day_ordinal_second;
+SELECT DATE_FORMAT('2024-03-03', '%D')           AS day_ordinal_third;
+SELECT DATE_FORMAT('2024-03-04', '%D')           AS day_ordinal_fourth;
+SELECT DATE_FORMAT('2024-03-11', '%D')           AS day_ordinal_eleventh;
+SELECT DATE_FORMAT('2024-03-21', '%D')           AS day_ordinal_21st;
+
+--echo === Hour specifiers (24h and 12h) ===
+
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%H')  AS hour_24_padded;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%k')  AS hour_24_nopad;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%h')  AS hour_12_padded;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%I')  AS hour_12_padded_alias;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%l')  AS hour_12_nopad;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%p')  AS am_pm;
+# Midnight / noon edge for 12h: 00:xx → 12 AM, 12:xx → 12 PM.
+SELECT DATE_FORMAT('2024-03-15 00:30:00', '%h')  AS midnight_h12;
+SELECT DATE_FORMAT('2024-03-15 12:30:00', '%h')  AS noon_h12;
+SELECT DATE_FORMAT('2024-03-15 00:30:00', '%p')  AS midnight_ampm;
+SELECT DATE_FORMAT('2024-03-15 12:30:00', '%p')  AS noon_ampm;
+
+--echo === Minute / second / microsecond ===
+
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%i')  AS minute;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%S')  AS second_upper;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%s')  AS second_lower;
+SELECT DATE_FORMAT('2024-03-15 14:30:45.123456', '%f') AS microsec;
+# %f on date-only input → '000000' (no time portion).
+SELECT DATE_FORMAT('2024-03-15', '%f')           AS microsec_date_only;
+
+--echo === Composite time specifiers (%T, %r) ===
+
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%T')  AS time_24;
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%r')  AS time_12_ampm;
+SELECT DATE_FORMAT('2024-03-15 00:30:00', '%r')  AS time_12_midnight;
+
+--echo === Weekday specifiers ===
+
+# 2024-03-15 is a Friday.
+SELECT DATE_FORMAT('2024-03-15', '%W')           AS weekday_full;
+SELECT DATE_FORMAT('2024-03-15', '%a')           AS weekday_abbrev;
+SELECT DATE_FORMAT('2024-03-15', '%w')           AS weekday_numeric;
+
+--echo === Day-of-year (%j, zero-padded to 3) ===
+
+SELECT DATE_FORMAT('2024-01-01', '%j')           AS doy_1;
+SELECT DATE_FORMAT('2024-02-29', '%j')           AS doy_leap_feb_29;
+SELECT DATE_FORMAT('2024-12-31', '%j')           AS doy_leap_year_end;
+
+--echo === Combined format strings ===
+
+# ISO 8601 date.
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S') AS iso_8601;
+# RFC 2822-ish.
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%a, %d %b %Y %T')   AS rfc_2822_ish;
+# Just the date with full month name.
+SELECT DATE_FORMAT('2024-03-15', '%M %D, %Y')                  AS pretty_date;
+
+--echo === Literal text passthrough + %% escape ===
+
+# Literal punctuation between specifiers passes through.
+SELECT DATE_FORMAT('2024-03-15', 'Year: %Y, Month: %M')   AS literal_text;
+# %% emits a literal '%'.
+SELECT DATE_FORMAT('2024-03-15', '%Y%%')                  AS percent_escape;
+# Trailing bare '%' is tolerated (emitted verbatim).
+SELECT DATE_FORMAT('2024-03-15', '%Y%')                   AS trailing_percent;
+
+--echo === Multi-byte UTF-8 in format string ===
+
+# The byte-safe walk copies the multi-byte chars unchanged.
+SELECT DATE_FORMAT('2024-03-15', '%Y é %m')               AS utf8_in_format;
+
+--echo === Unknown specifier → ERROR (zeta divergence; MySQL emits verbatim) ===
+
+# zeta strict-errors with reference to zeta#1093. MySQL would
+# emit '%z' as literal '%z'.
+--error 1105
+SELECT DATE_FORMAT('2024-03-15', '%z');
+
+--echo === NULL passthrough + arity ===
+
+SELECT DATE_FORMAT(NULL, '%Y')      IS NULL      AS null_date;
+SELECT DATE_FORMAT('2024-03-15', NULL) IS NULL   AS null_format;
+--error 1105
+SELECT DATE_FORMAT();
+--error 1105
+SELECT DATE_FORMAT('2024-03-15');
+--error 1105
+SELECT DATE_FORMAT('2024-03-15', '%Y', 'extra');
+
+--echo === Determinism ===
+
+SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d')
+     = DATE_FORMAT('2024-03-15', '%Y-%m-%d')                  AS deterministic;
