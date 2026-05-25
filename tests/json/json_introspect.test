@@ -24,27 +24,35 @@
 # apps use when validating shapes, building WHERE filters, or
 # computing array-style aggregates without materializing the rows.
 #
-# Notable semantic differences worth tracking when a fix lands:
-#   * JSON_KEYS(j) returns a JSON array. Zeta's nearest analog
-#     `jsonb_object_keys(j)` is set-returning (one text row per key).
-#   * JSON_LENGTH(j) returns the count of top-level elements for both
-#     objects AND arrays. Zeta has `jsonb_array_length` (arrays only);
-#     there is no direct object equivalent.
-#   * JSON_CONTAINS(h, n) returns 0/1. Postgres uses the `@>` operator
-#     (which zeta accepts on jsonb). Folding the function form into
-#     `@>` is the natural mapping.
+# Status: 5 of 6 functions probed here are now IMPLEMENTED in
+# zeta and return MySQL-compatible values. JSON_CONTAINS_PATH
+# remains the lone gap (still errors `unknown function`).
+#
+# Notable semantic differences worth tracking:
+#   * JSON_KEYS(j) returns a JSON array. zeta-jsonb stores
+#     objects with keys sorted alphabetically, so the array
+#     is alphabetic regardless of input order. MySQL preserves
+#     insertion order. Set semantics of all introspection
+#     functions are unaffected.
+#   * JSON_LENGTH(j) returns the count of top-level elements
+#     for both objects AND arrays. Implemented in zeta;
+#     2-arg path form is NOT implemented (separate slice).
+#   * JSON_CONTAINS(h, n) routes through zeta-jsonb's `@>`
+#     containment matcher — equivalent semantics for the 2-arg
+#     form. The 3-arg path form is NOT implemented.
 #
 # Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
 #   # zeta-adapt: not a line-for-line copy; surface probe written to
 #     fit the M0 runner. Upstream coverage in json_functions.inc is
 #     dense and intermixed with directives the runner does not
 #     implement.
-#   # zeta-adapt: all six MySQL functions probed here are missing
-#     aliases — bundled under zeta #1063 (the general MySQL JSON
-#     function-alias gap, broader than `JSON_TYPE` etc.).
-#   # zeta-adapt: .result is pinned to zeta's *observed* output
-#     (ERROR 1105 for each). When a fix lands, drop the matching
-#     `--error` line and re-run to capture success output.
+#   # zeta-adapt: JSON_KEYS / JSON_LENGTH / JSON_DEPTH /
+#     JSON_CONTAINS / JSON_OVERLAPS implemented (zeta #1163,
+#     #1162, #1164, #1165, #1271). JSON_CONTAINS_PATH still
+#     errors `unknown function` (tracked separately).
+#   # zeta-adapt: object key ordering — JSON_KEYS result is
+#     alphabetic per zeta-jsonb's binary form (pinned in
+#     tests/main/json_length_depth_keys_basic_extra.test).
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
@@ -54,35 +62,40 @@ INSERT INTO t1 VALUES
   (2, '[1, 2, [3, 4, [5]]]'),
   (3, '{"x": "y"}');
 
---echo # ---- JSON_KEYS — top-level keys as a JSON array ----   zeta #1063
---echo # MySQL: ["a", "b", "c"]
---error 1105
+--echo # ---- JSON_KEYS — top-level keys as a JSON array ----   IMPLEMENTED
+--echo # MySQL: ["a", "b", "c"] (insertion order).
+--echo # zeta:  ["a", "b", "c"] (alphabetic — happens to coincide here).
 SELECT JSON_KEYS(j) AS k FROM t1 WHERE i = 1;
+--echo # Sort-divergence probe: input keys NOT in alphabetic order.
+--echo # MySQL would return ["z","a","m"]; zeta sorts alphabetically.
+SELECT JSON_KEYS('{"z":1,"a":2,"m":3}') AS sorted_keys;
 
---echo # ---- JSON_LENGTH — count top-level elements ----   zeta #1063
---echo # MySQL: 3 for the object, 3 for the array (top-level count).
---error 1105
+--echo # ---- JSON_LENGTH — count top-level elements ----   IMPLEMENTED
+--echo # MySQL / zeta: 3 for the object, 3 for the array (top-level count).
 SELECT JSON_LENGTH(j) AS len FROM t1 WHERE i = 1;
+SELECT JSON_LENGTH(j) AS len FROM t1 WHERE i = 2;
 
---echo # ---- JSON_DEPTH — max nesting depth ----   zeta #1063
---echo # MySQL: 3 for row 1 (root -> b/c -> nested), 4 for row 2.
---error 1105
+--echo # ---- JSON_DEPTH — max nesting depth ----   IMPLEMENTED
+--echo # MySQL / zeta: 3 for row 1 (root -> c -> bool, max over
+--echo # siblings); 4 for row 2 (root -> arr -> arr -> scalar).
+SELECT JSON_DEPTH(j) AS d FROM t1 WHERE i = 1;
 SELECT JSON_DEPTH(j) AS d FROM t1 WHERE i = 2;
 
---echo # ---- JSON_CONTAINS — does haystack contain needle? ----   zeta #1063
---echo # MySQL: 1 (true) when {"a":1} is contained in row 1.
---error 1105
+--echo # ---- JSON_CONTAINS — does haystack contain needle? ----   IMPLEMENTED
+--echo # MySQL / zeta: 1 (true) when {"a":1} is contained in row 1.
 SELECT JSON_CONTAINS(j, '{"a": 1}') AS yes FROM t1 WHERE i = 1;
 
---echo # ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   zeta #1063
+--echo # ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   GAP (untracked)
 --echo # MySQL: 1 when "one" of the listed paths resolves.
+--echo # zeta:  errors `unknown function: JSON_CONTAINS_PATH`. The
+--echo # other 5 introspection functions landed; this one is the
+--echo # lone holdout. No tracking issue cited yet.
 --error 1105
 SELECT JSON_CONTAINS_PATH(j, 'one', '$.a', '$.missing') AS yes FROM t1 WHERE i = 1;
 
---echo # ---- JSON_OVERLAPS — any element in common ----   zeta #1063
---echo # MySQL 8.0.17+: 1 when any element of two arrays / any key+val
---echo # of two objects matches.
---error 1105
+--echo # ---- JSON_OVERLAPS — any element in common ----   IMPLEMENTED
+--echo # MySQL 8.0.17+ / zeta: 1 when any element of two arrays /
+--echo # any key+val of two objects matches.
 SELECT JSON_OVERLAPS(j, '[2, 3]') AS yes FROM t1 WHERE i = 2;
 
 DROP TABLE t1;
