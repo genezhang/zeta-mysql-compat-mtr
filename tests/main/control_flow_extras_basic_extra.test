@@ -1,0 +1,149 @@
+# Independently authored CONTROL-FLOW extras smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - control_flow_basic.test: IF/IFNULL basics, COALESCE,
+#     NULLIF, CASE simple+searched, GREATEST/LEAST, ISNULL.
+#   - function_basic.test:137-148: IF bool/int/NULL conditions.
+#   - coalesce_nullif_edges_basic_extra.test: COALESCE all-null,
+#     zero-arg, short-circuit, NULLIF NULL/type-coercion,
+#     IFNULL arity, NVL, NVL2.
+#   - case_expr_basic_extra.test: CASE in WHERE/ORDER/GROUP/
+#     nested/aggregation/known-bugs.
+#
+# This slice pins what those slices DO NOT:
+#   - IF function FULL truthiness matrix: per-Value-variant
+#     truthiness via the per-arm match at lib.rs:45978-45987.
+#     Existing slices cover bool, int, NULL. Missing: string
+#     ('0'/''/non-empty), float (0.0/non-zero), and the
+#     `_ => true` arm (Date/Timestamp/JSONB/Interval/etc.).
+#   - IF arity errors (0/1/2/4 args).
+#   - NULLIF DATE/TIMESTAMP value-coercive equality (from
+#     the DATE_ADD slice PR #324 finding).
+#   - NULLIF Bool/Int strict comparison.
+#   - ISNULL on typed values (JSONB, Date, Timestamp,
+#     Interval) — existing slice covers NULL/string/int only.
+#
+# Big-picture finding:
+#   IF(cond, x, y) truthiness has a small per-type matrix:
+#     Bool → b
+#     Int/UInt/Float64 → != 0
+#     String → !is_empty() AND != "0"
+#     Null → false
+#     anything else → true (Date, Timestamp, JSONB, Interval,
+#                            UUID, DECIMAL, ...)
+#   STRIKING: SQL `0.0` parses as Value::Decimal, which falls
+#   through to `_ => true` — so IF(0.0, ...) is TRUTHY. The
+#   Float64 truthiness arm is only reachable via explicit
+#   CAST AS DOUBLE PRECISION. Major footgun if a caller
+#   expects `0.0` to behave like `0` in IF.
+#   The string "0" being false is a MySQL idiom (mirrors
+#   MySQL/PHP). The `_ => true` catch-all means a Date or
+#   JSONB column always takes the THEN branch, which is
+#   non-obvious for callers writing `IF(col, ...)` on a
+#   non-scalar column.
+#
+# Adaptation notes:
+#   # zeta-adapt: IF string '0' → false (MySQL idiom);
+#     '0.0' → true (not equal to '0'); '' → false.
+#   # zeta-adapt: IF on Date/Timestamp/JSONB/etc. → always
+#     true via `_ => true` catch-all arm. Likely surprising
+#     for callers but locked in here.
+#   # zeta-adapt: NULLIF uses values_equal which is value-
+#     coercive across DATE/TIMESTAMP-at-midnight (same as
+#     equality finding pinned in DATE_ADD slice PR #324).
+#   # zeta-adapt: Arity errors → 1105.
+
+--echo === IF truthiness — String matrix ===
+
+# String '0' → FALSE (MySQL idiom). Existing coverage only
+# tests bool/int/NULL conditions.
+SELECT IF('0', 'then', 'else')                                AS str_zero_is_false;
+# Empty string → FALSE.
+SELECT IF('', 'then', 'else')                                 AS empty_str_is_false;
+# Non-empty non-"0" string → TRUE.
+SELECT IF('hello', 'then', 'else')                            AS nonempty_str_is_true;
+# '0.0' is a 3-char string, NOT the special "0" → TRUE.
+SELECT IF('0.0', 'then', 'else')                              AS str_zero_point_zero_is_true;
+# Whitespace-only string ' ' is non-empty and not "0" → TRUE.
+SELECT IF(' ', 'then', 'else')                                AS whitespace_str_is_true;
+
+--echo === IF truthiness — Decimal vs Float64 (STRIKING finding) ===
+
+# CRITICAL: SQL parses 0.0 as Value::Decimal, NOT Value::Float64.
+# Decimal is NOT in the truthiness match arms (lib.rs:45978-
+# 45986), so it hits the `_ => true` catch-all. Meaning:
+#   IF(0.0, ...) returns 'then' (TRUTHY) — divergence vs the
+#   intuitive "0 is false" reading. MySQL would treat 0.0 as
+#   false. Pin loudly.
+SELECT IF(0.0, 'then', 'else')                                AS decimal_zero_is_TRUTHY;
+SELECT IF(3.14, 'then', 'else')                               AS decimal_nonzero_is_truthy;
+SELECT IF(-1.5, 'then', 'else')                               AS decimal_negative_is_truthy;
+# Confirm: IF(0) (Int) IS falsy; IF(0.0) (Decimal) is NOT.
+# Inequality = 1 proves the two paths take different branches.
+SELECT IF(0.0, 'then', 'else')
+    <> IF(0,   'then', 'else')                                AS decimal_zero_differs_from_int_zero;
+# To actually reach the Value::Float64 truthiness arm, force a
+# Float64 typed value via CAST. The arm DOES treat 0.0 as
+# false — but only when the value is genuinely Float64-typed.
+SELECT IF(CAST(0.0 AS DOUBLE PRECISION), 'then', 'else')      AS float64_zero_is_false;
+SELECT IF(CAST(3.14 AS DOUBLE PRECISION), 'then', 'else')     AS float64_nonzero_is_true;
+
+--echo === IF truthiness — `_ => true` catch-all (non-scalar Value variants) ===
+
+# Date / Timestamp / JSONB / Interval — all hit the catch-all
+# `_ => true` arm at the impl. None of these are "scalar
+# truthy" in MySQL; pinned as zeta divergence.
+SELECT IF(DATE '2024-03-15', 'then', 'else')                  AS date_is_true;
+SELECT IF(TIMESTAMP '2024-03-15 14:30:00', 'then', 'else')    AS timestamp_is_true;
+SELECT IF(CAST('{"a":1}' AS JSONB), 'then', 'else')           AS jsonb_is_true;
+SELECT IF(INTERVAL 1 DAY, 'then', 'else')                     AS interval_is_true;
+
+--echo === IF arity errors ===
+
+--error 1105
+SELECT IF();
+--error 1105
+SELECT IF(1);
+--error 1105
+SELECT IF(1, 2);
+--error 1105
+SELECT IF(1, 2, 3, 4);
+
+--echo === NULLIF DATE/TIMESTAMP value-coercive equality (cross-slice link) ===
+
+# NULLIF uses values_equal which (per DATE_ADD slice PR #324
+# finding) treats DATE 'X' and TIMESTAMP 'X 00:00:00' as
+# equal. So NULLIF returns NULL when they're "equal" even
+# across types — confirms the value-coercion is consistent
+# across the equality surface.
+SELECT NULLIF(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
+                                                              IS NULL
+                                                              AS date_eq_ts_midnight_returns_null;
+# When time portion is non-zero, they differ → returns the
+# first value.
+SELECT NULLIF(DATE '2024-03-15', TIMESTAMP '2024-03-15 12:00:00')
+                                                              IS NOT NULL
+                                                              AS date_ne_ts_noon_returns_first;
+
+--echo === NULLIF Bool/Int strict comparison ===
+
+# Per JSON_OVERLAPS strict-type finding (PR #314): Bool and
+# Integer are NOT considered equal under values_equal. So
+# NULLIF returns the first arg, not NULL.
+SELECT NULLIF(TRUE, 1)                                        AS bool_true_vs_int_1_keeps_first;
+SELECT NULLIF(FALSE, 0)                                       AS bool_false_vs_int_0_keeps_first;
+# Confirm: NULLIF(TRUE, TRUE) does return NULL (same type+value).
+SELECT NULLIF(TRUE, TRUE)  IS NULL                            AS bool_eq_bool_returns_null;
+
+--echo === ISNULL on typed values (JSONB, Date, Timestamp, Interval) ===
+
+# Existing slice only covers ISNULL(NULL/string/int). The
+# typed-value arm is unreached.
+SELECT ISNULL(DATE '2024-03-15')                              AS isnull_date;
+SELECT ISNULL(TIMESTAMP '2024-03-15 14:30:00')                AS isnull_timestamp;
+SELECT ISNULL(CAST('{"a":1}' AS JSONB))                       AS isnull_jsonb;
+SELECT ISNULL(INTERVAL 1 DAY)                                 AS isnull_interval;
+# A typed NULL (CAST NULL AS DATE) still ISNULL → 1.
+SELECT ISNULL(CAST(NULL AS DATE))                             AS isnull_typed_null;
