@@ -1,0 +1,134 @@
+# Independently authored STRCMP / TIMESTAMPDIFF smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Two unrelated-but-uncovered functions; STRCMP is
+# pure-string, TIMESTAMPDIFF is calendar arithmetic.
+#
+# Big-picture finding:
+#   STRCMP(a, b)               — -1 / 0 / 1 byte-lexicographic
+#                                comparison. NULL on either → NULL.
+#                                Byte-equal (case-sensitive) per zeta
+#                                convention.
+#   TIMESTAMPDIFF(u, s, e)     — integer delta from s to e in unit
+#                                `u` (MICROSECOND/SECOND/MINUTE/HOUR/
+#                                DAY/WEEK/MONTH/QUARTER/YEAR). Negative
+#                                if s > e. Calendar-boundary counting
+#                                for MONTH/QUARTER/YEAR (sign-aware).
+#
+# Adaptation notes:
+#   # zeta-adapt: STRCMP is byte-equal (case-sensitive). MySQL
+#     default collation would be case-insensitive — STRCMP('a','A')
+#     = 0 in MySQL default, ≠ 0 in zeta. Pinned.
+#   # zeta-adapt: TIMESTAMPDIFF unit string is case-INsensitive
+#     (uppercased internally).
+#   # zeta-adapt: TIMESTAMPDIFF accepts Date, Timestamp, and
+#     date-or-timestamp parseable strings on both sides.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === STRCMP: basic lex compare ===
+
+SELECT STRCMP('a', 'a')                  AS equal_zero;
+SELECT STRCMP('a', 'b')                  AS less_neg_one;
+SELECT STRCMP('b', 'a')                  AS greater_one;
+SELECT STRCMP('abc', 'abd')              AS less_at_third;
+SELECT STRCMP('abc', 'abc')              AS equal_three;
+
+--echo === STRCMP: length-based ordering ===
+
+# Shorter string is "less" if it's a prefix of the longer.
+SELECT STRCMP('abc', 'abcd')             AS prefix_shorter_neg;
+SELECT STRCMP('abcd', 'abc')             AS prefix_longer_pos;
+
+--echo === STRCMP: case sensitivity (zeta byte-equal divergence) ===
+
+# MySQL default collation: STRCMP('a','A') = 0 (case-insensitive).
+# zeta: byte-equal → 'a' (0x61) > 'A' (0x41) → 1.
+SELECT STRCMP('a', 'A')                  AS case_byte_equal;
+SELECT STRCMP('hello', 'Hello')          AS case_mixed;
+
+--echo === STRCMP: empty + NULL ===
+
+SELECT STRCMP('', '')                    AS both_empty;
+SELECT STRCMP('', 'a')                   AS empty_less;
+SELECT STRCMP('a', '')                   AS empty_greater;
+SELECT STRCMP(NULL, 'a') IS NULL         AS null_a;
+SELECT STRCMP('a', NULL) IS NULL         AS null_b;
+SELECT STRCMP(NULL, NULL) IS NULL        AS null_both;
+
+--echo === STRCMP: numeric coercion ===
+
+SELECT STRCMP(1, 1)                      AS int_equal;
+SELECT STRCMP(1, 2)                      AS int_less;
+SELECT STRCMP('10', 10)                  AS string_vs_int;
+
+--echo === STRCMP: arity ===
+
+--error 1105
+SELECT STRCMP();
+--error 1105
+SELECT STRCMP('a');
+--error 1105
+SELECT STRCMP('a', 'b', 'c');
+
+--echo === TIMESTAMPDIFF: MICROSECOND / SECOND / MINUTE / HOUR ===
+
+SELECT TIMESTAMPDIFF(MICROSECOND, '2024-01-01 00:00:00', '2024-01-01 00:00:01') AS us_one_sec;
+SELECT TIMESTAMPDIFF(SECOND,      '2024-01-01 00:00:00', '2024-01-01 00:01:00') AS sec_one_min;
+SELECT TIMESTAMPDIFF(MINUTE,      '2024-01-01 00:00:00', '2024-01-01 01:00:00') AS min_one_hr;
+SELECT TIMESTAMPDIFF(HOUR,        '2024-01-01 00:00:00', '2024-01-02 00:00:00') AS hr_one_day;
+
+--echo === TIMESTAMPDIFF: DAY / WEEK ===
+
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', '2024-01-08')                 AS day_one_week;
+SELECT TIMESTAMPDIFF(WEEK, '2024-01-01', '2024-01-15')                 AS week_two;
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', '2024-12-31')                 AS day_leap_year;
+
+--echo === TIMESTAMPDIFF: MONTH / QUARTER / YEAR (calendar arithmetic) ===
+
+# Whole month boundaries.
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-01', '2024-04-01')                AS month_three;
+SELECT TIMESTAMPDIFF(QUARTER, '2024-01-01', '2024-12-31')              AS quarter_three;
+SELECT TIMESTAMPDIFF(YEAR, '2020-06-01', '2024-06-01')                 AS year_four_exact;
+# Calendar-boundary edge: same Y/M, day NOT yet reached → MONTH = 0.
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-15', '2024-02-14')                AS month_one_day_short;
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-15', '2024-02-15')                AS month_exactly_one;
+# Day reached + time-of-day → MONTH still 1 since day-of-month equal.
+SELECT TIMESTAMPDIFF(YEAR, '2020-03-01', '2024-02-29')                 AS year_three_short;
+
+--echo === TIMESTAMPDIFF: negative direction (start > end) ===
+
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-08', '2024-01-01')                 AS neg_day;
+SELECT TIMESTAMPDIFF(MONTH, '2024-04-01', '2024-01-01')                AS neg_month;
+
+--echo === TIMESTAMPDIFF: unit case-insensitive ===
+
+SELECT TIMESTAMPDIFF(day,  '2024-01-01', '2024-01-02')                 AS unit_lower;
+SELECT TIMESTAMPDIFF(Day,  '2024-01-01', '2024-01-02')                 AS unit_mixed;
+
+--echo === TIMESTAMPDIFF: NULL on any arg ===
+
+SELECT TIMESTAMPDIFF(NULL, '2024-01-01', '2024-01-02') IS NULL         AS null_unit;
+SELECT TIMESTAMPDIFF(DAY,  NULL,         '2024-01-02') IS NULL         AS null_start;
+SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', NULL)         IS NULL         AS null_end;
+
+--echo === TIMESTAMPDIFF: arity ===
+
+# Note: TIMESTAMPDIFF's unit identifier (DAY, MONTH, etc.) is
+# special-cased only inside the canonical 3-arg form. For any
+# other arity, the bare identifier falls back to a column-name
+# lookup and surfaces as 1054 ("column not found: DAY"). The
+# 0-arg form reaches the executor arity guard → 1105.
+--error 1105
+SELECT TIMESTAMPDIFF();
+--error 1054
+SELECT TIMESTAMPDIFF(DAY);
+--error 1054
+SELECT TIMESTAMPDIFF(DAY, '2024-01-01');
+--error 1054
+SELECT TIMESTAMPDIFF(DAY, '2024-01-01', '2024-01-02', 'extra');
+
+--echo === Determinism ===
+
+SELECT STRCMP('a', 'b')     = STRCMP('a', 'b')               AS strcmp_det;
+SELECT TIMESTAMPDIFF(DAY, '2024-01-01', '2024-01-02')
+     = TIMESTAMPDIFF(DAY, '2024-01-01', '2024-01-02')        AS tsdiff_det;
