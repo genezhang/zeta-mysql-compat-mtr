@@ -1,0 +1,138 @@
+=== DAYOFWEEK: Sunday=1 .. Saturday=7 ===
+SELECT DAYOFWEEK('2024-01-07')           AS sunday;
+sunday
+1
+SELECT DAYOFWEEK('2024-01-08')           AS monday;
+monday
+2
+SELECT DAYOFWEEK('2024-01-09')           AS tuesday;
+tuesday
+3
+SELECT DAYOFWEEK('2024-01-10')           AS wednesday;
+wednesday
+4
+SELECT DAYOFWEEK('2024-01-11')           AS thursday;
+thursday
+5
+SELECT DAYOFWEEK('2024-01-12')           AS friday;
+friday
+6
+SELECT DAYOFWEEK('2024-01-13')           AS saturday;
+saturday
+7
+SELECT DAYOFWEEK('1970-01-01')           AS epoch_thursday;
+epoch_thursday
+5
+=== WEEKDAY: Monday=0 .. Sunday=6 ===
+SELECT WEEKDAY('2024-01-08')             AS monday_0;
+monday_0
+0
+SELECT WEEKDAY('2024-01-09')             AS tuesday_1;
+tuesday_1
+1
+SELECT WEEKDAY('2024-01-13')             AS saturday_5;
+saturday_5
+5
+SELECT WEEKDAY('2024-01-14')             AS sunday_6;
+sunday_6
+6
+SELECT WEEKDAY('1970-01-01')             AS epoch_thursday_3;
+epoch_thursday_3
+3
+=== DAYOFWEEK / WEEKDAY: cross-consistency invariant ===
+SELECT WEEKDAY('2024-01-08') = (DAYOFWEEK('2024-01-08') + 5) % 7  AS invariant_monday;
+invariant_monday
+1
+SELECT WEEKDAY('2024-01-13') = (DAYOFWEEK('2024-01-13') + 5) % 7  AS invariant_saturday;
+invariant_saturday
+1
+=== DAYOFYEAR: 1..365 / 1..366 ===
+SELECT DAYOFYEAR('2024-01-01')           AS year_start;
+year_start
+1
+SELECT DAYOFYEAR('2024-01-31')           AS day_31;
+day_31
+31
+SELECT DAYOFYEAR('2024-02-01')           AS day_32;
+day_32
+32
+SELECT DAYOFYEAR('2024-02-29')           AS leap_feb_29;
+leap_feb_29
+60
+SELECT DAYOFYEAR('2024-03-01')           AS day_after_leap;
+day_after_leap
+61
+SELECT DAYOFYEAR('2024-12-31')           AS leap_year_end_366;
+leap_year_end_366
+366
+SELECT DAYOFYEAR('2023-12-31')           AS non_leap_year_end_365;
+non_leap_year_end_365
+365
+SELECT DAYOFYEAR('2023-03-01')           AS non_leap_day_after_feb;
+non_leap_day_after_feb
+60
+SELECT DAYOFYEAR('2025-01-01')           AS year_start_1;
+year_start_1
+1
+=== LAST_DAY: end-of-month for various months ===
+SELECT LAST_DAY('2024-01-15')            AS jan_eom;
+jan_eom
+2024-01-31
+SELECT LAST_DAY('2024-03-01')            AS mar_eom;
+mar_eom
+2024-03-31
+SELECT LAST_DAY('2024-04-15')            AS apr_eom;
+apr_eom
+2024-04-30
+SELECT LAST_DAY('2024-12-25')            AS dec_eom;
+dec_eom
+2024-12-31
+SELECT LAST_DAY('2024-02-15')            AS feb_leap;
+feb_leap
+2024-02-29
+SELECT LAST_DAY('2023-02-15')            AS feb_non_leap;
+feb_non_leap
+2023-02-28
+SELECT LAST_DAY(LAST_DAY('2024-01-15'))
+     = LAST_DAY('2024-01-15')            AS idempotent;
+idempotent
+1
+SELECT LAST_DAY('2024-01-15') - DATE '2024-01-15' AS days_to_eom;
+days_to_eom
+16
+=== LAST_DAY: timestamp input ===
+SELECT LAST_DAY('2024-02-15 14:30:00')   AS ts_leap_feb;
+ts_leap_feb
+2024-02-29
+SELECT LAST_DAY('2024-04-15 23:59:59')   AS ts_apr;
+ts_apr
+2024-04-30
+=== NULL passthrough ===
+SELECT DAYOFWEEK(NULL) IS NULL           AS dow_null;
+dow_null
+1
+SELECT WEEKDAY(NULL)   IS NULL           AS wkd_null;
+wkd_null
+1
+SELECT DAYOFYEAR(NULL) IS NULL           AS doy_null;
+doy_null
+1
+SELECT LAST_DAY(NULL)  IS NULL           AS ld_null;
+ld_null
+1
+=== Arity errors ===
+SELECT DAYOFWEEK();
+ERROR 1105: execution error: DAYOFWEEK requires 1 argument
+SELECT WEEKDAY();
+ERROR 1105: execution error: WEEKDAY requires 1 argument
+SELECT DAYOFYEAR();
+ERROR 1105: execution error: DAYOFYEAR requires 1 argument
+SELECT LAST_DAY();
+ERROR 1105: execution error: LAST_DAY requires 1 argument
+=== Determinism ===
+SELECT DAYOFWEEK('2024-01-08') = DAYOFWEEK('2024-01-08') AS dow_det;
+dow_det
+1
+SELECT LAST_DAY('2024-02-15')  = LAST_DAY('2024-02-15')  AS ld_det;
+ld_det
+1
