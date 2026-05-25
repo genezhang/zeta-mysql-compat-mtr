@@ -1,0 +1,151 @@
+# Independently authored TRIM family + REPLACE extras smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - trim_family_basic_extra.test: 1-arg / 2-arg forms,
+#     Unicode whitespace divergence, multi-byte sets, NULL,
+#     directionality, idempotency, arity (1064 for TRIM(),
+#     1105 for LTRIM/RTRIM).
+#   - replace_basic_extra.test: basic, empty-from divergence,
+#     case sensitivity, multi-byte, NULL, arity, numeric int
+#     coercion.
+#
+# This slice pins what those slices DO NOT:
+#   - SQL-standard `TRIM(LEADING/TRAILING/BOTH ... FROM ...)`
+#     qualifier rewriting — the parser converts these into
+#     LTRIM / RTRIM / TRIM function calls. Never pinned.
+#   - `TRIM(BOTH FROM s)` with NO trim_what arg — falls back to
+#     1-arg TRIM (default whitespace).
+#   - TRIM/LTRIM/RTRIM type-coercion matrix (bool, date,
+#     timestamp) via value_to_sql_string. Existing slice
+#     covers strings + Unicode chars; numeric/bool/date arms
+#     of the coerce helper are unreached.
+#   - REPLACE bool / date / timestamp coercion (existing slice
+#     covers numeric int only).
+#   - REPLACE empty-from + empty-to combo on a NON-empty input
+#     (existing slice has the triple-empty corner only).
+#
+# Big-picture finding:
+#   The SQL-standard TRIM qualifiers (LEADING/TRAILING/BOTH)
+#   are SYNTACTIC SUGAR — the parser rewrites them to
+#   LTRIM/RTRIM/TRIM function calls (per
+#   zeta-parser/src/convert.rs Trim arm). The qualifier form
+#   has no separate impl arm, so semantics are exactly what
+#   the function-call form pins. Documenting this so a user
+#   who hits a TRIM(LEADING ...) issue knows to debug the
+#   LTRIM arm.
+#
+# Adaptation notes:
+#   # zeta-adapt: TRIM(LEADING 'x' FROM 'xxhello') parses as
+#     LTRIM('xxhello', 'x'). TRIM(TRAILING) → RTRIM. TRIM(BOTH)
+#     and TRIM (no qualifier) → TRIM. Verified by recording.
+#   # zeta-adapt: value_to_sql_string is the coercion path for
+#     non-string inputs across the whole string-function family;
+#     bool → 'true'/'false', date → 'YYYY-MM-DD', timestamp →
+#     'YYYY-MM-DD HH:MM:SS.ffffff' (with .000000 padding).
+
+--echo === SQL-standard TRIM qualifier rewriting ===
+
+# The 3 equivalence rows below are AST-shape sanity (parser
+# rewrites both sides to the same Expr::Function call), NOT
+# semantic invariants. They guard against a parser refactor
+# that splits one rewrite arm without the other. The _recorded
+# rows immediately after pin the actual values.
+SELECT TRIM(LEADING 'x' FROM 'xxxhellox')
+     = LTRIM('xxxhellox', 'x')                                AS leading_eq_ltrim;
+SELECT TRIM(TRAILING 'x' FROM 'xhelloxxx')
+     = RTRIM('xhelloxxx', 'x')                                AS trailing_eq_rtrim;
+# Note: zeta's TRIM doesn't accept the MySQL comma syntax
+# TRIM(s, chars), so compare via TRIM(BOTH 'x' FROM ...) =
+# TRIM('x' FROM ...) (the SQL-standard equivalent).
+SELECT TRIM(BOTH 'x' FROM 'xxhelloxx')
+     =      TRIM('x' FROM 'xxhelloxx')                        AS both_eq_default;
+# Direct recording of the LEADING / TRAILING forms.
+SELECT TRIM(LEADING 'x' FROM 'xxxhellox')                     AS leading_recorded;
+SELECT TRIM(TRAILING 'x' FROM 'xhelloxxx')                    AS trailing_recorded;
+SELECT TRIM(BOTH 'x' FROM 'xxhelloxx')                        AS both_recorded;
+
+--echo === TRIM qualifier with NO trim_what — falls back to 1-arg form ===
+
+# Parser produces TRIM(s) / LTRIM(s) / RTRIM(s) when trim_what
+# is absent, regardless of the qualifier. All three fall back
+# to the 1-arg default-whitespace path.
+SELECT TRIM(BOTH FROM '  hello  ')                            AS both_no_what_strips_ws;
+SELECT TRIM(BOTH FROM '  hello  ')   = 'hello'                AS both_no_what_eq_default;
+# LEADING with no trim_what -> LTRIM(s) (1-arg).
+SELECT TRIM(LEADING FROM '  hello  ')                         AS leading_no_what_strips_left;
+SELECT TRIM(LEADING FROM '  hello  ')
+     = LTRIM('  hello  ')                                     AS leading_no_what_eq_ltrim;
+# TRAILING with no trim_what -> RTRIM(s) (1-arg).
+SELECT TRIM(TRAILING FROM '  hello  ')                        AS trailing_no_what_strips_right;
+SELECT TRIM(TRAILING FROM '  hello  ')
+     = RTRIM('  hello  ')                                     AS trailing_no_what_eq_rtrim;
+
+--echo === TRIM/LTRIM/RTRIM with non-string input (bool coercion) ===
+
+# value_to_sql_string converts bool → 'true' / 'false'.
+# Default-whitespace TRIM is a no-op on 'true'/'false'.
+SELECT TRIM(TRUE)                                             AS trim_bool_true;
+SELECT TRIM(FALSE)                                            AS trim_bool_false;
+SELECT LTRIM(TRUE)                                            AS ltrim_bool;
+SELECT RTRIM(FALSE)                                           AS rtrim_bool;
+# Trim chars FROM bool: 't' from 'true' leaves 'rue'.
+SELECT LTRIM(TRUE, 't')                                       AS ltrim_bool_with_chars;
+
+--echo === TRIM/LTRIM/RTRIM with date input (coerce via Display) ===
+
+# DATE Display is 'YYYY-MM-DD'. Trim '-' leaves '20240315'.
+SELECT TRIM('-' FROM DATE '2024-03-15')                       AS trim_date_dashes;
+# LTRIM only leading dashes (DATE Display starts with year).
+SELECT LTRIM(DATE '2024-03-15', '2')                          AS ltrim_date_leading_2;
+# RTRIM trailing.
+SELECT RTRIM(DATE '2024-03-15', '5')                          AS rtrim_date_trailing_5;
+
+--echo === TRIM with timestamp input (note .000000 padding) ===
+
+# TIMESTAMP Display UNCONDITIONALLY writes `.{micros:06}` (see
+# zeta-common/src/value.rs Timestamp arm), so the trailing `.`
+# in the next row is a CONSEQUENCE of that padding being all
+# zeros — NOT a general invariant. If Timestamp Display were
+# ever changed to elide trailing zeros (mirroring Value::Time),
+# the row would re-record without the lone `.`.
+SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45', '0')            AS rtrim_timestamp_zeros;
+# Companion with non-zero micros: RTRIM('0') strips the 3
+# trailing zeros of '.123000' → '.123', no lone dot. Pins the
+# non-elision form of Display so a regression that changes it
+# is caught by THIS row even if the all-zero row above coincides
+# with new behavior.
+SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45.123000', '0')     AS rtrim_timestamp_nonzero_micros;
+# Verify Display: TRIM on a whole-second timestamp returns the
+# full padded form unchanged (no trimmable chars at the ends).
+SELECT TRIM(TIMESTAMP '2024-03-15 14:30:45')                  AS trim_timestamp_default_ws_noop;
+
+--echo === REPLACE with bool input ===
+
+# 'true' → 'TRUE' via case-replace.
+SELECT REPLACE(TRUE, 'tr', 'TR')                              AS replace_bool_true;
+SELECT REPLACE(FALSE, 'al', 'AL')                             AS replace_bool_false;
+
+--echo === REPLACE with date input ===
+
+# Replace '-' with '/' in the Display form.
+SELECT REPLACE(DATE '2024-03-15', '-', '/')                   AS replace_date_dashes;
+# Date FROM, string TO.
+SELECT REPLACE('birthday: 2024-03-15', DATE '2024-03-15', 'TODAY')
+                                                              AS replace_date_in_str;
+
+--echo === REPLACE with timestamp input ===
+
+# Strip the always-present .000000 microseconds tail.
+SELECT REPLACE(TIMESTAMP '2024-03-15 14:30:45', '.000000', '')
+                                                              AS replace_ts_strip_us;
+
+--echo === REPLACE empty-from + empty-to combo on non-empty input ===
+
+# Existing slice has the triple-empty corner only. Pin the
+# non-empty-input case: empty-from inserts at every position,
+# empty-to means each insert is the empty string → net no-op.
+# Total chars = original (3) + insertions (4 empty strings) = 3.
+SELECT REPLACE('abc', '', '')                                 AS replace_empty_from_empty_to;
+SELECT LENGTH(REPLACE('abc', '', '')) = 3                     AS replace_empty_both_len_unchanged;
