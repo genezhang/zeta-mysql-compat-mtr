@@ -1,0 +1,144 @@
+# Independently authored JSON_SET / JSON_INSERT / JSON_REPLACE
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/. Three JSON mutation functions with
+# subtle conditional semantics; none had dedicated compat-mtr
+# coverage yet (json_basic touches a few but not exhaustively).
+#
+# Big-picture finding:
+#   JSON_SET(t, p1, v1, ...)     — set p1=v1 regardless of
+#                                  whether p1 already exists.
+#                                  (insert OR replace)
+#   JSON_INSERT(t, p1, v1, ...)  — set ONLY IF p1 does NOT exist
+#                                  (no overwrite of existing).
+#   JSON_REPLACE(t, p1, v1, ...) — set ONLY IF p1 DOES exist
+#                                  (no insert of new).
+#
+# Common bug area: confusing the three. Pinning differential
+# tests against the same target makes the divergence obvious.
+#
+# Adaptation notes:
+#   # zeta-adapt: First-pass scope is OBJECT-KEY paths only.
+#     Array-index paths ($[0]) cause early NULL return.
+#     Pinned by negative test.
+#   # zeta-adapt: NULL target → NULL result.
+#   # zeta-adapt: NULL path mid-pair → NULL result (short-
+#     circuits, no further pairs processed).
+#   # zeta-adapt: Invalid path syntax (not parseable by
+#     parse_mysql_json_path) → NULL.
+#   # zeta-adapt: zeta's JSONB canonicalizer SORTS object keys
+#     alphabetically (PG/zeta convention). MySQL preserves
+#     insertion order. Differential SET vs INSERT vs REPLACE
+#     tests use single-key paths so the key-order divergence
+#     doesn't muddy the recording.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Differential: same target, missing path → SET inserts, INSERT inserts, REPLACE no-ops ===
+
+# Target has only 'a'. Path is missing 'b'. Each function's
+# response shows its identity.
+SELECT JSON_SET    ('{"a":1}', '$.b', 2)         AS set_missing;
+SELECT JSON_INSERT ('{"a":1}', '$.b', 2)         AS insert_missing;
+SELECT JSON_REPLACE('{"a":1}', '$.b', 2)         AS replace_missing;
+
+--echo === Differential: existing path → SET replaces, INSERT no-ops, REPLACE replaces ===
+
+SELECT JSON_SET    ('{"a":1}', '$.a', 99)        AS set_existing;
+SELECT JSON_INSERT ('{"a":1}', '$.a', 99)        AS insert_existing;
+SELECT JSON_REPLACE('{"a":1}', '$.a', 99)        AS replace_existing;
+
+--echo === Multi-pair (path, value) variadic ===
+
+# Two pairs, both on missing paths. SET inserts both; INSERT
+# inserts both; REPLACE inserts NEITHER.
+SELECT JSON_SET    ('{"a":1}', '$.b', 2, '$.c', 3)  AS set_two_missing;
+SELECT JSON_INSERT ('{"a":1}', '$.b', 2, '$.c', 3)  AS insert_two_missing;
+SELECT JSON_REPLACE('{"a":1}', '$.b', 2, '$.c', 3)  AS replace_two_missing;
+
+# Mixed: one existing, one missing. SET applies both, INSERT
+# only the missing one, REPLACE only the existing one.
+SELECT JSON_SET    ('{"a":1}', '$.a', 99, '$.b', 2) AS set_mixed;
+SELECT JSON_INSERT ('{"a":1}', '$.a', 99, '$.b', 2) AS insert_mixed;
+SELECT JSON_REPLACE('{"a":1}', '$.a', 99, '$.b', 2) AS replace_mixed;
+
+--echo === Value types: int / string / bool / array / object / null ===
+
+SELECT JSON_SET('{}', '$.k', 42)                 AS val_int;
+SELECT JSON_SET('{}', '$.k', 'hi')               AS val_string;
+SELECT JSON_SET('{}', '$.k', TRUE)               AS val_bool;
+SELECT JSON_SET('{}', '$.k', CAST('[1,2,3]' AS JSONB))  AS val_array;
+SELECT JSON_SET('{}', '$.k', CAST('{"x":1}' AS JSONB))  AS val_object;
+# SQL NULL value sets the path to JSON null.
+SELECT JSON_SET('{}', '$.k', NULL)               AS val_sql_null;
+
+--echo === NULL target / NULL path mid-pair → NULL ===
+
+SELECT JSON_SET(NULL, '$.a', 1)        IS NULL   AS set_null_target;
+SELECT JSON_INSERT(NULL, '$.a', 1)     IS NULL   AS insert_null_target;
+SELECT JSON_REPLACE(NULL, '$.a', 1)    IS NULL   AS replace_null_target;
+# NULL path mid-pair short-circuits to NULL.
+SELECT JSON_SET('{"a":1}', NULL, 2)    IS NULL   AS set_null_path;
+
+--echo === Array-index path → NULL (first-pass: object keys only) ===
+
+# Path '$[0]' is a syntactically valid MySQL JSON path but the
+# impl's first-pass scope only handles object-key paths.
+SELECT JSON_SET   ('[1,2,3]', '$[0]', 99) IS NULL AS set_array_path_null;
+SELECT JSON_INSERT('[1,2,3]', '$[0]', 99) IS NULL AS insert_array_path_null;
+
+--echo === Invalid path syntax → NULL ===
+
+SELECT JSON_SET('{"a":1}',   'not-a-path', 2) IS NULL AS set_bad_path;
+SELECT JSON_INSERT('{"a":1}','not-a-path', 2) IS NULL AS insert_bad_path;
+
+--echo === Arity: needs target + at least one (path, value) pair ===
+
+# Even-arg count (target + odd number of args = even total)
+# is rejected. Documented in impl: args.len() < 3 OR even.
+--error 1105
+SELECT JSON_SET();
+--error 1105
+SELECT JSON_SET('{"a":1}');
+--error 1105
+SELECT JSON_SET('{"a":1}', '$.a');
+--error 1105
+SELECT JSON_SET('{"a":1}', '$.a', 1, '$.b');
+--error 1105
+SELECT JSON_INSERT();
+--error 1105
+SELECT JSON_INSERT('{"a":1}', '$.a');
+--error 1105
+SELECT JSON_REPLACE();
+--error 1105
+SELECT JSON_REPLACE('{"a":1}', '$.a');
+
+--echo === Nested-key paths (multi-step keys vector) ===
+
+# Path '$.a.c' on '{"a":{"b":1}}' sets a.c. Each function's
+# response follows its identity (SET inserts since a.c missing).
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.c', 9)  AS set_nested_missing;
+SELECT JSON_INSERT ('{"a":{"b":1}}', '$.a.c', 9)  AS insert_nested_missing;
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.c', 9)  AS replace_nested_missing;
+# Existing nested key.
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.b', 9)  AS set_nested_existing;
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.b', 9)  AS replace_nested_existing;
+
+--echo === Scalar target (non-object): path set fails silently ===
+
+# Target is a JSON string scalar, not an object. SET/INSERT/REPLACE
+# all attempt to set `$.k` but the path can't apply to a scalar —
+# zeta returns the scalar unchanged.
+SELECT JSON_SET('"a string"', '$.k', 1)           AS set_scalar_target;
+SELECT JSON_INSERT('"a string"', '$.k', 1)        AS insert_scalar_target;
+
+--echo === Idempotency: applying SET twice with the same value is stable ===
+
+SELECT JSON_SET(JSON_SET('{"a":1}', '$.a', 99), '$.a', 99)
+     = JSON_SET('{"a":1}', '$.a', 99)            AS set_idempotent;
+
+--echo === Determinism ===
+
+SELECT JSON_SET('{"a":1}', '$.b', 2)
+     = JSON_SET('{"a":1}', '$.b', 2)             AS set_det;
+SELECT JSON_INSERT('{"a":1}', '$.b', 2)
+     = JSON_INSERT('{"a":1}', '$.b', 2)          AS insert_det;

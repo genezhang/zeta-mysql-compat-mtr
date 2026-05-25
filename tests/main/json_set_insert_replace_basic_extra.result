@@ -1,0 +1,139 @@
+=== Differential: same target, missing path → SET inserts, INSERT inserts, REPLACE no-ops ===
+SELECT JSON_SET    ('{"a":1}', '$.b', 2)         AS set_missing;
+set_missing
+{"a":1,"b":2}
+SELECT JSON_INSERT ('{"a":1}', '$.b', 2)         AS insert_missing;
+insert_missing
+{"a":1,"b":2}
+SELECT JSON_REPLACE('{"a":1}', '$.b', 2)         AS replace_missing;
+replace_missing
+{"a":1}
+=== Differential: existing path → SET replaces, INSERT no-ops, REPLACE replaces ===
+SELECT JSON_SET    ('{"a":1}', '$.a', 99)        AS set_existing;
+set_existing
+{"a":99}
+SELECT JSON_INSERT ('{"a":1}', '$.a', 99)        AS insert_existing;
+insert_existing
+{"a":1}
+SELECT JSON_REPLACE('{"a":1}', '$.a', 99)        AS replace_existing;
+replace_existing
+{"a":99}
+=== Multi-pair (path, value) variadic ===
+SELECT JSON_SET    ('{"a":1}', '$.b', 2, '$.c', 3)  AS set_two_missing;
+set_two_missing
+{"a":1,"b":2,"c":3}
+SELECT JSON_INSERT ('{"a":1}', '$.b', 2, '$.c', 3)  AS insert_two_missing;
+insert_two_missing
+{"a":1,"b":2,"c":3}
+SELECT JSON_REPLACE('{"a":1}', '$.b', 2, '$.c', 3)  AS replace_two_missing;
+replace_two_missing
+{"a":1}
+SELECT JSON_SET    ('{"a":1}', '$.a', 99, '$.b', 2) AS set_mixed;
+set_mixed
+{"a":99,"b":2}
+SELECT JSON_INSERT ('{"a":1}', '$.a', 99, '$.b', 2) AS insert_mixed;
+insert_mixed
+{"a":1,"b":2}
+SELECT JSON_REPLACE('{"a":1}', '$.a', 99, '$.b', 2) AS replace_mixed;
+replace_mixed
+{"a":99}
+=== Value types: int / string / bool / array / object / null ===
+SELECT JSON_SET('{}', '$.k', 42)                 AS val_int;
+val_int
+{"k":42}
+SELECT JSON_SET('{}', '$.k', 'hi')               AS val_string;
+val_string
+{"k":"hi"}
+SELECT JSON_SET('{}', '$.k', TRUE)               AS val_bool;
+val_bool
+{"k":true}
+SELECT JSON_SET('{}', '$.k', CAST('[1,2,3]' AS JSONB))  AS val_array;
+val_array
+{"k":[1,2,3]}
+SELECT JSON_SET('{}', '$.k', CAST('{"x":1}' AS JSONB))  AS val_object;
+val_object
+{"k":{"x":1}}
+SELECT JSON_SET('{}', '$.k', NULL)               AS val_sql_null;
+val_sql_null
+{"k":null}
+=== NULL target / NULL path mid-pair → NULL ===
+SELECT JSON_SET(NULL, '$.a', 1)        IS NULL   AS set_null_target;
+set_null_target
+1
+SELECT JSON_INSERT(NULL, '$.a', 1)     IS NULL   AS insert_null_target;
+insert_null_target
+1
+SELECT JSON_REPLACE(NULL, '$.a', 1)    IS NULL   AS replace_null_target;
+replace_null_target
+1
+SELECT JSON_SET('{"a":1}', NULL, 2)    IS NULL   AS set_null_path;
+set_null_path
+1
+=== Array-index path → NULL (first-pass: object keys only) ===
+SELECT JSON_SET   ('[1,2,3]', '$[0]', 99) IS NULL AS set_array_path_null;
+set_array_path_null
+1
+SELECT JSON_INSERT('[1,2,3]', '$[0]', 99) IS NULL AS insert_array_path_null;
+insert_array_path_null
+1
+=== Invalid path syntax → NULL ===
+SELECT JSON_SET('{"a":1}',   'not-a-path', 2) IS NULL AS set_bad_path;
+set_bad_path
+1
+SELECT JSON_INSERT('{"a":1}','not-a-path', 2) IS NULL AS insert_bad_path;
+insert_bad_path
+1
+=== Arity: needs target + at least one (path, value) pair ===
+SELECT JSON_SET();
+ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+SELECT JSON_SET('{"a":1}');
+ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+SELECT JSON_SET('{"a":1}', '$.a');
+ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+SELECT JSON_SET('{"a":1}', '$.a', 1, '$.b');
+ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+SELECT JSON_INSERT();
+ERROR 1105: execution error: JSON_INSERT requires target and one or more (path, value) pairs
+SELECT JSON_INSERT('{"a":1}', '$.a');
+ERROR 1105: execution error: JSON_INSERT requires target and one or more (path, value) pairs
+SELECT JSON_REPLACE();
+ERROR 1105: execution error: JSON_REPLACE requires target and one or more (path, value) pairs
+SELECT JSON_REPLACE('{"a":1}', '$.a');
+ERROR 1105: execution error: JSON_REPLACE requires target and one or more (path, value) pairs
+=== Nested-key paths (multi-step keys vector) ===
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.c', 9)  AS set_nested_missing;
+set_nested_missing
+{"a":{"b":1,"c":9}}
+SELECT JSON_INSERT ('{"a":{"b":1}}', '$.a.c', 9)  AS insert_nested_missing;
+insert_nested_missing
+{"a":{"b":1,"c":9}}
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.c', 9)  AS replace_nested_missing;
+replace_nested_missing
+{"a":{"b":1}}
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.b', 9)  AS set_nested_existing;
+set_nested_existing
+{"a":{"b":9}}
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.b', 9)  AS replace_nested_existing;
+replace_nested_existing
+{"a":{"b":9}}
+=== Scalar target (non-object): path set fails silently ===
+SELECT JSON_SET('"a string"', '$.k', 1)           AS set_scalar_target;
+set_scalar_target
+"a string"
+SELECT JSON_INSERT('"a string"', '$.k', 1)        AS insert_scalar_target;
+insert_scalar_target
+"a string"
+=== Idempotency: applying SET twice with the same value is stable ===
+SELECT JSON_SET(JSON_SET('{"a":1}', '$.a', 99), '$.a', 99)
+     = JSON_SET('{"a":1}', '$.a', 99)            AS set_idempotent;
+set_idempotent
+1
+=== Determinism ===
+SELECT JSON_SET('{"a":1}', '$.b', 2)
+     = JSON_SET('{"a":1}', '$.b', 2)             AS set_det;
+set_det
+1
+SELECT JSON_INSERT('{"a":1}', '$.b', 2)
+     = JSON_INSERT('{"a":1}', '$.b', 2)          AS insert_det;
+insert_det
+1
