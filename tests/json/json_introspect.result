@@ -10,6 +10,11 @@ INSERT INTO t1 VALUES
 SELECT JSON_KEYS(j) AS k FROM t1 WHERE i = 1;
 k
 ["a","b","c"]
+# Sort-divergence probe: input keys NOT in alphabetic order.
+# MySQL would return ["z","a","m"]; zeta sorts alphabetically.
+SELECT JSON_KEYS('{"z":1,"a":2,"m":3}') AS sorted_keys;
+sorted_keys
+["a","m","z"]
 # ---- JSON_LENGTH — count top-level elements ----   IMPLEMENTED
 # MySQL / zeta: 3 for the object, 3 for the array (top-level count).
 SELECT JSON_LENGTH(j) AS len FROM t1 WHERE i = 1;
@@ -32,9 +37,11 @@ d
 SELECT JSON_CONTAINS(j, '{"a": 1}') AS yes FROM t1 WHERE i = 1;
 yes
 1
-# ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   GAP (not implemented)
+# ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   GAP (untracked)
 # MySQL: 1 when "one" of the listed paths resolves.
-# zeta:  errors `unknown function: JSON_CONTAINS_PATH`.
+# zeta:  errors `unknown function: JSON_CONTAINS_PATH`. The
+# other 5 introspection functions landed; this one is the
+# lone holdout. No tracking issue cited yet.
 SELECT JSON_CONTAINS_PATH(j, 'one', '$.a', '$.missing') AS yes FROM t1 WHERE i = 1;
 ERROR 1105: execution error: unknown function: JSON_CONTAINS_PATH
 # ---- JSON_OVERLAPS — any element in common ----   IMPLEMENTED

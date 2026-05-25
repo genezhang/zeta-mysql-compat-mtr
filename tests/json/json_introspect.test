@@ -36,7 +36,7 @@
 #     functions are unaffected.
 #   * JSON_LENGTH(j) returns the count of top-level elements
 #     for both objects AND arrays. Implemented in zeta;
-#     2-arg path form is NOT (separate slice).
+#     2-arg path form is NOT implemented (separate slice).
 #   * JSON_CONTAINS(h, n) routes through zeta-jsonb's `@>`
 #     containment matcher — equivalent semantics for the 2-arg
 #     form. The 3-arg path form is NOT implemented.
@@ -66,6 +66,9 @@ INSERT INTO t1 VALUES
 --echo # MySQL: ["a", "b", "c"] (insertion order).
 --echo # zeta:  ["a", "b", "c"] (alphabetic — happens to coincide here).
 SELECT JSON_KEYS(j) AS k FROM t1 WHERE i = 1;
+--echo # Sort-divergence probe: input keys NOT in alphabetic order.
+--echo # MySQL would return ["z","a","m"]; zeta sorts alphabetically.
+SELECT JSON_KEYS('{"z":1,"a":2,"m":3}') AS sorted_keys;
 
 --echo # ---- JSON_LENGTH — count top-level elements ----   IMPLEMENTED
 --echo # MySQL / zeta: 3 for the object, 3 for the array (top-level count).
@@ -82,9 +85,11 @@ SELECT JSON_DEPTH(j) AS d FROM t1 WHERE i = 2;
 --echo # MySQL / zeta: 1 (true) when {"a":1} is contained in row 1.
 SELECT JSON_CONTAINS(j, '{"a": 1}') AS yes FROM t1 WHERE i = 1;
 
---echo # ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   GAP (not implemented)
+--echo # ---- JSON_CONTAINS_PATH — does any/all path resolve? ----   GAP (untracked)
 --echo # MySQL: 1 when "one" of the listed paths resolves.
---echo # zeta:  errors `unknown function: JSON_CONTAINS_PATH`.
+--echo # zeta:  errors `unknown function: JSON_CONTAINS_PATH`. The
+--echo # other 5 introspection functions landed; this one is the
+--echo # lone holdout. No tracking issue cited yet.
 --error 1105
 SELECT JSON_CONTAINS_PATH(j, 'one', '$.a', '$.missing') AS yes FROM t1 WHERE i = 1;
 
