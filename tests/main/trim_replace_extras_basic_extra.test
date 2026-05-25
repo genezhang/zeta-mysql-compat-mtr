@@ -17,7 +17,7 @@
 #     LTRIM / RTRIM / TRIM function calls. Never pinned.
 #   - `TRIM(BOTH FROM s)` with NO trim_what arg — falls back to
 #     1-arg TRIM (default whitespace).
-#   - TRIM/LTRIM/RTRIM full type-coercion matrix (bool, date,
+#   - TRIM/LTRIM/RTRIM type-coercion matrix (bool, date,
 #     timestamp) via value_to_sql_string. Existing slice
 #     covers strings + Unicode chars; numeric/bool/date arms
 #     of the coerce helper are unreached.
@@ -47,13 +47,15 @@
 
 --echo === SQL-standard TRIM qualifier rewriting ===
 
-# TRIM(LEADING 'x' FROM 'xxxhellox') = LTRIM('xxxhellox', 'x').
+# The 3 equivalence rows below are AST-shape sanity (parser
+# rewrites both sides to the same Expr::Function call), NOT
+# semantic invariants. They guard against a parser refactor
+# that splits one rewrite arm without the other. The _recorded
+# rows immediately after pin the actual values.
 SELECT TRIM(LEADING 'x' FROM 'xxxhellox')
      = LTRIM('xxxhellox', 'x')                                AS leading_eq_ltrim;
-# TRIM(TRAILING 'x' FROM 'xhelloxxx') = RTRIM('xhelloxxx', 'x').
 SELECT TRIM(TRAILING 'x' FROM 'xhelloxxx')
      = RTRIM('xhelloxxx', 'x')                                AS trailing_eq_rtrim;
-# TRIM(BOTH 'x' FROM 'xxhelloxx') = TRIM('xxhelloxx', 'x').
 # Note: zeta's TRIM doesn't accept the MySQL comma syntax
 # TRIM(s, chars), so compare via TRIM(BOTH 'x' FROM ...) =
 # TRIM('x' FROM ...) (the SQL-standard equivalent).
@@ -64,11 +66,21 @@ SELECT TRIM(LEADING 'x' FROM 'xxxhellox')                     AS leading_recorde
 SELECT TRIM(TRAILING 'x' FROM 'xhelloxxx')                    AS trailing_recorded;
 SELECT TRIM(BOTH 'x' FROM 'xxhelloxx')                        AS both_recorded;
 
---echo === TRIM(BOTH FROM s) — no trim_what, defaults to whitespace ===
+--echo === TRIM qualifier with NO trim_what — falls back to 1-arg form ===
 
-# Parser produces TRIM(s) (1-arg) when trim_what is absent.
+# Parser produces TRIM(s) / LTRIM(s) / RTRIM(s) when trim_what
+# is absent, regardless of the qualifier. All three fall back
+# to the 1-arg default-whitespace path.
 SELECT TRIM(BOTH FROM '  hello  ')                            AS both_no_what_strips_ws;
 SELECT TRIM(BOTH FROM '  hello  ')   = 'hello'                AS both_no_what_eq_default;
+# LEADING with no trim_what -> LTRIM(s) (1-arg).
+SELECT TRIM(LEADING FROM '  hello  ')                         AS leading_no_what_strips_left;
+SELECT TRIM(LEADING FROM '  hello  ')
+     = LTRIM('  hello  ')                                     AS leading_no_what_eq_ltrim;
+# TRAILING with no trim_what -> RTRIM(s) (1-arg).
+SELECT TRIM(TRAILING FROM '  hello  ')                        AS trailing_no_what_strips_right;
+SELECT TRIM(TRAILING FROM '  hello  ')
+     = RTRIM('  hello  ')                                     AS trailing_no_what_eq_rtrim;
 
 --echo === TRIM/LTRIM/RTRIM with non-string input (bool coercion) ===
 
@@ -92,9 +104,22 @@ SELECT RTRIM(DATE '2024-03-15', '5')                          AS rtrim_date_trai
 
 --echo === TRIM with timestamp input (note .000000 padding) ===
 
-# TIMESTAMP Display appends .000000 for whole-second times.
-# RTRIM trailing zeros leaves '2024-03-15 14:30:45.'
+# TIMESTAMP Display UNCONDITIONALLY writes `.{micros:06}` (see
+# zeta-common/src/value.rs Timestamp arm), so the trailing `.`
+# in the next row is a CONSEQUENCE of that padding being all
+# zeros — NOT a general invariant. If Timestamp Display were
+# ever changed to elide trailing zeros (mirroring Value::Time),
+# the row would re-record without the lone `.`.
 SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45', '0')            AS rtrim_timestamp_zeros;
+# Companion with non-zero micros: RTRIM('0') strips the 3
+# trailing zeros of '.123000' → '.123', no lone dot. Pins the
+# non-elision form of Display so a regression that changes it
+# is caught by THIS row even if the all-zero row above coincides
+# with new behavior.
+SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45.123000', '0')     AS rtrim_timestamp_nonzero_micros;
+# Verify Display: TRIM on a whole-second timestamp returns the
+# full padded form unchanged (no trimmable chars at the ends).
+SELECT TRIM(TIMESTAMP '2024-03-15 14:30:45')                  AS trim_timestamp_default_ws_noop;
 
 --echo === REPLACE with bool input ===
 

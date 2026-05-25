@@ -20,12 +20,26 @@ xhello
 SELECT TRIM(BOTH 'x' FROM 'xxhelloxx')                        AS both_recorded;
 both_recorded
 hello
-=== TRIM(BOTH FROM s) — no trim_what, defaults to whitespace ===
+=== TRIM qualifier with NO trim_what — falls back to 1-arg form ===
 SELECT TRIM(BOTH FROM '  hello  ')                            AS both_no_what_strips_ws;
 both_no_what_strips_ws
 hello
 SELECT TRIM(BOTH FROM '  hello  ')   = 'hello'                AS both_no_what_eq_default;
 both_no_what_eq_default
+1
+SELECT TRIM(LEADING FROM '  hello  ')                         AS leading_no_what_strips_left;
+leading_no_what_strips_left
+hello  
+SELECT TRIM(LEADING FROM '  hello  ')
+     = LTRIM('  hello  ')                                     AS leading_no_what_eq_ltrim;
+leading_no_what_eq_ltrim
+1
+SELECT TRIM(TRAILING FROM '  hello  ')                        AS trailing_no_what_strips_right;
+trailing_no_what_strips_right
+  hello
+SELECT TRIM(TRAILING FROM '  hello  ')
+     = RTRIM('  hello  ')                                     AS trailing_no_what_eq_rtrim;
+trailing_no_what_eq_rtrim
 1
 === TRIM/LTRIM/RTRIM with non-string input (bool coercion) ===
 SELECT TRIM(TRUE)                                             AS trim_bool_true;
@@ -57,6 +71,12 @@ rtrim_date_trailing_5
 SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45', '0')            AS rtrim_timestamp_zeros;
 rtrim_timestamp_zeros
 2024-03-15 14:30:45.
+SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45.123000', '0')     AS rtrim_timestamp_nonzero_micros;
+rtrim_timestamp_nonzero_micros
+2024-03-15 14:30:45.123
+SELECT TRIM(TIMESTAMP '2024-03-15 14:30:45')                  AS trim_timestamp_default_ws_noop;
+trim_timestamp_default_ws_noop
+2024-03-15 14:30:45.000000
 === REPLACE with bool input ===
 SELECT REPLACE(TRUE, 'tr', 'TR')                              AS replace_bool_true;
 replace_bool_true
