@@ -75,6 +75,8 @@ SELECT REGEXP_INSTR('a', NULL)   IS NULL     AS null_pattern;
 --error 1105
 SELECT REGEXP_INSTR();
 --error 1105
+SELECT REGEXP_INSTR('a');
+--error 1105
 SELECT REGEXP_INSTR('a', 'b', 1, 'extra');
 
 --echo === REGEXP_SUBSTR: extract first match ===
@@ -97,6 +99,8 @@ SELECT REGEXP_SUBSTR(NULL, 'x')   IS NULL    AS null_source;
 SELECT REGEXP_SUBSTR('a', NULL)   IS NULL    AS null_pattern;
 --error 1105
 SELECT REGEXP_SUBSTR();
+--error 1105
+SELECT REGEXP_SUBSTR('a');
 --error 1105
 SELECT REGEXP_SUBSTR('a', 'b', 1, 'extra');
 
@@ -143,6 +147,34 @@ SELECT REGEXP_LIKE('café', 'é')                AS utf8_like;
 SELECT REGEXP_SUBSTR('café', 'é')              AS utf8_substr;
 SELECT REGEXP_REPLACE('café', 'é', 'e')        AS utf8_replace;
 SELECT REGEXP_REPLACE('café', 'é', 'e') = 'cafe' AS utf8_replace_value;
+
+--echo === Lookbehind / lookahead pattern rejected ===
+
+# Rust regex crate doesn't support lookbehind/lookahead — pins
+# the contract divergence from MySQL ICU (which DOES support
+# them). Both REGEXP_LIKE and REGEXP_REPLACE go through
+# compile_regex_cached → 1105 on the unsupported feature.
+--error 1105
+SELECT REGEXP_LIKE('abc', '(?<=foo)bar');
+--error 1105
+SELECT REGEXP_REPLACE('abc', '(?<=foo)bar', 'X');
+
+--echo === REGEXP_REPLACE: literal `$` in replacement ===
+
+# Rust regex treats `$` in replacement as a backref introducer.
+# `$word` is interpreted as a named-group reference; since the
+# pattern has no named group `word`, it expands to empty.
+# Literal `$` requires `$$` or `${0}`/`${N}` shaping.
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$word')        AS dollar_word_named_group;
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$$')           AS dollar_escaped;
+
+--echo === Empty source string on all four ===
+
+SELECT REGEXP_LIKE('', 'abc')                           AS empty_source_like;
+SELECT REGEXP_INSTR('', 'abc')                          AS empty_source_instr;
+SELECT REGEXP_SUBSTR('', 'abc') IS NULL                 AS empty_source_substr;
+SELECT REGEXP_REPLACE('', 'abc', 'X')                   AS empty_source_replace;
+SELECT LENGTH(REGEXP_REPLACE('', 'abc', 'X')) = 0       AS empty_source_replace_len;
 
 --echo === Determinism ===
 

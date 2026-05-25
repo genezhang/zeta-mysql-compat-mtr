@@ -69,6 +69,8 @@ null_pattern
 1
 SELECT REGEXP_INSTR();
 ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
+SELECT REGEXP_INSTR('a');
+ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
 SELECT REGEXP_INSTR('a', 'b', 1, 'extra');
 ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
 === REGEXP_SUBSTR: extract first match ===
@@ -102,6 +104,8 @@ SELECT REGEXP_SUBSTR('a', NULL)   IS NULL    AS null_pattern;
 null_pattern
 1
 SELECT REGEXP_SUBSTR();
+ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+SELECT REGEXP_SUBSTR('a');
 ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
 SELECT REGEXP_SUBSTR('a', 'b', 1, 'extra');
 ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
@@ -163,6 +167,40 @@ utf8_replace
 cafe
 SELECT REGEXP_REPLACE('café', 'é', 'e') = 'cafe' AS utf8_replace_value;
 utf8_replace_value
+1
+=== Lookbehind / lookahead pattern rejected ===
+SELECT REGEXP_LIKE('abc', '(?<=foo)bar');
+ERROR 1105: execution error: invalid regex: regex parse error:
+    (?<=foo)bar
+    ^^^^
+error: look-around, including look-ahead and look-behind, is not supported
+SELECT REGEXP_REPLACE('abc', '(?<=foo)bar', 'X');
+ERROR 1105: execution error: invalid regex: regex parse error:
+    (?<=foo)bar
+    ^^^^
+error: look-around, including look-ahead and look-behind, is not supported
+=== REGEXP_REPLACE: literal `$` in replacement ===
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$word')        AS dollar_word_named_group;
+dollar_word_named_group
+
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$$')           AS dollar_escaped;
+dollar_escaped
+$
+=== Empty source string on all four ===
+SELECT REGEXP_LIKE('', 'abc')                           AS empty_source_like;
+empty_source_like
+0
+SELECT REGEXP_INSTR('', 'abc')                          AS empty_source_instr;
+empty_source_instr
+0
+SELECT REGEXP_SUBSTR('', 'abc') IS NULL                 AS empty_source_substr;
+empty_source_substr
+1
+SELECT REGEXP_REPLACE('', 'abc', 'X')                   AS empty_source_replace;
+empty_source_replace
+
+SELECT LENGTH(REGEXP_REPLACE('', 'abc', 'X')) = 0       AS empty_source_replace_len;
+empty_source_replace_len
 1
 === Determinism ===
 SELECT REGEXP_LIKE('a', 'a')    = REGEXP_LIKE('a', 'a')    AS like_det;
