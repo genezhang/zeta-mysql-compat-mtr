@@ -1,0 +1,179 @@
+# Independently authored combined extras smoke for the three
+# JSON modifier functions — JSON_ARRAY_APPEND / JSON_ARRAY_INSERT
+# / JSON_REMOVE — for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_array_append_basic_extra.test (full root/path/chain
+#     matrix, NULL, arity, invalid JSON, wildcards)
+#   - json_array_insert_basic_extra.test (insert/append/clamp,
+#     non-array no-op, chain w/ shifted indices, path-error)
+#   - json_remove_basic_extra.test (key/index removal, root
+#     error, NULL, nested NULL, arity, TEXT-column variant)
+#
+# This slice pins what those slices DO NOT:
+#   - Already-typed JSONB target (CAST AS JSONB) for all three —
+#     exercises the Value::Jsonb arm of each modifier's coerce
+#     block, which is currently unreached.
+#   - Wrong-type target rejection (INT, FLOAT, BYTEA) for all
+#     three. Each impl has an explicit `_ => Err(...)` arm that
+#     the existing slices skip.
+#   - CAST(... AS JSON) value injection for APPEND/INSERT — the
+#     impl comments explicitly call this out as the way to
+#     append a JSON structure rather than a JSON string. Never
+#     pinned anywhere. (JSON_REMOVE takes no value argument, so
+#     there is no symmetric REMOVE case.)
+#   - JSON_REMOVE multi-path chain where some paths succeed and
+#     some are no-ops — the existing slice covers each in
+#     isolation but not interleaved.
+#   - Empty-container outcomes after JSON_REMOVE drops the last
+#     key / element.
+#
+# Big-picture finding:
+#   The three modifiers share a common coerce pattern (Value::Null
+#   short-circuit, Value::Jsonb pass-through, Value::String parse,
+#   `_` reject). Existing slices only ever pass STRING targets;
+#   this slice closes the typed-arm and wrong-type-arm gaps.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON and JSONB are PARSER ALIASES in zeta —
+#     both map to DataType::Jsonb (zeta-parser/src/datatype.rs).
+#     The runtime distinction tested below is between a raw SQL
+#     STRING (which the modifier parses on the fly via
+#     from_json_str) and an already-typed Value::Jsonb (which
+#     passes through). CAST(... AS JSON) and CAST(... AS JSONB)
+#     are interchangeable; the slice uses both spellings to
+#     mirror MySQL (JSON) vs PG (JSONB) idiom in the docs but
+#     they route through the same arm.
+#   # zeta-adapt: Wrong-type target (INT, FLOAT, BYTEA, etc.)
+#     → 1105 with the per-function 'target must be JSON'
+#     message.
+#   # zeta-adapt: CAST AS JSON/JSONB value injection is the
+#     documented escape hatch for appending/inserting JSON
+#     structures instead of JSON strings.
+
+--echo === Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+
+# Sanity: prove the CAST routes to a typed value (not a String
+# that the modifier would still parse on the fly). If a future
+# refactor lowered CAST AS JSONB to a string-typed expression,
+# the "typed Jsonb arm" coverage below would silently regress
+# back to the String arm; this row catches that.
+SELECT JSON_TYPE(CAST('[1,2]' AS JSONB))                      AS jsonb_cast_lands_as_array;
+
+--echo === JSON_ARRAY_APPEND on already-typed JSONB target ===
+
+# Without CAST, the target routes through from_json_str (String
+# arm). CAST AS JSONB forces the Value::Jsonb branch.
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND(CAST('[1,2]' AS JSONB), '$', 3))
+                                                              AS typed_append_len;
+SELECT JSON_EXTRACT(JSON_ARRAY_APPEND(CAST('[1,2]' AS JSONB), '$', 3), '$[2]')
+                                                              AS typed_append_val;
+
+--echo === JSON_ARRAY_INSERT on already-typed JSONB target ===
+
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT(CAST('[1,2,3]' AS JSONB), '$[1]', 9))
+                                                              AS typed_insert_len;
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT(CAST('[1,2,3]' AS JSONB), '$[1]', 9), '$[1]')
+                                                              AS typed_insert_val;
+
+--echo === JSON_REMOVE on already-typed JSONB target ===
+
+SELECT JSON_LENGTH(JSON_REMOVE(CAST('{"a":1,"b":2}' AS JSONB), '$.a'))
+                                                              AS typed_remove_len;
+SELECT JSON_EXTRACT(JSON_REMOVE(CAST('{"a":1,"b":2}' AS JSONB), '$.a'), '$.b')
+                                                              AS typed_remove_survivor;
+
+--echo === Wrong-type target (INT) → ERROR for all three ===
+
+--error 1105
+SELECT JSON_ARRAY_APPEND(42, '$', 1);
+--error 1105
+SELECT JSON_ARRAY_INSERT(42, '$[0]', 1);
+--error 1105
+SELECT JSON_REMOVE(42, '$.a');
+
+--echo === Wrong-type target (FLOAT) → ERROR for all three ===
+
+--error 1105
+SELECT JSON_ARRAY_APPEND(3.14, '$', 1);
+--error 1105
+SELECT JSON_ARRAY_INSERT(3.14, '$[0]', 1);
+--error 1105
+SELECT JSON_REMOVE(3.14, '$.a');
+
+--echo === Wrong-type target (BOOLEAN) → ERROR for all three ===
+
+# BOOLEAN hits the same `_` arm but via a different upstream
+# lowering than INT / FLOAT. (BYTEA would also be interesting,
+# but `CAST(... AS BYTEA)` is itself rejected by the executor
+# with 'unsupported CAST target type: BYTEA' — a separate
+# parser/executor inconsistency, pinned via that surface.)
+--error 1105
+SELECT JSON_ARRAY_APPEND(TRUE, '$', 1);
+--error 1105
+SELECT JSON_ARRAY_INSERT(TRUE, '$[0]', 1);
+--error 1105
+SELECT JSON_REMOVE(TRUE, '$.a');
+
+--echo === CAST AS JSON value injection (APPEND) ===
+
+# Without CAST, the SQL string '{"x":1}' becomes a JSON STRING
+# element. With CAST AS JSON, it becomes a JSON OBJECT element.
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[]', '$', '{"x":1}'),
+  '$[0]'
+))                                                            AS string_appended_as_string;
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[]', '$', CAST('{"x":1}' AS JSON)),
+  '$[0]'
+))                                                            AS string_appended_as_json_via_cast;
+# CAST AS JSON of an array literal: appended as array.
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[]', '$', CAST('[10,20]' AS JSON)),
+  '$[0]'
+))                                                            AS array_appended_via_cast;
+
+--echo === CAST AS JSON value injection (INSERT) ===
+
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', CAST('{"x":1}' AS JSON)),
+  '$[1]'
+))                                                            AS object_inserted_via_cast;
+# Symmetric to the APPEND array-literal pin above.
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', CAST('[10,20]' AS JSON)),
+  '$[1]'
+))                                                            AS array_inserted_via_cast;
+
+--echo === JSON_REMOVE multi-path chain: mixed success + no-op ===
+
+# First path removes; second path is missing (silent no-op).
+# Final length should reflect the one successful removal.
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2}', '$.a', '$.missing'))
+                                                              AS one_removed_one_noop;
+# Interleaved: noop, hit, noop. Same outcome (1 removed).
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2,"c":3}',
+                               '$.missing', '$.b', '$.also_missing'))
+                                                              AS interleaved_noops;
+# Three hits → all three removed.
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2,"c":3,"d":4}',
+                               '$.a', '$.b', '$.c'))           AS three_removed;
+
+--echo === JSON_REMOVE drops the last key/element → empty container ===
+
+# All keys removed: object becomes {} (length 0, still OBJECT).
+SELECT JSON_TYPE(JSON_REMOVE('{"a":1}', '$.a'))               AS empty_obj_after_remove_type;
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1}', '$.a'))             AS empty_obj_after_remove_len;
+# All elements removed: array becomes [] (length 0, still ARRAY).
+SELECT JSON_TYPE(JSON_REMOVE('[1]', '$[0]'))                  AS empty_arr_after_remove_type;
+SELECT JSON_LENGTH(JSON_REMOVE('[1]', '$[0]'))                AS empty_arr_after_remove_len;
+
+--echo === JSON_REMOVE same path twice: second is silent no-op ===
+
+# After removing $.a once, $.a no longer exists — second removal
+# is a no-op. Final state same as removing once.
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2}', '$.a', '$.a'))
+                                                              AS same_path_twice_len;
+SELECT JSON_EXTRACT(JSON_REMOVE('{"a":1,"b":2}', '$.a', '$.a'), '$.b')
+                                                              AS same_path_twice_survivor;

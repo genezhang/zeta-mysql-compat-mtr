@@ -1,0 +1,120 @@
+=== Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+SELECT JSON_TYPE(CAST('[1,2]' AS JSONB))                      AS jsonb_cast_lands_as_array;
+jsonb_cast_lands_as_array
+ARRAY
+=== JSON_ARRAY_APPEND on already-typed JSONB target ===
+SELECT JSON_LENGTH(JSON_ARRAY_APPEND(CAST('[1,2]' AS JSONB), '$', 3))
+                                                              AS typed_append_len;
+typed_append_len
+3
+SELECT JSON_EXTRACT(JSON_ARRAY_APPEND(CAST('[1,2]' AS JSONB), '$', 3), '$[2]')
+                                                              AS typed_append_val;
+typed_append_val
+3
+=== JSON_ARRAY_INSERT on already-typed JSONB target ===
+SELECT JSON_LENGTH(JSON_ARRAY_INSERT(CAST('[1,2,3]' AS JSONB), '$[1]', 9))
+                                                              AS typed_insert_len;
+typed_insert_len
+4
+SELECT JSON_EXTRACT(JSON_ARRAY_INSERT(CAST('[1,2,3]' AS JSONB), '$[1]', 9), '$[1]')
+                                                              AS typed_insert_val;
+typed_insert_val
+9
+=== JSON_REMOVE on already-typed JSONB target ===
+SELECT JSON_LENGTH(JSON_REMOVE(CAST('{"a":1,"b":2}' AS JSONB), '$.a'))
+                                                              AS typed_remove_len;
+typed_remove_len
+1
+SELECT JSON_EXTRACT(JSON_REMOVE(CAST('{"a":1,"b":2}' AS JSONB), '$.a'), '$.b')
+                                                              AS typed_remove_survivor;
+typed_remove_survivor
+2
+=== Wrong-type target (INT) → ERROR for all three ===
+SELECT JSON_ARRAY_APPEND(42, '$', 1);
+ERROR 1105: execution error: JSON_ARRAY_APPEND target must be JSON
+SELECT JSON_ARRAY_INSERT(42, '$[0]', 1);
+ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
+SELECT JSON_REMOVE(42, '$.a');
+ERROR 1105: execution error: JSON_REMOVE target must be JSON
+=== Wrong-type target (FLOAT) → ERROR for all three ===
+SELECT JSON_ARRAY_APPEND(3.14, '$', 1);
+ERROR 1105: execution error: JSON_ARRAY_APPEND target must be JSON
+SELECT JSON_ARRAY_INSERT(3.14, '$[0]', 1);
+ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
+SELECT JSON_REMOVE(3.14, '$.a');
+ERROR 1105: execution error: JSON_REMOVE target must be JSON
+=== Wrong-type target (BOOLEAN) → ERROR for all three ===
+SELECT JSON_ARRAY_APPEND(TRUE, '$', 1);
+ERROR 1105: execution error: JSON_ARRAY_APPEND target must be JSON
+SELECT JSON_ARRAY_INSERT(TRUE, '$[0]', 1);
+ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
+SELECT JSON_REMOVE(TRUE, '$.a');
+ERROR 1105: execution error: JSON_REMOVE target must be JSON
+=== CAST AS JSON value injection (APPEND) ===
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[]', '$', '{"x":1}'),
+  '$[0]'
+))                                                            AS string_appended_as_string;
+string_appended_as_string
+STRING
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[]', '$', CAST('{"x":1}' AS JSON)),
+  '$[0]'
+))                                                            AS string_appended_as_json_via_cast;
+string_appended_as_json_via_cast
+OBJECT
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_APPEND('[]', '$', CAST('[10,20]' AS JSON)),
+  '$[0]'
+))                                                            AS array_appended_via_cast;
+array_appended_via_cast
+ARRAY
+=== CAST AS JSON value injection (INSERT) ===
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', CAST('{"x":1}' AS JSON)),
+  '$[1]'
+))                                                            AS object_inserted_via_cast;
+object_inserted_via_cast
+OBJECT
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', CAST('[10,20]' AS JSON)),
+  '$[1]'
+))                                                            AS array_inserted_via_cast;
+array_inserted_via_cast
+ARRAY
+=== JSON_REMOVE multi-path chain: mixed success + no-op ===
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2}', '$.a', '$.missing'))
+                                                              AS one_removed_one_noop;
+one_removed_one_noop
+1
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2,"c":3}',
+                               '$.missing', '$.b', '$.also_missing'))
+                                                              AS interleaved_noops;
+interleaved_noops
+2
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2,"c":3,"d":4}',
+                               '$.a', '$.b', '$.c'))           AS three_removed;
+three_removed
+1
+=== JSON_REMOVE drops the last key/element → empty container ===
+SELECT JSON_TYPE(JSON_REMOVE('{"a":1}', '$.a'))               AS empty_obj_after_remove_type;
+empty_obj_after_remove_type
+OBJECT
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1}', '$.a'))             AS empty_obj_after_remove_len;
+empty_obj_after_remove_len
+0
+SELECT JSON_TYPE(JSON_REMOVE('[1]', '$[0]'))                  AS empty_arr_after_remove_type;
+empty_arr_after_remove_type
+ARRAY
+SELECT JSON_LENGTH(JSON_REMOVE('[1]', '$[0]'))                AS empty_arr_after_remove_len;
+empty_arr_after_remove_len
+0
+=== JSON_REMOVE same path twice: second is silent no-op ===
+SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2}', '$.a', '$.a'))
+                                                              AS same_path_twice_len;
+same_path_twice_len
+1
+SELECT JSON_EXTRACT(JSON_REMOVE('{"a":1,"b":2}', '$.a', '$.a'), '$.b')
+                                                              AS same_path_twice_survivor;
+same_path_twice_survivor
+2
