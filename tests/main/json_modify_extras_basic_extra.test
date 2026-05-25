@@ -15,13 +15,14 @@
 #   - Already-typed JSONB target (CAST AS JSONB) for all three —
 #     exercises the Value::Jsonb arm of each modifier's coerce
 #     block, which is currently unreached.
-#   - Wrong-type target rejection (INT, FLOAT) for all three.
-#     Each impl has an explicit `_ => Err(...)` arm that the
-#     existing slices skip.
+#   - Wrong-type target rejection (INT, FLOAT, BYTEA) for all
+#     three. Each impl has an explicit `_ => Err(...)` arm that
+#     the existing slices skip.
 #   - CAST(... AS JSON) value injection for APPEND/INSERT — the
 #     impl comments explicitly call this out as the way to
 #     append a JSON structure rather than a JSON string. Never
-#     pinned anywhere.
+#     pinned anywhere. (JSON_REMOVE takes no value argument, so
+#     there is no symmetric REMOVE case.)
 #   - JSON_REMOVE multi-path chain where some paths succeed and
 #     some are no-ops — the existing slice covers each in
 #     isolation but not interleaved.
@@ -35,11 +36,30 @@
 #   this slice closes the typed-arm and wrong-type-arm gaps.
 #
 # Adaptation notes:
-#   # zeta-adapt: Wrong-type target (INT, FLOAT, etc.) → 1105
-#     with the per-function 'target must be JSON' message.
-#   # zeta-adapt: CAST AS JSON value injection is the documented
-#     escape hatch for appending/inserting JSON structures
-#     instead of JSON strings.
+#   # zeta-adapt: JSON and JSONB are PARSER ALIASES in zeta —
+#     both map to DataType::Jsonb (zeta-parser/src/datatype.rs).
+#     The runtime distinction tested below is between a raw SQL
+#     STRING (which the modifier parses on the fly via
+#     from_json_str) and an already-typed Value::Jsonb (which
+#     passes through). CAST(... AS JSON) and CAST(... AS JSONB)
+#     are interchangeable; the slice uses both spellings to
+#     mirror MySQL (JSON) vs PG (JSONB) idiom in the docs but
+#     they route through the same arm.
+#   # zeta-adapt: Wrong-type target (INT, FLOAT, BYTEA, etc.)
+#     → 1105 with the per-function 'target must be JSON'
+#     message.
+#   # zeta-adapt: CAST AS JSON/JSONB value injection is the
+#     documented escape hatch for appending/inserting JSON
+#     structures instead of JSON strings.
+
+--echo === Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+
+# Sanity: prove the CAST routes to a typed value (not a String
+# that the modifier would still parse on the fly). If a future
+# refactor lowered CAST AS JSONB to a string-typed expression,
+# the "typed Jsonb arm" coverage below would silently regress
+# back to the String arm; this row catches that.
+SELECT JSON_TYPE(CAST('[1,2]' AS JSONB))                      AS jsonb_cast_lands_as_array;
 
 --echo === JSON_ARRAY_APPEND on already-typed JSONB target ===
 
@@ -82,6 +102,20 @@ SELECT JSON_ARRAY_INSERT(3.14, '$[0]', 1);
 --error 1105
 SELECT JSON_REMOVE(3.14, '$.a');
 
+--echo === Wrong-type target (BOOLEAN) → ERROR for all three ===
+
+# BOOLEAN hits the same `_` arm but via a different upstream
+# lowering than INT / FLOAT. (BYTEA would also be interesting,
+# but `CAST(... AS BYTEA)` is itself rejected by the executor
+# with 'unsupported CAST target type: BYTEA' — a separate
+# parser/executor inconsistency, pinned via that surface.)
+--error 1105
+SELECT JSON_ARRAY_APPEND(TRUE, '$', 1);
+--error 1105
+SELECT JSON_ARRAY_INSERT(TRUE, '$[0]', 1);
+--error 1105
+SELECT JSON_REMOVE(TRUE, '$.a');
+
 --echo === CAST AS JSON value injection (APPEND) ===
 
 # Without CAST, the SQL string '{"x":1}' becomes a JSON STRING
@@ -106,6 +140,11 @@ SELECT JSON_TYPE(JSON_EXTRACT(
   JSON_ARRAY_INSERT('[1,2]', '$[1]', CAST('{"x":1}' AS JSON)),
   '$[1]'
 ))                                                            AS object_inserted_via_cast;
+# Symmetric to the APPEND array-literal pin above.
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', CAST('[10,20]' AS JSON)),
+  '$[1]'
+))                                                            AS array_inserted_via_cast;
 
 --echo === JSON_REMOVE multi-path chain: mixed success + no-op ===
 

@@ -1,3 +1,7 @@
+=== Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+SELECT JSON_TYPE(CAST('[1,2]' AS JSONB))                      AS jsonb_cast_lands_as_array;
+jsonb_cast_lands_as_array
+ARRAY
 === JSON_ARRAY_APPEND on already-typed JSONB target ===
 SELECT JSON_LENGTH(JSON_ARRAY_APPEND(CAST('[1,2]' AS JSONB), '$', 3))
                                                               AS typed_append_len;
@@ -39,6 +43,13 @@ SELECT JSON_ARRAY_INSERT(3.14, '$[0]', 1);
 ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
 SELECT JSON_REMOVE(3.14, '$.a');
 ERROR 1105: execution error: JSON_REMOVE target must be JSON
+=== Wrong-type target (BOOLEAN) → ERROR for all three ===
+SELECT JSON_ARRAY_APPEND(TRUE, '$', 1);
+ERROR 1105: execution error: JSON_ARRAY_APPEND target must be JSON
+SELECT JSON_ARRAY_INSERT(TRUE, '$[0]', 1);
+ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
+SELECT JSON_REMOVE(TRUE, '$.a');
+ERROR 1105: execution error: JSON_REMOVE target must be JSON
 === CAST AS JSON value injection (APPEND) ===
 SELECT JSON_TYPE(JSON_EXTRACT(
   JSON_ARRAY_APPEND('[]', '$', '{"x":1}'),
@@ -65,6 +76,12 @@ SELECT JSON_TYPE(JSON_EXTRACT(
 ))                                                            AS object_inserted_via_cast;
 object_inserted_via_cast
 OBJECT
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_ARRAY_INSERT('[1,2]', '$[1]', CAST('[10,20]' AS JSON)),
+  '$[1]'
+))                                                            AS array_inserted_via_cast;
+array_inserted_via_cast
+ARRAY
 === JSON_REMOVE multi-path chain: mixed success + no-op ===
 SELECT JSON_LENGTH(JSON_REMOVE('{"a":1,"b":2}', '$.a', '$.missing'))
                                                               AS one_removed_one_noop;
