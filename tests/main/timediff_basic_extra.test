@@ -21,6 +21,12 @@
 #   # zeta-adapt: Saturating subtract — overflow saturates at
 #     i64::MIN/MAX µs rather than wrapping. MySQL would error on
 #     out-of-range TIME (TIME range is ±838:59:59).
+#     Note: the saturation boundary itself is unreachable through
+#     parseable date/time literals (would need an input ~292,471
+#     years out, which parse_timestamp rejects long before). The
+#     saturating arithmetic is therefore validated by Rust unit
+#     tests; this slice pins the practically-observable side
+#     (wide-but-finite diffs emitted unbounded — see below).
 #   # zeta-adapt: Wide diffs that exceed MySQL TIME range
 #     (±838:59:59) are NOT clamped by zeta; the encoder still
 #     emits HH:MM:SS with the unbounded hour count. Documented
@@ -74,11 +80,29 @@ SELECT TIMEDIFF('00:00:00.250000', '00:00:01.500000') AS neg_subsec;
 # where each side independently mapped to its own absolute µs origin.
 # This is a documented quirk of zeta's per-side coercion; the result
 # is well-defined but not equivalent to MySQL's semantics (MySQL
-# requires matching types or rejects).
-SELECT TIMEDIFF('14:30:45', '2024-03-15 14:30:45') IS NOT NULL
-                                                      AS mixed_time_minus_ts_returns_value;
-SELECT TIMEDIFF('2024-03-15 14:30:45', '14:30:45') IS NOT NULL
-                                                      AS mixed_ts_minus_time_returns_value;
+# requires matching types or rejects). Pin the literal HH:MM:SS so a
+# silent semantic shift is caught.
+SELECT TIMEDIFF('14:30:45', '2024-03-15 14:30:45')    AS mixed_time_minus_ts;
+SELECT TIMEDIFF('2024-03-15 14:30:45', '14:30:45')    AS mixed_ts_minus_time;
+
+--echo === Typed-value inputs via CAST (exercises Value::Time / Value::Timestamp arms) ===
+
+# Without CAST, every string literal goes through the String arm
+# (parse_time → parse_timestamp). CAST forces the typed arms so a
+# refactor that breaks Value::Time / Value::Timestamp coercion is
+# caught.
+SELECT TIMEDIFF(CAST('14:30:45' AS TIME),
+                CAST('12:15:30' AS TIME))             AS typed_time_minus_time;
+# DATETIME is rejected by the executor as unsupported CAST target;
+# TIMESTAMP works and lands in Value::Timestamp the same way.
+SELECT TIMEDIFF(CAST('2024-03-15 14:30:45' AS TIMESTAMP),
+                CAST('2024-03-15 12:15:30' AS TIMESTAMP))
+                                                      AS typed_ts_minus_ts;
+# Cross-form determinism: typed values vs string literals yield
+# identical results.
+SELECT TIMEDIFF(CAST('14:30:45' AS TIME),
+                CAST('12:15:30' AS TIME))
+     = TIMEDIFF('14:30:45', '12:15:30')               AS typed_eq_string;
 
 --echo === NULL passthrough (both positions) ===
 
