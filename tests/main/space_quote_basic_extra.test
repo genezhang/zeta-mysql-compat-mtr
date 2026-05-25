@@ -1,0 +1,149 @@
+# Independently authored SPACE / QUOTE smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Both functions are implemented in zeta but had
+# no compat-mtr coverage yet — bundling them since they're both
+# 1-arg string-emitting and roughly the same shape.
+#
+# Big-picture finding:
+#   SPACE(n)  — emit n ASCII spaces. n <= 0 → ''. n > MAX
+#               (10 MiB) → 1105 to prevent DoS. NULL → NULL.
+#   QUOTE(s)  — wrap `s` in single quotes and escape the four
+#               chars MySQL would mis-parse inside a string
+#               literal: apostrophe ('), backslash (\), NUL
+#               (\0), Ctrl-Z (\Z). NULL input is special:
+#               returns the LITERAL 4-character text "NULL"
+#               (NOT SQL NULL — MySQL docs are explicit).
+#
+# Adaptation notes:
+#   # zeta-adapt: SPACE n must be a true integer (Int32/Int64).
+#     Strings or floats → 1105. MySQL coerces. Strict in zeta
+#     matches the REPEAT pattern; pinned by the int-type test.
+#   # zeta-adapt: SPACE has a 10 MiB cap (matches REPEAT). MySQL
+#     also caps via max_allowed_packet (typically 64 MB).
+#   # zeta-adapt: QUOTE escapes exactly the 4 MySQL-meaningful
+#     chars; other chars (newline, tab, '%') are passed through.
+#     This matches MySQL behavior.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === SPACE: basic n-spaces ===
+
+# Exact length pins so we don't depend on visible-whitespace
+# display.
+SELECT LENGTH(SPACE(0))    = 0  AS empty;
+SELECT LENGTH(SPACE(1))    = 1  AS one;
+SELECT LENGTH(SPACE(5))    = 5  AS five;
+SELECT LENGTH(SPACE(100))  = 100 AS hundred;
+# CHAR_LENGTH companion — drift-insurance for any future change
+# that makes the SPACE byte representation multi-byte
+# (currently every space is 1 byte ASCII so CHAR_LENGTH ==
+# LENGTH; if that ever diverges, this catches it).
+SELECT CHAR_LENGTH(SPACE(5))   = 5 AS char_len;
+SELECT CHAR_LENGTH(SPACE(100)) = 100 AS char_len_hundred;
+# Content check: each character is ASCII space (0x20).
+SELECT SPACE(3)            = '   ' AS three_spaces_text;
+
+--echo === SPACE: n <= 0 returns empty string (NOT NULL) ===
+
+SELECT SPACE(0)  IS NULL   AS zero_not_null;
+SELECT SPACE(-1) IS NULL   AS neg_not_null;
+SELECT LENGTH(SPACE(-1))   = 0 AS neg_zero_len;
+SELECT LENGTH(SPACE(-100)) = 0 AS big_neg_zero_len;
+
+--echo === SPACE: size cap (10 MiB) ===
+
+# Just under the cap should succeed; above should 1105.
+SELECT LENGTH(SPACE(10485760)) = 10485760 AS at_cap;
+--error 1105
+SELECT SPACE(10485761);
+# Way over the cap should also reject cleanly.
+--error 1105
+SELECT SPACE(100000000);
+
+--echo === SPACE: NULL passthrough ===
+
+SELECT SPACE(NULL) IS NULL AS null_passes;
+
+--echo === SPACE: integer-type strictness ===
+
+# Non-integer count → 1105 (MySQL would coerce).
+--error 1105
+SELECT SPACE('five');
+--error 1105
+SELECT SPACE(2.5);
+
+--echo === QUOTE: basic ASCII wrap ===
+
+SELECT QUOTE('hello')      AS basic;
+SELECT QUOTE('')           AS empty;
+
+--echo === QUOTE: 4 escape chars ===
+
+# Apostrophe: input contains a single quote (SQL standard
+# double-apostrophe escape in the literal). Input = "it's" (4
+# chars); QUOTE escapes the apostrophe via backslash.
+SELECT QUOTE('it''s')      AS apostrophe;
+# Backslash: in PG-style string literals `\` is LITERAL (not an
+# escape introducer). 'a\b' decodes to 3 chars; QUOTE escapes
+# the lone backslash → 'a\\b'.
+SELECT QUOTE('a\b')        AS backslash;
+# Combination: input has both. Literal "it''s\file" decodes to
+# 9 chars `it's\file`. QUOTE escapes both the apostrophe and
+# the backslash.
+SELECT QUOTE('it''s\file') AS combo;
+
+--echo === QUOTE: NUL and Ctrl-Z escape arms (via CHR()) ===
+
+# These two escape arms can't be exercised via PG-literal strings
+# (the parser would mishandle the embedded NUL / Ctrl-Z). Use
+# CHR() to manufacture the bytes. Expected outputs:
+#   QUOTE(CHR(0))  = "'\0'"  (4 chars: quote + \ + 0 + quote)
+#   QUOTE(CHR(26)) = "'\Z'"  (4 chars: quote + \ + Z + quote)
+SELECT LENGTH(QUOTE(CHR(0)))  = 4 AS nul_escaped_len;
+SELECT LENGTH(QUOTE(CHR(26))) = 4 AS ctrlz_escaped_len;
+# Substring pin: confirms the escape SEQUENCE is the expected
+# two chars, not (e.g.) some hex form.
+SELECT SUBSTRING(QUOTE(CHR(0)),  2, 2) = '\0' AS nul_sequence;
+SELECT SUBSTRING(QUOTE(CHR(26)), 2, 2) = '\Z' AS ctrlz_sequence;
+
+--echo === QUOTE: NULL → literal text 'NULL' (NOT SQL NULL) ===
+
+# This is a deliberate MySQL quirk — QUOTE(NULL) returns the
+# 4-char string "NULL", not SQL NULL. Pin both the value and
+# the "not SQL NULL" property.
+SELECT QUOTE(NULL)         AS null_text;
+SELECT QUOTE(NULL) IS NULL AS null_returns_not_sql_null;
+SELECT LENGTH(QUOTE(NULL)) = 4 AS null_text_length;
+
+--echo === QUOTE: multi-byte UTF-8 passes through unchanged ===
+
+# 'café' has no special chars to escape; just wrap.
+SELECT QUOTE('café')       AS utf8_pass;
+
+--echo === QUOTE: non-string scalar stringified first ===
+
+# value_to_sql_string coerces; ints become string then quoted.
+SELECT QUOTE(123)          AS int_in;
+SELECT QUOTE(TRUE)         AS bool_in;
+
+--echo === QUOTE: characters NOT escaped (passed through) ===
+
+# Newline, tab, '%' all pass through — only the 4 MySQL-special
+# chars are escaped.
+SELECT QUOTE('a%b')        AS pct_through;
+
+--echo === Determinism ===
+
+SELECT SPACE(7) = SPACE(7)                 AS space_det;
+SELECT QUOTE('hello') = QUOTE('hello')     AS quote_det;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT SPACE();
+--error 1105
+SELECT SPACE(1, 2);
+--error 1105
+SELECT QUOTE();
+--error 1105
+SELECT QUOTE('a', 'b');

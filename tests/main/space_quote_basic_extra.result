@@ -1,0 +1,123 @@
+=== SPACE: basic n-spaces ===
+SELECT LENGTH(SPACE(0))    = 0  AS empty;
+empty
+1
+SELECT LENGTH(SPACE(1))    = 1  AS one;
+one
+1
+SELECT LENGTH(SPACE(5))    = 5  AS five;
+five
+1
+SELECT LENGTH(SPACE(100))  = 100 AS hundred;
+hundred
+1
+SELECT CHAR_LENGTH(SPACE(5))   = 5 AS char_len;
+char_len
+1
+SELECT CHAR_LENGTH(SPACE(100)) = 100 AS char_len_hundred;
+char_len_hundred
+1
+SELECT SPACE(3)            = '   ' AS three_spaces_text;
+three_spaces_text
+1
+=== SPACE: n <= 0 returns empty string (NOT NULL) ===
+SELECT SPACE(0)  IS NULL   AS zero_not_null;
+zero_not_null
+0
+SELECT SPACE(-1) IS NULL   AS neg_not_null;
+neg_not_null
+0
+SELECT LENGTH(SPACE(-1))   = 0 AS neg_zero_len;
+neg_zero_len
+1
+SELECT LENGTH(SPACE(-100)) = 0 AS big_neg_zero_len;
+big_neg_zero_len
+1
+=== SPACE: size cap (10 MiB) ===
+SELECT LENGTH(SPACE(10485760)) = 10485760 AS at_cap;
+at_cap
+1
+SELECT SPACE(10485761);
+ERROR 1105: execution error: SPACE result exceeds maximum allowed size
+SELECT SPACE(100000000);
+ERROR 1105: execution error: SPACE result exceeds maximum allowed size
+=== SPACE: NULL passthrough ===
+SELECT SPACE(NULL) IS NULL AS null_passes;
+null_passes
+1
+=== SPACE: integer-type strictness ===
+SELECT SPACE('five');
+ERROR 1105: execution error: SPACE count must be integer
+SELECT SPACE(2.5);
+ERROR 1105: execution error: SPACE count must be integer
+=== QUOTE: basic ASCII wrap ===
+SELECT QUOTE('hello')      AS basic;
+basic
+'hello'
+SELECT QUOTE('')           AS empty;
+empty
+''
+=== QUOTE: 4 escape chars ===
+SELECT QUOTE('it''s')      AS apostrophe;
+apostrophe
+'it\'s'
+SELECT QUOTE('a\b')        AS backslash;
+backslash
+'a\\b'
+SELECT QUOTE('it''s\file') AS combo;
+combo
+'it\'s\\file'
+=== QUOTE: NUL and Ctrl-Z escape arms (via CHR()) ===
+SELECT LENGTH(QUOTE(CHR(0)))  = 4 AS nul_escaped_len;
+nul_escaped_len
+1
+SELECT LENGTH(QUOTE(CHR(26))) = 4 AS ctrlz_escaped_len;
+ctrlz_escaped_len
+1
+SELECT SUBSTRING(QUOTE(CHR(0)),  2, 2) = '\0' AS nul_sequence;
+nul_sequence
+1
+SELECT SUBSTRING(QUOTE(CHR(26)), 2, 2) = '\Z' AS ctrlz_sequence;
+ctrlz_sequence
+1
+=== QUOTE: NULL → literal text 'NULL' (NOT SQL NULL) ===
+SELECT QUOTE(NULL)         AS null_text;
+null_text
+NULL
+SELECT QUOTE(NULL) IS NULL AS null_returns_not_sql_null;
+null_returns_not_sql_null
+0
+SELECT LENGTH(QUOTE(NULL)) = 4 AS null_text_length;
+null_text_length
+1
+=== QUOTE: multi-byte UTF-8 passes through unchanged ===
+SELECT QUOTE('café')       AS utf8_pass;
+utf8_pass
+'café'
+=== QUOTE: non-string scalar stringified first ===
+SELECT QUOTE(123)          AS int_in;
+int_in
+'123'
+SELECT QUOTE(TRUE)         AS bool_in;
+bool_in
+'true'
+=== QUOTE: characters NOT escaped (passed through) ===
+SELECT QUOTE('a%b')        AS pct_through;
+pct_through
+'a%b'
+=== Determinism ===
+SELECT SPACE(7) = SPACE(7)                 AS space_det;
+space_det
+1
+SELECT QUOTE('hello') = QUOTE('hello')     AS quote_det;
+quote_det
+1
+=== Arity errors ===
+SELECT SPACE();
+ERROR 1105: execution error: SPACE requires 1 argument
+SELECT SPACE(1, 2);
+ERROR 1105: execution error: SPACE requires 1 argument
+SELECT QUOTE();
+ERROR 1105: execution error: QUOTE requires 1 argument
+SELECT QUOTE('a', 'b');
+ERROR 1105: execution error: QUOTE requires 1 argument
