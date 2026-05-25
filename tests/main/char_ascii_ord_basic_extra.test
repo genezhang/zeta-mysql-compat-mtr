@@ -1,0 +1,149 @@
+# Independently authored CHAR / ASCII / ORD smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Three char ↔ int code-point conversion functions
+# implemented in zeta but no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   CHAR(n1, n2, ...)  — build a string from byte values. Each
+#                        ni is taken mod 256 (so 65 → 'A', 321
+#                        → 'A' too, -1 → 0xFF). NULL args are
+#                        skipped. Result is TEXT if the bytes
+#                        are valid UTF-8, otherwise VARBINARY.
+#   ASCII(s)           — Unicode code point of the FIRST character
+#                        (NOT first byte). NULL → NULL; empty → 0.
+#                        Multi-byte: 'é' → 233 (the code point),
+#                        not the first byte 0xC3.
+#   ORD(s)             — big-endian combine of the UTF-8 BYTES of
+#                        the first character. ASCII char → ASCII
+#                        code (same as ASCII()). Multi-byte: 'é'
+#                        (UTF-8: 0xC3 0xA9) → 0xC3A9 = 50089.
+#
+# Adaptation notes:
+#   # zeta-adapt: ASCII returns the Unicode code point, NOT the
+#     first byte. MySQL returns the first byte (so MySQL ASCII('é')
+#     = 195 = 0xC3). Documented divergence.
+#   # zeta-adapt: ORD matches MySQL exactly (big-endian combine).
+#   # zeta-adapt: CHAR returns VARBINARY when the bytes don't form
+#     valid UTF-8. The wire-charset fix (zeta #1276) ensures the
+#     raw bytes round-trip.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes differ,
+#     behavior (reject) matches.
+
+--echo === CHAR: basic single-byte values ===
+
+SELECT CHAR(65)                          AS letter_a;
+SELECT CHAR(72, 105)                     AS two_chars_hi;
+SELECT CHAR(72, 101, 108, 108, 111)      AS five_chars_hello;
+# mod 256 wrap: 321 = 65 (mod 256) → 'A'.
+SELECT CHAR(321)                         AS wrap_mod_256;
+SELECT CHAR(321) = CHAR(65)              AS wrap_equals_basic;
+# Negative wraps: -1 mod 256 = 255 → 0xFF (non-UTF-8 byte).
+# Returns VARBINARY because 0xFF alone is invalid UTF-8.
+SELECT HEX(CHAR(-1))                     AS neg_wrap_hex;
+# Large negative: -321 rem_euclid 256 = 191. (Plain `%` in Rust
+# gives -65; rem_euclid wraps correctly.)
+SELECT HEX(CHAR(-321))                   AS large_neg_wrap_hex;
+# All-or-nothing UTF-8 validation: one bad byte in the middle
+# drops the WHOLE result to Bytes. CHAR(65, 255, 66) is 'A',
+# 0xFF, 'B' — invalid sequence as a whole, returns VARBINARY.
+SELECT HEX(CHAR(65, 255, 66))            AS mixed_invalid_utf8;
+SELECT LENGTH(CHAR(65, 255, 66))    = 3  AS mixed_invalid_utf8_len;
+
+--echo === CHAR: NULL args are skipped ===
+
+SELECT CHAR(72, NULL, 105)               AS null_skipped;
+# All NULL → empty result.
+SELECT CHAR(NULL, NULL)                  AS all_null;
+SELECT LENGTH(CHAR(NULL, NULL))     = 0  AS all_null_zero_len;
+
+--echo === CHAR: multi-byte UTF-8 from sequence of bytes ===
+
+# 0xC3 0xA9 is the UTF-8 encoding of 'é'. CHAR(195, 169) → 'é'.
+SELECT CHAR(195, 169)                    AS utf8_e_acute;
+SELECT CHAR(195, 169) = 'é'              AS utf8_e_acute_text;
+
+--echo === CHAR: invalid UTF-8 sequence returns VARBINARY ===
+
+# 0xFF 0xFE is not valid UTF-8. Must round-trip via HEX so the
+# wire-charset fix (zeta #1276) is also exercised.
+SELECT HEX(CHAR(255, 254))               AS invalid_utf8_hex;
+SELECT LENGTH(CHAR(255, 254))       = 2  AS invalid_utf8_byte_len;
+
+--echo === CHAR: arity errors ===
+
+--error 1105
+SELECT CHAR();
+
+--echo === ASCII: basic ===
+
+SELECT ASCII('A')                        AS upper_a;
+SELECT ASCII('a')                        AS lower_a;
+SELECT ASCII('0')                        AS digit_0;
+SELECT ASCII(' ')                        AS space;
+# Only the FIRST character matters.
+SELECT ASCII('Hello')                    AS first_only;
+# Empty string → 0.
+SELECT ASCII('')                         AS empty;
+
+--echo === ASCII: zeta divergence (code point, NOT first byte) ===
+
+# 'é' is one char, code point 233. MySQL returns 195 (first
+# byte 0xC3). zeta returns 233 (the code point). Pinned.
+SELECT ASCII('é')                        AS utf8_codepoint;
+SELECT ASCII('é') = 233                  AS utf8_codepoint_is_233;
+SELECT ASCII('é') <> 195                 AS not_first_byte;
+# Multi-byte first char followed by ASCII: confirms first-char-
+# only AND that the multi-byte char isn't accidentally split.
+SELECT ASCII('éA') = 233                 AS multibyte_then_ascii;
+
+--echo === ASCII: NULL passthrough + arity ===
+
+SELECT ASCII(NULL) IS NULL               AS null_passes;
+--error 1105
+SELECT ASCII();
+--error 1105
+SELECT ASCII('a', 'b');
+
+--echo === ORD: basic (ASCII-only matches ASCII()) ===
+
+SELECT ORD('A')                          AS upper_a;
+SELECT ORD('0')                          AS digit_0;
+SELECT ORD(' ')                          AS space;
+# Only first char.
+SELECT ORD('Hello')                      AS first_only;
+# Empty input → 0.
+SELECT ORD('')                           AS empty;
+# ASCII-range parity: ORD == ASCII for any 1-byte first char.
+SELECT ORD('A') = ASCII('A')             AS ascii_parity_a;
+SELECT ORD('z') = ASCII('z')             AS ascii_parity_z;
+
+--echo === ORD: multi-byte (big-endian UTF-8 byte combine) ===
+
+# 'é' UTF-8 = 0xC3 0xA9 → 0xC3A9 = 50089.
+SELECT ORD('é')                          AS utf8_e_acute;
+SELECT ORD('é') = 50089                  AS utf8_e_acute_value;
+# 3-byte char '€' = 0xE2 0x82 0xAC → 0xE282AC = 14844588.
+SELECT ORD('€')                          AS utf8_euro;
+SELECT ORD('€') = 14844588               AS utf8_euro_value;
+# 4-byte emoji '🎯' = 0xF0 0x9F 0x8E 0xAF.
+SELECT ORD('🎯')                         AS utf8_emoji;
+
+--echo === ORD: NULL passthrough + arity ===
+
+SELECT ORD(NULL) IS NULL                 AS null_passes;
+--error 1105
+SELECT ORD();
+--error 1105
+SELECT ORD('a', 'b');
+
+--echo === Cross-family round-trip: CHAR(ASCII(x)) for ASCII x ===
+
+# Round-trip works for ASCII chars (one byte, no UTF-8 surprises).
+SELECT CHAR(ASCII('A')) = 'A'            AS rt_ascii_A;
+SELECT CHAR(ASCII('z')) = 'z'            AS rt_ascii_z;
+
+--echo === Determinism ===
+
+SELECT CHAR(65)         = CHAR(65)           AS char_det;
+SELECT ASCII('A')       = ASCII('A')         AS ascii_det;
+SELECT ORD('é')         = ORD('é')           AS ord_det;

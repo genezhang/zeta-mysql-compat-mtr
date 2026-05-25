@@ -1,0 +1,158 @@
+=== CHAR: basic single-byte values ===
+SELECT CHAR(65)                          AS letter_a;
+letter_a
+A
+SELECT CHAR(72, 105)                     AS two_chars_hi;
+two_chars_hi
+Hi
+SELECT CHAR(72, 101, 108, 108, 111)      AS five_chars_hello;
+five_chars_hello
+Hello
+SELECT CHAR(321)                         AS wrap_mod_256;
+wrap_mod_256
+A
+SELECT CHAR(321) = CHAR(65)              AS wrap_equals_basic;
+wrap_equals_basic
+1
+SELECT HEX(CHAR(-1))                     AS neg_wrap_hex;
+neg_wrap_hex
+FF
+SELECT HEX(CHAR(-321))                   AS large_neg_wrap_hex;
+large_neg_wrap_hex
+BF
+SELECT HEX(CHAR(65, 255, 66))            AS mixed_invalid_utf8;
+mixed_invalid_utf8
+41FF42
+SELECT LENGTH(CHAR(65, 255, 66))    = 3  AS mixed_invalid_utf8_len;
+mixed_invalid_utf8_len
+1
+=== CHAR: NULL args are skipped ===
+SELECT CHAR(72, NULL, 105)               AS null_skipped;
+null_skipped
+Hi
+SELECT CHAR(NULL, NULL)                  AS all_null;
+all_null
+
+SELECT LENGTH(CHAR(NULL, NULL))     = 0  AS all_null_zero_len;
+all_null_zero_len
+1
+=== CHAR: multi-byte UTF-8 from sequence of bytes ===
+SELECT CHAR(195, 169)                    AS utf8_e_acute;
+utf8_e_acute
+é
+SELECT CHAR(195, 169) = 'é'              AS utf8_e_acute_text;
+utf8_e_acute_text
+1
+=== CHAR: invalid UTF-8 sequence returns VARBINARY ===
+SELECT HEX(CHAR(255, 254))               AS invalid_utf8_hex;
+invalid_utf8_hex
+FFFE
+SELECT LENGTH(CHAR(255, 254))       = 2  AS invalid_utf8_byte_len;
+invalid_utf8_byte_len
+1
+=== CHAR: arity errors ===
+SELECT CHAR();
+ERROR 1105: execution error: CHAR requires at least 1 argument
+=== ASCII: basic ===
+SELECT ASCII('A')                        AS upper_a;
+upper_a
+65
+SELECT ASCII('a')                        AS lower_a;
+lower_a
+97
+SELECT ASCII('0')                        AS digit_0;
+digit_0
+48
+SELECT ASCII(' ')                        AS space;
+space
+32
+SELECT ASCII('Hello')                    AS first_only;
+first_only
+72
+SELECT ASCII('')                         AS empty;
+empty
+0
+=== ASCII: zeta divergence (code point, NOT first byte) ===
+SELECT ASCII('é')                        AS utf8_codepoint;
+utf8_codepoint
+233
+SELECT ASCII('é') = 233                  AS utf8_codepoint_is_233;
+utf8_codepoint_is_233
+1
+SELECT ASCII('é') <> 195                 AS not_first_byte;
+not_first_byte
+1
+SELECT ASCII('éA') = 233                 AS multibyte_then_ascii;
+multibyte_then_ascii
+1
+=== ASCII: NULL passthrough + arity ===
+SELECT ASCII(NULL) IS NULL               AS null_passes;
+null_passes
+1
+SELECT ASCII();
+ERROR 1105: execution error: ASCII requires 1 argument
+SELECT ASCII('a', 'b');
+ERROR 1105: execution error: ASCII requires 1 argument
+=== ORD: basic (ASCII-only matches ASCII()) ===
+SELECT ORD('A')                          AS upper_a;
+upper_a
+65
+SELECT ORD('0')                          AS digit_0;
+digit_0
+48
+SELECT ORD(' ')                          AS space;
+space
+32
+SELECT ORD('Hello')                      AS first_only;
+first_only
+72
+SELECT ORD('')                           AS empty;
+empty
+0
+SELECT ORD('A') = ASCII('A')             AS ascii_parity_a;
+ascii_parity_a
+1
+SELECT ORD('z') = ASCII('z')             AS ascii_parity_z;
+ascii_parity_z
+1
+=== ORD: multi-byte (big-endian UTF-8 byte combine) ===
+SELECT ORD('é')                          AS utf8_e_acute;
+utf8_e_acute
+50089
+SELECT ORD('é') = 50089                  AS utf8_e_acute_value;
+utf8_e_acute_value
+1
+SELECT ORD('€')                          AS utf8_euro;
+utf8_euro
+14844588
+SELECT ORD('€') = 14844588               AS utf8_euro_value;
+utf8_euro_value
+1
+SELECT ORD('🎯')                         AS utf8_emoji;
+utf8_emoji
+4036988591
+=== ORD: NULL passthrough + arity ===
+SELECT ORD(NULL) IS NULL                 AS null_passes;
+null_passes
+1
+SELECT ORD();
+ERROR 1105: execution error: ORD requires 1 argument
+SELECT ORD('a', 'b');
+ERROR 1105: execution error: ORD requires 1 argument
+=== Cross-family round-trip: CHAR(ASCII(x)) for ASCII x ===
+SELECT CHAR(ASCII('A')) = 'A'            AS rt_ascii_A;
+rt_ascii_A
+1
+SELECT CHAR(ASCII('z')) = 'z'            AS rt_ascii_z;
+rt_ascii_z
+1
+=== Determinism ===
+SELECT CHAR(65)         = CHAR(65)           AS char_det;
+char_det
+1
+SELECT ASCII('A')       = ASCII('A')         AS ascii_det;
+ascii_det
+1
+SELECT ORD('é')         = ORD('é')           AS ord_det;
+ord_det
+1
