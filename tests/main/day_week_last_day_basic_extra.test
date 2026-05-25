@@ -1,0 +1,115 @@
+# Independently authored DAYOFWEEK / DAYOFYEAR / WEEKDAY /
+# LAST_DAY smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/. Four date-component
+# accessors / helpers; none had compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   DAYOFWEEK(d)   — MySQL convention: Sunday=1 .. Saturday=7.
+#                    DIFFERENT from PG dow (Sunday=0..Saturday=6).
+#   DAYOFYEAR(d)   — 1..365 (1..366 in leap years).
+#   WEEKDAY(d)     — Monday=0 .. Sunday=6. Inverse of DAYOFWEEK
+#                    in the sense that 1970-01-01 is Thursday
+#                    in both (DAYOFWEEK=5, WEEKDAY=3).
+#   LAST_DAY(d)    — date of the last day of the month containing d.
+#                    Handles year-wrap (Dec → Dec).
+#
+# Anchor: 1970-01-01 is Thursday (UNIX epoch).
+#   DAYOFWEEK('1970-01-01') = 5 (Sun=1, Mon=2, ..., Thu=5)
+#   WEEKDAY('1970-01-01')   = 3 (Mon=0, Tue=1, Wed=2, Thu=3)
+#
+# Adaptation notes:
+#   # zeta-adapt: DAYOFWEEK 1-based Sunday-first matches MySQL,
+#     diverges from PG's 0-based Sunday-first.
+#   # zeta-adapt: WEEKDAY 0-based Monday-first matches MySQL.
+#   # zeta-adapt: Inputs accept Date, Timestamp, or parseable
+#     date/timestamp strings.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === DAYOFWEEK: Sunday=1 .. Saturday=7 ===
+
+# 2024-01-07 is a Sunday. Anchor: Sun=1, Mon=2, ..., Sat=7.
+SELECT DAYOFWEEK('2024-01-07')           AS sunday;
+SELECT DAYOFWEEK('2024-01-08')           AS monday;
+SELECT DAYOFWEEK('2024-01-09')           AS tuesday;
+SELECT DAYOFWEEK('2024-01-10')           AS wednesday;
+SELECT DAYOFWEEK('2024-01-11')           AS thursday;
+SELECT DAYOFWEEK('2024-01-12')           AS friday;
+SELECT DAYOFWEEK('2024-01-13')           AS saturday;
+# Epoch anchor: 1970-01-01 is Thursday → 5.
+SELECT DAYOFWEEK('1970-01-01')           AS epoch_thursday;
+
+--echo === WEEKDAY: Monday=0 .. Sunday=6 ===
+
+SELECT WEEKDAY('2024-01-08')             AS monday_0;
+SELECT WEEKDAY('2024-01-09')             AS tuesday_1;
+SELECT WEEKDAY('2024-01-13')             AS saturday_5;
+SELECT WEEKDAY('2024-01-14')             AS sunday_6;
+SELECT WEEKDAY('1970-01-01')             AS epoch_thursday_3;
+
+--echo === DAYOFWEEK / WEEKDAY: cross-consistency invariant ===
+
+# Both functions must agree on the day-of-week (just different
+# numbering). For the same date, MySQL invariant:
+#   WEEKDAY = (DAYOFWEEK + 5) mod 7   (shift Sun-1 to Mon-0)
+SELECT WEEKDAY('2024-01-08') = (DAYOFWEEK('2024-01-08') + 5) % 7  AS invariant_monday;
+SELECT WEEKDAY('2024-01-13') = (DAYOFWEEK('2024-01-13') + 5) % 7  AS invariant_saturday;
+
+--echo === DAYOFYEAR: 1..365 / 1..366 ===
+
+SELECT DAYOFYEAR('2024-01-01')           AS year_start;
+SELECT DAYOFYEAR('2024-01-31')           AS day_31;
+SELECT DAYOFYEAR('2024-02-01')           AS day_32;
+# 2024 is leap year → Feb has 29 days, so Mar 1 = day 61.
+SELECT DAYOFYEAR('2024-02-29')           AS leap_feb_29;
+SELECT DAYOFYEAR('2024-03-01')           AS day_after_leap;
+SELECT DAYOFYEAR('2024-12-31')           AS leap_year_end_366;
+# 2023 is NOT leap → Mar 1 = day 60, Dec 31 = day 365.
+SELECT DAYOFYEAR('2023-12-31')           AS non_leap_year_end_365;
+SELECT DAYOFYEAR('2023-03-01')           AS non_leap_day_after_feb;
+
+--echo === LAST_DAY: end-of-month for various months ===
+
+# Standard month-lengths.
+SELECT LAST_DAY('2024-01-15')            AS jan;
+SELECT LAST_DAY('2024-03-01')            AS mar;
+SELECT LAST_DAY('2024-04-15')            AS apr;
+SELECT LAST_DAY('2024-12-25')            AS dec;
+# Leap-year February.
+SELECT LAST_DAY('2024-02-15')            AS feb_leap;
+# Non-leap February.
+SELECT LAST_DAY('2023-02-15')            AS feb_non_leap;
+# Idempotent: applying LAST_DAY to already-last-day stays.
+SELECT LAST_DAY(LAST_DAY('2024-01-15'))
+     = LAST_DAY('2024-01-15')            AS idempotent;
+
+--echo === LAST_DAY: timestamp input ===
+
+# Accepts timestamp (time portion ignored).
+SELECT LAST_DAY('2024-02-15 14:30:00')   AS ts_leap_feb;
+SELECT LAST_DAY('2024-04-15 23:59:59')   AS ts_apr;
+
+--echo === NULL passthrough ===
+
+SELECT DAYOFWEEK(NULL) IS NULL           AS dow_null;
+SELECT WEEKDAY(NULL)   IS NULL           AS wkd_null;
+SELECT DAYOFYEAR(NULL) IS NULL           AS doy_null;
+SELECT LAST_DAY(NULL)  IS NULL           AS ld_null;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT DAYOFWEEK();
+--error 1105
+SELECT WEEKDAY();
+--error 1105
+SELECT DAYOFYEAR();
+--error 1105
+SELECT LAST_DAY();
+# Note: extras may not all error cleanly (see CEIL/FLOOR gap
+# from PR #302); pin only the 0-arg arity here.
+
+--echo === Determinism ===
+
+SELECT DAYOFWEEK('2024-01-08') = DAYOFWEEK('2024-01-08') AS dow_det;
+SELECT LAST_DAY('2024-02-15')  = LAST_DAY('2024-02-15')  AS ld_det;
