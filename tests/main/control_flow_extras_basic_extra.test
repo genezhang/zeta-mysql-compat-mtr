@@ -90,6 +90,16 @@ SELECT IF(0.0, 'then', 'else')
 SELECT IF(CAST(0.0 AS DOUBLE PRECISION), 'then', 'else')      AS float64_zero_is_false;
 SELECT IF(CAST(3.14 AS DOUBLE PRECISION), 'then', 'else')     AS float64_nonzero_is_true;
 
+--echo === IF truthiness — Int64 / UInt64 arms (CAST coercion) ===
+
+# Existing slices use Int32 literals only. Force the Int64
+# arm via CAST AS BIGINT. The == 0 check fires the same way.
+SELECT IF(CAST(0 AS BIGINT), 'then', 'else')                  AS int64_zero_is_false;
+SELECT IF(CAST(5 AS BIGINT), 'then', 'else')                  AS int64_nonzero_is_true;
+# Force the UInt64 arm via CAST AS UNSIGNED. Same semantics.
+SELECT IF(CAST(0 AS UNSIGNED), 'then', 'else')                AS uint64_zero_is_false;
+SELECT IF(CAST(5 AS UNSIGNED), 'then', 'else')                AS uint64_nonzero_is_true;
+
 --echo === IF truthiness — `_ => true` catch-all (non-scalar Value variants) ===
 
 # Date / Timestamp / JSONB / Interval — all hit the catch-all
@@ -113,11 +123,13 @@ SELECT IF(1, 2, 3, 4);
 
 --echo === NULLIF DATE/TIMESTAMP value-coercive equality (cross-slice link) ===
 
-# NULLIF uses values_equal which (per DATE_ADD slice PR #324
-# finding) treats DATE 'X' and TIMESTAMP 'X 00:00:00' as
-# equal. So NULLIF returns NULL when they're "equal" even
-# across types — confirms the value-coercion is consistent
-# across the equality surface.
+# coalesce_nullif_edges_basic_extra.test:73 already pins the
+# Int/Decimal flavor of value-coercive equality
+# (NULLIF(1, 1.0) = NULL). This row extends the SAME
+# principle to the DATE/TIMESTAMP type pair (the DATE_ADD
+# slice PR #324 finding) — not a new equality principle,
+# just a different type pair confirming the surface is
+# consistent.
 SELECT NULLIF(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
                                                               IS NULL
                                                               AS date_eq_ts_midnight_returns_null;
@@ -132,10 +144,19 @@ SELECT NULLIF(DATE '2024-03-15', TIMESTAMP '2024-03-15 12:00:00')
 # Per JSON_OVERLAPS strict-type finding (PR #314): Bool and
 # Integer are NOT considered equal under values_equal. So
 # NULLIF returns the first arg, not NULL.
-SELECT NULLIF(TRUE, 1)                                        AS bool_true_vs_int_1_keeps_first;
-SELECT NULLIF(FALSE, 0)                                       AS bool_false_vs_int_0_keeps_first;
+# IMPORTANT: bare `NULLIF(TRUE, 1)` pins render as `1` on
+# the MySQL wire (mysql_async::Value has no Bool variant —
+# both Bool TRUE and Int 1 render as TINYINT 1), so we
+# can't distinguish "kept TRUE" from "returned Int 1".
+# Use `IS NULL` / `IS NOT NULL` predicates instead — those
+# discriminate the actual semantic without depending on wire
+# rendering of the underlying type.
+SELECT NULLIF(TRUE, 1)   IS NOT NULL                          AS bool_true_vs_int_1_kept_not_null;
+SELECT NULLIF(FALSE, 0)  IS NOT NULL                          AS bool_false_vs_int_0_kept_not_null;
 # Confirm: NULLIF(TRUE, TRUE) does return NULL (same type+value).
 SELECT NULLIF(TRUE, TRUE)  IS NULL                            AS bool_eq_bool_returns_null;
+# Confirm: NULLIF(1, 1) (Int=Int) also returns NULL.
+SELECT NULLIF(1, 1)        IS NULL                            AS int_eq_int_returns_null;
 
 --echo === ISNULL on typed values (JSONB, Date, Timestamp, Interval) ===
 

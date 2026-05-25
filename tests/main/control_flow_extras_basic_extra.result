@@ -34,6 +34,19 @@ else
 SELECT IF(CAST(3.14 AS DOUBLE PRECISION), 'then', 'else')     AS float64_nonzero_is_true;
 float64_nonzero_is_true
 then
+=== IF truthiness — Int64 / UInt64 arms (CAST coercion) ===
+SELECT IF(CAST(0 AS BIGINT), 'then', 'else')                  AS int64_zero_is_false;
+int64_zero_is_false
+else
+SELECT IF(CAST(5 AS BIGINT), 'then', 'else')                  AS int64_nonzero_is_true;
+int64_nonzero_is_true
+then
+SELECT IF(CAST(0 AS UNSIGNED), 'then', 'else')                AS uint64_zero_is_false;
+uint64_zero_is_false
+else
+SELECT IF(CAST(5 AS UNSIGNED), 'then', 'else')                AS uint64_nonzero_is_true;
+uint64_nonzero_is_true
+then
 === IF truthiness — `_ => true` catch-all (non-scalar Value variants) ===
 SELECT IF(DATE '2024-03-15', 'then', 'else')                  AS date_is_true;
 date_is_true
@@ -68,14 +81,17 @@ SELECT NULLIF(DATE '2024-03-15', TIMESTAMP '2024-03-15 12:00:00')
 date_ne_ts_noon_returns_first
 1
 === NULLIF Bool/Int strict comparison ===
-SELECT NULLIF(TRUE, 1)                                        AS bool_true_vs_int_1_keeps_first;
-bool_true_vs_int_1_keeps_first
+SELECT NULLIF(TRUE, 1)   IS NOT NULL                          AS bool_true_vs_int_1_kept_not_null;
+bool_true_vs_int_1_kept_not_null
 1
-SELECT NULLIF(FALSE, 0)                                       AS bool_false_vs_int_0_keeps_first;
-bool_false_vs_int_0_keeps_first
-0
+SELECT NULLIF(FALSE, 0)  IS NOT NULL                          AS bool_false_vs_int_0_kept_not_null;
+bool_false_vs_int_0_kept_not_null
+1
 SELECT NULLIF(TRUE, TRUE)  IS NULL                            AS bool_eq_bool_returns_null;
 bool_eq_bool_returns_null
+1
+SELECT NULLIF(1, 1)        IS NULL                            AS int_eq_int_returns_null;
+int_eq_int_returns_null
 1
 === ISNULL on typed values (JSONB, Date, Timestamp, Interval) ===
 SELECT ISNULL(DATE '2024-03-15')                              AS isnull_date;
