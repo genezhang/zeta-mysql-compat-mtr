@@ -38,9 +38,15 @@ id-123
 SELECT CONCAT(1, '+', 2, '=', 3)         AS many_ints;
 many_ints
 1+2=3
-SELECT CONCAT(TRUE, '/', FALSE)          AS bool_coerce;
-bool_coerce
+SELECT CONCAT(TRUE, '/', FALSE)          AS bool_coerce_pg_style;
+bool_coerce_pg_style
 true/false
+SELECT CONCAT(TRUE, '/', FALSE) = 'true/false' AS bool_text_form;
+bool_text_form
+1
+SELECT CONCAT('0', 1)                    AS leading_zero;
+leading_zero
+01
 === CONCAT: multi-byte UTF-8 ===
 SELECT CONCAT('café', 'bar')             AS utf8_basic;
 utf8_basic
@@ -71,6 +77,9 @@ foo, bar
 === CONCAT_WS: NULL separator → NULL ===
 SELECT CONCAT_WS(NULL, 'a', 'b')  IS NULL AS null_sep;
 null_sep
+1
+SELECT CONCAT_WS(NULL)            IS NULL AS null_sep_no_values;
+null_sep_no_values
 1
 === CONCAT_WS: NULL values SKIPPED (not propagated) ===
 SELECT CONCAT_WS(',', 'a', NULL, 'c')    AS null_value_skipped;
@@ -106,6 +115,9 @@ int_args
 SELECT CONCAT_WS('é', 'a', 'b', 'c')     AS utf8_sep;
 utf8_sep
 aébéc
+SELECT CONCAT_WS(',', 'a,b', 'c', 'd')   AS sep_in_value;
+sep_in_value
+a,b,c,d
 === CONCAT_WS: 0 / 1 args ===
 SELECT CONCAT_WS()                      IS NULL AS no_args_null;
 no_args_null

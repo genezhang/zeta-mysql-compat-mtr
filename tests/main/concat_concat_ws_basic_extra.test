@@ -21,6 +21,9 @@
 #     caller of CONCAT in zeta would NOT see NULL propagation.
 #   # zeta-adapt: CONCAT_WS NULL-value-skip behavior matches MySQL
 #     directly — no shim rewrite needed.
+#   # zeta-adapt: Boolean coercion uses PG-style 'true'/'false'
+#     text (zeta's value_to_sql_string), NOT MySQL's '1'/'0'.
+#     Real divergence on the wire. Pinned below.
 #   # zeta-adapt: Empty separator in CONCAT_WS is valid and
 #     produces a plain concatenation (no separator).
 #   # zeta-adapt: Arity: CONCAT with 0 args returns '' (empty
@@ -51,7 +54,15 @@ SELECT LENGTH(CONCAT('', '', ''))   = 0  AS all_empty_zero_len;
 # Non-string args stringified via value_to_sql_string.
 SELECT CONCAT('id-', 123)                AS int_coerce;
 SELECT CONCAT(1, '+', 2, '=', 3)         AS many_ints;
-SELECT CONCAT(TRUE, '/', FALSE)          AS bool_coerce;
+# Documented zeta divergence: booleans coerce to "true"/"false"
+# text (PG-native), NOT "1"/"0" (MySQL native). Pin the zeta
+# output so a future shift toward MySQL coercion would visibly
+# break the recording.
+SELECT CONCAT(TRUE, '/', FALSE)          AS bool_coerce_pg_style;
+SELECT CONCAT(TRUE, '/', FALSE) = 'true/false' AS bool_text_form;
+# Leading zero: '0' stays '0' (not coerced to numeric 0 and
+# stripped).
+SELECT CONCAT('0', 1)                    AS leading_zero;
 
 --echo === CONCAT: multi-byte UTF-8 ===
 
@@ -74,6 +85,11 @@ SELECT CONCAT_WS(', ', 'foo', 'bar')     AS multi_char_sep;
 --echo === CONCAT_WS: NULL separator → NULL ===
 
 SELECT CONCAT_WS(NULL, 'a', 'b')  IS NULL AS null_sep;
+# CONCAT_WS(NULL) — only the separator and it's NULL. The args
+# block is non-empty (1 element), but that element is the sep,
+# which is NULL → result NULL. Distinct branch from
+# CONCAT_WS() (no args at all).
+SELECT CONCAT_WS(NULL)            IS NULL AS null_sep_no_values;
 
 --echo === CONCAT_WS: NULL values SKIPPED (not propagated) ===
 
@@ -99,6 +115,10 @@ SELECT CONCAT_WS(',', 'lonely')          = 'lonely' AS single_no_sep_appended;
 SELECT CONCAT_WS('|', 1, 2, 3)           AS int_args;
 # Separator can itself be multi-byte.
 SELECT CONCAT_WS('é', 'a', 'b', 'c')     AS utf8_sep;
+# Separator inside the values is NOT escaped — passes through
+# verbatim. The output then has the separator at boundaries AND
+# inside values. Common parsing gotcha.
+SELECT CONCAT_WS(',', 'a,b', 'c', 'd')   AS sep_in_value;
 
 --echo === CONCAT_WS: 0 / 1 args ===
 
