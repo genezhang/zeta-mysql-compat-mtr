@@ -26,7 +26,7 @@ ciphertext_changed
 SELECT LENGTH(AES_ENCRYPT('hello world', 'mykey')) > 0      AS ciphertext_has_bytes;
 ciphertext_has_bytes
 1
-=== Wrong key → AES-CBC unpad error (zeta uses CBC mode) ===
+=== Wrong key → garbage OR PKCS7 unpad error (mode-dependent) ===
 SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'key1'), 'key2');
 ERROR 1105: execution error: AES-CBC decrypt error: Unpad Error
 === NULL passthrough ===
@@ -55,8 +55,22 @@ SELECT AES_DECRYPT('data');
 ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
 SELECT AES_DECRYPT('data', 'key', 'extra');
 ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
-=== Determinism: same plaintext+key → ??? (mode-dependent) ===
+=== Determinism: same plaintext+key → DIFFERENT (random IV) ===
 SELECT AES_ENCRYPT('repeat', 'mykey') = AES_ENCRYPT('repeat', 'mykey')
        AS same_data_same_key_eq;
 same_data_same_key_eq
 0
+=== Multi-block plaintext (CBC chaining beyond 16 bytes) ===
+SELECT HEX(AES_DECRYPT(AES_ENCRYPT(REPEAT('A', 32), 'mykey'), 'mykey'))
+     = REPEAT('41', 32)                        AS multi_block_rt;
+multi_block_rt
+1
+SELECT LENGTH(AES_DECRYPT(AES_ENCRYPT(REPEAT('A', 32), 'mykey'), 'mykey')) = 32
+       AS multi_block_len;
+multi_block_len
+1
+=== Key normalization: SHA-256 hashes any key length to 32 bytes ===
+SELECT AES_ENCRYPT('data', 'k') <> AES_ENCRYPT('data', REPEAT('k', 100))
+       AS short_vs_long_key_differs;
+short_vs_long_key_differs
+1
