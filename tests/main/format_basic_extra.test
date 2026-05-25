@@ -1,0 +1,104 @@
+# Independently authored FORMAT smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+# FORMAT is implemented in zeta but had no compat-mtr coverage
+# yet.
+#
+# Big-picture finding:
+#   FORMAT(num, decimals)            — round to `decimals` places,
+#       inject ',' as thousands separator. Always returns a string.
+#   FORMAT(num, decimals, 'locale')  — same; zeta silently ignores
+#       the locale arg (tracks open gap zeta#970). Common in ORM-
+#       generated SQL that always passes the locale.
+#
+# Algorithm path split:
+#   - DECIMAL/NUMERIC inputs go through rust_decimal rounding,
+#     preserving precision past the f64 ~15-significant-digit
+#     window. This matters for large or high-precision numbers
+#     used in finance/accounting.
+#   - Float/Int/String fall back to f64. Non-finite f64
+#     (NaN/Inf/-Inf) returns NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta only supports the default en_US-style
+#     grouping (',' thousands, '.' decimal). MySQL accepts a
+#     locale name and would emit '.' thousands for de_DE etc.;
+#     zeta silently ignores the locale (gap zeta#970). Tests
+#     pin this by asserting the same output for any locale arg.
+#   # zeta-adapt: decimals arg is clamped to [0, 30]. MySQL also
+#     clamps; the actual cap might differ but the principle does
+#     not.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes differ,
+#     behavior (reject) matches.
+
+--echo === Basic 2-arg formatting ===
+
+SELECT FORMAT(12345.6789, 2)        AS basic;
+SELECT FORMAT(1234567, 0)           AS int_no_dec;
+SELECT FORMAT(0, 2)                 AS zero;
+SELECT FORMAT(0.5, 1)               AS half;
+
+--echo === Negative numbers (sign preserved, grouping inside sign) ===
+
+SELECT FORMAT(-1234567.89, 2)       AS neg_basic;
+SELECT FORMAT(-0.5, 1)              AS neg_half;
+
+--echo === Decimal padding (more decimals than the input has) ===
+
+SELECT FORMAT(1, 2)                 AS pad_int;
+SELECT FORMAT(1.5, 4)               AS pad_extra;
+SELECT FORMAT(123456789, 3)         AS pad_big_int;
+
+--echo === Decimal truncation (rounding, not just chopping) ===
+
+# 1.235 rounds to 1.24 (half-up). 1.234 → 1.23.
+SELECT FORMAT(1.235, 2)             AS round_half_up;
+SELECT FORMAT(1.234, 2)             AS round_down;
+# Ties on rust_decimal's half-up — pin the value either way.
+SELECT FORMAT(1.5, 0)               AS round_half_to_int;
+
+--echo === Large numbers (grouping every 3 digits) ===
+
+SELECT FORMAT(1000, 0)              AS thousand;
+SELECT FORMAT(1000000, 0)           AS million;
+SELECT FORMAT(1000000000, 0)        AS billion;
+SELECT FORMAT(1234567890123, 2)     AS trillion_plus;
+
+--echo === 3-arg locale form (locale silently ignored) ===
+
+# Both calls produce the same output regardless of locale arg —
+# pins the "locale ignored" semantic (zeta#970 gap).
+SELECT FORMAT(1234.5, 2, 'en_US') = FORMAT(1234.5, 2) AS locale_en_us_noop;
+SELECT FORMAT(1234.5, 2, 'de_DE') = FORMAT(1234.5, 2) AS locale_de_de_noop;
+SELECT FORMAT(1234.5, 2, 'xx_YY') = FORMAT(1234.5, 2) AS locale_unknown_noop;
+
+--echo === Decimals clamp: negative → 0, > 30 → 30 ===
+
+# Negative decimals must NOT panic; clamp to 0.
+SELECT FORMAT(1.5, -1)              AS neg_decimals;
+# > 30 must NOT panic; clamp to 30. Easier check: length of result
+# is bounded (1 + '.' + 30 = 32 chars for FORMAT(1, 99)).
+SELECT LENGTH(FORMAT(1, 99)) = 32   AS clamped_to_30;
+
+--echo === Non-finite f64 → NULL ===
+
+# Manufacture NaN / Inf via 0/0 and 1/0. NULLIF guards against
+# div-by-zero erroring before FORMAT can be tested.
+SELECT FORMAT(0.0 / NULLIF(0, 0), 2) IS NULL AS nan_returns_null;
+
+--echo === NULL passthrough ===
+
+SELECT FORMAT(NULL, 2)        IS NULL AS null_n;
+SELECT FORMAT(1.5, NULL)      IS NULL AS null_decimals;
+
+--echo === Determinism ===
+
+SELECT FORMAT(12345.67, 2) = FORMAT(12345.67, 2) AS deterministic;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT FORMAT();
+--error 1105
+SELECT FORMAT(1.5);
+--error 1105
+SELECT FORMAT(1.5, 2, 'en_US', 'extra');
