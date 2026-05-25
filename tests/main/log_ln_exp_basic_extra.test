@@ -1,0 +1,121 @@
+# Independently authored LOG / LN / EXP smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Three log/exp functions; none had compat-mtr
+# coverage yet.
+#
+# Big-picture finding:
+#   LOG(x)          — base-10 log (MySQL/Spark convention!).
+#                     NOT natural log. PG `LOG(x)` would also
+#                     give log10 but the impl-level routing differs.
+#   LOG(base, x)    — log base `base` of x. base > 0, x > 0,
+#                     base ≠ 1, else error.
+#   LN(x)           — natural log (base e). x > 0 else error.
+#   EXP(x)          — e^x. Overflow → +Infinity (NOT error).
+#                     Pinned divergence from PG strict.
+#
+# Adaptation notes:
+#   # zeta-adapt: LOG single-arg = log10 (MySQL convention).
+#     PG's LOG also defaults to log10, but Oracle / TSQL use ln.
+#     Pinned via known vectors.
+#   # zeta-adapt: LOG / LN of 0 or negative → ERROR 1105 (PG-style
+#     strict). MySQL would return NULL. Documented divergence.
+#   # zeta-adapt: LOG with base == 1 → ERROR 1105 (math is
+#     undefined). MySQL would NULL.
+#   # zeta-adapt: EXP overflow → +Infinity (NOT error). Matches
+#     MySQL/Spark; diverges from PG strict.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === LOG: 1-arg = log10 (MySQL convention) ===
+
+SELECT LOG(1)                            AS log_one_is_zero;
+SELECT LOG(10)                           AS log_ten_is_one;
+SELECT LOG(100)                          AS log_hundred_is_two;
+SELECT LOG(1000)                         AS log_thousand_is_three;
+# Differentiating pin: LOG ≠ LN. LOG(e) ≠ 1 (LN(e) = 1).
+SELECT LOG(EXP(1)) <> 1                  AS log_is_log10_not_ln;
+SELECT LN(EXP(1)) = 1                    AS ln_inverse_exp;
+
+--echo === LOG: 2-arg form (log base b of x) ===
+
+SELECT LOG(2, 8)                         AS log2_eight_is_three;
+SELECT LOG(10, 1000)                     AS log10_thousand_is_three;
+SELECT LOG(3, 27)                        AS log3_27_is_three;
+# Round-trip via POW: POW(b, LOG(b, x)) ≈ x.
+SELECT ROUND(POW(2, LOG(2, 16)))  = 16   AS log_pow_round_trip;
+
+--echo === LOG / LN / EXP: error on invalid input (zeta strict, MySQL NULL) ===
+
+--error 1105
+SELECT LOG(0);
+--error 1105
+SELECT LOG(-1);
+--error 1105
+SELECT LN(0);
+--error 1105
+SELECT LN(-1);
+--error 1105
+SELECT LOG(-2, 8);
+--error 1105
+SELECT LOG(2, -8);
+# Base == 1 is mathematically undefined.
+--error 1105
+SELECT LOG(1, 100);
+
+--echo === LN: known vectors ===
+
+# LN(1) = 0, LN(e) = 1.
+SELECT LN(1)                             AS ln_one_is_zero;
+SELECT LN(EXP(1))                        AS ln_e_is_one;
+SELECT LN(EXP(2))                        AS ln_e_sq;
+
+--echo === EXP: known vectors ===
+
+# EXP(0) = 1, EXP(1) = e ≈ 2.718...
+SELECT EXP(0)                            AS exp_zero_is_one;
+# Round to 10 places to be wire-stable across platforms.
+SELECT ROUND(EXP(1), 10)                 AS exp_one_rounded_e;
+SELECT EXP(-1) > 0.36 AND EXP(-1) < 0.37 AS exp_neg_one_range;
+
+--echo === EXP: overflow returns +Infinity (NOT error) ===
+
+# Pinned divergence: zeta/MySQL/Spark return +Inf for overflow,
+# PG strict errors out. EXP(1000) > f64::MAX → +Inf.
+SELECT EXP(1000) > 1e308                 AS overflow_is_inf;
+# Underflow → 0 (well below f64::MIN_POSITIVE for any practical
+# integer input).
+SELECT EXP(-1000) = 0                    AS underflow_is_zero;
+
+--echo === Cross-family inverse: LN(EXP(x)) ≈ x ===
+
+SELECT ROUND(LN(EXP(5)), 9)              AS inverse_5;
+SELECT ROUND(LN(EXP(-3)), 9)             AS inverse_neg_3;
+
+--echo === NULL passthrough ===
+
+SELECT LOG(NULL)         IS NULL         AS log1_null;
+SELECT LOG(NULL, 10)     IS NULL         AS log_null_base;
+SELECT LOG(2, NULL)      IS NULL         AS log_null_x;
+SELECT LN(NULL)          IS NULL         AS ln_null;
+SELECT EXP(NULL)         IS NULL         AS exp_null;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT LOG();
+--error 1105
+SELECT LOG(2, 8, 3);
+--error 1105
+SELECT LN();
+--error 1105
+SELECT LN(1, 2);
+--error 1105
+SELECT EXP();
+--error 1105
+SELECT EXP(1, 2);
+
+--echo === Determinism ===
+
+SELECT LOG(10)   = LOG(10)              AS log_det;
+SELECT LN(2)     = LN(2)                AS ln_det;
+SELECT EXP(1)    = EXP(1)               AS exp_det;

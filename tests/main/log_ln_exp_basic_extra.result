@@ -1,0 +1,120 @@
+=== LOG: 1-arg = log10 (MySQL convention) ===
+SELECT LOG(1)                            AS log_one_is_zero;
+log_one_is_zero
+0
+SELECT LOG(10)                           AS log_ten_is_one;
+log_ten_is_one
+1
+SELECT LOG(100)                          AS log_hundred_is_two;
+log_hundred_is_two
+2
+SELECT LOG(1000)                         AS log_thousand_is_three;
+log_thousand_is_three
+3
+SELECT LOG(EXP(1)) <> 1                  AS log_is_log10_not_ln;
+log_is_log10_not_ln
+1
+SELECT LN(EXP(1)) = 1                    AS ln_inverse_exp;
+ln_inverse_exp
+0
+=== LOG: 2-arg form (log base b of x) ===
+SELECT LOG(2, 8)                         AS log2_eight_is_three;
+log2_eight_is_three
+3
+SELECT LOG(10, 1000)                     AS log10_thousand_is_three;
+log10_thousand_is_three
+2.9999999999999996
+SELECT LOG(3, 27)                        AS log3_27_is_three;
+log3_27_is_three
+3
+SELECT ROUND(POW(2, LOG(2, 16)))  = 16   AS log_pow_round_trip;
+log_pow_round_trip
+0
+=== LOG / LN / EXP: error on invalid input (zeta strict, MySQL NULL) ===
+SELECT LOG(0);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LOG(-1);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LN(0);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LN(-1);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LOG(-2, 8);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LOG(2, -8);
+ERROR 1105: execution error: cannot take logarithm of zero or negative number
+SELECT LOG(1, 100);
+ERROR 1105: execution error: logarithm base must not equal 1
+=== LN: known vectors ===
+SELECT LN(1)                             AS ln_one_is_zero;
+ln_one_is_zero
+0
+SELECT LN(EXP(1))                        AS ln_e_is_one;
+ln_e_is_one
+1
+SELECT LN(EXP(2))                        AS ln_e_sq;
+ln_e_sq
+2
+=== EXP: known vectors ===
+SELECT EXP(0)                            AS exp_zero_is_one;
+exp_zero_is_one
+1
+SELECT ROUND(EXP(1), 10)                 AS exp_one_rounded_e;
+exp_one_rounded_e
+2.7182818285
+SELECT EXP(-1) > 0.36 AND EXP(-1) < 0.37 AS exp_neg_one_range;
+exp_neg_one_range
+1
+=== EXP: overflow returns +Infinity (NOT error) ===
+SELECT EXP(1000) > 1e308                 AS overflow_is_inf;
+overflow_is_inf
+1
+SELECT EXP(-1000) = 0                    AS underflow_is_zero;
+underflow_is_zero
+0
+=== Cross-family inverse: LN(EXP(x)) ≈ x ===
+SELECT ROUND(LN(EXP(5)), 9)              AS inverse_5;
+inverse_5
+5
+SELECT ROUND(LN(EXP(-3)), 9)             AS inverse_neg_3;
+inverse_neg_3
+-3
+=== NULL passthrough ===
+SELECT LOG(NULL)         IS NULL         AS log1_null;
+log1_null
+1
+SELECT LOG(NULL, 10)     IS NULL         AS log_null_base;
+log_null_base
+1
+SELECT LOG(2, NULL)      IS NULL         AS log_null_x;
+log_null_x
+1
+SELECT LN(NULL)          IS NULL         AS ln_null;
+ln_null
+1
+SELECT EXP(NULL)         IS NULL         AS exp_null;
+exp_null
+1
+=== Arity errors ===
+SELECT LOG();
+ERROR 1105: execution error: LOG requires 1 or 2 arguments
+SELECT LOG(2, 8, 3);
+ERROR 1105: execution error: LOG requires 1 or 2 arguments
+SELECT LN();
+ERROR 1105: execution error: LN requires 1 argument
+SELECT LN(1, 2);
+ERROR 1105: execution error: LN requires 1 argument
+SELECT EXP();
+ERROR 1105: execution error: EXP requires 1 argument
+SELECT EXP(1, 2);
+ERROR 1105: execution error: EXP requires 1 argument
+=== Determinism ===
+SELECT LOG(10)   = LOG(10)              AS log_det;
+log_det
+1
+SELECT LN(2)     = LN(2)                AS ln_det;
+ln_det
+1
+SELECT EXP(1)    = EXP(1)               AS exp_det;
+exp_det
+1
