@@ -1,0 +1,228 @@
+=== ABS: basic across numeric types ===
+SELECT ABS(5)                            AS pos_int;
+pos_int
+5
+SELECT ABS(-5)                           AS neg_int;
+neg_int
+5
+SELECT ABS(0)                            AS zero_int;
+zero_int
+0
+SELECT ABS(3.14)                         AS pos_dec;
+pos_dec
+3.14
+SELECT ABS(-3.14)                        AS neg_dec;
+neg_dec
+3.14
+SELECT ABS(-2147483648)                  AS neg_i32_min;
+neg_i32_min
+2147483648
+=== ABS: NULL + arity ===
+SELECT ABS(NULL) IS NULL                 AS null_passes;
+null_passes
+1
+SELECT ABS();
+ERROR 1105: execution error: ABS requires 1 argument
+SELECT ABS(1, 2);
+ERROR 1105: execution error: ABS requires 1 argument
+=== ROUND: 1-arg form ===
+SELECT ROUND(3.4)                        AS down;
+down
+3
+SELECT ROUND(3.5)                        AS half_up;
+half_up
+4
+SELECT ROUND(3.6)                        AS up;
+up
+4
+SELECT ROUND(-3.5)                       AS neg_half_away;
+neg_half_away
+-4
+SELECT ROUND(0.5)                        AS half_zero_pt_five;
+half_zero_pt_five
+1
+SELECT ROUND(5)                          AS int_identity;
+int_identity
+5
+=== ROUND: half-away-from-zero (NOT bankers) ===
+SELECT ROUND(2.5)                        AS tie_2_5_half_away;
+tie_2_5_half_away
+3
+SELECT FORMAT(2.5, 0)                    AS tie_2_5_bankers;
+tie_2_5_bankers
+2
+SELECT ROUND(2.5) <> FORMAT(2.5, 0)      AS round_vs_format_diverge;
+round_vs_format_diverge
+1
+SELECT ROUND(0.5)   = 1                  AS half_0_5_to_1;
+half_0_5_to_1
+1
+SELECT ROUND(1.5)   = 2                  AS half_1_5_to_2;
+half_1_5_to_2
+1
+SELECT ROUND(2.5)   = 3                  AS half_2_5_to_3;
+half_2_5_to_3
+1
+SELECT ROUND(-2.5)  = -3                 AS neg_half_2_5_to_neg_3;
+neg_half_2_5_to_neg_3
+1
+=== ROUND: 2-arg form (positive precision) ===
+SELECT ROUND(3.14159, 2)                 AS pi_2dp;
+pi_2dp
+3.14
+SELECT ROUND(3.14159, 4)                 AS pi_4dp;
+pi_4dp
+3.1416
+SELECT ROUND(3.999, 1)                   AS round_up_1dp;
+round_up_1dp
+4.0
+SELECT ROUND(-1.235, 2)                  AS neg_2dp_half_away;
+neg_2dp_half_away
+-1.24
+=== ROUND: negative precision (round to 10^|n|) ===
+SELECT ROUND(12345.67, -1)               AS to_tens;
+to_tens
+12350
+SELECT ROUND(12345.67, -2)               AS to_hundreds;
+to_hundreds
+12300
+SELECT ROUND(12345.67, -3)               AS to_thousands;
+to_thousands
+12000
+SELECT ROUND(149.5, -1)                  AS half_neg_1dp;
+half_neg_1dp
+150
+=== ROUND: NULL + arity ===
+SELECT ROUND(NULL)         IS NULL       AS null_passes;
+null_passes
+1
+SELECT ROUND(1.5, NULL)    IS NULL       AS null_precision;
+null_precision
+1
+SELECT ROUND();
+ERROR 1105: execution error: ROUND requires 1 or 2 arguments
+SELECT ROUND(1.5, 2, 3);
+ERROR 1105: execution error: ROUND requires 1 or 2 arguments
+=== TRUNCATE: positive precision ===
+SELECT TRUNCATE(3.999, 0)                AS to_int;
+to_int
+3
+SELECT TRUNCATE(3.999, 2)                AS to_2dp;
+to_2dp
+3.99
+SELECT TRUNCATE(-3.999, 0)               AS neg_to_int;
+neg_to_int
+-3
+SELECT TRUNCATE(3.5, 0)                  AS half_truncs_down;
+half_truncs_down
+3
+SELECT TRUNCATE(-3.5, 0)                 AS neg_half_truncs_toward_zero;
+neg_half_truncs_toward_zero
+-3
+SELECT TRUNCATE(3.5, 0)    <> ROUND(3.5) AS trunc_vs_round_diverge;
+trunc_vs_round_diverge
+1
+=== TRUNCATE: negative precision ===
+SELECT TRUNCATE(12345.67, -1)            AS trunc_tens;
+trunc_tens
+12340
+SELECT TRUNCATE(12345.67, -2)            AS trunc_hundreds;
+trunc_hundreds
+12300
+SELECT TRUNCATE(-12345.67, -2)           AS trunc_neg_hundreds;
+trunc_neg_hundreds
+-12300
+=== TRUNCATE: integer with non-negative precision = identity ===
+SELECT TRUNCATE(42, 5)                   AS int_identity;
+int_identity
+42
+=== TRUNCATE: NULL + arity ===
+SELECT TRUNCATE(NULL, 2)   IS NULL       AS null_x;
+null_x
+1
+SELECT TRUNCATE(1.5, NULL) IS NULL       AS null_n;
+null_n
+1
+SELECT TRUNCATE();
+ERROR 1105: execution error: TRUNCATE requires 2 arguments
+SELECT TRUNCATE(1.5);
+ERROR 1105: execution error: TRUNCATE requires 2 arguments
+SELECT TRUNCATE(1.5, 2, 3);
+ERROR 1105: execution error: TRUNCATE requires 2 arguments
+=== CEIL / CEILING ===
+SELECT CEIL(3.1)                         AS dec_up;
+dec_up
+4
+SELECT CEIL(-3.1)                        AS neg_dec_toward_zero;
+neg_dec_toward_zero
+-3
+SELECT CEIL(3.0)                         AS exact;
+exact
+3
+SELECT CEIL(5)                           AS int_identity;
+int_identity
+5
+SELECT CEIL(NULL) IS NULL                AS null_passes;
+null_passes
+1
+SELECT CEILING(3.1) = CEIL(3.1)          AS ceiling_alias;
+ceiling_alias
+1
+SELECT CEIL();
+ERROR 1105: execution error: CEIL requires 1 argument
+SELECT CEIL(1, 2)                        AS ceil_extra_args_silent;
+ceil_extra_args_silent
+1
+=== FLOOR ===
+SELECT FLOOR(3.9)                        AS dec_down;
+dec_down
+3
+SELECT FLOOR(-3.1)                       AS neg_dec_away_zero;
+neg_dec_away_zero
+-4
+SELECT FLOOR(3.0)                        AS exact;
+exact
+3
+SELECT FLOOR(5)                          AS int_identity;
+int_identity
+5
+SELECT FLOOR(NULL) IS NULL               AS null_passes;
+null_passes
+1
+SELECT FLOOR();
+ERROR 1105: execution error: FLOOR requires 1 argument
+SELECT FLOOR(1, 2)                       AS floor_extra_args_silent;
+floor_extra_args_silent
+1
+=== Cross-family invariants ===
+SELECT FLOOR(3.7) <= ROUND(3.7) AND ROUND(3.7) <= CEIL(3.7) AS bounds_invariant;
+bounds_invariant
+1
+SELECT FLOOR(-3.7) <= ROUND(-3.7) AND ROUND(-3.7) <= CEIL(-3.7) AS bounds_invariant_neg;
+bounds_invariant_neg
+1
+SELECT CEIL(3.0) - FLOOR(3.0) = 0        AS exact_no_gap;
+exact_no_gap
+1
+SELECT CEIL(3.5) - FLOOR(3.5) = 1        AS frac_one_gap;
+frac_one_gap
+1
+SELECT ABS(-99.99) >= 0                  AS abs_non_negative;
+abs_non_negative
+1
+=== Determinism ===
+SELECT ABS(-5)       = ABS(-5)           AS abs_det;
+abs_det
+1
+SELECT ROUND(3.5)    = ROUND(3.5)        AS round_det;
+round_det
+1
+SELECT TRUNCATE(3.5, 0) = TRUNCATE(3.5, 0) AS trunc_det;
+trunc_det
+1
+SELECT CEIL(3.1)     = CEIL(3.1)         AS ceil_det;
+ceil_det
+1
+SELECT FLOOR(3.9)    = FLOOR(3.9)        AS floor_det;
+floor_det
+1
