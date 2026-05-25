@@ -17,6 +17,15 @@ wrap_equals_basic
 SELECT HEX(CHAR(-1))                     AS neg_wrap_hex;
 neg_wrap_hex
 FF
+SELECT HEX(CHAR(-321))                   AS large_neg_wrap_hex;
+large_neg_wrap_hex
+BF
+SELECT HEX(CHAR(65, 255, 66))            AS mixed_invalid_utf8;
+mixed_invalid_utf8
+41FF42
+SELECT LENGTH(CHAR(65, 255, 66))    = 3  AS mixed_invalid_utf8_len;
+mixed_invalid_utf8_len
+1
 === CHAR: NULL args are skipped ===
 SELECT CHAR(72, NULL, 105)               AS null_skipped;
 null_skipped
@@ -72,6 +81,9 @@ utf8_codepoint_is_233
 1
 SELECT ASCII('é') <> 195                 AS not_first_byte;
 not_first_byte
+1
+SELECT ASCII('éA') = 233                 AS multibyte_then_ascii;
+multibyte_then_ascii
 1
 === ASCII: NULL passthrough + arity ===
 SELECT ASCII(NULL) IS NULL               AS null_passes;
