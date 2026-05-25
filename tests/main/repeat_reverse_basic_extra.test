@@ -1,0 +1,162 @@
+# Independently authored REPEAT / REVERSE smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Two simple string functions; neither had
+# compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   REPEAT(s, n)  — concatenate `s` with itself `n` times.
+#                   n <= 0 → empty string. NULL on either arg
+#                   → NULL. 10 MiB DoS cap.
+#   REVERSE(s)    — reverse the CHARACTERS (code points) of `s`,
+#                   NOT the raw bytes. Multi-byte UTF-8 is
+#                   reversed code-point-by-code-point. NULL → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: REPEAT n must be a true integer (Int32/Int64).
+#     Strings or floats → 1105. MySQL coerces. Strict in zeta
+#     matches the REPEAT/SPACE pattern.
+#   # zeta-adapt: REPEAT has a 10 MiB cap to prevent DoS via
+#     `n.saturating_mul(s.len())`.
+#   # zeta-adapt: REVERSE operates on Unicode code points, not
+#     bytes — REVERSE('café') = 'éfac', not the byte-reversed
+#     mojibake form.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). The error
+#     codes differ; the behavior (reject) matches.
+
+--echo === REPEAT: basic concatenation ===
+
+SELECT REPEAT('ab', 3)                   AS basic;
+SELECT REPEAT('hello', 1)                AS once;
+SELECT REPEAT('x', 5)                    AS single_char_5x;
+
+--echo === REPEAT: n <= 0 returns empty string (NOT NULL) ===
+
+SELECT REPEAT('ab', 0)                   AS zero_n;
+SELECT REPEAT('ab', -1)                  AS neg_n;
+SELECT REPEAT('ab', -100)                AS big_neg_n;
+SELECT REPEAT('ab', 0)   IS NULL         AS zero_not_null;
+SELECT LENGTH(REPEAT('ab', 0))    = 0    AS zero_zero_len;
+SELECT LENGTH(REPEAT('ab', -1))   = 0    AS neg_zero_len;
+
+--echo === REPEAT: empty input ===
+
+# Empty s with positive n → empty result.
+SELECT REPEAT('', 5)                     AS empty_s;
+SELECT LENGTH(REPEAT('', 5))      = 0    AS empty_s_zero_len;
+
+--echo === REPEAT: output length pin ===
+
+# LENGTH should equal n * length(s) bytes for ASCII.
+SELECT LENGTH(REPEAT('ab', 100))  = 200  AS len_100x;
+SELECT LENGTH(REPEAT('xyz', 7))   = 21   AS len_7x;
+
+--echo === REPEAT: multi-byte UTF-8 ===
+
+# Note: zeta's LENGTH() returns CHARACTER count (PostgreSQL
+# semantic), not byte count (MySQL semantic). Documented in the
+# LPAD/RPAD slice as a real divergence. So both pins below use
+# char-count math.
+# 'café' is 4 chars; REPEAT 3 times → 12 chars.
+SELECT LENGTH(REPEAT('café', 3))      = 12 AS utf8_pg_len;
+SELECT CHAR_LENGTH(REPEAT('café', 3)) = 12 AS utf8_char_len;
+
+--echo === REPEAT: 10 MiB DoS cap ===
+
+# At-cap should succeed; beyond-cap should reject.
+# `n * len(s) > 10485760` rejects. Use 1-char string for clean
+# n boundary.
+SELECT LENGTH(REPEAT('x', 10485760)) = 10485760 AS at_cap;
+--error 1105
+SELECT REPEAT('x', 10485761);
+# Multi-byte string × big n must hit cap on BYTE size, not char.
+--error 1105
+SELECT REPEAT('café', 10000000);
+
+--echo === REPEAT: NULL propagation ===
+
+SELECT REPEAT(NULL, 3)    IS NULL        AS null_s;
+SELECT REPEAT('ab', NULL) IS NULL        AS null_n;
+
+--echo === REPEAT: integer-type strictness ===
+
+--error 1105
+SELECT REPEAT('ab', 'three');
+--error 1105
+SELECT REPEAT('ab', 2.5);
+
+--echo === REPEAT: arity ===
+
+--error 1105
+SELECT REPEAT();
+--error 1105
+SELECT REPEAT('ab');
+--error 1105
+SELECT REPEAT('ab', 2, 'extra');
+
+--echo === REVERSE: basic ASCII ===
+
+SELECT REVERSE('hello')                  AS basic;
+SELECT REVERSE('')                       AS empty;
+SELECT REVERSE('a')                      AS single;
+SELECT REVERSE('abc')                    AS three;
+# Palindrome: reverse equals input.
+SELECT REVERSE('racecar') = 'racecar'    AS palindrome;
+
+--echo === REVERSE: multi-byte UTF-8 (code-point reversal, NOT byte) ===
+
+# 'café' chars are [c, a, f, é]. Reversed: [é, f, a, c] = 'éfac'.
+# LENGTH is char-count in zeta — stays 4 chars after reverse.
+SELECT REVERSE('café')                   AS utf8_reverse;
+SELECT LENGTH(REVERSE('café'))      = 4  AS utf8_len_preserved;
+SELECT CHAR_LENGTH(REVERSE('café')) = 4  AS utf8_chars_preserved;
+# Double-reverse round-trip.
+SELECT REVERSE(REVERSE('café')) = 'café' AS round_trip;
+# Emoji / 4-byte sequence: '🎯' is 1 char (4 UTF-8 bytes). REVERSE
+# keeps the code point intact (doesn't split into surrogates).
+# '🎯ab' is 3 chars total.
+SELECT LENGTH(REVERSE('🎯ab'))       = 3 AS emoji_char_pres;
+SELECT CHAR_LENGTH(REVERSE('🎯ab'))  = 3 AS emoji_char_pres_explicit;
+# Code-point preservation: the reversed string starts with 'b'
+# (a + b reversed to b + a, then emoji at end).
+SELECT REVERSE('🎯ab') = 'ba🎯' AS emoji_codepoint_intact;
+
+--echo === REVERSE: combining marks detach from base ===
+
+# 'café' written as base 'cafe' + combining acute (U+0301) is
+# 5 code points: c, a, f, e, ́. REVERSE reverses by code point,
+# so the combining mark ends up at the FRONT, decoupled from
+# 'e'. Pinning the divergence: composed and decomposed forms
+# behave differently — applications that need glyph-cluster-
+# aware reversal would need to normalize first.
+SELECT CHAR_LENGTH('cafe' || CHR(769))           = 5 AS decomposed_chars;
+SELECT CHAR_LENGTH(REVERSE('cafe' || CHR(769)))  = 5 AS decomposed_reversed_chars;
+# Property: after REVERSE, the first code point is the combining
+# mark (U+0301), separated from any base char.
+SELECT SUBSTRING(REVERSE('cafe' || CHR(769)), 1, 1) = CHR(769)
+       AS combining_mark_detached;
+
+--echo === REVERSE: NULL passthrough ===
+
+SELECT REVERSE(NULL) IS NULL             AS null_passes;
+
+--echo === REVERSE: numeric coercion ===
+
+# Non-string inputs are stringified first, then reversed. Two
+# incidental but worth-pinning behaviors:
+#   REVERSE(123)  → '321'  (digits reversed)
+#   REVERSE(TRUE) → 'eurt' (the stringified 'true' reversed —
+#                  NOT a typo)
+SELECT REVERSE(123)                      AS int_in;
+SELECT REVERSE(TRUE)                     AS bool_in;
+
+--echo === REVERSE: arity ===
+
+--error 1105
+SELECT REVERSE();
+--error 1105
+SELECT REVERSE('a', 'b');
+
+--echo === Determinism ===
+
+SELECT REPEAT('x', 5)   = REPEAT('x', 5)   AS repeat_det;
+SELECT REVERSE('hello') = REVERSE('hello') AS reverse_det;

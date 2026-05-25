@@ -1,0 +1,149 @@
+=== REPEAT: basic concatenation ===
+SELECT REPEAT('ab', 3)                   AS basic;
+basic
+ababab
+SELECT REPEAT('hello', 1)                AS once;
+once
+hello
+SELECT REPEAT('x', 5)                    AS single_char_5x;
+single_char_5x
+xxxxx
+=== REPEAT: n <= 0 returns empty string (NOT NULL) ===
+SELECT REPEAT('ab', 0)                   AS zero_n;
+zero_n
+
+SELECT REPEAT('ab', -1)                  AS neg_n;
+neg_n
+
+SELECT REPEAT('ab', -100)                AS big_neg_n;
+big_neg_n
+
+SELECT REPEAT('ab', 0)   IS NULL         AS zero_not_null;
+zero_not_null
+0
+SELECT LENGTH(REPEAT('ab', 0))    = 0    AS zero_zero_len;
+zero_zero_len
+1
+SELECT LENGTH(REPEAT('ab', -1))   = 0    AS neg_zero_len;
+neg_zero_len
+1
+=== REPEAT: empty input ===
+SELECT REPEAT('', 5)                     AS empty_s;
+empty_s
+
+SELECT LENGTH(REPEAT('', 5))      = 0    AS empty_s_zero_len;
+empty_s_zero_len
+1
+=== REPEAT: output length pin ===
+SELECT LENGTH(REPEAT('ab', 100))  = 200  AS len_100x;
+len_100x
+1
+SELECT LENGTH(REPEAT('xyz', 7))   = 21   AS len_7x;
+len_7x
+1
+=== REPEAT: multi-byte UTF-8 ===
+SELECT LENGTH(REPEAT('café', 3))      = 12 AS utf8_pg_len;
+utf8_pg_len
+1
+SELECT CHAR_LENGTH(REPEAT('café', 3)) = 12 AS utf8_char_len;
+utf8_char_len
+1
+=== REPEAT: 10 MiB DoS cap ===
+SELECT LENGTH(REPEAT('x', 10485760)) = 10485760 AS at_cap;
+at_cap
+1
+SELECT REPEAT('x', 10485761);
+ERROR 1105: execution error: REPEAT result exceeds maximum allowed size
+SELECT REPEAT('café', 10000000);
+ERROR 1105: execution error: REPEAT result exceeds maximum allowed size
+=== REPEAT: NULL propagation ===
+SELECT REPEAT(NULL, 3)    IS NULL        AS null_s;
+null_s
+1
+SELECT REPEAT('ab', NULL) IS NULL        AS null_n;
+null_n
+1
+=== REPEAT: integer-type strictness ===
+SELECT REPEAT('ab', 'three');
+ERROR 1105: execution error: REPEAT count must be integer
+SELECT REPEAT('ab', 2.5);
+ERROR 1105: execution error: REPEAT count must be integer
+=== REPEAT: arity ===
+SELECT REPEAT();
+ERROR 1105: execution error: REPEAT requires 2 arguments
+SELECT REPEAT('ab');
+ERROR 1105: execution error: REPEAT requires 2 arguments
+SELECT REPEAT('ab', 2, 'extra');
+ERROR 1105: execution error: REPEAT requires 2 arguments
+=== REVERSE: basic ASCII ===
+SELECT REVERSE('hello')                  AS basic;
+basic
+olleh
+SELECT REVERSE('')                       AS empty;
+empty
+
+SELECT REVERSE('a')                      AS single;
+single
+a
+SELECT REVERSE('abc')                    AS three;
+three
+cba
+SELECT REVERSE('racecar') = 'racecar'    AS palindrome;
+palindrome
+1
+=== REVERSE: multi-byte UTF-8 (code-point reversal, NOT byte) ===
+SELECT REVERSE('café')                   AS utf8_reverse;
+utf8_reverse
+éfac
+SELECT LENGTH(REVERSE('café'))      = 4  AS utf8_len_preserved;
+utf8_len_preserved
+1
+SELECT CHAR_LENGTH(REVERSE('café')) = 4  AS utf8_chars_preserved;
+utf8_chars_preserved
+1
+SELECT REVERSE(REVERSE('café')) = 'café' AS round_trip;
+round_trip
+1
+SELECT LENGTH(REVERSE('🎯ab'))       = 3 AS emoji_char_pres;
+emoji_char_pres
+1
+SELECT CHAR_LENGTH(REVERSE('🎯ab'))  = 3 AS emoji_char_pres_explicit;
+emoji_char_pres_explicit
+1
+SELECT REVERSE('🎯ab') = 'ba🎯' AS emoji_codepoint_intact;
+emoji_codepoint_intact
+1
+=== REVERSE: combining marks detach from base ===
+SELECT CHAR_LENGTH('cafe' || CHR(769))           = 5 AS decomposed_chars;
+decomposed_chars
+1
+SELECT CHAR_LENGTH(REVERSE('cafe' || CHR(769)))  = 5 AS decomposed_reversed_chars;
+decomposed_reversed_chars
+1
+SELECT SUBSTRING(REVERSE('cafe' || CHR(769)), 1, 1) = CHR(769)
+       AS combining_mark_detached;
+combining_mark_detached
+1
+=== REVERSE: NULL passthrough ===
+SELECT REVERSE(NULL) IS NULL             AS null_passes;
+null_passes
+1
+=== REVERSE: numeric coercion ===
+SELECT REVERSE(123)                      AS int_in;
+int_in
+321
+SELECT REVERSE(TRUE)                     AS bool_in;
+bool_in
+eurt
+=== REVERSE: arity ===
+SELECT REVERSE();
+ERROR 1105: execution error: REVERSE requires 1 argument
+SELECT REVERSE('a', 'b');
+ERROR 1105: execution error: REVERSE requires 1 argument
+=== Determinism ===
+SELECT REPEAT('x', 5)   = REPEAT('x', 5)   AS repeat_det;
+repeat_det
+1
+SELECT REVERSE('hello') = REVERSE('hello') AS reverse_det;
+reverse_det
+1
