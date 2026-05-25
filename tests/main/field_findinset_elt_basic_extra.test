@@ -1,0 +1,114 @@
+# Independently authored FIELD / FIND_IN_SET / ELT smoke for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. All three are implemented in zeta but had no
+# compat-mtr coverage yet — this slice locks in the string-array
+# lookup trio.
+#
+# Big-picture finding:
+#   FIELD(needle, s1, s2, ...) — 1-based index of needle in the
+#       remaining args; 0 if not found, 0 if needle is NULL.
+#   FIND_IN_SET(needle, csv)   — 1-based index of needle in the
+#       comma-separated csv string; 0 if not found, NULL if
+#       either arg is NULL. Edge: empty needle never matches.
+#   ELT(N, s1, s2, ...)        — pick the N-th string (1-based);
+#       NULL if N is NULL / < 1 / > number of strings / element
+#       itself is NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: FIELD with NULL needle returns 0 (matches
+#     MySQL exactly).
+#   # zeta-adapt: FIND_IN_SET with comma-bearing needle returns
+#     0 (a comma-delimited member can never contain a comma —
+#     MySQL semantics).
+#   # zeta-adapt: ELT's return type is pinned to Text in zeta's
+#     type-inference maps. MySQL preserves the source type;
+#     zeta stringifies. Tested as Text only.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Code numbers
+#     differ; the behavior (reject) matches.
+
+--echo === FIELD: basic 1-based lookup ===
+
+SELECT FIELD('b', 'a', 'b', 'c')   AS hit_second;
+SELECT FIELD('a', 'a', 'b', 'c')   AS hit_first;
+SELECT FIELD('c', 'a', 'b', 'c')   AS hit_last;
+SELECT FIELD('z', 'a', 'b', 'c')   AS miss;
+
+--echo === FIELD: NULL handling ===
+
+# NULL needle → 0 (NOT NULL; specific MySQL semantics).
+SELECT FIELD(NULL, 'a', 'b')           AS null_needle;
+# NULL haystack item is skipped (never matches).
+SELECT FIELD('b', 'a', NULL, 'b')      AS skips_null;
+
+--echo === FIELD: numeric coercion ===
+
+# MySQL stringifies for comparison; zeta uses value_to_sql_string
+# so FIELD(2, '1', '2', '3') = 2.
+SELECT FIELD(2, '1', '2', '3')         AS int_needle;
+SELECT FIELD('2', 1, 2, 3)             AS string_needle_int_hay;
+
+--echo === FIND_IN_SET: basic comma-split ===
+
+SELECT FIND_IN_SET('b', 'a,b,c')   AS hit_second;
+SELECT FIND_IN_SET('a', 'a,b,c')   AS hit_first;
+SELECT FIND_IN_SET('c', 'a,b,c')   AS hit_last;
+SELECT FIND_IN_SET('z', 'a,b,c')   AS miss;
+SELECT FIND_IN_SET('b', 'b')       AS single_member;
+
+--echo === FIND_IN_SET: empty / edge inputs ===
+
+# Empty needle never matches — including `('', '')` where naïve
+# split would give a phantom position 1.
+SELECT FIND_IN_SET('',  '')        AS empty_both;
+SELECT FIND_IN_SET('',  'a,b,c')   AS empty_needle;
+# Empty csv → 0 unless needle is also empty (above).
+SELECT FIND_IN_SET('a', '')        AS empty_csv;
+# Comma in needle → 0 (a single member never contains a comma).
+SELECT FIND_IN_SET('a,b', 'a,b,c') AS comma_needle;
+
+--echo === FIND_IN_SET: NULL propagation ===
+
+SELECT FIND_IN_SET(NULL, 'a,b')    IS NULL AS null_needle;
+SELECT FIND_IN_SET('a',  NULL)     IS NULL AS null_csv;
+
+--echo === ELT: 1-based pick ===
+
+SELECT ELT(1, 'a', 'b', 'c')   AS pick_first;
+SELECT ELT(2, 'a', 'b', 'c')   AS pick_second;
+SELECT ELT(3, 'a', 'b', 'c')   AS pick_last;
+
+--echo === ELT: out-of-bounds / NULL element / NULL N ===
+
+SELECT ELT(0, 'a', 'b')        IS NULL AS zero_n;
+SELECT ELT(-1, 'a', 'b')       IS NULL AS neg_n;
+SELECT ELT(99, 'a', 'b')       IS NULL AS overshoot;
+SELECT ELT(NULL, 'a', 'b')     IS NULL AS null_n;
+SELECT ELT(2, 'a', NULL)       IS NULL AS null_element;
+
+--echo === ELT: non-integer N coerces to NULL (not error) ===
+
+SELECT ELT('abc', 'a', 'b')    IS NULL AS string_n;
+
+--echo === Determinism cross-check ===
+
+# Trivial property: same args → same answer.
+SELECT FIELD('b', 'a', 'b') = FIELD('b', 'a', 'b')       AS field_det;
+SELECT FIND_IN_SET('b', 'a,b') = FIND_IN_SET('b', 'a,b') AS fis_det;
+SELECT ELT(1, 'a') = ELT(1, 'a')                         AS elt_det;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT FIELD();
+--error 1105
+SELECT FIELD('a');
+--error 1105
+SELECT FIND_IN_SET();
+--error 1105
+SELECT FIND_IN_SET('a');
+--error 1105
+SELECT FIND_IN_SET('a', 'b', 'c');
+--error 1105
+SELECT ELT();
+--error 1105
+SELECT ELT(1);
