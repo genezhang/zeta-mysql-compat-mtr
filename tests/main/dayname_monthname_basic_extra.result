@@ -88,6 +88,11 @@ dn_null
 SELECT MONTHNAME(NULL)  IS NULL          AS mn_null;
 mn_null
 1
+=== Unparseable string → ERROR (impl reject path) ===
+SELECT DAYNAME('not a date');
+ERROR 1105: execution error: DAYNAME: cannot parse "not a date" as a date or timestamp
+SELECT MONTHNAME('not a date');
+ERROR 1105: execution error: MONTHNAME: cannot parse "not a date" as a date or timestamp
 === Arity errors ===
 SELECT DAYNAME();
 ERROR 1105: execution error: DAYNAME requires 1 argument

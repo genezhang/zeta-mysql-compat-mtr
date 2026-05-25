@@ -64,6 +64,13 @@ SELECT LENGTH(MONTHNAME('2024-09-15'))   = 9 AS september_len_9;
 SELECT DAYNAME(NULL)    IS NULL          AS dn_null;
 SELECT MONTHNAME(NULL)  IS NULL          AS mn_null;
 
+--echo === Unparseable string → ERROR (impl reject path) ===
+
+--error 1105
+SELECT DAYNAME('not a date');
+--error 1105
+SELECT MONTHNAME('not a date');
+
 --echo === Arity errors ===
 
 --error 1105
