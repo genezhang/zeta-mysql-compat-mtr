@@ -1,0 +1,153 @@
+=== Scalar = scalar (strict equality) ===
+SELECT JSON_CONTAINS('1', '1')                AS scalar_int_match;
+scalar_int_match
+1
+SELECT JSON_CONTAINS('1', '2')                AS scalar_int_mismatch;
+scalar_int_mismatch
+0
+SELECT JSON_CONTAINS('"hi"', '"hi"')          AS scalar_str_match;
+scalar_str_match
+1
+SELECT JSON_CONTAINS('"hi"', '"bye"')         AS scalar_str_mismatch;
+scalar_str_mismatch
+0
+SELECT JSON_CONTAINS('true', 'true')          AS scalar_bool_match;
+scalar_bool_match
+1
+SELECT JSON_CONTAINS('true', 'false')         AS scalar_bool_mismatch;
+scalar_bool_mismatch
+0
+SELECT JSON_CONTAINS('1', '"1"')              AS scalar_int_vs_string;
+scalar_int_vs_string
+0
+=== Array containment — element membership ===
+SELECT JSON_CONTAINS('[1,2,3]', '1')          AS arr_contains_first;
+arr_contains_first
+1
+SELECT JSON_CONTAINS('[1,2,3]', '3')          AS arr_contains_last;
+arr_contains_last
+1
+SELECT JSON_CONTAINS('[1,2,3]', '[1,2]')      AS arr_contains_subset;
+arr_contains_subset
+1
+SELECT JSON_CONTAINS('[1,2,3]', '[3,2,1]')    AS arr_contains_reordered_full;
+arr_contains_reordered_full
+1
+SELECT JSON_CONTAINS('[1,2,3]', '[1,4]')      AS arr_contains_partial_miss;
+arr_contains_partial_miss
+0
+SELECT JSON_CONTAINS('[1,2,3]', '[]')         AS empty_arr_candidate_matches_any;
+empty_arr_candidate_matches_any
+1
+SELECT JSON_CONTAINS('[1,2,3]', '[1,1,1]')    AS arr_contains_dup_candidate;
+arr_contains_dup_candidate
+1
+SELECT JSON_CONTAINS('5',       '[5]')        AS scalar_target_arr_candidate;
+scalar_target_arr_candidate
+0
+=== Object subset (every k/v of candidate in target) ===
+SELECT JSON_CONTAINS('{"a":1,"b":2,"c":3}', '{"a":1}')         AS obj_subset_single;
+obj_subset_single
+1
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":1,"b":2}')         AS obj_subset_full;
+obj_subset_full
+1
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"b":2,"a":1}')         AS obj_subset_reordered;
+obj_subset_reordered
+1
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"a":2}')               AS obj_subset_value_mismatch;
+obj_subset_value_mismatch
+0
+SELECT JSON_CONTAINS('{"a":1,"b":2}', '{"c":3}')               AS obj_subset_missing_key;
+obj_subset_missing_key
+0
+SELECT JSON_CONTAINS('{"a":1}', '{}')                          AS obj_empty_candidate;
+obj_empty_candidate
+1
+SELECT JSON_CONTAINS('{}', '{}')                               AS empty_obj_in_empty;
+empty_obj_in_empty
+1
+=== Nested containment ===
+SELECT JSON_CONTAINS('{"a":{"b":1,"c":2}}', '{"a":{"b":1}}')   AS nested_obj_subset;
+nested_obj_subset
+1
+SELECT JSON_CONTAINS('{"a":{"b":1}}',       '{"a":{"b":2}}')   AS nested_obj_value_mismatch;
+nested_obj_value_mismatch
+0
+SELECT JSON_CONTAINS('[[1,2],[3,4]]',  '[[3,4]]')              AS nested_arr_elem;
+nested_arr_elem
+1
+SELECT JSON_CONTAINS('[[1,2],[3,4]]',  '[[5,6]]')              AS nested_arr_miss;
+nested_arr_miss
+0
+SELECT JSON_CONTAINS('[{"a":1},{"b":2}]', '[{"a":1}]')         AS arr_of_obj;
+arr_of_obj
+1
+SELECT JSON_CONTAINS('[{"a":1,"b":2}]',   '[{"a":1}]')         AS arr_of_obj_subset;
+arr_of_obj_subset
+1
+=== Mixed-shape mismatch (object vs array) ===
+SELECT JSON_CONTAINS('[1,2,3]',     '{"a":1}')                 AS arr_obj_mismatch;
+arr_obj_mismatch
+0
+SELECT JSON_CONTAINS('{"a":1}',     '[1]')                     AS obj_arr_mismatch;
+obj_arr_mismatch
+0
+=== NULL handling matrix ===
+SELECT JSON_CONTAINS(NULL, '1')        IS NULL                 AS null_target;
+null_target
+1
+SELECT JSON_CONTAINS('1', NULL)        IS NULL                 AS null_candidate;
+null_candidate
+1
+SELECT JSON_CONTAINS(NULL, NULL)       IS NULL                 AS null_both;
+null_both
+1
+SELECT JSON_CONTAINS('null', 'null')                           AS json_null_in_json_null;
+json_null_in_json_null
+1
+SELECT JSON_CONTAINS('[null]', 'null')                         AS json_null_in_arr;
+json_null_in_arr
+1
+SELECT JSON_CONTAINS('1', 'null')                              AS json_null_in_int;
+json_null_in_int
+0
+SELECT JSON_CONTAINS('{"a":null}', '{"a":null}')               AS json_null_as_obj_value;
+json_null_as_obj_value
+1
+SELECT JSON_CONTAINS('{"a":null,"b":1}', '{"a":null}')         AS json_null_obj_value_subset;
+json_null_obj_value_subset
+1
+=== Already-typed JSONB inputs (Value::Jsonb arm) ===
+SELECT JSON_CONTAINS(CAST('{"a":1,"b":2}' AS JSONB),
+                     CAST('{"a":1}'       AS JSONB))           AS both_typed;
+both_typed
+1
+SELECT JSON_CONTAINS(CAST('{"a":1,"b":2}' AS JSONB),
+                     '{"a":1}')                                AS target_typed;
+target_typed
+1
+SELECT JSON_CONTAINS('{"a":1,"b":2}',
+                     CAST('{"a":1}'       AS JSONB))           AS candidate_typed;
+candidate_typed
+1
+=== Invalid JSON → ERROR (zeta strict; MySQL NULLs) ===
+SELECT JSON_CONTAINS('not json', '1');
+ERROR 1105: execution error: JSON_CONTAINS argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_CONTAINS('1', 'not json');
+ERROR 1105: execution error: JSON_CONTAINS argument is not valid JSON: JSONB error: expected 'null' at position 1
+=== Non-JSON-typed arg → ERROR ===
+SELECT JSON_CONTAINS(42, '1');
+ERROR 1105: execution error: JSON_CONTAINS requires JSON-typed arguments
+SELECT JSON_CONTAINS('1', 42);
+ERROR 1105: execution error: JSON_CONTAINS requires JSON-typed arguments
+=== Arity errors ===
+SELECT JSON_CONTAINS();
+ERROR 1105: execution error: JSON_CONTAINS requires 2 arguments
+SELECT JSON_CONTAINS('1');
+ERROR 1105: execution error: JSON_CONTAINS requires 2 arguments
+SELECT JSON_CONTAINS('{"a":1}', '1', '$.a');
+ERROR 1105: execution error: JSON_CONTAINS requires 2 arguments
+=== KNOWN GAP: JSON_CONTAINS_PATH not implemented (sentinel) ===
+SELECT JSON_CONTAINS_PATH('{"a":1}', 'one', '$.a');
+ERROR 1105: execution error: unknown function: JSON_CONTAINS_PATH
