@@ -1,0 +1,145 @@
+# Independently authored GREATEST / LEAST + POW / MOD / SIGN
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/. None had compat-mtr coverage yet.
+# Bundled because they're all small scalar math / comparison
+# helpers.
+#
+# Big-picture finding:
+#   GREATEST(a, b, ...) — largest value; over the MySQL wire
+#                         the shim rewrites to MYSQL_GREATEST
+#                         (NULL propagation). PG-native callers
+#                         would see PG behavior (NULL skipped).
+#   LEAST(a, b, ...)    — smallest value; same wire rewrite.
+#   POW(b, e) / POWER   — b^e via f64.powf. NULL on either → NULL.
+#   MOD(a, b)           — integer remainder (sign of dividend).
+#                         Division by zero → 1105.
+#   SIGN(x)             — -1 / 0 / 1, NaN → NaN. NULL → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: Over the MySQL wire, GREATEST/LEAST NULL-arg
+#     → NULL result (MYSQL_GREATEST shim). Pinned here.
+#   # zeta-adapt: MOD by zero is an ERROR in zeta (1105), NOT
+#     a NULL like MySQL. Pinned via --error 1105.
+#   # zeta-adapt: POW preserves f64.powf semantics including
+#     special cases (POW(0, 0) = 1, POW(neg, frac) = NaN).
+#     Overflow → 1105 (check_float_overflow).
+#   # zeta-adapt: SIGN(NaN) = NaN (preserved); SIGN handles
+#     Decimal with rust_decimal::Decimal::ZERO/ONE.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === GREATEST: basic largest pick ===
+
+SELECT GREATEST(1, 2, 3)                 AS three_ints;
+SELECT GREATEST(3, 1, 2)                 AS unordered;
+SELECT GREATEST('a', 'b', 'c')           AS three_strings;
+SELECT GREATEST(1.5, 2.5, 0.5)           AS three_decimals;
+SELECT GREATEST(10)                      AS single_arg;
+
+--echo === GREATEST: NULL propagates (MYSQL_GREATEST over wire) ===
+
+SELECT GREATEST(1, NULL, 3) IS NULL      AS null_middle;
+SELECT GREATEST(NULL, NULL) IS NULL      AS all_nulls;
+SELECT GREATEST(NULL)        IS NULL     AS null_only;
+
+--echo === LEAST: basic smallest pick ===
+
+SELECT LEAST(1, 2, 3)                    AS three_ints;
+SELECT LEAST(3, 1, 2)                    AS unordered;
+SELECT LEAST('a', 'b', 'c')              AS three_strings;
+SELECT LEAST(1.5, 2.5, 0.5)              AS three_decimals;
+SELECT LEAST(10)                         AS single_arg;
+
+--echo === LEAST: NULL propagates (MYSQL_LEAST over wire) ===
+
+SELECT LEAST(1, NULL, 3)    IS NULL      AS null_middle;
+SELECT LEAST(NULL, NULL)    IS NULL      AS all_nulls;
+SELECT LEAST(NULL)          IS NULL      AS null_only;
+
+--echo === GREATEST / LEAST cross-check: invariant ===
+
+# GREATEST and LEAST should never disagree on the bounds.
+SELECT GREATEST(1, 2, 3) >= LEAST(1, 2, 3) AS bound_invariant;
+SELECT GREATEST(5, 5)    = LEAST(5, 5)      AS all_equal;
+
+--echo === GREATEST / LEAST: arity errors ===
+
+--error 1105
+SELECT GREATEST();
+--error 1105
+SELECT LEAST();
+
+--echo === POW: basic ===
+
+SELECT POW(2, 10)                        AS two_to_ten;
+SELECT POW(10, 0)                        AS ten_to_zero;
+# Special: 0^0 = 1 (IEEE/f64.powf).
+SELECT POW(0, 0)                         AS zero_to_zero;
+# Negative base + integer exponent.
+SELECT POW(-2, 3)                        AS neg_base_int_exp;
+# Fractional exponent (square root).
+SELECT POW(9, 0.5)                       AS sqrt_via_pow;
+# POWER alias.
+SELECT POWER(2, 8)                       AS power_alias;
+
+--echo === POW: NULL + arity ===
+
+SELECT POW(NULL, 2)        IS NULL       AS null_base;
+SELECT POW(2, NULL)        IS NULL       AS null_exp;
+--error 1105
+SELECT POW();
+--error 1105
+SELECT POW(2);
+--error 1105
+SELECT POW(2, 3, 4);
+
+--echo === MOD: basic + sign behavior ===
+
+SELECT MOD(10, 3)                        AS basic;
+SELECT MOD(0, 5)                         AS zero_dividend;
+# Sign of result follows DIVIDEND (Rust % semantics).
+SELECT MOD(-10, 3)                       AS neg_dividend;
+SELECT MOD(10, -3)                       AS neg_divisor;
+SELECT MOD(-10, -3)                      AS neg_both;
+
+--echo === MOD: division by zero → 1105 ===
+
+# zeta errors (1105); MySQL would return NULL. Real divergence.
+--error 1105
+SELECT MOD(10, 0);
+
+--echo === MOD: NULL + arity ===
+
+SELECT MOD(NULL, 3)        IS NULL       AS null_dividend;
+SELECT MOD(10, NULL)       IS NULL       AS null_divisor;
+--error 1105
+SELECT MOD();
+--error 1105
+SELECT MOD(10);
+--error 1105
+SELECT MOD(10, 3, 1);
+
+--echo === SIGN: -1 / 0 / 1 ===
+
+SELECT SIGN(5)                           AS pos_int;
+SELECT SIGN(-5)                          AS neg_int;
+SELECT SIGN(0)                           AS zero_int;
+SELECT SIGN(3.14)                        AS pos_dec;
+SELECT SIGN(-3.14)                       AS neg_dec;
+SELECT SIGN(0.0)                         AS zero_dec;
+
+--echo === SIGN: NULL + arity ===
+
+SELECT SIGN(NULL) IS NULL                AS null_passes;
+--error 1105
+SELECT SIGN();
+--error 1105
+SELECT SIGN(1, 2);
+
+--echo === Determinism ===
+
+SELECT GREATEST(1,2) = GREATEST(1,2)     AS greatest_det;
+SELECT LEAST(1,2)    = LEAST(1,2)        AS least_det;
+SELECT POW(2,3)      = POW(2,3)          AS pow_det;
+SELECT MOD(10,3)     = MOD(10,3)         AS mod_det;
+SELECT SIGN(5)       = SIGN(5)           AS sign_det;
