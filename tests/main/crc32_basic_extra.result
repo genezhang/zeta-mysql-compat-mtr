@@ -1,0 +1,50 @@
+=== Known IEEE CRC32 vectors ===
+SELECT CRC32('123456789')   AS check_vector;
+check_vector
+3421780262
+SELECT CRC32('a')           AS single_a;
+single_a
+3904355907
+SELECT CRC32('abc')         AS abc;
+abc
+891568578
+SELECT CRC32('hello')       AS hello;
+hello
+907060870
+SELECT CRC32('The quick brown fox jumps over the lazy dog') AS pangram;
+pangram
+1095738169
+=== Empty input → CRC32 of empty bytes (defined as 0) ===
+SELECT CRC32('') AS empty;
+empty
+0
+=== Binary input via UNHEX ===
+SELECT CRC32(UNHEX('DEADBEEF'))     AS deadbeef;
+deadbeef
+2090640218
+SELECT CRC32(UNHEX('00FF00FF'))     AS alternating;
+alternating
+3000894588
+=== Determinism + distinct-input separation ===
+SELECT CRC32('zeta') = CRC32('zeta') AS deterministic;
+deterministic
+1
+SELECT CRC32('a')    <> CRC32('b')   AS distinct_inputs;
+distinct_inputs
+1
+SELECT CRC32('hello') <> CRC32('hellO') AS one_bit_flip;
+one_bit_flip
+1
+=== Output range: fits in u32 (≤ 4294967295) ===
+SELECT CRC32('zeta') BETWEEN 0 AND 4294967295 AS in_u32_range;
+in_u32_range
+1
+=== NULL passthrough ===
+SELECT CRC32(NULL) IS NULL AS null_passes;
+null_passes
+1
+=== Arity errors ===
+SELECT CRC32();
+ERROR 1105: execution error: CRC32 requires 1 argument
+SELECT CRC32('a', 'b');
+ERROR 1105: execution error: CRC32 requires 1 argument
