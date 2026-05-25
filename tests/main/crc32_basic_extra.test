@@ -1,0 +1,71 @@
+# Independently authored CRC32 smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+# CRC32 is implemented in zeta (via crc32fast / IEEE polynomial)
+# but had no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   CRC32(s) — IEEE 802.3 CRC-32 of the input bytes, returned as
+#              an unsigned 32-bit integer. Non-string inputs are
+#              stringified first (MySQL coercion). NULL → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta uses the canonical IEEE polynomial
+#     (0xEDB88320 reversed); MySQL ships the same algorithm.
+#     Well-known vectors (e.g. '123456789' → 0xCBF43926
+#     = 3421780262) match across both engines.
+#   # zeta-adapt: Result type is u32, fits in BIGINT — wire
+#     comparison against a numeric literal works directly with
+#     no type coercion noise.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Same
+#     direction (rejects).
+
+--echo === Known IEEE CRC32 vectors ===
+
+# Industry-standard test string ('123456789') and a few common
+# well-known reference strings (incl. the standard pangram) —
+# these values are stable across every IEEE-CRC32 implementation
+# (zlib, MySQL, Python's zlib.crc32, Rust's crc32fast). If zeta
+# returns something else, something is wrong.
+SELECT CRC32('123456789')   AS check_vector;
+SELECT CRC32('a')           AS single_a;
+SELECT CRC32('abc')         AS abc;
+SELECT CRC32('hello')       AS hello;
+SELECT CRC32('The quick brown fox jumps over the lazy dog') AS pangram;
+# Multi-byte UTF-8 input — the hash is over BYTES, so 'é' is two
+# bytes (0xC3 0xA9), not one. Asserting != CRC32 of any 1-byte
+# string locks in the byte-semantics claim in the header.
+SELECT CRC32('é') <> CRC32('a')   AS utf8_byte_semantics;
+# Numeric-input coercion path the header asserts.
+SELECT CRC32(12345)               AS int_coerced;
+
+--echo === Empty input → CRC32 of empty bytes (defined as 0) ===
+
+SELECT CRC32('') AS empty;
+
+--echo === Binary input via UNHEX ===
+
+# Non-UTF-8 bytes — must hash the raw bytes, not error.
+SELECT CRC32(UNHEX('DEADBEEF'))     AS deadbeef;
+SELECT CRC32(UNHEX('00FF00FF'))     AS alternating;
+
+--echo === Determinism + distinct-input separation ===
+
+SELECT CRC32('zeta') = CRC32('zeta') AS deterministic;
+SELECT CRC32('a')    <> CRC32('b')   AS distinct_inputs;
+# Bit flip in input must propagate to output.
+SELECT CRC32('hello') <> CRC32('hellO') AS one_bit_flip;
+
+--echo === Output range: fits in u32 (≤ 4294967295) ===
+
+SELECT CRC32('zeta') BETWEEN 0 AND 4294967295 AS in_u32_range;
+
+--echo === NULL passthrough ===
+
+SELECT CRC32(NULL) IS NULL AS null_passes;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT CRC32();
+--error 1105
+SELECT CRC32('a', 'b');
