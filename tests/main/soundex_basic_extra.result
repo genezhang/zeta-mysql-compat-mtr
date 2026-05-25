@@ -1,0 +1,106 @@
+=== Classic phonetic vectors ===
+SELECT SOUNDEX('Robert')   AS r163;
+r163
+R163
+SELECT SOUNDEX('Rupert')   AS r163_alt;
+r163_alt
+R163
+SELECT SOUNDEX('Rubin')    AS r150;
+r150
+R150
+SELECT SOUNDEX('Ashcraft') AS a261;
+a261
+A261
+SELECT SOUNDEX('Tymczak')  AS t522;
+t522
+T522
+=== H/W are silently skipped (NOT separators) ===
+SELECT SOUNDEX('Honeyman') AS honeyman;
+honeyman
+H555
+SELECT SOUNDEX('Wright')   AS wright;
+wright
+W623
+=== Padding to length 4 ===
+SELECT SOUNDEX('A')          AS single_a;
+single_a
+A000
+SELECT SOUNDEX('B')          AS single_b;
+single_b
+B000
+SELECT SOUNDEX('Lee')        AS lee;
+lee
+L000
+SELECT LENGTH(SOUNDEX('A'))             = 4 AS pad_len_a;
+pad_len_a
+1
+SELECT LENGTH(SOUNDEX('Lee'))           = 4 AS pad_len_lee;
+pad_len_lee
+1
+SELECT LENGTH(SOUNDEX('Robert'))        = 4 AS pad_len_robert;
+pad_len_robert
+1
+SELECT LENGTH(SOUNDEX('Ashcraft'))      = 4 AS pad_len_ashcraft;
+pad_len_ashcraft
+1
+=== Vowel separation: lets adjacent same-code through ===
+SELECT SOUNDEX('Baba')   AS baba;
+baba
+B100
+SELECT SOUNDEX('Bob')    AS bob;
+bob
+B100
+=== Truncation to 4 chars ===
+SELECT SOUNDEX('Pfister') AS pfister;
+pfister
+P236
+SELECT LENGTH(SOUNDEX('PfizerJohnson')) = 4 AS long_input_trunc;
+long_input_trunc
+1
+=== Empty / no-letter input → empty string (NOT NULL) ===
+SELECT SOUNDEX('')          AS empty_str;
+empty_str
+
+SELECT SOUNDEX('12345')     AS digits_only;
+digits_only
+
+SELECT SOUNDEX('!!!')       AS symbols_only;
+symbols_only
+
+SELECT SOUNDEX('') IS NULL          AS empty_not_null;
+empty_not_null
+0
+SELECT LENGTH(SOUNDEX('12345')) = 0 AS digits_zero_len;
+digits_zero_len
+1
+=== Non-ASCII letters skipped (NOT folded) ===
+SELECT SOUNDEX('ÉaB')       AS non_ascii_skipped;
+non_ascii_skipped
+A100
+=== Case-insensitive ===
+SELECT SOUNDEX('ROBERT')    = SOUNDEX('robert') AS case_invariant;
+case_invariant
+1
+SELECT SOUNDEX('RoBeRt')    = SOUNDEX('Robert') AS mixed_case;
+mixed_case
+1
+=== NULL passthrough ===
+SELECT SOUNDEX(NULL) IS NULL AS null_passes;
+null_passes
+1
+=== Numeric coercion ===
+SELECT SOUNDEX(123)         AS numeric_in;
+numeric_in
+
+=== Determinism ===
+SELECT SOUNDEX('repeat') = SOUNDEX('repeat') AS deterministic;
+deterministic
+1
+SELECT SOUNDEX('a') <> SOUNDEX('z')          AS distinct_inputs;
+distinct_inputs
+1
+=== Arity errors ===
+SELECT SOUNDEX();
+ERROR 1105: execution error: SOUNDEX requires 1 argument
+SELECT SOUNDEX('a', 'b');
+ERROR 1105: execution error: SOUNDEX requires 1 argument
