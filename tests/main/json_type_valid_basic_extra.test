@@ -81,7 +81,13 @@ SELECT JSON_TYPE('1e10')                      AS exp_notation_collapses_to_integ
 SELECT JSON_TYPE('null')                      AS json_null_returns_string_tag;
 SELECT JSON_TYPE('null') = 'NULL'             AS json_null_eq_string_NULL;
 SELECT JSON_TYPE(NULL)   IS NULL              AS sql_null_returns_sql_null;
-SELECT JSON_TYPE(NULL)   = 'NULL'             AS sql_null_not_eq_string_NULL;
+# Under SQL 3VL, NULL = 'NULL' is UNKNOWN (NULL), not FALSE.
+# The point of pinning this is that JSON_TYPE(NULL) does NOT
+# return the STRING 'NULL' — it returns SQL NULL, so the
+# equality comparison itself is unknown. Asserting the 3VL
+# result via `IS NULL` keeps the label and pinned value
+# consistent.
+SELECT (JSON_TYPE(NULL) = 'NULL') IS NULL     AS sql_null_eq_string_NULL_is_unknown;
 
 --echo === JSON_TYPE — INTEGER vs DOUBLE storage-driven divergence ===
 
@@ -95,11 +101,11 @@ SELECT JSON_TYPE('1.0')                       AS one_point_zero_is_integer;
 SELECT JSON_TYPE('0.0')                       AS zero_point_zero_is_integer;
 SELECT JSON_TYPE('1e0')                       AS one_exp_zero_is_integer;
 SELECT JSON_TYPE('5e0')                       AS five_exp_zero_is_integer;
-# Stronger finding: even a "fraction-with-exponent" form that
-# evaluates to an integer collapses to INTEGER. 1.5e2 = 150,
-# which fits i64 with scale 0 → JsonbType::Integer. The
-# divergence isn't just about ".0" syntax — it's about whether
-# the NUMERIC VALUE happens to be a whole number in i64 range.
+# Confirming the impl comment in practice: a "fraction-with-
+# exponent" form that EVALUATES TO an integer collapses to
+# INTEGER. 1.5e2 = 150, which fits i64 with scale 0 →
+# JsonbType::Integer. The divergence is value-driven, not
+# lexical-form-driven, as the impl already documents.
 SELECT JSON_TYPE('1.5e2')                     AS fraction_exp_evaluates_to_integer;
 # True doubles (non-integer value, or beyond i64 with scale 0)
 # stay DOUBLE.
@@ -111,6 +117,17 @@ SELECT JSON_TYPE('0.1')                       AS small_fraction_stays_double;
 # Length is 0 but the tag is still ARRAY / OBJECT.
 SELECT JSON_TYPE('[]')                        AS empty_array_still_array;
 SELECT JSON_TYPE('{}')                        AS empty_object_still_object;
+
+--echo === JSON_TYPE — already-typed JSONB input (Value::Jsonb arm) ===
+
+# Without CAST, every input goes through the String arm
+# (from_json_str). CAST AS JSONB exercises the Value::Jsonb
+# arm so a refactor that breaks the typed-value branch is
+# caught.
+SELECT JSON_TYPE(CAST('{"a":1}' AS JSONB))    AS typed_object;
+SELECT JSON_TYPE(CAST('[1,2,3]' AS JSONB))    AS typed_array;
+SELECT JSON_TYPE(CAST('42'      AS JSONB))    AS typed_integer;
+SELECT JSON_TYPE(CAST('null'    AS JSONB))    AS typed_json_null;
 
 --echo === JSON_TYPE — invalid JSON → ERROR (zeta strict; MySQL NULL) ===
 

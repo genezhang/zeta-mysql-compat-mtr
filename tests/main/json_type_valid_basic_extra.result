@@ -36,9 +36,9 @@ json_null_eq_string_NULL
 SELECT JSON_TYPE(NULL)   IS NULL              AS sql_null_returns_sql_null;
 sql_null_returns_sql_null
 1
-SELECT JSON_TYPE(NULL)   = 'NULL'             AS sql_null_not_eq_string_NULL;
-sql_null_not_eq_string_NULL
-NULL
+SELECT (JSON_TYPE(NULL) = 'NULL') IS NULL     AS sql_null_eq_string_NULL_is_unknown;
+sql_null_eq_string_NULL_is_unknown
+1
 === JSON_TYPE — INTEGER vs DOUBLE storage-driven divergence ===
 SELECT JSON_TYPE('1.0')                       AS one_point_zero_is_integer;
 one_point_zero_is_integer
@@ -68,6 +68,19 @@ ARRAY
 SELECT JSON_TYPE('{}')                        AS empty_object_still_object;
 empty_object_still_object
 OBJECT
+=== JSON_TYPE — already-typed JSONB input (Value::Jsonb arm) ===
+SELECT JSON_TYPE(CAST('{"a":1}' AS JSONB))    AS typed_object;
+typed_object
+OBJECT
+SELECT JSON_TYPE(CAST('[1,2,3]' AS JSONB))    AS typed_array;
+typed_array
+ARRAY
+SELECT JSON_TYPE(CAST('42'      AS JSONB))    AS typed_integer;
+typed_integer
+INTEGER
+SELECT JSON_TYPE(CAST('null'    AS JSONB))    AS typed_json_null;
+typed_json_null
+NULL
 === JSON_TYPE — invalid JSON → ERROR (zeta strict; MySQL NULL) ===
 SELECT JSON_TYPE('not json');
 ERROR 1105: execution error: JSON_TYPE first argument is not valid JSON: JSONB error: expected 'null' at position 1
