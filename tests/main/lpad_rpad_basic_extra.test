@@ -92,13 +92,36 @@ SELECT RPAD('abcdef', 3, '')      AS rpad_empty_fill_no_pad_needed;
 --echo === Multi-byte UTF-8 counted as 1 char per code point ===
 
 # 'café' is 4 chars / 5 bytes. Padding to 6 chars adds 2 fill
-# chars; resulting byte length depends on fill (5 + 2*1 = 7).
+# chars; the visible result has 6 character positions.
 SELECT LPAD('café', 6, '*')             AS lpad_utf8;
 SELECT RPAD('café', 6, '*')             AS rpad_utf8;
+# Length pin: zeta's LENGTH is character-count (PostgreSQL
+# semantic), NOT byte-count (MySQL semantic). For LPAD('café',
+# 6, '*'), zeta returns 6 (chars), MySQL would return 7 (bytes
+# = 2 ASCII + 5 UTF-8). Locking in zeta behavior — documented
+# divergence from MySQL.
+SELECT LENGTH(LPAD('café', 6, '*'))     = 6 AS lpad_utf8_pg_len;
+SELECT LENGTH(RPAD('café', 6, '*'))     = 6 AS rpad_utf8_pg_len;
 # Truncation must respect char boundaries: first 3 chars of
 # 'café' is 'caf', NOT 'ca' + half-of-é.
 SELECT LPAD('café', 3, '*')             AS lpad_utf8_trunc;
 SELECT RPAD('café', 3, '*')             AS rpad_utf8_trunc;
+
+--echo === Empty input + pad-needed (uncovered branch) ===
+
+# `s.chars().count() = 0 < len`, fill non-empty, so we cycle
+# the fill all the way to len.
+SELECT LPAD('', 5, '*')                 AS lpad_empty_in;
+SELECT RPAD('', 5, '*')                 AS rpad_empty_in;
+SELECT LPAD('', 5, 'ab')                AS lpad_empty_in_cycle;
+SELECT RPAD('', 5, 'ab')                AS rpad_empty_in_cycle;
+
+--echo === Fill longer than pad needed (cycle iterator truncation) ===
+
+# pad_needed = 1; fill is 'abcdef'. cycle().take(1) yields the
+# first char of the fill regardless of fill length.
+SELECT LPAD('xy', 3, 'abcdef')          AS lpad_long_fill_short_pad;
+SELECT RPAD('xy', 3, 'abcdef')          AS rpad_long_fill_short_pad;
 
 --echo === NULL propagation on any arg ===
 
@@ -115,7 +138,14 @@ SELECT RPAD('abc', 6, NULL)    IS NULL AS rpad_null_fill;
 SELECT LPAD();
 --error 1105
 SELECT LPAD('a', 5, '*', 'extra');
+# 4-arg arity guard runs before evaluating the extras — pinning a
+# non-string 4th arg confirms the guard fires pre-eval (no type
+# coercion happens first).
+--error 1105
+SELECT LPAD('a', 5, '*', 99);
 --error 1105
 SELECT RPAD();
 --error 1105
 SELECT RPAD('a', 5, '*', 'extra');
+--error 1105
+SELECT RPAD('a', 5, '*', 99);

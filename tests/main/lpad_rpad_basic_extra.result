@@ -80,12 +80,38 @@ lpad_utf8
 SELECT RPAD('café', 6, '*')             AS rpad_utf8;
 rpad_utf8
 café**
+SELECT LENGTH(LPAD('café', 6, '*'))     = 6 AS lpad_utf8_pg_len;
+lpad_utf8_pg_len
+1
+SELECT LENGTH(RPAD('café', 6, '*'))     = 6 AS rpad_utf8_pg_len;
+rpad_utf8_pg_len
+1
 SELECT LPAD('café', 3, '*')             AS lpad_utf8_trunc;
 lpad_utf8_trunc
 caf
 SELECT RPAD('café', 3, '*')             AS rpad_utf8_trunc;
 rpad_utf8_trunc
 caf
+=== Empty input + pad-needed (uncovered branch) ===
+SELECT LPAD('', 5, '*')                 AS lpad_empty_in;
+lpad_empty_in
+*****
+SELECT RPAD('', 5, '*')                 AS rpad_empty_in;
+rpad_empty_in
+*****
+SELECT LPAD('', 5, 'ab')                AS lpad_empty_in_cycle;
+lpad_empty_in_cycle
+ababa
+SELECT RPAD('', 5, 'ab')                AS rpad_empty_in_cycle;
+rpad_empty_in_cycle
+ababa
+=== Fill longer than pad needed (cycle iterator truncation) ===
+SELECT LPAD('xy', 3, 'abcdef')          AS lpad_long_fill_short_pad;
+lpad_long_fill_short_pad
+axy
+SELECT RPAD('xy', 3, 'abcdef')          AS rpad_long_fill_short_pad;
+rpad_long_fill_short_pad
+xya
 === NULL propagation on any arg ===
 SELECT LPAD(NULL, 6, '*')      IS NULL AS lpad_null_s;
 lpad_null_s
@@ -110,7 +136,11 @@ SELECT LPAD();
 ERROR 1105: execution error: LPAD requires 2 or 3 arguments
 SELECT LPAD('a', 5, '*', 'extra');
 ERROR 1105: execution error: LPAD requires 2 or 3 arguments
+SELECT LPAD('a', 5, '*', 99);
+ERROR 1105: execution error: LPAD requires 2 or 3 arguments
 SELECT RPAD();
 ERROR 1105: execution error: RPAD requires 2 or 3 arguments
 SELECT RPAD('a', 5, '*', 'extra');
+ERROR 1105: execution error: RPAD requires 2 or 3 arguments
+SELECT RPAD('a', 5, '*', 99);
 ERROR 1105: execution error: RPAD requires 2 or 3 arguments
