@@ -31,6 +31,9 @@ foobarbaz
 SELECT LENGTH(REPLACE('xxxxx', 'x', ''))    = 0  AS all_removed_zero_len;
 all_removed_zero_len
 1
+SELECT LENGTH(REPLACE('', '', '')) = 0           AS triple_empty_zero_len;
+triple_empty_zero_len
+1
 === REPLACE: empty 'from' (zeta-vs-MySQL divergence) ===
 SELECT REPLACE('abc', '', 'X')                   AS empty_from_inserts;
 empty_from_inserts
@@ -68,6 +71,12 @@ utf8_to_from
 SELECT REPLACE('aaa', 'aa', 'b')                 AS non_overlap;
 non_overlap
 ba
+SELECT REPLACE('xxx', 'x', 'xx')                 AS to_contains_from;
+to_contains_from
+xxxxxx
+SELECT LENGTH(REPLACE('xxx', 'x', 'xx')) = 6     AS to_contains_from_len;
+to_contains_from_len
+1
 SELECT REPLACE('a', 'a', 'longer')               AS to_longer_than_from;
 to_longer_than_from
 longer

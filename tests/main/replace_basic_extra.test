@@ -17,8 +17,8 @@
 #   # zeta-adapt: Case-sensitive byte-equal matching (same
 #     story as INSTR / FIND_IN_SET / FIELD). MySQL default
 #     would be case-insensitive.
-#   # zeta-adapt: REPLACE requires EXACTLY 3 args — no 2-arg
-#     form. Arity errors → 1105 (MySQL: 1582).
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Same
+#     direction (reject); both engines require exactly 3 args.
 
 --echo === REPLACE: basic ===
 
@@ -38,6 +38,10 @@ SELECT REPLACE('xhellox', 'x', '')               AS remove_x;
 SELECT REPLACE('aaaa', 'aa', '')                 AS remove_pair;
 SELECT REPLACE('foo bar baz', ' ', '')           AS remove_spaces;
 SELECT LENGTH(REPLACE('xxxxx', 'x', ''))    = 0  AS all_removed_zero_len;
+# Triple-empty corner: REPLACE('', '', '') goes through the
+# empty-'from' insert path; inserting '' at position 0 of an
+# empty string yields ''.
+SELECT LENGTH(REPLACE('', '', '')) = 0           AS triple_empty_zero_len;
 
 --echo === REPLACE: empty 'from' (zeta-vs-MySQL divergence) ===
 
@@ -74,6 +78,11 @@ SELECT REPLACE('été', 'é', 'á')                  AS utf8_to_from;
 # 'aaa' replace 'aa' with 'b': left-to-right one-pass yields
 # 'ba' (consume aa, then 'a' remains). NOT 'ab'.
 SELECT REPLACE('aaa', 'aa', 'b')                 AS non_overlap;
+# 'to' contains the 'from' char — does NOT iterate. Rust scans
+# the ORIGINAL string positions, so each 'x' becomes 'xx' once
+# (no infinite expansion). 'xxx' (3 chars) → 6 chars output.
+SELECT REPLACE('xxx', 'x', 'xx')                 AS to_contains_from;
+SELECT LENGTH(REPLACE('xxx', 'x', 'xx')) = 6     AS to_contains_from_len;
 # Longer 'to' than 'from': string grows.
 SELECT REPLACE('a', 'a', 'longer')               AS to_longer_than_from;
 # Shorter 'to' than 'from': string shrinks.
