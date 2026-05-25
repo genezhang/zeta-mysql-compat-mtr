@@ -1,0 +1,194 @@
+=== GREATEST: basic largest pick ===
+SELECT GREATEST(1, 2, 3)                 AS three_ints;
+three_ints
+3
+SELECT GREATEST(3, 1, 2)                 AS unordered;
+unordered
+3
+SELECT GREATEST('a', 'b', 'c')           AS three_strings;
+three_strings
+c
+SELECT GREATEST(1.5, 2.5, 0.5)           AS three_decimals;
+three_decimals
+2.5
+SELECT GREATEST(10)                      AS single_arg;
+single_arg
+10
+=== GREATEST: NULL propagates (MYSQL_GREATEST over wire) ===
+SELECT GREATEST(1, NULL, 3) IS NULL      AS null_middle;
+null_middle
+1
+SELECT GREATEST(NULL, NULL) IS NULL      AS all_nulls;
+all_nulls
+1
+SELECT GREATEST(NULL)        IS NULL     AS null_only;
+null_only
+1
+=== LEAST: basic smallest pick ===
+SELECT LEAST(1, 2, 3)                    AS three_ints;
+three_ints
+1
+SELECT LEAST(3, 1, 2)                    AS unordered;
+unordered
+1
+SELECT LEAST('a', 'b', 'c')              AS three_strings;
+three_strings
+a
+SELECT LEAST(1.5, 2.5, 0.5)              AS three_decimals;
+three_decimals
+0.5
+SELECT LEAST(10)                         AS single_arg;
+single_arg
+10
+=== LEAST: NULL propagates (MYSQL_LEAST over wire) ===
+SELECT LEAST(1, NULL, 3)    IS NULL      AS null_middle;
+null_middle
+1
+SELECT LEAST(NULL, NULL)    IS NULL      AS all_nulls;
+all_nulls
+1
+SELECT LEAST(NULL)          IS NULL      AS null_only;
+null_only
+1
+=== GREATEST / LEAST cross-check: invariant ===
+SELECT GREATEST(1, 2, 3) >= LEAST(1, 2, 3) AS bound_invariant;
+bound_invariant
+1
+SELECT GREATEST(5, 5)    = LEAST(5, 5)      AS all_equal;
+all_equal
+1
+=== GREATEST / LEAST: arity errors ===
+SELECT GREATEST();
+ERROR 1105: execution error: MYSQL_GREATEST requires at least 1 argument
+SELECT LEAST();
+ERROR 1105: execution error: MYSQL_LEAST requires at least 1 argument
+=== POW: basic ===
+SELECT POW(2, 10)                        AS two_to_ten;
+two_to_ten
+1024
+SELECT POW(10, 0)                        AS ten_to_zero;
+ten_to_zero
+1
+SELECT POW(0, 0)                         AS zero_to_zero;
+zero_to_zero
+1
+SELECT POW(-2, 3)                        AS neg_base_int_exp;
+neg_base_int_exp
+-8
+SELECT POW(9, 0.5)                       AS sqrt_via_pow;
+sqrt_via_pow
+3
+SELECT POWER(2, 8)                       AS power_alias;
+power_alias
+256
+=== POW: NULL + arity ===
+SELECT POW(NULL, 2)        IS NULL       AS null_base;
+null_base
+1
+SELECT POW(2, NULL)        IS NULL       AS null_exp;
+null_exp
+1
+SELECT POW(NULL, NULL)     IS NULL       AS null_both;
+null_both
+1
+SELECT POW();
+ERROR 1105: execution error: POW requires 2 arguments
+SELECT POW(2);
+ERROR 1105: execution error: POW requires 2 arguments
+SELECT POW(2, 3, 4);
+ERROR 1105: execution error: POW requires 2 arguments
+=== POW: overflow → 1105 (check_float_overflow guard) ===
+SELECT POW(10, 1000);
+ERROR 1105: execution error: value out of range: overflow in POW
+=== MOD: basic + sign behavior ===
+SELECT MOD(10, 3)                        AS basic;
+basic
+1
+SELECT MOD(0, 5)                         AS zero_dividend;
+zero_dividend
+0
+SELECT MOD(-10, 3)                       AS neg_dividend;
+neg_dividend
+-1
+SELECT MOD(10, -3)                       AS neg_divisor;
+neg_divisor
+1
+SELECT MOD(-10, -3)                      AS neg_both;
+neg_both
+-1
+=== MOD: division by zero → 1105 ===
+SELECT MOD(10, 0);
+ERROR 1105: execution error: division by zero
+=== MOD: NULL + arity ===
+SELECT MOD(NULL, 3)        IS NULL       AS null_dividend;
+null_dividend
+1
+SELECT MOD(10, NULL)       IS NULL       AS null_divisor;
+null_divisor
+1
+SELECT MOD();
+ERROR 1105: execution error: MOD requires 2 arguments
+SELECT MOD(10);
+ERROR 1105: execution error: MOD requires 2 arguments
+SELECT MOD(10, 3, 1);
+ERROR 1105: execution error: MOD requires 2 arguments
+=== SIGN: -1 / 0 / 1 ===
+SELECT SIGN(5)                           AS pos_int;
+pos_int
+1
+SELECT SIGN(-5)                          AS neg_int;
+neg_int
+-1
+SELECT SIGN(0)                           AS zero_int;
+zero_int
+0
+SELECT SIGN(3.14)                        AS pos_dec;
+pos_dec
+1
+SELECT SIGN(-3.14)                       AS neg_dec;
+neg_dec
+-1
+SELECT SIGN(0.0)                         AS zero_dec;
+zero_dec
+0
+=== SIGN: NULL + arity ===
+SELECT SIGN(NULL) IS NULL                AS null_passes;
+null_passes
+1
+SELECT SIGN(CAST('NaN' AS DOUBLE PRECISION))            AS sign_nan;
+sign_nan
+NaN
+SELECT SIGN();
+ERROR 1105: execution error: SIGN requires 1 argument
+SELECT SIGN(1, 2);
+ERROR 1105: execution error: SIGN requires 1 argument
+=== MOD: mixed Int32 / Int64 arms ===
+SELECT MOD(CAST(10 AS INT), CAST(3 AS BIGINT))  AS mod_i32_i64;
+mod_i32_i64
+1
+SELECT MOD(CAST(10 AS BIGINT), CAST(3 AS INT))  AS mod_i64_i32;
+mod_i64_i32
+1
+=== GREATEST / LEAST: mixed-type args ===
+SELECT GREATEST(1, '2', 3)                              AS mixed_int_str;
+mixed_int_str
+3
+SELECT LEAST(1, '2', 3)                                 AS mixed_int_str_least;
+mixed_int_str_least
+1
+=== Determinism ===
+SELECT GREATEST(1,2) = GREATEST(1,2)     AS greatest_det;
+greatest_det
+1
+SELECT LEAST(1,2)    = LEAST(1,2)        AS least_det;
+least_det
+1
+SELECT POW(2,3)      = POW(2,3)          AS pow_det;
+pow_det
+1
+SELECT MOD(10,3)     = MOD(10,3)         AS mod_det;
+mod_det
+1
+SELECT SIGN(5)       = SIGN(5)           AS sign_det;
+sign_det
+1
