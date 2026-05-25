@@ -11,6 +11,12 @@ five
 SELECT LENGTH(SPACE(100))  = 100 AS hundred;
 hundred
 1
+SELECT CHAR_LENGTH(SPACE(5))   = 5 AS char_len;
+char_len
+1
+SELECT CHAR_LENGTH(SPACE(100)) = 100 AS char_len_hundred;
+char_len_hundred
+1
 SELECT SPACE(3)            = '   ' AS three_spaces_text;
 three_spaces_text
 1
@@ -61,6 +67,19 @@ backslash
 SELECT QUOTE('it''s\file') AS combo;
 combo
 'it\'s\\file'
+=== QUOTE: NUL and Ctrl-Z escape arms (via CHR()) ===
+SELECT LENGTH(QUOTE(CHR(0)))  = 4 AS nul_escaped_len;
+nul_escaped_len
+1
+SELECT LENGTH(QUOTE(CHR(26))) = 4 AS ctrlz_escaped_len;
+ctrlz_escaped_len
+1
+SELECT SUBSTRING(QUOTE(CHR(0)),  2, 2) = '\0' AS nul_sequence;
+nul_sequence
+1
+SELECT SUBSTRING(QUOTE(CHR(26)), 2, 2) = '\Z' AS ctrlz_sequence;
+ctrlz_sequence
+1
 === QUOTE: NULL → literal text 'NULL' (NOT SQL NULL) ===
 SELECT QUOTE(NULL)         AS null_text;
 null_text

@@ -34,6 +34,12 @@ SELECT LENGTH(SPACE(0))    = 0  AS empty;
 SELECT LENGTH(SPACE(1))    = 1  AS one;
 SELECT LENGTH(SPACE(5))    = 5  AS five;
 SELECT LENGTH(SPACE(100))  = 100 AS hundred;
+# CHAR_LENGTH companion — drift-insurance for any future change
+# that makes the SPACE byte representation multi-byte
+# (currently every space is 1 byte ASCII so CHAR_LENGTH ==
+# LENGTH; if that ever diverges, this catches it).
+SELECT CHAR_LENGTH(SPACE(5))   = 5 AS char_len;
+SELECT CHAR_LENGTH(SPACE(100)) = 100 AS char_len_hundred;
 # Content check: each character is ASCII space (0x20).
 SELECT SPACE(3)            = '   ' AS three_spaces_text;
 
@@ -85,6 +91,20 @@ SELECT QUOTE('a\b')        AS backslash;
 # 9 chars `it's\file`. QUOTE escapes both the apostrophe and
 # the backslash.
 SELECT QUOTE('it''s\file') AS combo;
+
+--echo === QUOTE: NUL and Ctrl-Z escape arms (via CHR()) ===
+
+# These two escape arms can't be exercised via PG-literal strings
+# (the parser would mishandle the embedded NUL / Ctrl-Z). Use
+# CHR() to manufacture the bytes. Expected outputs:
+#   QUOTE(CHR(0))  = "'\0'"  (4 chars: quote + \ + 0 + quote)
+#   QUOTE(CHR(26)) = "'\Z'"  (4 chars: quote + \ + Z + quote)
+SELECT LENGTH(QUOTE(CHR(0)))  = 4 AS nul_escaped_len;
+SELECT LENGTH(QUOTE(CHR(26))) = 4 AS ctrlz_escaped_len;
+# Substring pin: confirms the escape SEQUENCE is the expected
+# two chars, not (e.g.) some hex form.
+SELECT SUBSTRING(QUOTE(CHR(0)),  2, 2) = '\0' AS nul_sequence;
+SELECT SUBSTRING(QUOTE(CHR(26)), 2, 2) = '\Z' AS ctrlz_sequence;
 
 --echo === QUOTE: NULL → literal text 'NULL' (NOT SQL NULL) ===
 
