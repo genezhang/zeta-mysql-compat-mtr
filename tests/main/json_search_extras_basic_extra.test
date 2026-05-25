@@ -1,0 +1,158 @@
+# Independently authored JSON_SEARCH extras smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_search_basic_extra.test: 'one'/'all' modes, nested
+#     paths, LIKE wildcards (% / _), custom escape, multi-
+#     match array, single-match string quirk, no-match NULL,
+#     non-string-scalar skip, case-insensitive mode, NULL
+#     propagation, invalid mode, multi-char escape reject,
+#     arity, unsupported path-args, invalid JSON.
+#
+# This slice pins what that slice DOES NOT:
+#   - Already-typed JSONB doc (CAST AS JSONB) — exercises the
+#     Value::Jsonb arm of the doc-coerce block, currently
+#     unreached.
+#   - Wrong-type doc / mode / search_str / escape_char →
+#     1105 for each `_ => Err(...)` arm in the impl.
+#   - Empty escape_char rejection (distinct from multi-char).
+#   - Quoted-key path emission ($."weird key") — keys with
+#     non-identifier characters emit through the quoted form.
+#     The impl explicitly handles inner " and \ escaping.
+#   - Default escape character is backslash when 4th arg
+#     omitted — distinct from custom-escape coverage.
+#   - Empty search string behavior (LIKE-style empty pattern).
+#   - Multi-byte UTF-8 in search target.
+#
+# Big-picture finding:
+#   The path-emission code (lib.rs json_search_recurse) chooses
+#   between bare `$.key` and quoted `$."weird key"` syntax
+#   based on whether the key matches an identifier. The
+#   non-identifier branch escapes inner `"` and `\` per
+#   JSON-string conventions. Never previously pinned, and
+#   round-trip behavior matters for downstream JSON_EXTRACT
+#   consumers.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON and JSONB are PARSER ALIASES; CAST AS
+#     JSON and CAST AS JSONB route through the same arm.
+#   # zeta-adapt: Wrong-type arg → 1105 with the per-arg
+#     message (target / mode / search_str / escape_char).
+#   # zeta-adapt: Empty escape char → 1105 'must be a single
+#     character' (distinct from multi-char also rejected).
+
+--echo === JSON_SEARCH on already-typed JSONB doc ===
+
+# Exercises the Value::Jsonb arm of the doc-coerce block.
+# (The CAST itself producing a typed Value::Jsonb is implicit
+# here — if CAST regressed to a string-typed expression the
+# typed_doc_path row would still pass, but the typed arm
+# coverage would silently regress to the String arm. The
+# json_set_extras / json_modify_extras / json_merge_extras
+# slices include a standalone routing-proof row; not
+# duplicated here since they share the same CAST plumbing.)
+SELECT JSON_SEARCH(CAST('{"a":"hello","b":"world"}' AS JSONB),
+                   'one', 'world')                            AS typed_doc_path;
+SELECT JSON_TYPE(JSON_SEARCH(CAST('["x","y"]' AS JSONB),
+                             'one', 'x'))                     AS typed_arr_match_type;
+
+--echo === Wrong-type doc → ERROR ===
+
+--error 1105
+SELECT JSON_SEARCH(42, 'one', 'x');
+--error 1105
+SELECT JSON_SEARCH(3.14, 'one', 'x');
+--error 1105
+SELECT JSON_SEARCH(TRUE, 'one', 'x');
+
+--echo === Wrong-type mode → ERROR ===
+
+# mode must be String. INT here hits the
+# `JSON_SEARCH one_or_all must be a string` arm.
+--error 1105
+SELECT JSON_SEARCH('{"a":"x"}', 42, 'x');
+
+--echo === Wrong-type search_str → ERROR ===
+
+# search_str must be String. INT hits
+# `JSON_SEARCH search_str must be a string`.
+--error 1105
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 42);
+
+--echo === Wrong-type escape_char → ERROR ===
+
+# escape_char must be String. INT hits
+# `JSON_SEARCH escape_char must be a string`.
+--error 1105
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 'x', 42);
+
+--echo === Empty escape_char rejected (distinct from multi-char) ===
+
+# Empty string fails the `first.is_none()` check at impl —
+# 1105 'must be a single character'. Same message as multi-
+# char form but different cause; pin both forms for symmetry.
+--error 1105
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 'x', '');
+
+--echo === Quoted-key path emission (non-identifier key) ===
+
+# Key 'weird key' contains a space → not a bare identifier.
+# Path emitter wraps as $."weird key". Round-trips through
+# JSON_EXTRACT so downstream consumers can navigate to the
+# value the path points at.
+SELECT JSON_SEARCH('{"weird key":"hit"}', 'one', 'hit')       AS quoted_key_space;
+# Key with inner double-quote: should escape as \" inside the
+# quoted form.
+SELECT JSON_SEARCH('{"k\"ey":"hit"}', 'one', 'hit')           AS quoted_key_inner_dquote;
+# Key with backslash: should escape as \\ (PG string semantics:
+# input '\\' is 2 literal backslashes; JSON-encoded as \\\\ in
+# the path string).
+SELECT JSON_SEARCH('{"a\\b":"hit"}', 'one', 'hit')            AS quoted_key_backslash;
+
+--echo === Bare-identifier vs must-quote key emission edge cases ===
+
+# format_json_path_key uses identifier-char classification:
+# leading _ + ASCII alphanumeric is bare; leading digit forces
+# quoting. Pin both branches.
+SELECT JSON_SEARCH('{"_a":"hit"}', 'one', 'hit')              AS bare_underscore_leading;
+SELECT JSON_SEARCH('{"1a":"hit"}', 'one', 'hit')              AS digit_leading_quoted;
+
+--echo === Compositional path: quoted key INSIDE array ===
+
+# Array containing object with non-identifier key — path
+# emitter should compose: $[0]."weird key". Exercises the
+# index + quoted-key combination that no single existing row
+# covers.
+SELECT JSON_SEARCH('[{"weird key":"hit"}]', 'one', 'hit')     AS arr_then_quoted_key;
+
+--echo === Default escape char is backslash when 4th arg omitted ===
+
+# Pattern source string is '100\%' — under PG string semantics
+# that's 5 chars: 1,0,0,\,%. With default backslash escape,
+# the \% sequence escapes the wildcard → literal '%'. Pattern
+# matches the literal value "100%". Distinct from the
+# custom-escape pin in the existing slice (which uses '!').
+SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100\%')             AS default_escape_backslash;
+# Companion: a 6-char input '100\\%' becomes pattern
+# 1,0,0,\,\,% under PG. With backslash escape, that parses
+# as literal '100', escaped '\\' → literal '\', then '%'
+# wildcard → matches '100\<anything>'. Doc value is '100%'
+# (no backslash) → no match → NULL. Pattern is well-formed;
+# it just requires a literal backslash the doc doesn't have.
+SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100\\%') IS NULL    AS default_escape_extra_bs_no_match;
+
+--echo === Empty search string semantics ===
+
+# LIKE with empty pattern matches empty string only.
+SELECT JSON_SEARCH('{"a":"","b":"x"}', 'one', '')             AS empty_pattern_matches_empty;
+# No empty strings in doc → NULL.
+SELECT JSON_SEARCH('{"a":"x","b":"y"}', 'one', '') IS NULL    AS empty_pattern_no_match;
+
+--echo === Multi-byte UTF-8 in search target ===
+
+# Multi-byte char in the searched value; pattern uses the same
+# char. zeta should match by Unicode code point, not bytes.
+SELECT JSON_SEARCH('{"a":"héllo"}', 'one', 'héllo')           AS utf8_exact_match;
+# Wildcard around a multi-byte char.
+SELECT JSON_SEARCH('{"a":"héllo"}', 'one', 'h%o')             AS utf8_wildcard_match;
