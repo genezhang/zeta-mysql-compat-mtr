@@ -1,0 +1,211 @@
+=== REGEXP_LIKE: basic match / no match ===
+SELECT REGEXP_LIKE('hello world', 'world')   AS basic_match;
+basic_match
+1
+SELECT REGEXP_LIKE('hello world', 'xyz')     AS no_match;
+no_match
+0
+SELECT REGEXP_LIKE('abc', '^a.+c$')          AS anchored;
+anchored
+1
+SELECT REGEXP_LIKE('abc', '^a$')             AS anchored_no_match;
+anchored_no_match
+0
+SELECT REGEXP_LIKE('foo|bar', 'foo|bar')     AS alternation;
+alternation
+1
+=== REGEXP_LIKE: case-insensitive flag 'i' ===
+SELECT REGEXP_LIKE('Hello', 'hello')         AS case_default;
+case_default
+0
+SELECT REGEXP_LIKE('Hello', 'hello', 'i')    AS case_insensitive;
+case_insensitive
+1
+SELECT REGEXP_LIKE('HELLO', 'hello')         AS case_strict;
+case_strict
+0
+=== REGEXP_LIKE: NULL propagation + arity ===
+SELECT REGEXP_LIKE(NULL, 'x')   IS NULL      AS null_source;
+null_source
+1
+SELECT REGEXP_LIKE('a', NULL)   IS NULL      AS null_pattern;
+null_pattern
+1
+SELECT REGEXP_LIKE();
+ERROR 1105: execution error: REGEXP_LIKE requires 2 or 3 arguments
+SELECT REGEXP_LIKE('a');
+ERROR 1105: execution error: REGEXP_LIKE requires 2 or 3 arguments
+SELECT REGEXP_LIKE('a', 'b', 'i', 'extra');
+ERROR 1105: execution error: REGEXP_LIKE requires 2 or 3 arguments
+=== REGEXP_INSTR: 1-based position of first match ===
+SELECT REGEXP_INSTR('hello world', 'world')  AS find_world;
+find_world
+7
+SELECT REGEXP_INSTR('hello world', 'hello')  AS find_at_start;
+find_at_start
+1
+SELECT REGEXP_INSTR('hello world', 'xyz')    AS no_match_zero;
+no_match_zero
+0
+SELECT REGEXP_INSTR('abc', '')               AS empty_pattern;
+empty_pattern
+1
+=== REGEXP_INSTR: 3-arg start position ===
+SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 1)   AS start_1;
+start_1
+1
+SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 5)   AS start_skips_first;
+start_skips_first
+9
+SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 99)  AS start_past_end;
+start_past_end
+0
+=== REGEXP_INSTR: NULL + arity ===
+SELECT REGEXP_INSTR(NULL, 'x')   IS NULL     AS null_source;
+null_source
+1
+SELECT REGEXP_INSTR('a', NULL)   IS NULL     AS null_pattern;
+null_pattern
+1
+SELECT REGEXP_INSTR();
+ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
+SELECT REGEXP_INSTR('a');
+ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
+SELECT REGEXP_INSTR('a', 'b', 1, 'extra');
+ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
+=== REGEXP_SUBSTR: extract first match ===
+SELECT REGEXP_SUBSTR('hello world', 'w.r.d')  AS substr_word;
+substr_word
+world
+SELECT REGEXP_SUBSTR('id-42-name', '[0-9]+')  AS substr_digits;
+substr_digits
+42
+SELECT REGEXP_SUBSTR('no digits here', '[0-9]+') IS NULL AS no_match_null;
+no_match_null
+1
+SELECT REGEXP_SUBSTR('foo bar', '^foo')       AS anchored_match;
+anchored_match
+foo
+SELECT REGEXP_SUBSTR('foo bar', '^bar') IS NULL AS anchored_no_match;
+anchored_no_match
+1
+=== REGEXP_SUBSTR: 3-arg start position ===
+SELECT REGEXP_SUBSTR('abc123def456', '[0-9]+', 1)  AS first_digits;
+first_digits
+123
+SELECT REGEXP_SUBSTR('abc123def456', '[0-9]+', 7)  AS skip_to_second;
+skip_to_second
+456
+=== REGEXP_SUBSTR: NULL + arity ===
+SELECT REGEXP_SUBSTR(NULL, 'x')   IS NULL    AS null_source;
+null_source
+1
+SELECT REGEXP_SUBSTR('a', NULL)   IS NULL    AS null_pattern;
+null_pattern
+1
+SELECT REGEXP_SUBSTR();
+ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+SELECT REGEXP_SUBSTR('a');
+ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+SELECT REGEXP_SUBSTR('a', 'b', 1, 'extra');
+ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+=== REGEXP_REPLACE: replace first by default ===
+SELECT REGEXP_REPLACE('aaa', 'a', 'X')        AS replace_first;
+replace_first
+Xaa
+SELECT REGEXP_REPLACE('aaa', 'a', 'X') = 'Xaa' AS replace_first_value;
+replace_first_value
+1
+=== REGEXP_REPLACE: global 'g' flag ===
+SELECT REGEXP_REPLACE('aaa', 'a', 'X', 'g')   AS replace_all;
+replace_all
+XXX
+SELECT REGEXP_REPLACE('foo bar foo', 'foo', 'baz', 'g') AS replace_all_word;
+replace_all_word
+baz bar baz
+=== REGEXP_REPLACE: case-insensitive 'i' flag ===
+SELECT REGEXP_REPLACE('Hello World', 'hello', 'X', 'i')  AS ci_replace;
+ci_replace
+X World
+SELECT REGEXP_REPLACE('AAA bbb AAA', 'aaa', 'X', 'gi')   AS gi_replace;
+gi_replace
+X bbb X
+=== REGEXP_REPLACE: capture groups + backrefs ===
+SELECT REGEXP_REPLACE('John Smith', '([A-Z]\w+) ([A-Z]\w+)', '$2, $1') AS swap_names;
+swap_names
+Smith, John
+SELECT REGEXP_REPLACE('2024-01-15', '(\d+)-(\d+)-(\d+)', '$3/$2/$1')   AS reformat_date;
+reformat_date
+15/01/2024
+=== REGEXP_REPLACE: NULL + arity ===
+SELECT REGEXP_REPLACE(NULL, 'x', 'y')   IS NULL  AS null_source;
+null_source
+1
+SELECT REGEXP_REPLACE('a', NULL, 'y')   IS NULL  AS null_pattern;
+null_pattern
+1
+SELECT REGEXP_REPLACE('a', 'x', NULL)   IS NULL  AS null_replacement;
+null_replacement
+1
+SELECT REGEXP_REPLACE();
+ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+SELECT REGEXP_REPLACE('a');
+ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+SELECT REGEXP_REPLACE('a', 'b');
+ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+SELECT REGEXP_REPLACE('a', 'b', 'c', 'g', 'extra');
+ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+=== Multi-byte UTF-8 patterns ===
+SELECT REGEXP_LIKE('café', 'é')                AS utf8_like;
+utf8_like
+1
+SELECT REGEXP_SUBSTR('café', 'é')              AS utf8_substr;
+utf8_substr
+é
+SELECT REGEXP_REPLACE('café', 'é', 'e')        AS utf8_replace;
+utf8_replace
+cafe
+SELECT REGEXP_REPLACE('café', 'é', 'e') = 'cafe' AS utf8_replace_value;
+utf8_replace_value
+1
+=== Lookbehind / lookahead pattern rejected ===
+SELECT REGEXP_LIKE('abc', '(?<=foo)bar');
+ERROR 1105: execution error: invalid regex: regex parse error:
+    (?<=foo)bar
+    ^^^^
+error: look-around, including look-ahead and look-behind, is not supported
+SELECT REGEXP_REPLACE('abc', '(?<=foo)bar', 'X');
+ERROR 1105: execution error: invalid regex: regex parse error:
+    (?<=foo)bar
+    ^^^^
+error: look-around, including look-ahead and look-behind, is not supported
+=== REGEXP_REPLACE: literal `$` in replacement ===
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$word')        AS dollar_word_named_group;
+dollar_word_named_group
+
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$$')           AS dollar_escaped;
+dollar_escaped
+$
+=== Empty source string on all four ===
+SELECT REGEXP_LIKE('', 'abc')                           AS empty_source_like;
+empty_source_like
+0
+SELECT REGEXP_INSTR('', 'abc')                          AS empty_source_instr;
+empty_source_instr
+0
+SELECT REGEXP_SUBSTR('', 'abc') IS NULL                 AS empty_source_substr;
+empty_source_substr
+1
+SELECT REGEXP_REPLACE('', 'abc', 'X')                   AS empty_source_replace;
+empty_source_replace
+
+SELECT LENGTH(REGEXP_REPLACE('', 'abc', 'X')) = 0       AS empty_source_replace_len;
+empty_source_replace_len
+1
+=== Determinism ===
+SELECT REGEXP_LIKE('a', 'a')    = REGEXP_LIKE('a', 'a')    AS like_det;
+like_det
+1
+SELECT REGEXP_INSTR('ab', 'b')  = REGEXP_INSTR('ab', 'b')  AS instr_det;
+instr_det
+1

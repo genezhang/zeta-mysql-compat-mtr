@@ -1,0 +1,182 @@
+# Independently authored REGEXP_LIKE / REGEXP_INSTR /
+# REGEXP_SUBSTR / REGEXP_REPLACE smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+# All four function-form regex functions are implemented in
+# zeta but had no compat-mtr coverage yet (the existing
+# like_regexp slice only covered LIKE + REGEXP operators).
+#
+# Big-picture finding:
+#   REGEXP_LIKE(s, pat[, flags])    — bool: pattern matches anywhere
+#   REGEXP_INSTR(s, pat[, pos])     — 1-based byte position of first
+#                                     match, or 0; optional start pos
+#   REGEXP_SUBSTR(s, pat[, pos])    — substring of first match, NULL
+#                                     if no match
+#   REGEXP_REPLACE(s, pat, rep[, flags]) — replace first / global
+#
+# Adaptation notes:
+#   # zeta-adapt: Regex flavor is Rust `regex` crate (Perl-style
+#     without lookarounds / backrefs). Differs from MySQL's ICU.
+#     Common-subset patterns work; advanced features may diverge.
+#   # zeta-adapt: REGEXP_LIKE / REGEXP_REPLACE flags: 'i' =
+#     case-insensitive; REGEXP_REPLACE also accepts 'g' = global.
+#     REGEXP_INSTR / REGEXP_SUBSTR do NOT accept a flags arg in
+#     zeta's current impl; 3rd arg is the start position.
+#   # zeta-adapt: REGEXP_REPLACE without 'g' replaces only the
+#     FIRST match (Rust regex `replace` vs `replace_all`).
+#   # zeta-adapt: NULL on any string arg → NULL.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === REGEXP_LIKE: basic match / no match ===
+
+SELECT REGEXP_LIKE('hello world', 'world')   AS basic_match;
+SELECT REGEXP_LIKE('hello world', 'xyz')     AS no_match;
+SELECT REGEXP_LIKE('abc', '^a.+c$')          AS anchored;
+SELECT REGEXP_LIKE('abc', '^a$')             AS anchored_no_match;
+SELECT REGEXP_LIKE('foo|bar', 'foo|bar')     AS alternation;
+
+--echo === REGEXP_LIKE: case-insensitive flag 'i' ===
+
+SELECT REGEXP_LIKE('Hello', 'hello')         AS case_default;
+SELECT REGEXP_LIKE('Hello', 'hello', 'i')    AS case_insensitive;
+# Without 'i' flag, ALL-caps doesn't match.
+SELECT REGEXP_LIKE('HELLO', 'hello')         AS case_strict;
+
+--echo === REGEXP_LIKE: NULL propagation + arity ===
+
+SELECT REGEXP_LIKE(NULL, 'x')   IS NULL      AS null_source;
+SELECT REGEXP_LIKE('a', NULL)   IS NULL      AS null_pattern;
+--error 1105
+SELECT REGEXP_LIKE();
+--error 1105
+SELECT REGEXP_LIKE('a');
+--error 1105
+SELECT REGEXP_LIKE('a', 'b', 'i', 'extra');
+
+--echo === REGEXP_INSTR: 1-based position of first match ===
+
+SELECT REGEXP_INSTR('hello world', 'world')  AS find_world;
+SELECT REGEXP_INSTR('hello world', 'hello')  AS find_at_start;
+SELECT REGEXP_INSTR('hello world', 'xyz')    AS no_match_zero;
+# Empty pattern matches at position 1.
+SELECT REGEXP_INSTR('abc', '')               AS empty_pattern;
+
+--echo === REGEXP_INSTR: 3-arg start position ===
+
+# 'aaa bbb aaa' has 'a' at positions 1 and 9.
+SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 1)   AS start_1;
+SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 5)   AS start_skips_first;
+SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 99)  AS start_past_end;
+
+--echo === REGEXP_INSTR: NULL + arity ===
+
+SELECT REGEXP_INSTR(NULL, 'x')   IS NULL     AS null_source;
+SELECT REGEXP_INSTR('a', NULL)   IS NULL     AS null_pattern;
+--error 1105
+SELECT REGEXP_INSTR();
+--error 1105
+SELECT REGEXP_INSTR('a');
+--error 1105
+SELECT REGEXP_INSTR('a', 'b', 1, 'extra');
+
+--echo === REGEXP_SUBSTR: extract first match ===
+
+SELECT REGEXP_SUBSTR('hello world', 'w.r.d')  AS substr_word;
+SELECT REGEXP_SUBSTR('id-42-name', '[0-9]+')  AS substr_digits;
+SELECT REGEXP_SUBSTR('no digits here', '[0-9]+') IS NULL AS no_match_null;
+SELECT REGEXP_SUBSTR('foo bar', '^foo')       AS anchored_match;
+SELECT REGEXP_SUBSTR('foo bar', '^bar') IS NULL AS anchored_no_match;
+
+--echo === REGEXP_SUBSTR: 3-arg start position ===
+
+# 'abc123def456' — first run of digits is '123', second is '456'.
+SELECT REGEXP_SUBSTR('abc123def456', '[0-9]+', 1)  AS first_digits;
+SELECT REGEXP_SUBSTR('abc123def456', '[0-9]+', 7)  AS skip_to_second;
+
+--echo === REGEXP_SUBSTR: NULL + arity ===
+
+SELECT REGEXP_SUBSTR(NULL, 'x')   IS NULL    AS null_source;
+SELECT REGEXP_SUBSTR('a', NULL)   IS NULL    AS null_pattern;
+--error 1105
+SELECT REGEXP_SUBSTR();
+--error 1105
+SELECT REGEXP_SUBSTR('a');
+--error 1105
+SELECT REGEXP_SUBSTR('a', 'b', 1, 'extra');
+
+--echo === REGEXP_REPLACE: replace first by default ===
+
+SELECT REGEXP_REPLACE('aaa', 'a', 'X')        AS replace_first;
+# Without 'g' flag, only first match is replaced.
+SELECT REGEXP_REPLACE('aaa', 'a', 'X') = 'Xaa' AS replace_first_value;
+
+--echo === REGEXP_REPLACE: global 'g' flag ===
+
+SELECT REGEXP_REPLACE('aaa', 'a', 'X', 'g')   AS replace_all;
+SELECT REGEXP_REPLACE('foo bar foo', 'foo', 'baz', 'g') AS replace_all_word;
+
+--echo === REGEXP_REPLACE: case-insensitive 'i' flag ===
+
+SELECT REGEXP_REPLACE('Hello World', 'hello', 'X', 'i')  AS ci_replace;
+# Combined flags 'gi'.
+SELECT REGEXP_REPLACE('AAA bbb AAA', 'aaa', 'X', 'gi')   AS gi_replace;
+
+--echo === REGEXP_REPLACE: capture groups + backrefs ===
+
+# Backrefs work via Rust regex syntax: $1, $2, ...
+SELECT REGEXP_REPLACE('John Smith', '([A-Z]\w+) ([A-Z]\w+)', '$2, $1') AS swap_names;
+SELECT REGEXP_REPLACE('2024-01-15', '(\d+)-(\d+)-(\d+)', '$3/$2/$1')   AS reformat_date;
+
+--echo === REGEXP_REPLACE: NULL + arity ===
+
+SELECT REGEXP_REPLACE(NULL, 'x', 'y')   IS NULL  AS null_source;
+SELECT REGEXP_REPLACE('a', NULL, 'y')   IS NULL  AS null_pattern;
+SELECT REGEXP_REPLACE('a', 'x', NULL)   IS NULL  AS null_replacement;
+--error 1105
+SELECT REGEXP_REPLACE();
+--error 1105
+SELECT REGEXP_REPLACE('a');
+--error 1105
+SELECT REGEXP_REPLACE('a', 'b');
+--error 1105
+SELECT REGEXP_REPLACE('a', 'b', 'c', 'g', 'extra');
+
+--echo === Multi-byte UTF-8 patterns ===
+
+SELECT REGEXP_LIKE('café', 'é')                AS utf8_like;
+SELECT REGEXP_SUBSTR('café', 'é')              AS utf8_substr;
+SELECT REGEXP_REPLACE('café', 'é', 'e')        AS utf8_replace;
+SELECT REGEXP_REPLACE('café', 'é', 'e') = 'cafe' AS utf8_replace_value;
+
+--echo === Lookbehind / lookahead pattern rejected ===
+
+# Rust regex crate doesn't support lookbehind/lookahead — pins
+# the contract divergence from MySQL ICU (which DOES support
+# them). Both REGEXP_LIKE and REGEXP_REPLACE go through
+# compile_regex_cached → 1105 on the unsupported feature.
+--error 1105
+SELECT REGEXP_LIKE('abc', '(?<=foo)bar');
+--error 1105
+SELECT REGEXP_REPLACE('abc', '(?<=foo)bar', 'X');
+
+--echo === REGEXP_REPLACE: literal `$` in replacement ===
+
+# Rust regex treats `$` in replacement as a backref introducer.
+# `$word` is interpreted as a named-group reference; since the
+# pattern has no named group `word`, it expands to empty.
+# Literal `$` requires `$$` or `${0}`/`${N}` shaping.
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$word')        AS dollar_word_named_group;
+SELECT REGEXP_REPLACE('Hello', 'Hello', '$$')           AS dollar_escaped;
+
+--echo === Empty source string on all four ===
+
+SELECT REGEXP_LIKE('', 'abc')                           AS empty_source_like;
+SELECT REGEXP_INSTR('', 'abc')                          AS empty_source_instr;
+SELECT REGEXP_SUBSTR('', 'abc') IS NULL                 AS empty_source_substr;
+SELECT REGEXP_REPLACE('', 'abc', 'X')                   AS empty_source_replace;
+SELECT LENGTH(REGEXP_REPLACE('', 'abc', 'X')) = 0       AS empty_source_replace_len;
+
+--echo === Determinism ===
+
+SELECT REGEXP_LIKE('a', 'a')    = REGEXP_LIKE('a', 'a')    AS like_det;
+SELECT REGEXP_INSTR('ab', 'b')  = REGEXP_INSTR('ab', 'b')  AS instr_det;
