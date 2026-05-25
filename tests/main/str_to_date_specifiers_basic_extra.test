@@ -1,0 +1,144 @@
+# Independently authored STR_TO_DATE specifier-matrix smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. Inverse of DATE_FORMAT (zeta #306 slice);
+# STR_TO_DATE has minimal coverage today (5 cases total across
+# date_time_basic and datetime_format_basic).
+#
+# Big-picture finding:
+#   STR_TO_DATE(s, fmt)  — parse `s` using MySQL format
+#       specifiers and return a TIMESTAMP. Format string is
+#       symmetric with DATE_FORMAT. Out-of-range components
+#       error 1105 (zeta strict; MySQL would NULL).
+#
+# Always returns TIMESTAMP type (when only date specifiers
+# matched, time component is zero / midnight).
+#
+# Adaptation notes:
+#   # zeta-adapt: Out-of-range month / day / hour → 1105 ERROR.
+#     MySQL would return NULL on parse failure. Documented
+#     divergence.
+#   # zeta-adapt: NULL string OR NULL format → NULL result.
+#   # zeta-adapt: STR_TO_DATE round-trip with DATE_FORMAT is
+#     symmetric for the matched specifier set.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Year and month specifiers ===
+
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d')      AS iso_date;
+SELECT STR_TO_DATE('24-03-15',   '%y-%m-%d')      AS year_2digit;
+# %c (no-pad month) accepts both 1-digit and 2-digit input.
+SELECT STR_TO_DATE('2024-3-15',  '%Y-%c-%d')      AS month_nopad;
+# %M = full month name.
+SELECT STR_TO_DATE('March 15 2024', '%M %d %Y')   AS month_name_full;
+# %b = abbrev month name.
+SELECT STR_TO_DATE('Mar 15 2024', '%b %d %Y')     AS month_abbrev;
+
+--echo === Day specifiers ===
+
+SELECT STR_TO_DATE('2024-03-01', '%Y-%m-%d')      AS day_padded;
+SELECT STR_TO_DATE('2024-3-1',   '%Y-%c-%e')      AS day_nopad;
+
+--echo === Hour specifiers (24h and 12h with AM/PM) ===
+
+SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S')  AS h24;
+SELECT STR_TO_DATE('2024-03-15 02:30:45 PM', '%Y-%m-%d %h:%i:%S %p')  AS h12_pm;
+SELECT STR_TO_DATE('2024-03-15 02:30:45 AM', '%Y-%m-%d %h:%i:%S %p')  AS h12_am;
+# 12 AM = midnight (hour 0); 12 PM = noon (hour 12).
+SELECT STR_TO_DATE('2024-03-15 12:00:00 AM', '%Y-%m-%d %h:%i:%S %p')  AS midnight;
+SELECT STR_TO_DATE('2024-03-15 12:00:00 PM', '%Y-%m-%d %h:%i:%S %p')  AS noon;
+
+--echo === Composite specifiers (%T, %r) ===
+
+SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %T')          AS time_composite_24;
+SELECT STR_TO_DATE('2024-03-15 02:30:45 PM', '%Y-%m-%d %r')       AS time_composite_12;
+
+--echo === Round-trip with DATE_FORMAT ===
+
+# DATE_FORMAT then STR_TO_DATE should reconstruct the original
+# (timestamp-typed).
+SELECT STR_TO_DATE(DATE_FORMAT('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S'),
+                                '%Y-%m-%d %H:%i:%S')
+     = '2024-03-15 14:30:45'                       AS dformat_str_to_date_rt;
+# RFC-like format round-trip.
+SELECT STR_TO_DATE(DATE_FORMAT('2024-03-15', '%M %d, %Y'),
+                                '%M %d, %Y')
+     = '2024-03-15'                                AS pretty_rt;
+
+--echo === Default values when specifiers missing ===
+
+# %Y alone: month/day default to 1/1, time to midnight.
+SELECT STR_TO_DATE('2024', '%Y')                  AS year_only;
+# Year + month, day defaults to 1.
+SELECT STR_TO_DATE('2024-03', '%Y-%m')            AS year_month_only;
+
+--echo === Out-of-range → 1105 (zeta strict; MySQL NULL) ===
+
+# Month 13 invalid.
+--error 1105
+SELECT STR_TO_DATE('2024-13-01', '%Y-%m-%d');
+# Day 30 in February (not leap).
+--error 1105
+SELECT STR_TO_DATE('2023-02-30', '%Y-%m-%d');
+# Hour 25 invalid.
+--error 1105
+SELECT STR_TO_DATE('2024-03-15 25:00:00', '%Y-%m-%d %H:%i:%S');
+# 12-hour range guard: hour 13 with AM/PM rejected; 0 with PM rejected.
+--error 1105
+SELECT STR_TO_DATE('13:00:00 AM', '%h:%i:%S %p');
+--error 1105
+SELECT STR_TO_DATE('00:00:00 PM', '%h:%i:%S %p');
+
+--echo === Trailing extra input → ERROR (zeta strict; MySQL warns) ===
+
+# zeta rejects unconsumed trailing chars; MySQL would warn
+# and return the partial parse. Documented divergence.
+--error 1105
+SELECT STR_TO_DATE('2024-03-15 extra', '%Y-%m-%d');
+
+--echo === Unsupported specifier in STR_TO_DATE (asymmetry vs DATE_FORMAT) ===
+
+# DATE_FORMAT supports %j / %U / %u / %V / %v / %X / %x / %z.
+# STR_TO_DATE does NOT (back-solving from week-numbers / DOY
+# isn't implemented). Pin the asymmetry.
+--error 1105
+SELECT STR_TO_DATE('1',          '%j');
+--error 1105
+SELECT STR_TO_DATE('2024-01',    '%X-%v');
+--error 1105
+SELECT STR_TO_DATE('garbage',    '%z');
+
+--echo === Consumed-but-unused specifiers (parser accepts, semantics ignored) ===
+
+# %a/%W (weekday names), %w (numeric DOW), %D (day ordinal),
+# %f (microseconds) all parse without error — the named-weekday
+# components don't constrain the date.
+SELECT STR_TO_DATE('Friday 2024-03-15', '%W %Y-%m-%d')   AS weekday_name_consumed;
+SELECT STR_TO_DATE('5 2024-03-15',      '%w %Y-%m-%d')   AS weekday_num_consumed;
+SELECT STR_TO_DATE('1st March 2024',    '%D %M %Y')      AS ordinal_consumed;
+# %f microseconds: '1' → 100000 us (left-aligned per impl).
+SELECT STR_TO_DATE('2024-03-15 14:30:45.1', '%Y-%m-%d %H:%i:%S.%f') AS frac_seconds;
+
+--echo === No-pad hours: %k (24h) and %l (12h) ===
+
+SELECT STR_TO_DATE('2024-03-15 9:30:00',    '%Y-%m-%d %k:%i:%S')      AS hour_24_nopad;
+SELECT STR_TO_DATE('2024-03-15 9:30:00 PM', '%Y-%m-%d %l:%i:%S %p')   AS hour_12_nopad;
+
+--echo === NULL passthrough ===
+
+SELECT STR_TO_DATE(NULL, '%Y-%m-%d')   IS NULL    AS null_str;
+SELECT STR_TO_DATE('2024-03-15', NULL) IS NULL    AS null_fmt;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT STR_TO_DATE();
+--error 1105
+SELECT STR_TO_DATE('2024-03-15');
+--error 1105
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d', 'extra');
+
+--echo === Determinism ===
+
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d')
+     = STR_TO_DATE('2024-03-15', '%Y-%m-%d')         AS deterministic;

@@ -1,0 +1,124 @@
+=== Year and month specifiers ===
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d')      AS iso_date;
+iso_date
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('24-03-15',   '%y-%m-%d')      AS year_2digit;
+year_2digit
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('2024-3-15',  '%Y-%c-%d')      AS month_nopad;
+month_nopad
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('March 15 2024', '%M %d %Y')   AS month_name_full;
+month_name_full
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('Mar 15 2024', '%b %d %Y')     AS month_abbrev;
+month_abbrev
+2024-03-15 00:00:00
+=== Day specifiers ===
+SELECT STR_TO_DATE('2024-03-01', '%Y-%m-%d')      AS day_padded;
+day_padded
+2024-03-01 00:00:00
+SELECT STR_TO_DATE('2024-3-1',   '%Y-%c-%e')      AS day_nopad;
+day_nopad
+2024-03-01 00:00:00
+=== Hour specifiers (24h and 12h with AM/PM) ===
+SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S')  AS h24;
+h24
+2024-03-15 14:30:45
+SELECT STR_TO_DATE('2024-03-15 02:30:45 PM', '%Y-%m-%d %h:%i:%S %p')  AS h12_pm;
+h12_pm
+2024-03-15 14:30:45
+SELECT STR_TO_DATE('2024-03-15 02:30:45 AM', '%Y-%m-%d %h:%i:%S %p')  AS h12_am;
+h12_am
+2024-03-15 02:30:45
+SELECT STR_TO_DATE('2024-03-15 12:00:00 AM', '%Y-%m-%d %h:%i:%S %p')  AS midnight;
+midnight
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('2024-03-15 12:00:00 PM', '%Y-%m-%d %h:%i:%S %p')  AS noon;
+noon
+2024-03-15 12:00:00
+=== Composite specifiers (%T, %r) ===
+SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %T')          AS time_composite_24;
+time_composite_24
+2024-03-15 14:30:45
+SELECT STR_TO_DATE('2024-03-15 02:30:45 PM', '%Y-%m-%d %r')       AS time_composite_12;
+time_composite_12
+2024-03-15 14:30:45
+=== Round-trip with DATE_FORMAT ===
+SELECT STR_TO_DATE(DATE_FORMAT('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S'),
+                                '%Y-%m-%d %H:%i:%S')
+     = '2024-03-15 14:30:45'                       AS dformat_str_to_date_rt;
+dformat_str_to_date_rt
+1
+SELECT STR_TO_DATE(DATE_FORMAT('2024-03-15', '%M %d, %Y'),
+                                '%M %d, %Y')
+     = '2024-03-15'                                AS pretty_rt;
+pretty_rt
+1
+=== Default values when specifiers missing ===
+SELECT STR_TO_DATE('2024', '%Y')                  AS year_only;
+year_only
+2024-01-01 00:00:00
+SELECT STR_TO_DATE('2024-03', '%Y-%m')            AS year_month_only;
+year_month_only
+2024-03-01 00:00:00
+=== Out-of-range → 1105 (zeta strict; MySQL NULL) ===
+SELECT STR_TO_DATE('2024-13-01', '%Y-%m-%d');
+ERROR 1105: execution error: STR_TO_DATE: month 13 out of range 1..=12
+SELECT STR_TO_DATE('2023-02-30', '%Y-%m-%d');
+ERROR 1105: execution error: STR_TO_DATE: day 30 out of range 1..=28 for 2023-02
+SELECT STR_TO_DATE('2024-03-15 25:00:00', '%Y-%m-%d %H:%i:%S');
+ERROR 1105: execution error: STR_TO_DATE: hour 25 out of range 0..=23
+SELECT STR_TO_DATE('13:00:00 AM', '%h:%i:%S %p');
+ERROR 1105: execution error: STR_TO_DATE: hour 13 out of 12-hour range 1..=12
+SELECT STR_TO_DATE('00:00:00 PM', '%h:%i:%S %p');
+ERROR 1105: execution error: STR_TO_DATE: hour 0 out of 12-hour range 1..=12
+=== Trailing extra input → ERROR (zeta strict; MySQL warns) ===
+SELECT STR_TO_DATE('2024-03-15 extra', '%Y-%m-%d');
+ERROR 1105: execution error: STR_TO_DATE: 6 trailing character(s) after format exhausted
+=== Unsupported specifier in STR_TO_DATE (asymmetry vs DATE_FORMAT) ===
+SELECT STR_TO_DATE('1',          '%j');
+ERROR 1105: execution error: STR_TO_DATE: directive %j not supported (see zeta #1093)
+SELECT STR_TO_DATE('2024-01',    '%X-%v');
+ERROR 1105: execution error: STR_TO_DATE: directive %X not supported (see zeta #1093)
+SELECT STR_TO_DATE('garbage',    '%z');
+ERROR 1105: execution error: STR_TO_DATE: directive %z not supported (see zeta #1093)
+=== Consumed-but-unused specifiers (parser accepts, semantics ignored) ===
+SELECT STR_TO_DATE('Friday 2024-03-15', '%W %Y-%m-%d')   AS weekday_name_consumed;
+weekday_name_consumed
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('5 2024-03-15',      '%w %Y-%m-%d')   AS weekday_num_consumed;
+weekday_num_consumed
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('1st March 2024',    '%D %M %Y')      AS ordinal_consumed;
+ordinal_consumed
+2024-03-01 00:00:00
+SELECT STR_TO_DATE('2024-03-15 14:30:45.1', '%Y-%m-%d %H:%i:%S.%f') AS frac_seconds;
+frac_seconds
+2024-03-15 14:30:45.100000
+=== No-pad hours: %k (24h) and %l (12h) ===
+SELECT STR_TO_DATE('2024-03-15 9:30:00',    '%Y-%m-%d %k:%i:%S')      AS hour_24_nopad;
+hour_24_nopad
+2024-03-15 09:30:00
+SELECT STR_TO_DATE('2024-03-15 9:30:00 PM', '%Y-%m-%d %l:%i:%S %p')   AS hour_12_nopad;
+hour_12_nopad
+2024-03-15 21:30:00
+=== NULL passthrough ===
+SELECT STR_TO_DATE(NULL, '%Y-%m-%d')   IS NULL    AS null_str;
+null_str
+1
+SELECT STR_TO_DATE('2024-03-15', NULL) IS NULL    AS null_fmt;
+null_fmt
+1
+=== Arity errors ===
+SELECT STR_TO_DATE();
+ERROR 1105: execution error: STR_TO_DATE requires 2 arguments
+SELECT STR_TO_DATE('2024-03-15');
+ERROR 1105: execution error: STR_TO_DATE requires 2 arguments
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d', 'extra');
+ERROR 1105: execution error: STR_TO_DATE requires 2 arguments
+=== Determinism ===
+SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d')
+     = STR_TO_DATE('2024-03-15', '%Y-%m-%d')         AS deterministic;
+deterministic
+1
