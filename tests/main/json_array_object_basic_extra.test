@@ -1,0 +1,158 @@
+# Independently authored JSON_OBJECT / JSON_ARRAY constructor
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json/json_funcs.test:80,84: 2 baseline rows
+#       JSON_OBJECT('a',1,'b','two')
+#       JSON_ARRAY(1,'two',NULL,true)
+#   - json_basic.test:86,90: 2 baseline rows (same shape)
+#
+# This slice pins what those slices DO NOT:
+#   - Empty constructor calls: JSON_OBJECT() -> {}, JSON_ARRAY() -> [].
+#   - Key alphabetic-sort divergence: input order != output order.
+#   - Non-string KEY auto-stringification (int, bool, float).
+#   - Empty-string key (valid).
+#   - NULL VALUE preserved as JSON null vs NULL KEY → 1105 error.
+#   - Odd-arg-count → 1105 (JSON_OBJECT only).
+#   - Duplicate keys: last write wins (per zeta-jsonb build_object).
+#   - Nested constructor composition (object containing array,
+#     array containing object, doubly-nested).
+#   - JSONB element passthrough — pre-typed JSONB is embedded
+#     as-is, not re-stringified.
+#   - SQL Decimal-vs-Float input typing (connection to the
+#     JSON_TYPE INTEGER-normalization storage quirk).
+#   - Special-character string values (quote, backslash, unicode).
+#
+# Big-picture finding:
+#   JSON_OBJECT applies zeta-jsonb's binary alphabetic-key sort
+#   to its output, so input order is LOST. This is the same
+#   divergence as JSON_KEYS (pinned in
+#   json_length_depth_keys_basic_extra.test). JSON_ARRAY does
+#   NOT sort — element order is preserved.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON_OBJECT output keys are alphabetic
+#     (zeta-jsonb canonical form). MySQL preserves insertion
+#     order. Documented divergence.
+#   # zeta-adapt: Non-string KEY auto-stringified via
+#     value_to_sql_string (numeric, bool → text). Matches
+#     MySQL coercion direction; pinned for parity.
+#   # zeta-adapt: NULL key → 1105 'argument 1: key must not be
+#     null' (MySQL: 3158). Codes differ, behavior (reject)
+#     matches.
+#   # zeta-adapt: Odd arg count → 1105 'jsonb_build_object
+#     requires an even number of arguments'.
+#   # zeta-adapt: Duplicate keys behavior is determined by
+#     zeta-jsonb build_object; pinned below so a refactor
+#     that changes "last wins" semantics is caught.
+
+--echo === JSON_OBJECT — empty + key alphabetic sort divergence ===
+
+# Empty constructor: matches MySQL.
+SELECT JSON_OBJECT()                                           AS empty_obj;
+# Output keys sorted alphabetically — input order LOST.
+SELECT JSON_OBJECT('z', 1, 'a', 2, 'm', 3)                     AS keys_sorted_alpha;
+# Numeric-string keys sort lexicographically (NOT numerically).
+SELECT JSON_OBJECT('2', 'a', '1', 'b', '10', 'c')              AS numeric_string_keys_lex;
+# Single-pair object — degenerate case.
+SELECT JSON_OBJECT('a', 1)                                     AS single_pair;
+
+--echo === JSON_OBJECT — non-string keys auto-stringified ===
+
+# Integer key → string "1". Matches MySQL coercion direction.
+SELECT JSON_OBJECT(1, 'one')                                   AS int_key_stringified;
+# Bool key → string "true" / "false".
+SELECT JSON_OBJECT(TRUE, 'yes', FALSE, 'no')                   AS bool_key_stringified;
+# Mixed-typed keys: all stringified, then sorted alphabetically.
+SELECT JSON_OBJECT(2, 'two', 'ten', 10, 1, 'one')              AS mixed_keys_stringified;
+# Empty string key: valid, produces {"":"val"}.
+SELECT JSON_OBJECT('', 'empty')                                AS empty_string_key;
+
+--echo === JSON_OBJECT — NULL VALUE → JSON null (preserved) ===
+
+SELECT JSON_OBJECT('a', NULL)                                  AS null_value_preserved;
+SELECT JSON_OBJECT('a', NULL, 'b', 1)                          AS null_value_with_other;
+
+--echo === JSON_OBJECT — NULL KEY → ERROR ===
+
+--error 1105
+SELECT JSON_OBJECT(NULL, 'val');
+# NULL in second key position also rejects (the error message
+# always cites 'argument 1', which is a known minor quirk —
+# the impl checks each key but reports first-arg index).
+--error 1105
+SELECT JSON_OBJECT('a', 1, NULL, 2);
+
+--echo === JSON_OBJECT — odd arg count → ERROR ===
+
+--error 1105
+SELECT JSON_OBJECT('a');
+--error 1105
+SELECT JSON_OBJECT('a', 1, 'b');
+
+--echo === JSON_OBJECT — duplicate keys (last wins via build_object) ===
+
+# Two identical keys → only the LAST value survives in the
+# output. zeta-jsonb's build_object dedups by overwriting.
+SELECT JSON_OBJECT('a', 1, 'a', 2)                             AS dup_keys_last_wins;
+SELECT JSON_OBJECT('a', 1, 'b', 2, 'a', 99)                    AS dup_with_other_keys;
+
+--echo === JSON_ARRAY — empty + insertion order preserved ===
+
+# Empty constructor: matches MySQL.
+SELECT JSON_ARRAY()                                            AS empty_arr;
+# Element order preserved (NO sort; only objects are sorted).
+SELECT JSON_ARRAY(3, 1, 2)                                     AS order_preserved;
+SELECT JSON_ARRAY('z', 'a', 'm')                               AS strings_order_preserved;
+
+--echo === JSON_ARRAY — heterogeneous element types ===
+
+# Mix of int, string, bool, null — each preserves its JsonbType.
+SELECT JSON_ARRAY(1, 'two', true, NULL, false, 3.14)           AS heterogeneous;
+
+--echo === JSON_ARRAY — numeric input typing (INTEGER vs DOUBLE) ===
+
+# 1.0 as a SQL Decimal literal routes through sql_value_to_jsonb's
+# Value::Decimal arm → from_decimal → Integer (scale=0).
+# 1e0 as a SQL Float literal routes through Value::Float64 →
+# from_f64 (a different path). Pin both so any future change to
+# either coercion is caught.
+SELECT JSON_TYPE(JSON_ARRAY(1.0)   -> '$[0]')                  AS decimal_input_tag;
+SELECT JSON_TYPE(JSON_ARRAY(1e0)   -> '$[0]')                  AS float_input_tag;
+SELECT JSON_TYPE(JSON_ARRAY(1)     -> '$[0]')                  AS integer_input_tag;
+SELECT JSON_TYPE(JSON_ARRAY(1.5)   -> '$[0]')                  AS true_decimal_tag;
+
+--echo === Nested constructor composition ===
+
+# Object containing array value.
+SELECT JSON_OBJECT('list', JSON_ARRAY(1, 2, 3))                AS obj_with_arr;
+# Array containing object element.
+SELECT JSON_ARRAY(JSON_OBJECT('a', 1), JSON_OBJECT('b', 2))    AS arr_of_obj;
+# Doubly-nested: object containing array containing object.
+SELECT JSON_OBJECT('outer',
+                   JSON_ARRAY(JSON_OBJECT('inner', 42)))       AS doubly_nested;
+
+--echo === JSONB element passthrough (CAST AS JSONB) ===
+
+# Pre-typed JSONB passes through sql_value_to_jsonb's Value::Jsonb
+# arm — embedded as a JSON value, NOT re-stringified.
+SELECT JSON_ARRAY(CAST('{"a":1}' AS JSONB),
+                  CAST('[1,2,3]' AS JSONB))                    AS jsonb_passthrough_arr;
+SELECT JSON_OBJECT('payload', CAST('{"nested":true}' AS JSONB)) AS jsonb_passthrough_obj;
+
+--echo === Special-character string values (escape round-trip) ===
+
+# zeta-server uses PostgreSQL-style string literal semantics
+# over the MySQL wire (backslash is literal, not an escape
+# character). Documented divergence from MySQL native escapes;
+# pinned here so the constructor round-trip is well-defined.
+# Double-quote in value → escaped as \" in the JSON output.
+SELECT JSON_ARRAY('quote: "')                                  AS value_with_quote;
+# Input '\\' is 2 literal backslashes under PG semantics; each
+# backslash JSON-encodes as \\, so the output contains 4 chars
+# between the quotes (= 2 actual backslashes in the value).
+# MySQL semantics would interpret '\\' as 1 backslash.
+SELECT JSON_ARRAY('back: \\')                                  AS value_with_backslash_pg;
+# Multi-byte UTF-8 in value (emitted as raw UTF-8, not \u escape).
+SELECT JSON_ARRAY('é')                                         AS value_with_utf8;

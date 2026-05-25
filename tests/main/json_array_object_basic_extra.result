@@ -1,0 +1,106 @@
+=== JSON_OBJECT — empty + key alphabetic sort divergence ===
+SELECT JSON_OBJECT()                                           AS empty_obj;
+empty_obj
+{}
+SELECT JSON_OBJECT('z', 1, 'a', 2, 'm', 3)                     AS keys_sorted_alpha;
+keys_sorted_alpha
+{"a":2,"m":3,"z":1}
+SELECT JSON_OBJECT('2', 'a', '1', 'b', '10', 'c')              AS numeric_string_keys_lex;
+numeric_string_keys_lex
+{"1":"b","10":"c","2":"a"}
+SELECT JSON_OBJECT('a', 1)                                     AS single_pair;
+single_pair
+{"a":1}
+=== JSON_OBJECT — non-string keys auto-stringified ===
+SELECT JSON_OBJECT(1, 'one')                                   AS int_key_stringified;
+int_key_stringified
+{"1":"one"}
+SELECT JSON_OBJECT(TRUE, 'yes', FALSE, 'no')                   AS bool_key_stringified;
+bool_key_stringified
+{"false":"no","true":"yes"}
+SELECT JSON_OBJECT(2, 'two', 'ten', 10, 1, 'one')              AS mixed_keys_stringified;
+mixed_keys_stringified
+{"1":"one","2":"two","ten":10}
+SELECT JSON_OBJECT('', 'empty')                                AS empty_string_key;
+empty_string_key
+{"":"empty"}
+=== JSON_OBJECT — NULL VALUE → JSON null (preserved) ===
+SELECT JSON_OBJECT('a', NULL)                                  AS null_value_preserved;
+null_value_preserved
+{"a":null}
+SELECT JSON_OBJECT('a', NULL, 'b', 1)                          AS null_value_with_other;
+null_value_with_other
+{"a":null,"b":1}
+=== JSON_OBJECT — NULL KEY → ERROR ===
+SELECT JSON_OBJECT(NULL, 'val');
+ERROR 1105: execution error: argument 1: key must not be null
+SELECT JSON_OBJECT('a', 1, NULL, 2);
+ERROR 1105: execution error: argument 1: key must not be null
+=== JSON_OBJECT — odd arg count → ERROR ===
+SELECT JSON_OBJECT('a');
+ERROR 1105: execution error: jsonb_build_object requires an even number of arguments
+SELECT JSON_OBJECT('a', 1, 'b');
+ERROR 1105: execution error: jsonb_build_object requires an even number of arguments
+=== JSON_OBJECT — duplicate keys (last wins via build_object) ===
+SELECT JSON_OBJECT('a', 1, 'a', 2)                             AS dup_keys_last_wins;
+dup_keys_last_wins
+{"a":2}
+SELECT JSON_OBJECT('a', 1, 'b', 2, 'a', 99)                    AS dup_with_other_keys;
+dup_with_other_keys
+{"a":99,"b":2}
+=== JSON_ARRAY — empty + insertion order preserved ===
+SELECT JSON_ARRAY()                                            AS empty_arr;
+empty_arr
+[]
+SELECT JSON_ARRAY(3, 1, 2)                                     AS order_preserved;
+order_preserved
+[3,1,2]
+SELECT JSON_ARRAY('z', 'a', 'm')                               AS strings_order_preserved;
+strings_order_preserved
+["z","a","m"]
+=== JSON_ARRAY — heterogeneous element types ===
+SELECT JSON_ARRAY(1, 'two', true, NULL, false, 3.14)           AS heterogeneous;
+heterogeneous
+[1,"two",true,null,false,3.14]
+=== JSON_ARRAY — numeric input typing (INTEGER vs DOUBLE) ===
+SELECT JSON_TYPE(JSON_ARRAY(1.0)   -> '$[0]')                  AS decimal_input_tag;
+decimal_input_tag
+INTEGER
+SELECT JSON_TYPE(JSON_ARRAY(1e0)   -> '$[0]')                  AS float_input_tag;
+float_input_tag
+INTEGER
+SELECT JSON_TYPE(JSON_ARRAY(1)     -> '$[0]')                  AS integer_input_tag;
+integer_input_tag
+INTEGER
+SELECT JSON_TYPE(JSON_ARRAY(1.5)   -> '$[0]')                  AS true_decimal_tag;
+true_decimal_tag
+DOUBLE
+=== Nested constructor composition ===
+SELECT JSON_OBJECT('list', JSON_ARRAY(1, 2, 3))                AS obj_with_arr;
+obj_with_arr
+{"list":[1,2,3]}
+SELECT JSON_ARRAY(JSON_OBJECT('a', 1), JSON_OBJECT('b', 2))    AS arr_of_obj;
+arr_of_obj
+[{"a":1},{"b":2}]
+SELECT JSON_OBJECT('outer',
+                   JSON_ARRAY(JSON_OBJECT('inner', 42)))       AS doubly_nested;
+doubly_nested
+{"outer":[{"inner":42}]}
+=== JSONB element passthrough (CAST AS JSONB) ===
+SELECT JSON_ARRAY(CAST('{"a":1}' AS JSONB),
+                  CAST('[1,2,3]' AS JSONB))                    AS jsonb_passthrough_arr;
+jsonb_passthrough_arr
+[{"a":1},[1,2,3]]
+SELECT JSON_OBJECT('payload', CAST('{"nested":true}' AS JSONB)) AS jsonb_passthrough_obj;
+jsonb_passthrough_obj
+{"payload":{"nested":true}}
+=== Special-character string values (escape round-trip) ===
+SELECT JSON_ARRAY('quote: "')                                  AS value_with_quote;
+value_with_quote
+["quote: \""]
+SELECT JSON_ARRAY('back: \\')                                  AS value_with_backslash_pg;
+value_with_backslash_pg
+["back: \\\\"]
+SELECT JSON_ARRAY('é')                                         AS value_with_utf8;
+value_with_utf8
+["é"]
