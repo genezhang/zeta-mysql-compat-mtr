@@ -17,6 +17,9 @@ neg_dec
 SELECT ABS(-2147483648)                  AS neg_i32_min;
 neg_i32_min
 2147483648
+SELECT ABS(-9223372036854775808)         AS abs_i64_min;
+abs_i64_min
+9223372036854775808
 === ABS: NULL + arity ===
 SELECT ABS(NULL) IS NULL                 AS null_passes;
 null_passes
@@ -92,6 +95,13 @@ to_thousands
 SELECT ROUND(149.5, -1)                  AS half_neg_1dp;
 half_neg_1dp
 150
+SELECT ROUND(123, -1)                    AS int_neg_precision;
+int_neg_precision
+120
+=== ROUND on Float64 ties (f64::round path, separate from Decimal) ===
+SELECT ROUND(2.5e0)                      AS float_tie_half_away;
+float_tie_half_away
+3
 === ROUND: NULL + arity ===
 SELECT ROUND(NULL)         IS NULL       AS null_passes;
 null_passes
@@ -143,6 +153,8 @@ null_x
 SELECT TRUNCATE(1.5, NULL) IS NULL       AS null_n;
 null_n
 1
+SELECT TRUNCATE('3.999', 2);
+ERROR 1105: execution error: cannot convert '3.999' to number
 SELECT TRUNCATE();
 ERROR 1105: execution error: TRUNCATE requires 2 arguments
 SELECT TRUNCATE(1.5);
@@ -170,8 +182,11 @@ ceiling_alias
 1
 SELECT CEIL();
 ERROR 1105: execution error: CEIL requires 1 argument
-SELECT CEIL(1, 2)                        AS ceil_extra_args_silent;
-ceil_extra_args_silent
+SELECT CEIL(1, 2)                        AS ceil_extra_args_dropped;
+ceil_extra_args_dropped
+1
+SELECT CEIL(1, 2) = 1                    AS ceil_extras_first_arg_survives;
+ceil_extras_first_arg_survives
 1
 === FLOOR ===
 SELECT FLOOR(3.9)                        AS dec_down;
@@ -191,8 +206,11 @@ null_passes
 1
 SELECT FLOOR();
 ERROR 1105: execution error: FLOOR requires 1 argument
-SELECT FLOOR(1, 2)                       AS floor_extra_args_silent;
-floor_extra_args_silent
+SELECT FLOOR(1, 2)                       AS floor_extra_args_dropped;
+floor_extra_args_dropped
+1
+SELECT FLOOR(1, 2) = 1                   AS floor_extras_first_arg_survives;
+floor_extras_first_arg_survives
 1
 === Cross-family invariants ===
 SELECT FLOOR(3.7) <= ROUND(3.7) AND ROUND(3.7) <= CEIL(3.7) AS bounds_invariant;

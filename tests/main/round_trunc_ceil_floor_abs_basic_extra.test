@@ -35,6 +35,12 @@ SELECT ABS(0)                            AS zero_int;
 SELECT ABS(3.14)                         AS pos_dec;
 SELECT ABS(-3.14)                        AS neg_dec;
 SELECT ABS(-2147483648)                  AS neg_i32_min;
+# ABS(i64::MIN) — `(-9223372036854775808).abs()` panics in
+# debug builds (`-i64::MIN` overflows). Release builds wrap
+# silently. Either way, no clean MySQL-style NULL — pinning
+# the observed behavior. If zeta grows a saturating /
+# erroring guard later, this assertion will visibly change.
+SELECT ABS(-9223372036854775808)         AS abs_i64_min;
 
 --echo === ABS: NULL + arity ===
 
@@ -81,6 +87,17 @@ SELECT ROUND(12345.67, -1)               AS to_tens;
 SELECT ROUND(12345.67, -2)               AS to_hundreds;
 SELECT ROUND(12345.67, -3)               AS to_thousands;
 SELECT ROUND(149.5, -1)                  AS half_neg_1dp;
+# Int + negative precision: bypasses the Int fast-path (which
+# only fires for non-negative precision) and falls through the
+# f64 path.
+SELECT ROUND(123, -1)                    AS int_neg_precision;
+
+--echo === ROUND on Float64 ties (f64::round path, separate from Decimal) ===
+
+# Float literal 2.5e0 hits the f64.round() arm (not the Decimal
+# arm). Rust's f64::round() is also half-away-from-zero, so
+# same answer as Decimal path.
+SELECT ROUND(2.5e0)                      AS float_tie_half_away;
 
 --echo === ROUND: NULL + arity ===
 
@@ -115,6 +132,11 @@ SELECT TRUNCATE(42, 5)                   AS int_identity;
 
 SELECT TRUNCATE(NULL, 2)   IS NULL       AS null_x;
 SELECT TRUNCATE(1.5, NULL) IS NULL       AS null_n;
+# String input: zeta's TRUNCATE does NOT implicit-coerce strings
+# to numbers via value_to_f64_checked — errors 1105 instead.
+# (MySQL would silently coerce.) Documented divergence.
+--error 1105
+SELECT TRUNCATE('3.999', 2);
 --error 1105
 SELECT TRUNCATE();
 --error 1105
@@ -133,12 +155,17 @@ SELECT CEIL(NULL) IS NULL                AS null_passes;
 SELECT CEILING(3.1) = CEIL(3.1)          AS ceiling_alias;
 --error 1105
 SELECT CEIL();
-# Note: CEIL(1, 2) does NOT error in zeta — the function-call
-# arity guard fires only on EMPTY args; extra args are silently
-# accepted (the impl uses match on args.len() == 1 but extras
-# reach a different code path somehow). Pin the observed
-# behavior so the gap is locked in for future cleanup.
-SELECT CEIL(1, 2)                        AS ceil_extra_args_silent;
+# Note: CEIL(1, 2) does NOT error. Root cause is in the PARSER:
+# sqlparser-rs parses CEIL/FLOOR as dedicated AST nodes
+# (Expr::Ceil { expr, .. } / Expr::Floor { expr, .. }) and
+# zeta-parser convert.rs:4164-4179 builds Function { args:
+# vec![convert_expr(*expr)] } — extras are silently DROPPED at
+# parse time before reaching the executor's arity guard. So
+# CEIL(1, 2) reaches the executor as CEIL(1) and returns 1.
+# Pin both the no-error AND the discriminating "first arg
+# survives" assertion. Future fix lands in the parser.
+SELECT CEIL(1, 2)                        AS ceil_extra_args_dropped;
+SELECT CEIL(1, 2) = 1                    AS ceil_extras_first_arg_survives;
 
 --echo === FLOOR ===
 
@@ -149,8 +176,9 @@ SELECT FLOOR(5)                          AS int_identity;
 SELECT FLOOR(NULL) IS NULL               AS null_passes;
 --error 1105
 SELECT FLOOR();
-# Same gap as CEIL: extras silently accepted.
-SELECT FLOOR(1, 2)                       AS floor_extra_args_silent;
+# Same parser gap as CEIL: extras dropped at parse time.
+SELECT FLOOR(1, 2)                       AS floor_extra_args_dropped;
+SELECT FLOOR(1, 2) = 1                   AS floor_extras_first_arg_survives;
 
 --echo === Cross-family invariants ===
 
