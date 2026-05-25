@@ -1,0 +1,80 @@
+=== Scalar extraction by JSON type ===
+SELECT JSON_VALUE('{"a":"hello"}', '$.a') AS str_unquoted;
+str_unquoted
+hello
+SELECT JSON_VALUE('{"a":42}', '$.a')      AS int_as_string;
+int_as_string
+42
+SELECT JSON_VALUE('{"a":3.14}', '$.a')    AS dec_as_string;
+dec_as_string
+3.14
+SELECT JSON_VALUE('{"a":true}', '$.a')    AS bool_true;
+bool_true
+true
+SELECT JSON_VALUE('{"a":false}', '$.a')   AS bool_false;
+bool_false
+false
+SELECT JSON_VALUE('{"a":null}', '$.a') IS NULL AS json_null_is_sql_null;
+json_null_is_sql_null
+1
+=== Non-scalar at path → NULL (JSON_VALUE is scalar-only) ===
+SELECT JSON_VALUE('{"a":[1,2]}', '$.a')     IS NULL AS arr_at_path_null;
+arr_at_path_null
+1
+SELECT JSON_VALUE('{"a":{"b":1}}', '$.a')   IS NULL AS obj_at_path_null;
+obj_at_path_null
+1
+=== Root path: scalar vs container ===
+SELECT JSON_VALUE('"plain"', '$') AS root_string;
+root_string
+plain
+SELECT JSON_VALUE('42', '$')      AS root_int;
+root_int
+42
+SELECT JSON_VALUE('{"a":1}', '$') IS NULL AS root_obj_null;
+root_obj_null
+1
+SELECT JSON_VALUE('[1,2,3]', '$') IS NULL AS root_arr_null;
+root_arr_null
+1
+=== Array index extract ===
+SELECT JSON_VALUE('["x","y","z"]', '$[1]') AS index_extract;
+index_extract
+y
+=== Path doesn't resolve → NULL ===
+SELECT JSON_VALUE('{"a":1}', '$.missing') IS NULL AS missing_key;
+missing_key
+1
+SELECT JSON_VALUE('[1,2,3]', '$[99]')     IS NULL AS oob_index;
+oob_index
+1
+SELECT JSON_VALUE('[1,2,3]', '$.a')       IS NULL AS type_mismatch;
+type_mismatch
+1
+=== Nested path (>1 step) → NULL (under-claim) ===
+SELECT JSON_VALUE('{"a":{"b":"hit"}}', '$.a.b') IS NULL AS nested_under_claim;
+nested_under_claim
+1
+=== SQL NULL anywhere → NULL ===
+SELECT JSON_VALUE(NULL, '$.a')        IS NULL AS null_doc;
+null_doc
+1
+SELECT JSON_VALUE('{"a":1}', NULL)    IS NULL AS null_path;
+null_path
+1
+=== Distinction from JSON_EXTRACT: unwrapped string ===
+SELECT LENGTH(JSON_VALUE('{"a":"hello"}', '$.a'))   AS value_len;
+value_len
+5
+SELECT LENGTH(JSON_EXTRACT('{"a":"hello"}', '$.a')) AS extract_len_with_quotes;
+extract_len_with_quotes
+7
+=== Arity / invalid JSON / wildcard ===
+SELECT JSON_VALUE();
+ERROR 1105: execution error: JSON_VALUE requires exactly 2 arguments (doc, path)
+SELECT JSON_VALUE('{"a":1}');
+ERROR 1105: execution error: JSON_VALUE requires exactly 2 arguments (doc, path)
+SELECT JSON_VALUE('not json', '$.a');
+ERROR 1105: execution error: JSON_VALUE target is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_VALUE('{}', '$.*');
+ERROR 1105: execution error: JSON_VALUE invalid path: $.*
