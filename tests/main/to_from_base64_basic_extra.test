@@ -1,0 +1,119 @@
+# Independently authored TO_BASE64 / FROM_BASE64 smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Both functions are implemented in zeta but had no
+# compat-mtr coverage yet — this slice locks in the inverse pair.
+#
+# Big-picture finding:
+#   TO_BASE64(s)   — encode bytes as RFC 4648 standard base64
+#                    (alphabet A-Za-z0-9+/=). Strings are first
+#                    converted to their UTF-8 byte representation.
+#                    NULL → NULL.
+#   FROM_BASE64(s) — decode base64 back to bytes. Whitespace in
+#                    the input is stripped before decoding (so
+#                    output from `TO_BASE64` with embedded
+#                    newlines round-trips). Invalid input → NULL
+#                    (not an error). NULL → NULL.
+#
+# Inverse property: for any byte string `b`,
+#                   FROM_BASE64(TO_BASE64(b)) = b.
+#
+# Adaptation notes:
+#   # zeta-adapt: MySQL inserts a newline every 76 chars in the
+#     encoded output; zeta does not. The base64 alphabet is
+#     identical, and `FROM_BASE64` strips whitespace on both
+#     engines, so the round-trip works. The literal encoded form
+#     for very long inputs would diverge — tests stay short
+#     enough to avoid this.
+#   # zeta-adapt: FROM_BASE64 returns VARBINARY in zeta. Direct
+#     `FROM_BASE64(...) = 'string-literal'` is a byte-vs-text
+#     comparison that returns 0 (MySQL would auto-coerce and
+#     return 1). All round-trip assertions therefore go through
+#     LENGTH() or HEX() wrappers — byte-level checks that don't
+#     depend on type coercion.
+#   # zeta-adapt: zeta's SQL parser is PostgreSQL-style — `'\n'`
+#     in a string literal is the two chars `\` and `n`, NOT a
+#     newline. So `FROM_BASE64('TWFu\n')` does NOT exercise
+#     whitespace tolerance — the `\` isn't whitespace and breaks
+#     decode (→ NULL). Locked in as observed; the whitespace
+#     check uses a literal space instead.
+#   # zeta-adapt: Invalid input → NULL (matches MySQL).
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Same
+#     direction (rejects).
+
+--echo === TO_BASE64: known vectors ===
+
+# RFC 4648 §10 test vectors. "Man" / "Ma" / "M" exercise the
+# three padding cases (none / "=" / "==").
+SELECT TO_BASE64('Man')   AS three_byte;
+SELECT TO_BASE64('Ma')    AS two_byte;
+SELECT TO_BASE64('M')     AS one_byte;
+SELECT TO_BASE64('hello') AS five_byte;
+SELECT TO_BASE64('')      AS empty;
+
+--echo === TO_BASE64: binary input via UNHEX ===
+
+# Raw bytes 0x00..0xFF — not valid UTF-8 in places, must still
+# encode cleanly. UNHEX('00FFEEDD') = 4 bytes.
+SELECT TO_BASE64(UNHEX('00FFEEDD')) AS binary_bytes;
+
+--echo === TO_BASE64: NULL passthrough ===
+
+SELECT TO_BASE64(NULL) IS NULL AS null_passes;
+
+--echo === FROM_BASE64: known vectors ===
+
+SELECT FROM_BASE64('TWFu')     AS decode_three;
+SELECT FROM_BASE64('TWE=')     AS decode_two;
+SELECT FROM_BASE64('TQ==')     AS decode_one;
+SELECT FROM_BASE64('aGVsbG8=') AS decode_hello;
+
+--echo === FROM_BASE64: whitespace tolerance ===
+
+# MySQL inserts newlines every 76 chars; FROM_BASE64 must accept
+# the round-trip. Compare via HEX() — direct `= 'string'` is a
+# bytes-vs-text comparison that returns 0 in zeta (see header).
+SELECT HEX(FROM_BASE64('TWF u'))  = '4D616E'   AS strip_space_inline;
+# A literal space inside / leading / trailing must all decode.
+SELECT HEX(FROM_BASE64(' TWFu '))  = '4D616E'   AS strip_around;
+SELECT HEX(FROM_BASE64('T W F u')) = '4D616E'   AS strip_multi_space;
+
+--echo === FROM_BASE64: invalid input → NULL ===
+
+# Non-alphabet char, bad padding length — MySQL semantics: NULL,
+# not an error.
+SELECT FROM_BASE64('!!!@@@')  IS NULL AS bad_chars;
+SELECT FROM_BASE64('TWFu====') IS NULL AS bad_padding;
+
+--echo === FROM_BASE64: NULL passthrough ===
+
+SELECT FROM_BASE64(NULL) IS NULL AS null_passes;
+
+--echo === Inverse round-trip: FROM_BASE64(TO_BASE64(s)) = s ===
+
+# All round-trip checks go through LENGTH() or HEX(). zeta
+# returns VARBINARY from FROM_BASE64; direct `= 'string'`
+# evaluates as bytes-vs-text and returns 0 (see header note).
+SELECT LENGTH(FROM_BASE64(TO_BASE64('hello')))         = 5    AS rt_plain_len;
+SELECT LENGTH(FROM_BASE64(TO_BASE64('')))              = 0    AS rt_empty_len;
+SELECT LENGTH(FROM_BASE64(TO_BASE64('Man')))           = 3    AS rt_three_byte_len;
+# Byte-by-byte verification via HEX so we know the contents are
+# right, not just the length: 'hello' is 68656C6C6F.
+SELECT HEX(FROM_BASE64(TO_BASE64('hello'))) = '68656C6C6F'    AS rt_plain_bytes;
+
+--echo === Inverse round-trip: binary bytes ===
+
+# Binary input that contains non-UTF-8 bytes. Round-trip must
+# preserve every byte. HEX-wrap both sides so the assertion is
+# stable on any wire collation.
+SELECT HEX(FROM_BASE64(TO_BASE64(UNHEX('00FFEEDD')))) = '00FFEEDD' AS rt_binary;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT TO_BASE64();
+--error 1105
+SELECT TO_BASE64('a', 'b');
+--error 1105
+SELECT FROM_BASE64();
+--error 1105
+SELECT FROM_BASE64('TWFu', 'extra');
