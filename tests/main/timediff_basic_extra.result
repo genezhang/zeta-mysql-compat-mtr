@@ -1,0 +1,93 @@
+=== Basic positive duration: TIME - TIME ===
+SELECT TIMEDIFF('14:30:45', '12:15:30')               AS pos_time_time;
+pos_time_time
+02:15:15
+SELECT TIMEDIFF('23:59:59', '00:00:00')               AS pos_full_day_minus_1s;
+pos_full_day_minus_1s
+23:59:59
+SELECT TIMEDIFF('00:00:01', '00:00:00')               AS pos_one_second;
+pos_one_second
+00:00:01
+=== Negative direction: a < b → leading '-' ===
+SELECT TIMEDIFF('12:00:00', '14:00:00')               AS neg_2h;
+neg_2h
+-02:00:00
+SELECT TIMEDIFF('00:00:00', '00:00:01')               AS neg_one_second;
+neg_one_second
+-00:00:01
+=== Zero diff (a == b) ===
+SELECT TIMEDIFF('14:30:45', '14:30:45')               AS zero_time;
+zero_time
+00:00:00
+SELECT TIMEDIFF('2024-03-15 14:30:45', '2024-03-15 14:30:45') AS zero_ts;
+zero_ts
+00:00:00
+=== TIMESTAMP - TIMESTAMP (date components cancel) ===
+SELECT TIMEDIFF('2024-03-15 14:30:45', '2024-03-15 12:15:30')
+                                                      AS ts_ts_same_day;
+ts_ts_same_day
+02:15:15
+SELECT TIMEDIFF('2024-03-16 14:00:00', '2024-03-15 12:00:00')
+                                                      AS ts_ts_across_day_26h;
+ts_ts_across_day_26h
+26:00:00
+=== Sub-second (microsecond) precision ===
+SELECT TIMEDIFF('2024-03-15 14:30:45', '2024-03-15 12:15:30.123456')
+                                                      AS ts_subsec_borrow;
+ts_subsec_borrow
+02:15:14.876544
+SELECT TIMEDIFF('00:00:01.500000', '00:00:00.250000') AS time_subsec_both;
+time_subsec_both
+00:00:01.250000
+SELECT TIMEDIFF('00:00:00.250000', '00:00:01.500000') AS neg_subsec;
+neg_subsec
+-00:00:01.250000
+=== Mixed-type inputs (impl coerces each side independently) ===
+SELECT TIMEDIFF('14:30:45', '2024-03-15 14:30:45') IS NOT NULL
+                                                      AS mixed_time_minus_ts_returns_value;
+mixed_time_minus_ts_returns_value
+1
+SELECT TIMEDIFF('2024-03-15 14:30:45', '14:30:45') IS NOT NULL
+                                                      AS mixed_ts_minus_time_returns_value;
+mixed_ts_minus_time_returns_value
+1
+=== NULL passthrough (both positions) ===
+SELECT TIMEDIFF(NULL, '12:00:00')                IS NULL AS null_left;
+null_left
+1
+SELECT TIMEDIFF('12:00:00', NULL)                IS NULL AS null_right;
+null_right
+1
+SELECT TIMEDIFF(NULL, NULL)                      IS NULL AS null_both;
+null_both
+1
+=== Wrong-type inputs → ERROR (zeta strict; MySQL coerces/NULLs) ===
+SELECT TIMEDIFF(1, '00:00:00');
+ERROR 1105: execution error: TIMEDIFF left requires time, timestamp, or parseable string
+SELECT TIMEDIFF('00:00:00', 1);
+ERROR 1105: execution error: TIMEDIFF right requires time, timestamp, or parseable string
+SELECT TIMEDIFF('not a time', '00:00:00');
+ERROR 1105: execution error: TIMEDIFF left: cannot parse "not a time" as a time or timestamp
+SELECT TIMEDIFF('00:00:00', 'not a time');
+ERROR 1105: execution error: TIMEDIFF right: cannot parse "not a time" as a time or timestamp
+=== Arity errors ===
+SELECT TIMEDIFF();
+ERROR 1105: execution error: TIMEDIFF requires 2 arguments
+SELECT TIMEDIFF('14:30:00');
+ERROR 1105: execution error: TIMEDIFF requires 2 arguments
+SELECT TIMEDIFF('14:30:00', '12:00:00', 'extra');
+ERROR 1105: execution error: TIMEDIFF requires 2 arguments
+=== Wide diffs (>838:59:59) emit unbounded hours (zeta divergence) ===
+SELECT TIMEDIFF('2024-03-15 00:00:00', '2024-03-01 00:00:00')
+                                                      AS wide_336h;
+wide_336h
+336:00:00
+SELECT TIMEDIFF('2024-06-09 00:00:00', '2024-03-01 00:00:00')
+                                                      AS wide_2400h;
+wide_2400h
+2400:00:00
+=== Determinism ===
+SELECT TIMEDIFF('14:30:45', '12:15:30')
+     = TIMEDIFF('14:30:45', '12:15:30')               AS deterministic;
+deterministic
+1
