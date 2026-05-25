@@ -1,0 +1,64 @@
+=== CONCAT with DATE input ===
+SELECT CONCAT('birthday: ', DATE '2024-03-15')                AS date_in_concat;
+date_in_concat
+birthday: 2024-03-15
+SELECT CONCAT(DATE '2024-03-15', ' is the day')               AS date_first;
+date_first
+2024-03-15 is the day
+=== CONCAT with TIMESTAMP input (.000000 padding propagates) ===
+SELECT CONCAT('ts: ', TIMESTAMP '2024-03-15 14:30:45')        AS timestamp_in_concat;
+timestamp_in_concat
+ts: 2024-03-15 14:30:45.000000
+SELECT SUBSTRING(CONCAT('ts: ', TIMESTAMP '2024-03-15 14:30:45'), 5, 4)
+                                                              AS timestamp_year_extracted;
+timestamp_year_extracted
+2024
+=== CONCAT with JSONB input (compact Display) ===
+SELECT CONCAT('payload: ', CAST('{"a":1,"b":2}' AS JSONB))    AS jsonb_in_concat;
+jsonb_in_concat
+payload: {"a":1,"b":2}
+SELECT CONCAT('arr: ', CAST('[1,2,3]' AS JSONB))              AS jsonb_array_in_concat;
+jsonb_array_in_concat
+arr: [1,2,3]
+=== CONCAT mixed-type variadic (string + int + bool + date + jsonb) ===
+SELECT CONCAT('id=', 42, ', active=', TRUE, ', dob=',
+              DATE '2024-03-15', ', meta=',
+              CAST('{"x":1}' AS JSONB))                       AS mixed_variadic;
+mixed_variadic
+id=42, active=true, dob=2024-03-15, meta={"x":1}
+=== CONCAT_WS with numeric separator (sep itself coerces) ===
+SELECT CONCAT_WS(0, 'a', 'b', 'c')                            AS int_sep;
+int_sep
+a0b0c
+SELECT CONCAT_WS(0, 'a', 'b', 'c') = 'a0b0c'                  AS int_sep_eq;
+int_sep_eq
+1
+SELECT CONCAT_WS(TRUE, 'a', 'b')                              AS bool_sep;
+bool_sep
+atrueb
+=== CONCAT_WS with DATE separator ===
+SELECT CONCAT_WS(DATE '2024-03-15', 'a', 'b')                 AS date_sep;
+date_sep
+a2024-03-15b
+SELECT CONCAT_WS(DATE '2024-03-15', 'a', 'b') = 'a2024-03-15b'
+                                                              AS date_sep_eq;
+date_sep_eq
+1
+=== CONCAT_WS with DATE / TIMESTAMP values ===
+SELECT CONCAT_WS('/', DATE '2024-03-15', DATE '2024-06-01')   AS date_values_joined;
+date_values_joined
+2024-03-15/2024-06-01
+SELECT CONCAT_WS('|', TIMESTAMP '2024-03-15 14:30:45',
+                       TIMESTAMP '2024-03-15 14:30:46')       AS timestamp_values_joined;
+timestamp_values_joined
+2024-03-15 14:30:45.000000|2024-03-15 14:30:46.000000
+=== Direct MYSQL_CONCAT invocation (wire-shim target) ===
+SELECT MYSQL_CONCAT('a', 'b', 'c')                            AS mysql_concat_basic;
+mysql_concat_basic
+abc
+SELECT MYSQL_CONCAT('a', NULL, 'c') IS NULL                   AS mysql_concat_null_propagates;
+mysql_concat_null_propagates
+1
+SELECT MYSQL_CONCAT('a', 'b') = CONCAT('a', 'b')              AS mysql_concat_eq_concat;
+mysql_concat_eq_concat
+1

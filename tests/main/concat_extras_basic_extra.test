@@ -1,0 +1,101 @@
+# Independently authored CONCAT / CONCAT_WS extras smoke for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - concat_concat_ws_basic_extra.test: basics, NULL
+#     propagation (CONCAT) vs NULL-skip (CONCAT_WS), empty
+#     strings, numeric+bool+utf8 coercion, multi-byte
+#     separator, 0/1-arg variants.
+#
+# This slice pins what that slice DOES NOT:
+#   - DATE / TIMESTAMP coercion via value_to_sql_string.
+#     Confirms the .000000 timestamp padding finding
+#     propagates through CONCAT just like it did through
+#     RTRIM/REPLACE (PR #321).
+#   - JSONB coercion: Value::Jsonb Display routes through
+#     to_json_string (compact form).
+#   - Mixed-type variadic call (string + int + bool + date +
+#     timestamp + JSONB in one CONCAT).
+#   - Numeric separator in CONCAT_WS (separator itself
+#     coerces via value_to_sql_string).
+#   - DATE separator in CONCAT_WS (the multi-byte sep test
+#     pinned 'é' but not a Display-coerced value).
+#   - Direct MYSQL_CONCAT invocation (the wire-internal name
+#     that the shim rewrites CONCAT to). Confirms the rewrite
+#     destination is callable in its own right.
+#
+# Big-picture finding:
+#   value_to_sql_string is the universal stringification
+#   gateway for all the string-family functions; the
+#   .000000 timestamp padding and JSONB compact form both
+#   manifest here exactly as they do in TRIM/REPLACE. Pinning
+#   these in CONCAT makes the cross-family symmetry explicit
+#   for the .result reader.
+#
+# Adaptation notes:
+#   # zeta-adapt: TIMESTAMP Display always pads .{micros:06}
+#     (see PR #321 finding). CONCAT inherits this.
+#   # zeta-adapt: JSONB Display emits compact JSON
+#     ({"a":1}), no whitespace. CONCAT inherits this.
+#   # zeta-adapt: MYSQL_CONCAT is the wire-shim target for
+#     CONCAT (#960); it's also callable directly.
+
+--echo === CONCAT with DATE input ===
+
+SELECT CONCAT('birthday: ', DATE '2024-03-15')                AS date_in_concat;
+SELECT CONCAT(DATE '2024-03-15', ' is the day')               AS date_first;
+
+--echo === CONCAT with TIMESTAMP input (.000000 padding propagates) ===
+
+# Confirms the same .000000 finding pinned in PR #321 for
+# RTRIM/REPLACE manifests in CONCAT too.
+SELECT CONCAT('ts: ', TIMESTAMP '2024-03-15 14:30:45')        AS timestamp_in_concat;
+# Substring at expected position: char 5 = '2' (start of year).
+SELECT SUBSTRING(CONCAT('ts: ', TIMESTAMP '2024-03-15 14:30:45'), 5, 4)
+                                                              AS timestamp_year_extracted;
+
+--echo === CONCAT with JSONB input (compact Display) ===
+
+# JSONB Display routes through to_json_string — compact form,
+# no whitespace around colon. value_to_sql_string forwards.
+SELECT CONCAT('payload: ', CAST('{"a":1,"b":2}' AS JSONB))    AS jsonb_in_concat;
+# Array JSON.
+SELECT CONCAT('arr: ', CAST('[1,2,3]' AS JSONB))              AS jsonb_array_in_concat;
+
+--echo === CONCAT mixed-type variadic (string + int + bool + date + jsonb) ===
+
+SELECT CONCAT('id=', 42, ', active=', TRUE, ', dob=',
+              DATE '2024-03-15', ', meta=',
+              CAST('{"x":1}' AS JSONB))                       AS mixed_variadic;
+
+--echo === CONCAT_WS with numeric separator (sep itself coerces) ===
+
+# Separator 0 (int) becomes '0' via value_to_sql_string.
+SELECT CONCAT_WS(0, 'a', 'b', 'c')                            AS int_sep;
+SELECT CONCAT_WS(0, 'a', 'b', 'c') = 'a0b0c'                  AS int_sep_eq;
+# Bool separator becomes 'true' / 'false'.
+SELECT CONCAT_WS(TRUE, 'a', 'b')                              AS bool_sep;
+
+--echo === CONCAT_WS with DATE separator ===
+
+# Multi-char Display-coerced separator. Each '/' boundary
+# inserts '2024-03-15' between values.
+SELECT CONCAT_WS(DATE '2024-03-15', 'a', 'b')                 AS date_sep;
+SELECT CONCAT_WS(DATE '2024-03-15', 'a', 'b') = 'a2024-03-15b'
+                                                              AS date_sep_eq;
+
+--echo === CONCAT_WS with DATE / TIMESTAMP values ===
+
+SELECT CONCAT_WS('/', DATE '2024-03-15', DATE '2024-06-01')   AS date_values_joined;
+SELECT CONCAT_WS('|', TIMESTAMP '2024-03-15 14:30:45',
+                       TIMESTAMP '2024-03-15 14:30:46')       AS timestamp_values_joined;
+
+--echo === Direct MYSQL_CONCAT invocation (wire-shim target) ===
+
+# The MySQL wire shim rewrites CONCAT( -> MYSQL_CONCAT(. The
+# rewrite target is also callable directly. Pin that both
+# return the same NULL-propagation semantics.
+SELECT MYSQL_CONCAT('a', 'b', 'c')                            AS mysql_concat_basic;
+SELECT MYSQL_CONCAT('a', NULL, 'c') IS NULL                   AS mysql_concat_null_propagates;
+SELECT MYSQL_CONCAT('a', 'b') = CONCAT('a', 'b')              AS mysql_concat_eq_concat;
