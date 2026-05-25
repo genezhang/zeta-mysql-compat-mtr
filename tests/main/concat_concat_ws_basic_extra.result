@@ -1,0 +1,137 @@
+=== CONCAT: basic ===
+SELECT CONCAT('a', 'b', 'c')             AS three_str;
+three_str
+abc
+SELECT CONCAT('hello', ' ', 'world')     AS with_space;
+with_space
+hello world
+SELECT CONCAT('single')                  AS single_arg;
+single_arg
+single
+=== CONCAT: NULL propagates (MYSQL_CONCAT over wire) ===
+SELECT CONCAT('a', NULL, 'c')  IS NULL   AS null_in_middle;
+null_in_middle
+1
+SELECT CONCAT(NULL)            IS NULL   AS null_only;
+null_only
+1
+SELECT CONCAT('a', 'b', NULL)  IS NULL   AS null_last;
+null_last
+1
+SELECT CONCAT(NULL, NULL)      IS NULL   AS all_nulls;
+all_nulls
+1
+=== CONCAT: empty strings concatenate cleanly ===
+SELECT CONCAT('a', '', 'b')              AS empty_middle;
+empty_middle
+ab
+SELECT CONCAT('', '', '')                AS all_empty;
+all_empty
+
+SELECT LENGTH(CONCAT('', '', ''))   = 0  AS all_empty_zero_len;
+all_empty_zero_len
+1
+=== CONCAT: numeric coercion ===
+SELECT CONCAT('id-', 123)                AS int_coerce;
+int_coerce
+id-123
+SELECT CONCAT(1, '+', 2, '=', 3)         AS many_ints;
+many_ints
+1+2=3
+SELECT CONCAT(TRUE, '/', FALSE)          AS bool_coerce_pg_style;
+bool_coerce_pg_style
+true/false
+SELECT CONCAT(TRUE, '/', FALSE) = 'true/false' AS bool_text_form;
+bool_text_form
+1
+SELECT CONCAT('0', 1)                    AS leading_zero;
+leading_zero
+01
+=== CONCAT: multi-byte UTF-8 ===
+SELECT CONCAT('café', 'bar')             AS utf8_basic;
+utf8_basic
+cafébar
+SELECT CHAR_LENGTH(CONCAT('café', 'bar')) = 7 AS utf8_char_len;
+utf8_char_len
+1
+SELECT CONCAT('é', 'á', 'ö')             AS multi_utf8;
+multi_utf8
+éáö
+=== CONCAT: zero arguments (PG-style identity) ===
+SELECT CONCAT()                          AS no_args;
+no_args
+
+SELECT CONCAT() = ''                     AS no_args_is_empty;
+no_args_is_empty
+1
+=== CONCAT_WS: basic ===
+SELECT CONCAT_WS(',', 'a', 'b', 'c')     AS basic;
+basic
+a,b,c
+SELECT CONCAT_WS('-', 'a', 'b', 'c')     AS dash;
+dash
+a-b-c
+SELECT CONCAT_WS(', ', 'foo', 'bar')     AS multi_char_sep;
+multi_char_sep
+foo, bar
+=== CONCAT_WS: NULL separator → NULL ===
+SELECT CONCAT_WS(NULL, 'a', 'b')  IS NULL AS null_sep;
+null_sep
+1
+SELECT CONCAT_WS(NULL)            IS NULL AS null_sep_no_values;
+null_sep_no_values
+1
+=== CONCAT_WS: NULL values SKIPPED (not propagated) ===
+SELECT CONCAT_WS(',', 'a', NULL, 'c')    AS null_value_skipped;
+null_value_skipped
+a,c
+SELECT CONCAT_WS(',', NULL, 'a', NULL, 'b', NULL) AS many_nulls_skipped;
+many_nulls_skipped
+a,b
+SELECT CONCAT_WS(',', NULL, NULL, NULL)  AS all_values_null;
+all_values_null
+
+SELECT LENGTH(CONCAT_WS(',', NULL, NULL)) = 0 AS all_null_zero_len;
+all_null_zero_len
+1
+=== CONCAT_WS: empty separator (no separator effect) ===
+SELECT CONCAT_WS('', 'a', 'b', 'c')      AS empty_sep;
+empty_sep
+abc
+SELECT CONCAT_WS('', 'a', 'b', 'c')      = CONCAT('a', 'b', 'c') AS empty_sep_equiv_concat;
+empty_sep_equiv_concat
+1
+=== CONCAT_WS: single value (no separator inserted) ===
+SELECT CONCAT_WS(',', 'lonely')          AS single_value;
+single_value
+lonely
+SELECT CONCAT_WS(',', 'lonely')          = 'lonely' AS single_no_sep_appended;
+single_no_sep_appended
+1
+=== CONCAT_WS: numeric coercion + multi-byte separator ===
+SELECT CONCAT_WS('|', 1, 2, 3)           AS int_args;
+int_args
+1|2|3
+SELECT CONCAT_WS('é', 'a', 'b', 'c')     AS utf8_sep;
+utf8_sep
+aébéc
+SELECT CONCAT_WS(',', 'a,b', 'c', 'd')   AS sep_in_value;
+sep_in_value
+a,b,c,d
+=== CONCAT_WS: 0 / 1 args ===
+SELECT CONCAT_WS()                      IS NULL AS no_args_null;
+no_args_null
+1
+SELECT CONCAT_WS(',')                    AS sep_only;
+sep_only
+
+SELECT LENGTH(CONCAT_WS(','))      = 0   AS sep_only_zero_len;
+sep_only_zero_len
+1
+=== Determinism ===
+SELECT CONCAT('a', 'b')      = CONCAT('a', 'b')       AS concat_det;
+concat_det
+1
+SELECT CONCAT_WS(',', 'a', 'b') = CONCAT_WS(',', 'a', 'b') AS concat_ws_det;
+concat_ws_det
+1

@@ -1,0 +1,134 @@
+# Independently authored CONCAT / CONCAT_WS smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Both functions are implemented in zeta but had
+# no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   CONCAT(a, b, ...)        — variadic. Over the MySQL wire,
+#                              the shim rewrites CONCAT → MYSQL_CONCAT
+#                              which propagates NULL (any NULL arg →
+#                              NULL result). PG-native CONCAT treats
+#                              NULL as empty string.
+#   CONCAT_WS(sep, a, b, ...) — variadic with separator. NULL sep
+#                              → NULL result. NULL values are SKIPPED
+#                              (not propagated). Same on PG and MySQL,
+#                              so no wire rewrite.
+#
+# Adaptation notes:
+#   # zeta-adapt: Since this suite runs over the MySQL wire, the
+#     CONCAT() observed here uses MYSQL_CONCAT semantics (NULL
+#     propagation). All pins below reflect that. A PG-native
+#     caller of CONCAT in zeta would NOT see NULL propagation.
+#   # zeta-adapt: CONCAT_WS NULL-value-skip behavior matches MySQL
+#     directly — no shim rewrite needed.
+#   # zeta-adapt: Boolean coercion uses PG-style 'true'/'false'
+#     text (zeta's value_to_sql_string), NOT MySQL's '1'/'0'.
+#     Real divergence on the wire. Pinned below.
+#   # zeta-adapt: Empty separator in CONCAT_WS is valid and
+#     produces a plain concatenation (no separator).
+#   # zeta-adapt: Arity: CONCAT with 0 args returns '' (empty
+#     identity); CONCAT_WS with 0 args returns NULL (no sep
+#     extractable). Pinned.
+
+--echo === CONCAT: basic ===
+
+SELECT CONCAT('a', 'b', 'c')             AS three_str;
+SELECT CONCAT('hello', ' ', 'world')     AS with_space;
+SELECT CONCAT('single')                  AS single_arg;
+
+--echo === CONCAT: NULL propagates (MYSQL_CONCAT over wire) ===
+
+SELECT CONCAT('a', NULL, 'c')  IS NULL   AS null_in_middle;
+SELECT CONCAT(NULL)            IS NULL   AS null_only;
+SELECT CONCAT('a', 'b', NULL)  IS NULL   AS null_last;
+SELECT CONCAT(NULL, NULL)      IS NULL   AS all_nulls;
+
+--echo === CONCAT: empty strings concatenate cleanly ===
+
+SELECT CONCAT('a', '', 'b')              AS empty_middle;
+SELECT CONCAT('', '', '')                AS all_empty;
+SELECT LENGTH(CONCAT('', '', ''))   = 0  AS all_empty_zero_len;
+
+--echo === CONCAT: numeric coercion ===
+
+# Non-string args stringified via value_to_sql_string.
+SELECT CONCAT('id-', 123)                AS int_coerce;
+SELECT CONCAT(1, '+', 2, '=', 3)         AS many_ints;
+# Documented zeta divergence: booleans coerce to "true"/"false"
+# text (PG-native), NOT "1"/"0" (MySQL native). Pin the zeta
+# output so a future shift toward MySQL coercion would visibly
+# break the recording.
+SELECT CONCAT(TRUE, '/', FALSE)          AS bool_coerce_pg_style;
+SELECT CONCAT(TRUE, '/', FALSE) = 'true/false' AS bool_text_form;
+# Leading zero: '0' stays '0' (not coerced to numeric 0 and
+# stripped).
+SELECT CONCAT('0', 1)                    AS leading_zero;
+
+--echo === CONCAT: multi-byte UTF-8 ===
+
+SELECT CONCAT('café', 'bar')             AS utf8_basic;
+SELECT CHAR_LENGTH(CONCAT('café', 'bar')) = 7 AS utf8_char_len;
+# Compose multiple multi-byte segments.
+SELECT CONCAT('é', 'á', 'ö')             AS multi_utf8;
+
+--echo === CONCAT: zero arguments (PG-style identity) ===
+
+SELECT CONCAT()                          AS no_args;
+SELECT CONCAT() = ''                     AS no_args_is_empty;
+
+--echo === CONCAT_WS: basic ===
+
+SELECT CONCAT_WS(',', 'a', 'b', 'c')     AS basic;
+SELECT CONCAT_WS('-', 'a', 'b', 'c')     AS dash;
+SELECT CONCAT_WS(', ', 'foo', 'bar')     AS multi_char_sep;
+
+--echo === CONCAT_WS: NULL separator → NULL ===
+
+SELECT CONCAT_WS(NULL, 'a', 'b')  IS NULL AS null_sep;
+# CONCAT_WS(NULL) — only the separator and it's NULL. The args
+# block is non-empty (1 element), but that element is the sep,
+# which is NULL → result NULL. Distinct branch from
+# CONCAT_WS() (no args at all).
+SELECT CONCAT_WS(NULL)            IS NULL AS null_sep_no_values;
+
+--echo === CONCAT_WS: NULL values SKIPPED (not propagated) ===
+
+# Unlike CONCAT, NULLs in the value list are silently skipped.
+SELECT CONCAT_WS(',', 'a', NULL, 'c')    AS null_value_skipped;
+SELECT CONCAT_WS(',', NULL, 'a', NULL, 'b', NULL) AS many_nulls_skipped;
+# All values NULL with non-NULL separator → empty string.
+SELECT CONCAT_WS(',', NULL, NULL, NULL)  AS all_values_null;
+SELECT LENGTH(CONCAT_WS(',', NULL, NULL)) = 0 AS all_null_zero_len;
+
+--echo === CONCAT_WS: empty separator (no separator effect) ===
+
+SELECT CONCAT_WS('', 'a', 'b', 'c')      AS empty_sep;
+SELECT CONCAT_WS('', 'a', 'b', 'c')      = CONCAT('a', 'b', 'c') AS empty_sep_equiv_concat;
+
+--echo === CONCAT_WS: single value (no separator inserted) ===
+
+SELECT CONCAT_WS(',', 'lonely')          AS single_value;
+SELECT CONCAT_WS(',', 'lonely')          = 'lonely' AS single_no_sep_appended;
+
+--echo === CONCAT_WS: numeric coercion + multi-byte separator ===
+
+SELECT CONCAT_WS('|', 1, 2, 3)           AS int_args;
+# Separator can itself be multi-byte.
+SELECT CONCAT_WS('é', 'a', 'b', 'c')     AS utf8_sep;
+# Separator inside the values is NOT escaped — passes through
+# verbatim. The output then has the separator at boundaries AND
+# inside values. Common parsing gotcha.
+SELECT CONCAT_WS(',', 'a,b', 'c', 'd')   AS sep_in_value;
+
+--echo === CONCAT_WS: 0 / 1 args ===
+
+# 0 args → impl returns NULL (no sep extractable).
+SELECT CONCAT_WS()                      IS NULL AS no_args_null;
+# 1 arg (only separator, no values) → empty string.
+SELECT CONCAT_WS(',')                    AS sep_only;
+SELECT LENGTH(CONCAT_WS(','))      = 0   AS sep_only_zero_len;
+
+--echo === Determinism ===
+
+SELECT CONCAT('a', 'b')      = CONCAT('a', 'b')       AS concat_det;
+SELECT CONCAT_WS(',', 'a', 'b') = CONCAT_WS(',', 'a', 'b') AS concat_ws_det;
