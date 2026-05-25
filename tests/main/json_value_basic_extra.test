@@ -1,0 +1,88 @@
+# Independently authored JSON_VALUE smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+# JSON_VALUE errored "unknown function" in zeta before zeta PR
+# #1272; this slice locks in the scalar-only path-extract.
+#
+# Big-picture finding:
+#   JSON_VALUE(doc, path) — distinct from JSON_EXTRACT:
+#     - UNWRAPS JSON strings: returns 'hi' not '"hi"'
+#     - ONLY returns scalars: arrays/objects at path → NULL
+#     - Default return type is VARCHAR(512) (we emit as Text)
+#   By JSON type at path:
+#     String/Int/Numeric/Bool → SQL string repr
+#     JSON null → SQL NULL
+#     Array / Object → SQL NULL
+#   SQL NULL anywhere → SQL NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: first-pass scope is the 2-arg basic form only.
+#     RETURNING <type>, DEFAULT ... ON EMPTY, DEFAULT ... ON
+#     ERROR are pending parser grammar additions. MySQL ships
+#     these; zeta will follow in separate slices.
+#   # zeta-adapt: first-pass path scope is top-level only ($,
+#     $.key, $[N]). Nested paths under-claim to NULL — matches
+#     zeta's JSON_KEYS / JSON_REMOVE / JSON_ARRAY_APPEND
+#     convention. MySQL supports arbitrary depth.
+#   # zeta-adapt: zeta sorts object keys alphabetically when
+#     re-emitting. JSON_VALUE returns scalars, not objects, so
+#     this divergence doesn't affect this slice.
+#   # zeta-adapt: Invalid JSON / wildcard / arity → 1105
+#     (MySQL: 3141 / 3143 / 1582). Same direction (rejects).
+
+--echo === Scalar extraction by JSON type ===
+
+SELECT JSON_VALUE('{"a":"hello"}', '$.a') AS str_unquoted;
+SELECT JSON_VALUE('{"a":42}', '$.a')      AS int_as_string;
+SELECT JSON_VALUE('{"a":3.14}', '$.a')    AS dec_as_string;
+SELECT JSON_VALUE('{"a":true}', '$.a')    AS bool_true;
+SELECT JSON_VALUE('{"a":false}', '$.a')   AS bool_false;
+SELECT JSON_VALUE('{"a":null}', '$.a') IS NULL AS json_null_is_sql_null;
+
+--echo === Non-scalar at path → NULL (JSON_VALUE is scalar-only) ===
+
+SELECT JSON_VALUE('{"a":[1,2]}', '$.a')     IS NULL AS arr_at_path_null;
+SELECT JSON_VALUE('{"a":{"b":1}}', '$.a')   IS NULL AS obj_at_path_null;
+
+--echo === Root path: scalar vs container ===
+
+SELECT JSON_VALUE('"plain"', '$') AS root_string;
+SELECT JSON_VALUE('42', '$')      AS root_int;
+SELECT JSON_VALUE('{"a":1}', '$') IS NULL AS root_obj_null;
+SELECT JSON_VALUE('[1,2,3]', '$') IS NULL AS root_arr_null;
+
+--echo === Array index extract ===
+
+SELECT JSON_VALUE('["x","y","z"]', '$[1]') AS index_extract;
+
+--echo === Path doesn't resolve → NULL ===
+
+SELECT JSON_VALUE('{"a":1}', '$.missing') IS NULL AS missing_key;
+SELECT JSON_VALUE('[1,2,3]', '$[99]')     IS NULL AS oob_index;
+SELECT JSON_VALUE('[1,2,3]', '$.a')       IS NULL AS type_mismatch;
+
+--echo === Nested path (>1 step) → NULL (under-claim) ===
+
+SELECT JSON_VALUE('{"a":{"b":"hit"}}', '$.a.b') IS NULL AS nested_under_claim;
+
+--echo === SQL NULL anywhere → NULL ===
+
+SELECT JSON_VALUE(NULL, '$.a')        IS NULL AS null_doc;
+SELECT JSON_VALUE('{"a":1}', NULL)    IS NULL AS null_path;
+
+--echo === Distinction from JSON_EXTRACT: unwrapped string ===
+
+# JSON_EXTRACT returns a JSON-typed value; JSON_VALUE returns SQL scalar.
+# Length differs because JSON_EXTRACT includes the surrounding quotes.
+SELECT LENGTH(JSON_VALUE('{"a":"hello"}', '$.a'))   AS value_len;
+SELECT LENGTH(JSON_EXTRACT('{"a":"hello"}', '$.a')) AS extract_len_with_quotes;
+
+--echo === Arity / invalid JSON / wildcard ===
+
+--error 1105
+SELECT JSON_VALUE();
+--error 1105
+SELECT JSON_VALUE('{"a":1}');
+--error 1105
+SELECT JSON_VALUE('not json', '$.a');
+--error 1105
+SELECT JSON_VALUE('{}', '$.*');
