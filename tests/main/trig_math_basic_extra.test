@@ -1,0 +1,200 @@
+# Independently authored TRIG / MATH extras smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - log_ln_exp_basic_extra.test: LOG / LN / EXP
+#   - numeric_func_basic.test:88-101: SIN(0), COS(0), TAN(0),
+#     ASIN(1), ACOS(1), ATAN(1), ATAN2(1,1), LOG2(8),
+#     LOG10(1000), DEGREES(π), RADIANS(180), PI()
+#   - numeric_func_basic_extra.test:82: COT(1)
+#   - math_func_edges_basic_extra.test:122-128: LOG(0),
+#     LOG10(0), LOG2(-1) — strict-error pins
+#
+# This slice pins what those slices DO NOT — net-new only:
+#   - SIN/COS/TAN at π/2 and π (not just 0)
+#   - TAN(π/2): very-large-but-finite (fp imprecision)
+#   - COT(0) = +Infinity (divergence; existing pins COT(1) only)
+#   - ASIN/ACOS out-of-domain → NaN (divergence)
+#   - ATAN(y, x) = ATAN2(y, x) OVERLOAD equivalence
+#   - ATAN2 quadrant matrix (Q2/Q3/Q4 + axes; existing has Q1)
+#   - Full hyperbolic family (SINH/COSH/TANH/ASINH/ACOSH/ATANH)
+#   - ACOSH/ATANH out-of-domain → NaN; ATANH(±1) → ±Inf
+#   - PI() rejects ANY arg
+#   - NULL passthrough across the entire family
+#   - Arity errors with representatives (SIN/ATAN/ATAN2/COSH/
+#     LOG2 across the shared arity arm)
+#
+# Big-picture findings:
+#   - ATAN is OVERLOADED: ATAN(x) is single-arg arctan;
+#     ATAN(y, x) delegates to ATAN2(y, x). Documented in
+#     zeta-server/src/lib.rs JsonbType arm (~46427-46431).
+#   - COT(0) = +Inf (zeta uses std::f64 1.0/0.0); MySQL emits
+#     'out of range value'.
+#   - Out-of-domain inputs to ASIN/ACOS/ACOSH/ATANH return NaN
+#     (std::f64 semantics, NOT error). MySQL would NULL.
+#   - ATANH(±1) returns ±Infinity (boundary case, NOT NaN).
+#
+# Adaptation notes:
+#   # zeta-adapt: NaN test uses `x <> x` (IEEE 754: only NaN
+#     differs from itself). The pin runs through the server's
+#     constant-folded path; cmp_values in the executor would
+#     normalize NaN comparison differently. Pin reflects the
+#     server path the runner exercises.
+#   # zeta-adapt: COT(0) = +Inf. Pinned via 1.0/COT(0) < 1e-300
+#     (1.0/Inf == 0.0; 1.0/finite is at worst a subnormal that
+#     is still > 1e-300). The < 1e-300 form dodges the
+#     Float-vs-Int strict-equality trap that bit on `= 0`
+#     during recording. Same trick for ATANH(±1).
+#   # zeta-adapt: Out-of-domain trig → NaN, hyperbolic
+#     boundary → ±Inf. Both diverge from MySQL.
+
+--echo === SIN/COS at the harder angles (π/2, π) ===
+
+# 0 already pinned in numeric_func_basic; these add π/2 and π.
+SELECT ROUND(SIN(PI()/2), 10) > 0.999
+   AND ROUND(SIN(PI()/2), 10) < 1.001                         AS sin_pi_2_is_1;
+SELECT ABS(COS(PI()/2)) < 1e-10                               AS cos_pi_2_is_0;
+SELECT ABS(SIN(PI())) < 1e-10                                 AS sin_pi_is_0;
+SELECT ROUND(COS(PI()), 10) > -1.001
+   AND ROUND(COS(PI()), 10) < -0.999                          AS cos_pi_is_neg_1;
+
+--echo === TAN(π/2): undefined → very-large-but-finite (fp imprecision) ===
+
+# TAN(π/2) mathematically undefined; std::f64 returns ~1.633e16
+# because PI()/2 isn't exactly π/2 in fp. Pin "very large but
+# finite" (distinct from the COT(0) = +Inf row below).
+SELECT TAN(PI()/2) > 1e10                                     AS tan_pi_2_very_large;
+SELECT TAN(PI()/2) < 1e308                                    AS tan_pi_2_finite;
+
+--echo === COT(0) = +Infinity (divergence; MySQL errors) ===
+
+# Pinned via 1.0/COT(0) — under IEEE 754, 1.0/Inf == 0.0.
+# A "very large but finite" COT(0) would give a subnormal-
+# nonzero. Use < 1e-300 instead of = 0 / = 0.0 to dodge the
+# Float-vs-Int (and Float-vs-Float strict-eq) traps.
+SELECT 1.0/COT(0) < 1e-300                                    AS cot_0_is_inf_via_recip;
+# Companion: COT(0) is also greater than f64::MAX boundary.
+SELECT COT(0) > 1e308                                         AS cot_0_above_max;
+
+--echo === ACOS at additional value (-1 = π) ===
+
+# numeric_func_basic has ACOS(1)=0. This adds ACOS(-1) = π.
+SELECT ROUND(ACOS(-1), 10) > 3.141
+   AND ROUND(ACOS(-1), 10) < 3.142                            AS acos_neg_1_is_pi;
+SELECT ROUND(ACOS(0), 10) > 1.570
+   AND ROUND(ACOS(0), 10) < 1.572                             AS acos_0_is_pi_2;
+
+--echo === ASIN / ACOS: out-of-domain → NaN (divergence; MySQL NULL) ===
+
+# std::f64 returns NaN for |x| > 1; IEEE 754: NaN != NaN.
+SELECT ASIN(2)  <> ASIN(2)                                    AS asin_2_is_nan;
+SELECT ACOS(2)  <> ACOS(2)                                    AS acos_2_is_nan;
+SELECT ASIN(-2) <> ASIN(-2)                                   AS asin_neg_2_is_nan;
+
+--echo === ATAN(y, x) = ATAN2(y, x) overload equivalence ===
+
+# Impl: ATAN with 2 args delegates to ATAN2. Existing slices
+# only pin the single-arg form.
+SELECT ATAN(1, 1)  = ATAN2(1, 1)                              AS atan_2arg_eq_atan2;
+SELECT ATAN(-1, 1) = ATAN2(-1, 1)                             AS atan_2arg_neg_eq;
+
+--echo === ATAN2: quadrants Q2/Q3/Q4 + axes (numeric_func_basic has Q1) ===
+
+# Q2 (+y, -x): ATAN2(1, -1) = 3π/4 ≈ 2.356.
+SELECT ROUND(ATAN2(1, -1), 10)  > 2.356
+   AND ROUND(ATAN2(1, -1), 10)  < 2.357                       AS atan2_q2;
+# Q3 (-y, -x): ATAN2(-1, -1) = -3π/4 ≈ -2.356.
+SELECT ROUND(ATAN2(-1, -1), 10) > -2.357
+   AND ROUND(ATAN2(-1, -1), 10) < -2.356                      AS atan2_q3;
+# Q4 (-y, +x): ATAN2(-1, 1) = -π/4 ≈ -0.785.
+SELECT ROUND(ATAN2(-1, 1), 10)  > -0.786
+   AND ROUND(ATAN2(-1, 1), 10)  < -0.785                      AS atan2_q4;
+# Axes: ATAN2(0, 1) = 0, ATAN2(1, 0) = π/2.
+SELECT ABS(ATAN2(0, 1)) < 1e-10                               AS atan2_x_axis;
+SELECT ROUND(ATAN2(1, 0), 10) > 1.570
+   AND ROUND(ATAN2(1, 0), 10) < 1.572                         AS atan2_y_axis;
+
+--echo === Hyperbolic family (full coverage — net-new) ===
+
+SELECT ABS(SINH(0)) < 1e-10                                   AS sinh_0_is_0;
+SELECT ABS(COSH(0) - 1) < 1e-10                               AS cosh_0_is_1;
+SELECT ABS(TANH(0)) < 1e-10                                   AS tanh_0_is_0;
+# TANH saturates at ±1 for large |x|.
+SELECT TANH(20)  > 0.999 AND TANH(20)  <= 1.0                 AS tanh_large_pos_near_1;
+SELECT TANH(-20) < -0.999 AND TANH(-20) >= -1.0               AS tanh_large_neg_near_neg_1;
+SELECT ABS(ASINH(0)) < 1e-10                                  AS asinh_0_is_0;
+SELECT ABS(ACOSH(1)) < 1e-10                                  AS acosh_1_is_0;
+SELECT ABS(ATANH(0)) < 1e-10                                  AS atanh_0_is_0;
+
+--echo === Inverse hyperbolic out-of-domain (NaN) + boundary (±Inf) ===
+
+# ACOSH(<1) → NaN.
+SELECT ACOSH(0)  <> ACOSH(0)                                  AS acosh_below_1_is_nan;
+SELECT ACOSH(-1) <> ACOSH(-1)                                 AS acosh_neg_is_nan;
+# ATANH(|x| > 1) → NaN.
+SELECT ATANH(2)  <> ATANH(2)                                  AS atanh_above_1_is_nan;
+# ATANH(±1) → ±Infinity (boundary case, distinct from NaN).
+# Same recip-< trick as COT(0): 1/Inf is 0, 1/finite is subnormal.
+SELECT  1.0/ATANH(1)  < 1e-300                                AS atanh_1_is_pos_inf;
+SELECT -1.0/ATANH(-1) < 1e-300                                AS atanh_neg_1_is_neg_inf;
+
+--echo === PI() rejects ANY arg ===
+
+# Existing pin in numeric_func_basic only validates the value.
+--error 1105
+SELECT PI(1);
+--error 1105
+SELECT PI('foo');
+
+--echo === NULL passthrough across the family ===
+
+SELECT SIN(NULL)      IS NULL                                 AS sin_null;
+SELECT COS(NULL)      IS NULL                                 AS cos_null;
+SELECT TAN(NULL)      IS NULL                                 AS tan_null;
+SELECT COT(NULL)      IS NULL                                 AS cot_null;
+SELECT ASIN(NULL)     IS NULL                                 AS asin_null;
+SELECT ACOS(NULL)     IS NULL                                 AS acos_null;
+SELECT ATAN(NULL)     IS NULL                                 AS atan_null;
+SELECT ATAN2(NULL, 1) IS NULL                                 AS atan2_y_null;
+SELECT ATAN2(1, NULL) IS NULL                                 AS atan2_x_null;
+SELECT SINH(NULL)     IS NULL                                 AS sinh_null;
+SELECT COSH(NULL)     IS NULL                                 AS cosh_null;
+SELECT TANH(NULL)     IS NULL                                 AS tanh_null;
+SELECT ASINH(NULL)    IS NULL                                 AS asinh_null;
+SELECT ACOSH(NULL)    IS NULL                                 AS acosh_null;
+SELECT ATANH(NULL)    IS NULL                                 AS atanh_null;
+SELECT DEGREES(NULL)  IS NULL                                 AS degrees_null;
+SELECT RADIANS(NULL)  IS NULL                                 AS radians_null;
+SELECT LOG2(NULL)     IS NULL                                 AS log2_null;
+SELECT LOG10(NULL)    IS NULL                                 AS log10_null;
+
+--echo === Arity errors (representatives across the shared arm) ===
+
+# All 17 functions in the trig arm share one arity guard; pin
+# 4 reps (SIN, COSH, LOG2, DEGREES) plus the ATAN/ATAN2 special
+# cases.
+--error 1105
+SELECT SIN();
+--error 1105
+SELECT SIN(1, 2);
+--error 1105
+SELECT COSH();
+--error 1105
+SELECT LOG2();
+--error 1105
+SELECT LOG2(1, 2);
+--error 1105
+SELECT DEGREES();
+--error 1105
+SELECT ATAN();
+# ATAN with 3 args: not covered by either single-arg or
+# 2-arg overload.
+--error 1105
+SELECT ATAN(1, 2, 3);
+--error 1105
+SELECT ATAN2();
+--error 1105
+SELECT ATAN2(1);
+--error 1105
+SELECT ATAN2(1, 2, 3);
