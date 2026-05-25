@@ -20,12 +20,13 @@ payload: {"a":1,"b":2}
 SELECT CONCAT('arr: ', CAST('[1,2,3]' AS JSONB))              AS jsonb_array_in_concat;
 jsonb_array_in_concat
 arr: [1,2,3]
-=== CONCAT mixed-type variadic (string + int + bool + date + jsonb) ===
+=== CONCAT mixed-type variadic (string + int + bool + date + timestamp + jsonb) ===
 SELECT CONCAT('id=', 42, ', active=', TRUE, ', dob=',
-              DATE '2024-03-15', ', meta=',
+              DATE '2024-03-15', ', ts=',
+              TIMESTAMP '2024-03-15 14:30:45', ', meta=',
               CAST('{"x":1}' AS JSONB))                       AS mixed_variadic;
 mixed_variadic
-id=42, active=true, dob=2024-03-15, meta={"x":1}
+id=42, active=true, dob=2024-03-15, ts=2024-03-15 14:30:45.000000, meta={"x":1}
 === CONCAT_WS with numeric separator (sep itself coerces) ===
 SELECT CONCAT_WS(0, 'a', 'b', 'c')                            AS int_sep;
 int_sep
@@ -44,6 +45,13 @@ SELECT CONCAT_WS(DATE '2024-03-15', 'a', 'b') = 'a2024-03-15b'
                                                               AS date_sep_eq;
 date_sep_eq
 1
+=== CONCAT_WS typed-NULL separator → NULL (is_null fires before coerce) ===
+SELECT CONCAT_WS(CAST(NULL AS DATE), 'a', 'b') IS NULL        AS typed_null_date_sep;
+typed_null_date_sep
+1
+SELECT CONCAT_WS(CAST(NULL AS INT), 'a', 'b')  IS NULL        AS typed_null_int_sep;
+typed_null_int_sep
+1
 === CONCAT_WS with DATE / TIMESTAMP values ===
 SELECT CONCAT_WS('/', DATE '2024-03-15', DATE '2024-06-01')   AS date_values_joined;
 date_values_joined
@@ -59,6 +67,12 @@ abc
 SELECT MYSQL_CONCAT('a', NULL, 'c') IS NULL                   AS mysql_concat_null_propagates;
 mysql_concat_null_propagates
 1
-SELECT MYSQL_CONCAT('a', 'b') = CONCAT('a', 'b')              AS mysql_concat_eq_concat;
-mysql_concat_eq_concat
+SELECT MYSQL_CONCAT()                                         AS mysql_concat_zero_args;
+mysql_concat_zero_args
+
+SELECT MYSQL_CONCAT() = ''                                    AS mysql_concat_zero_args_is_empty;
+mysql_concat_zero_args_is_empty
 1
+SELECT MYSQL_CONCAT() IS NULL                                 AS mysql_concat_zero_args_not_null;
+mysql_concat_zero_args_not_null
+0

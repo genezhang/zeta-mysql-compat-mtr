@@ -63,10 +63,17 @@ SELECT CONCAT('payload: ', CAST('{"a":1,"b":2}' AS JSONB))    AS jsonb_in_concat
 # Array JSON.
 SELECT CONCAT('arr: ', CAST('[1,2,3]' AS JSONB))              AS jsonb_array_in_concat;
 
---echo === CONCAT mixed-type variadic (string + int + bool + date + jsonb) ===
+--echo === CONCAT mixed-type variadic (string + int + bool + date + timestamp + jsonb) ===
 
+# Note: the trailing `meta={"x":1}` portion is the JSONB
+# compact-Display load-bearing pin — the absence of
+# whitespace around the colon is the assertion that JSONB
+# Display routes through to_json_string. A future change to
+# pretty-print would silently re-record this row visibly.
+# Also includes a TIMESTAMP segment to exercise that arm.
 SELECT CONCAT('id=', 42, ', active=', TRUE, ', dob=',
-              DATE '2024-03-15', ', meta=',
+              DATE '2024-03-15', ', ts=',
+              TIMESTAMP '2024-03-15 14:30:45', ', meta=',
               CAST('{"x":1}' AS JSONB))                       AS mixed_variadic;
 
 --echo === CONCAT_WS with numeric separator (sep itself coerces) ===
@@ -85,6 +92,15 @@ SELECT CONCAT_WS(DATE '2024-03-15', 'a', 'b')                 AS date_sep;
 SELECT CONCAT_WS(DATE '2024-03-15', 'a', 'b') = 'a2024-03-15b'
                                                               AS date_sep_eq;
 
+--echo === CONCAT_WS typed-NULL separator → NULL (is_null fires before coerce) ===
+
+# sep.is_null() check at the impl runs BEFORE value_to_sql_
+# string is reached, so a TYPED null (e.g. CAST(NULL AS DATE))
+# still short-circuits to NULL. The existing slice pinned
+# untyped NULL only.
+SELECT CONCAT_WS(CAST(NULL AS DATE), 'a', 'b') IS NULL        AS typed_null_date_sep;
+SELECT CONCAT_WS(CAST(NULL AS INT), 'a', 'b')  IS NULL        AS typed_null_int_sep;
+
 --echo === CONCAT_WS with DATE / TIMESTAMP values ===
 
 SELECT CONCAT_WS('/', DATE '2024-03-15', DATE '2024-06-01')   AS date_values_joined;
@@ -94,8 +110,14 @@ SELECT CONCAT_WS('|', TIMESTAMP '2024-03-15 14:30:45',
 --echo === Direct MYSQL_CONCAT invocation (wire-shim target) ===
 
 # The MySQL wire shim rewrites CONCAT( -> MYSQL_CONCAT(. The
-# rewrite target is also callable directly. Pin that both
-# return the same NULL-propagation semantics.
+# rewrite target is also callable directly.
 SELECT MYSQL_CONCAT('a', 'b', 'c')                            AS mysql_concat_basic;
 SELECT MYSQL_CONCAT('a', NULL, 'c') IS NULL                   AS mysql_concat_null_propagates;
-SELECT MYSQL_CONCAT('a', 'b') = CONCAT('a', 'b')              AS mysql_concat_eq_concat;
+# Asymmetry pin: MYSQL_CONCAT() with ZERO args returns '' (impl
+# starts with empty String, loops over zero args). NOT NULL.
+# This is non-obvious since the function exists specifically as
+# the NULL-propagating MySQL-semantics variant — one might
+# expect the empty-args case to also yield NULL. Locked in.
+SELECT MYSQL_CONCAT()                                         AS mysql_concat_zero_args;
+SELECT MYSQL_CONCAT() = ''                                    AS mysql_concat_zero_args_is_empty;
+SELECT MYSQL_CONCAT() IS NULL                                 AS mysql_concat_zero_args_not_null;
