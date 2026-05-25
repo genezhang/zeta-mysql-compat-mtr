@@ -69,6 +69,40 @@ SELECT STR_TO_DATE('2023-02-30', '%Y-%m-%d');
 ERROR 1105: execution error: STR_TO_DATE: day 30 out of range 1..=28 for 2023-02
 SELECT STR_TO_DATE('2024-03-15 25:00:00', '%Y-%m-%d %H:%i:%S');
 ERROR 1105: execution error: STR_TO_DATE: hour 25 out of range 0..=23
+SELECT STR_TO_DATE('13:00:00 AM', '%h:%i:%S %p');
+ERROR 1105: execution error: STR_TO_DATE: hour 13 out of 12-hour range 1..=12
+SELECT STR_TO_DATE('00:00:00 PM', '%h:%i:%S %p');
+ERROR 1105: execution error: STR_TO_DATE: hour 0 out of 12-hour range 1..=12
+=== Trailing extra input → ERROR (zeta strict; MySQL warns) ===
+SELECT STR_TO_DATE('2024-03-15 extra', '%Y-%m-%d');
+ERROR 1105: execution error: STR_TO_DATE: 6 trailing character(s) after format exhausted
+=== Unsupported specifier in STR_TO_DATE (asymmetry vs DATE_FORMAT) ===
+SELECT STR_TO_DATE('1',          '%j');
+ERROR 1105: execution error: STR_TO_DATE: directive %j not supported (see zeta #1093)
+SELECT STR_TO_DATE('2024-01',    '%X-%v');
+ERROR 1105: execution error: STR_TO_DATE: directive %X not supported (see zeta #1093)
+SELECT STR_TO_DATE('garbage',    '%z');
+ERROR 1105: execution error: STR_TO_DATE: directive %z not supported (see zeta #1093)
+=== Consumed-but-unused specifiers (parser accepts, semantics ignored) ===
+SELECT STR_TO_DATE('Friday 2024-03-15', '%W %Y-%m-%d')   AS weekday_name_consumed;
+weekday_name_consumed
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('5 2024-03-15',      '%w %Y-%m-%d')   AS weekday_num_consumed;
+weekday_num_consumed
+2024-03-15 00:00:00
+SELECT STR_TO_DATE('1st March 2024',    '%D %M %Y')      AS ordinal_consumed;
+ordinal_consumed
+2024-03-01 00:00:00
+SELECT STR_TO_DATE('2024-03-15 14:30:45.1', '%Y-%m-%d %H:%i:%S.%f') AS frac_seconds;
+frac_seconds
+2024-03-15 14:30:45.100000
+=== No-pad hours: %k (24h) and %l (12h) ===
+SELECT STR_TO_DATE('2024-03-15 9:30:00',    '%Y-%m-%d %k:%i:%S')      AS hour_24_nopad;
+hour_24_nopad
+2024-03-15 09:30:00
+SELECT STR_TO_DATE('2024-03-15 9:30:00 PM', '%Y-%m-%d %l:%i:%S %p')   AS hour_12_nopad;
+hour_12_nopad
+2024-03-15 21:30:00
 === NULL passthrough ===
 SELECT STR_TO_DATE(NULL, '%Y-%m-%d')   IS NULL    AS null_str;
 null_str

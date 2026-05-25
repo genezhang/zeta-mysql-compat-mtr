@@ -83,6 +83,46 @@ SELECT STR_TO_DATE('2023-02-30', '%Y-%m-%d');
 # Hour 25 invalid.
 --error 1105
 SELECT STR_TO_DATE('2024-03-15 25:00:00', '%Y-%m-%d %H:%i:%S');
+# 12-hour range guard: hour 13 with AM/PM rejected; 0 with PM rejected.
+--error 1105
+SELECT STR_TO_DATE('13:00:00 AM', '%h:%i:%S %p');
+--error 1105
+SELECT STR_TO_DATE('00:00:00 PM', '%h:%i:%S %p');
+
+--echo === Trailing extra input → ERROR (zeta strict; MySQL warns) ===
+
+# zeta rejects unconsumed trailing chars; MySQL would warn
+# and return the partial parse. Documented divergence.
+--error 1105
+SELECT STR_TO_DATE('2024-03-15 extra', '%Y-%m-%d');
+
+--echo === Unsupported specifier in STR_TO_DATE (asymmetry vs DATE_FORMAT) ===
+
+# DATE_FORMAT supports %j / %U / %u / %V / %v / %X / %x / %z.
+# STR_TO_DATE does NOT (back-solving from week-numbers / DOY
+# isn't implemented). Pin the asymmetry.
+--error 1105
+SELECT STR_TO_DATE('1',          '%j');
+--error 1105
+SELECT STR_TO_DATE('2024-01',    '%X-%v');
+--error 1105
+SELECT STR_TO_DATE('garbage',    '%z');
+
+--echo === Consumed-but-unused specifiers (parser accepts, semantics ignored) ===
+
+# %a/%W (weekday names), %w (numeric DOW), %D (day ordinal),
+# %f (microseconds) all parse without error — the named-weekday
+# components don't constrain the date.
+SELECT STR_TO_DATE('Friday 2024-03-15', '%W %Y-%m-%d')   AS weekday_name_consumed;
+SELECT STR_TO_DATE('5 2024-03-15',      '%w %Y-%m-%d')   AS weekday_num_consumed;
+SELECT STR_TO_DATE('1st March 2024',    '%D %M %Y')      AS ordinal_consumed;
+# %f microseconds: '1' → 100000 us (left-aligned per impl).
+SELECT STR_TO_DATE('2024-03-15 14:30:45.1', '%Y-%m-%d %H:%i:%S.%f') AS frac_seconds;
+
+--echo === No-pad hours: %k (24h) and %l (12h) ===
+
+SELECT STR_TO_DATE('2024-03-15 9:30:00',    '%Y-%m-%d %k:%i:%S')      AS hour_24_nopad;
+SELECT STR_TO_DATE('2024-03-15 9:30:00 PM', '%Y-%m-%d %l:%i:%S %p')   AS hour_12_nopad;
 
 --echo === NULL passthrough ===
 
