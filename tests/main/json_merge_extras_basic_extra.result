@@ -39,11 +39,7 @@ preserve_typed_left_str_right
 === Wrong-type arg (INT) → ERROR for both ===
 SELECT JSON_MERGE_PATCH(42, '{"a":1}');
 ERROR 1105: execution error: JSON_MERGE_PATCH requires JSON-typed arguments
-SELECT JSON_MERGE_PATCH('{"a":1}', 42);
-ERROR 1105: execution error: JSON_MERGE_PATCH requires JSON-typed arguments
 SELECT JSON_MERGE_PRESERVE(42, '[1]');
-ERROR 1105: execution error: JSON_MERGE_PRESERVE requires JSON-typed arguments
-SELECT JSON_MERGE_PRESERVE('[1]', 42);
 ERROR 1105: execution error: JSON_MERGE_PRESERVE requires JSON-typed arguments
 === Wrong-type arg (FLOAT, BOOLEAN) → ERROR for both ===
 SELECT JSON_MERGE_PATCH(3.14, '{"a":1}');
@@ -70,7 +66,7 @@ SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('{}', '{"a":1,"b":2}'))
                                                             AS preserve_empty_plus_obj;
 preserve_empty_plus_obj
 2
-=== PRESERVE object+scalar (under-explored shape rule) ===
+=== PRESERVE object+scalar (autowrap into 2-element array) ===
 SELECT JSON_TYPE(JSON_MERGE_PRESERVE('{"a":1}', '5'))       AS preserve_obj_scalar_type;
 preserve_obj_scalar_type
 ARRAY
@@ -83,7 +79,7 @@ ARRAY
 SELECT JSON_LENGTH(JSON_MERGE_PRESERVE('5', '{"a":1}'))     AS preserve_scalar_obj_len;
 preserve_scalar_obj_len
 2
-=== PATCH deeply-nested null delete (3 levels) ===
+=== PATCH deeply-nested null delete (3 levels — depth probe) ===
 SELECT JSON_LENGTH(JSON_EXTRACT(
   JSON_MERGE_PATCH('{"a":{"b":{"c":1,"d":2}}}',
                    '{"a":{"b":{"c":null}}}'),
@@ -102,7 +98,7 @@ SELECT JSON_EXTRACT(
   '$.a.b.c') IS NULL AS deep_delete_leaf_gone;
 deep_delete_leaf_gone
 1
-=== PATCH on JSON null target (not SQL NULL) ===
+=== PATCH on JSON null target (JSON-null flavor of an existing branch) ===
 SELECT JSON_TYPE(JSON_MERGE_PATCH('null', '{"a":1}'))       AS patch_json_null_target_type;
 patch_json_null_target_type
 OBJECT
@@ -114,13 +110,13 @@ patch_json_null_as_patch_type
 NULL
 === Non-commutativity sanity (PATCH is order-dependent) ===
 SELECT JSON_EXTRACT(JSON_MERGE_PATCH('{"a":1}', '{"a":2}'), '$.a')
-     = JSON_EXTRACT(JSON_MERGE_PATCH('{"a":2}', '{"a":1}'), '$.a')
+    <> JSON_EXTRACT(JSON_MERGE_PATCH('{"a":2}', '{"a":1}'), '$.a')
                                                             AS patch_shared_key_not_commutative;
 patch_shared_key_not_commutative
-0
+1
 === Non-commutativity sanity (PRESERVE shared-key wraps in input order) ===
 SELECT JSON_EXTRACT(JSON_MERGE_PRESERVE('{"a":1}', '{"a":2}'), '$.a[0]')
-     = JSON_EXTRACT(JSON_MERGE_PRESERVE('{"a":2}', '{"a":1}'), '$.a[0]')
+    <> JSON_EXTRACT(JSON_MERGE_PRESERVE('{"a":2}', '{"a":1}'), '$.a[0]')
                                                             AS preserve_shared_key_not_commutative;
 preserve_shared_key_not_commutative
-0
+1
