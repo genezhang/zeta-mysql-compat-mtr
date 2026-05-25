@@ -1,0 +1,107 @@
+# Independently authored INSERT(str, pos, len, newstr) smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. INSERT is implemented in zeta but had no
+# compat-mtr coverage yet.
+#
+# Note: this is the 4-arg STRING function (splice replacement),
+# not the SQL DML statement. The two share a name; the function
+# form is what's being tested here.
+#
+# Big-picture finding:
+#   INSERT(str, pos, len, newstr) — replace the substring of
+#     `str` that starts at 1-based position `pos` and is `len`
+#     characters long with `newstr`. Return the new string.
+#   Edge cases (MySQL semantics):
+#     - pos < 1 or pos > strlen+1: return `str` unchanged
+#     - len < 0 or pos+len > strlen: splice everything from pos
+#       to end of string (treats len as "to-end")
+#     - NULL on any arg: return NULL
+#
+# Adaptation notes:
+#   # zeta-adapt: pos and len must be true integer types in zeta
+#     (Int32/Int64). Strings or floats → 1105. MySQL coerces.
+#     The integer-strictness is intentional in zeta (matches
+#     REPEAT pattern); pinned by the int-type test.
+#   # zeta-adapt: `pos` and `len` are character-count semantics
+#     (not bytes), so multi-byte UTF-8 char-pos works.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Basic 4-arg splice ===
+
+SELECT INSERT('Quadratic', 3, 4, 'What') AS middle;
+SELECT INSERT('Quadratic', 1, 4, 'XXXX') AS replace_start;
+SELECT INSERT('Quadratic', 6, 4, 'tic')  AS shorter_replacement;
+SELECT INSERT('Hello World', 7, 5, 'Earth') AS replace_word;
+
+--echo === Position past length: return str unchanged ===
+
+# Position 11 in a 9-char string → unchanged.
+SELECT INSERT('Quadratic', 11, 3, 'X')   AS pos_past_end;
+# Position 0 (< 1) → unchanged.
+SELECT INSERT('Quadratic',  0, 3, 'X')   AS pos_zero;
+# Negative position → unchanged.
+SELECT INSERT('Quadratic', -1, 3, 'X')   AS pos_negative;
+# Edge: pos = strlen+1 is the FIRST position past the end —
+# MySQL treats it as "out of range" too.
+SELECT INSERT('abc', 4, 0, 'X')          AS pos_at_strlen_plus_one;
+
+--echo === Length zero: pure insertion at pos ===
+
+# Length=0 means insert without removing anything. But pos must
+# still be in [1, strlen]. Pos=2 with len=0 inserts before char 2.
+SELECT INSERT('Quadratic', 2, 0, '__')   AS insert_only_pos2;
+SELECT INSERT('abc',       1, 0, 'X')    AS insert_only_pos1;
+
+--echo === Length too large or negative: splice to end ===
+
+# Len > remaining chars → drop to end and insert newstr.
+SELECT INSERT('Quadratic', 3, 100, 'XYZ') AS len_too_big;
+# Negative len → same semantic (splice to end).
+SELECT INSERT('Quadratic', 3, -1,  'XYZ') AS len_negative;
+# i64::MAX-style len (saturating_add guard in impl).
+SELECT INSERT('Quadratic', 3, 9223372036854775807, 'XYZ') AS len_intmax;
+
+--echo === Replacement is empty: substring removal ===
+
+SELECT INSERT('Quadratic', 3, 4, '')     AS empty_replace;
+
+--echo === NULL propagation on any arg ===
+
+SELECT INSERT(NULL,        3, 4, 'X')    IS NULL AS null_str;
+SELECT INSERT('Quadratic', NULL, 4, 'X') IS NULL AS null_pos;
+SELECT INSERT('Quadratic', 3, NULL, 'X') IS NULL AS null_len;
+SELECT INSERT('Quadratic', 3, 4, NULL)   IS NULL AS null_newstr;
+
+--echo === Multi-byte UTF-8 char-position semantics ===
+
+# 'café' is 4 chars / 5 bytes. Position 3 = 'f'. Replacing 'f'
+# (1 char) with 'F' gives 'caFé'. Position counts in chars.
+SELECT INSERT('café', 3, 1, 'F')         AS utf8_middle;
+# Replace the multi-byte char itself: pos=4 is 'é', len=1.
+SELECT INSERT('café', 4, 1, 'e')         AS utf8_replace_multibyte;
+
+--echo === Type strictness (zeta-specific) ===
+
+# Non-integer pos / len → 1105 (MySQL would coerce).
+--error 1105
+SELECT INSERT('abc', 'two', 1, 'X');
+--error 1105
+SELECT INSERT('abc', 2, 'three', 'X');
+
+--echo === Determinism ===
+
+SELECT INSERT('hello', 2, 2, 'XY') = INSERT('hello', 2, 2, 'XY') AS deterministic;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT INSERT();
+--error 1105
+SELECT INSERT('a');
+--error 1105
+SELECT INSERT('a', 1);
+--error 1105
+SELECT INSERT('a', 1, 1);
+--error 1105
+SELECT INSERT('a', 1, 1, 'X', 'extra');
