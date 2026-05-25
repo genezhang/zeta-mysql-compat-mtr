@@ -11,12 +11,15 @@
 #       generated SQL that always passes the locale.
 #
 # Algorithm path split:
-#   - DECIMAL/NUMERIC inputs go through rust_decimal rounding,
-#     preserving precision past the f64 ~15-significant-digit
-#     window. This matters for large or high-precision numbers
-#     used in finance/accounting.
+#   - DECIMAL/NUMERIC inputs go through
+#     `rust_decimal::Decimal::round_dp(dp)`. The default rounding
+#     strategy is `MidpointNearestEven` (bankers / round-half-to-
+#     even), NOT round-half-up. This DIVERGES from MySQL, which
+#     rounds half-away-from-zero. Tests pin specific tie cases
+#     (1.5 → 2, 2.5 → 2, 0.5 → 0) so the strategy is locked in.
 #   - Float/Int/String fall back to f64. Non-finite f64
-#     (NaN/Inf/-Inf) returns NULL.
+#     (NaN/Inf/-Inf) returns NULL. Integer inputs > 2^53 lose
+#     precision via the f64 cast — pinned below.
 #
 # Adaptation notes:
 #   # zeta-adapt: zeta only supports the default en_US-style
@@ -48,13 +51,28 @@ SELECT FORMAT(1, 2)                 AS pad_int;
 SELECT FORMAT(1.5, 4)               AS pad_extra;
 SELECT FORMAT(123456789, 3)         AS pad_big_int;
 
---echo === Decimal truncation (rounding, not just chopping) ===
+--echo === Decimal truncation (rust_decimal bankers rounding) ===
 
-# 1.235 rounds to 1.24 (half-up). 1.234 → 1.23.
-SELECT FORMAT(1.235, 2)             AS round_half_up;
-SELECT FORMAT(1.234, 2)             AS round_down;
-# Ties on rust_decimal's half-up — pin the value either way.
-SELECT FORMAT(1.5, 0)               AS round_half_to_int;
+# Important: zeta routes Decimal inputs through
+# `rust_decimal::Decimal::round_dp(dp)`, which defaults to
+# `MidpointNearestEven` (bankers rounding / round-half-to-even),
+# NOT half-up. Pin both tie and non-tie cases so the strategy is
+# locked in. MySQL uses round-half-away-from-zero — documented
+# divergence.
+#
+# Non-tie sanity: 1.234 rounds DOWN to 1.23 under both strategies.
+SELECT FORMAT(1.234, 2)             AS round_down_nontie;
+# Tie cases — these differentiate bankers vs half-up:
+#   1.5  → 2 under bankers (2 is even)
+#   2.5  → 2 under bankers (2 is even)  ← MySQL would give 3
+#   0.5  → 0 under bankers (0 is even)  ← MySQL would give 1
+#   1.225 → 1.22 under bankers          ← MySQL would give 1.23
+#   1.245 → 1.24 under bankers
+SELECT FORMAT(1.5, 0)               AS tie_1_5_to_even;
+SELECT FORMAT(2.5, 0)               AS tie_2_5_to_even;
+SELECT FORMAT(0.5, 0)               AS tie_0_5_to_even;
+SELECT FORMAT(1.225, 2)             AS tie_1_225_to_even;
+SELECT FORMAT(1.245, 2)             AS tie_1_245_to_even;
 
 --echo === Large numbers (grouping every 3 digits) ===
 
@@ -62,6 +80,16 @@ SELECT FORMAT(1000, 0)              AS thousand;
 SELECT FORMAT(1000000, 0)           AS million;
 SELECT FORMAT(1000000000, 0)        AS billion;
 SELECT FORMAT(1234567890123, 2)     AS trillion_plus;
+
+--echo === Large-integer precision loss (i64 → f64) ===
+
+# i64::MAX = 9223372036854775807. f64 has ~15.95 decimal digits
+# of precision, so this value is NOT representable exactly. It
+# rounds up by 1 on the round-trip. Pin the actual (wrong-but-
+# documented) output so a future Decimal/BigInt routing fix
+# lands on a visible change. Worth filing a separate issue —
+# integers > 2^53 should ideally route through rust_decimal.
+SELECT FORMAT(9223372036854775807, 0) AS int_max_f64_precision_loss;
 
 --echo === 3-arg locale form (locale silently ignored) ===
 
@@ -81,9 +109,12 @@ SELECT LENGTH(FORMAT(1, 99)) = 32   AS clamped_to_30;
 
 --echo === Non-finite f64 → NULL ===
 
-# Manufacture NaN / Inf via 0/0 and 1/0. NULLIF guards against
-# div-by-zero erroring before FORMAT can be tested.
-SELECT FORMAT(0.0 / NULLIF(0, 0), 2) IS NULL AS nan_returns_null;
+# Cast to a real NaN / Infinity DOUBLE — `0.0 / NULL` would just
+# be NULL by propagation and never exercise the impl's
+# `if !n.is_finite() { return Null }` branch.
+SELECT FORMAT(CAST('NaN' AS DOUBLE PRECISION),       2) IS NULL AS nan_returns_null;
+SELECT FORMAT(CAST('Infinity' AS DOUBLE PRECISION),  2) IS NULL AS inf_returns_null;
+SELECT FORMAT(CAST('-Infinity' AS DOUBLE PRECISION), 2) IS NULL AS neg_inf_returns_null;
 
 --echo === NULL passthrough ===
 
