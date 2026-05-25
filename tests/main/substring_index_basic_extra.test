@@ -49,6 +49,34 @@ SELECT SUBSTRING_INDEX('a,b,c', ',', -99)        AS neg_more_than_parts;
 
 SELECT SUBSTRING_INDEX('a,b,c', ',', 0)          AS zero_count;
 SELECT LENGTH(SUBSTRING_INDEX('a,b,c', ',', 0)) = 0 AS zero_count_empty;
+# Precedence: count=0 / empty-delim guards fire before split,
+# so even an empty hay with count=0 returns ''.
+SELECT SUBSTRING_INDEX('', ',', 0)               AS zero_count_empty_hay;
+
+--echo === Large negative count (i64::MIN literal) ===
+
+# The impl uses `unsigned_abs()` instead of `.abs()` so a true
+# i64::MIN won't panic. However, the literal
+# -9223372036854775808 written here parses through value_to_i64_opt
+# which does NOT recognize the unary-minus + i64::MIN form: it
+# returns None → unwrap_or(0) → 0 → zero-count guard fires →
+# empty string. So the unsigned_abs() path is unreachable via
+# this literal; it's a defensive guard, not an observable code
+# path. Pinning the actual observed output regardless — if the
+# parser ever starts producing a real i64::MIN here, the
+# unsigned_abs() guard must still not panic.
+SELECT SUBSTRING_INDEX('a,b,c,d', ',', -9223372036854775808)
+       AS int_min_lit_coerced_zero;
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c,d', ',', -9223372036854775808)) = 0
+       AS int_min_lit_returns_empty;
+
+--echo === Non-numeric count silently coerces to 0 ===
+
+# value_to_i64_opt returns None for non-numeric → unwrap_or(0)
+# → count=0 guard → ''.
+SELECT SUBSTRING_INDEX('a,b,c', ',', 'two')      AS string_count;
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c', ',', 'two')) = 0
+       AS string_count_empty;
 
 --echo === Empty delimiter → empty string ===
 

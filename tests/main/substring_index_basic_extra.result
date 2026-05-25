@@ -38,6 +38,26 @@ zero_count
 SELECT LENGTH(SUBSTRING_INDEX('a,b,c', ',', 0)) = 0 AS zero_count_empty;
 zero_count_empty
 1
+SELECT SUBSTRING_INDEX('', ',', 0)               AS zero_count_empty_hay;
+zero_count_empty_hay
+
+=== Large negative count (i64::MIN literal) ===
+SELECT SUBSTRING_INDEX('a,b,c,d', ',', -9223372036854775808)
+       AS int_min_lit_coerced_zero;
+int_min_lit_coerced_zero
+
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c,d', ',', -9223372036854775808)) = 0
+       AS int_min_lit_returns_empty;
+int_min_lit_returns_empty
+1
+=== Non-numeric count silently coerces to 0 ===
+SELECT SUBSTRING_INDEX('a,b,c', ',', 'two')      AS string_count;
+string_count
+
+SELECT LENGTH(SUBSTRING_INDEX('a,b,c', ',', 'two')) = 0
+       AS string_count_empty;
+string_count_empty
+1
 === Empty delimiter → empty string ===
 SELECT SUBSTRING_INDEX('a,b,c', '', 1)           AS empty_delim_pos;
 empty_delim_pos
