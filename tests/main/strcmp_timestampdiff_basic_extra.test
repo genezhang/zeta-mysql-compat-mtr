@@ -60,6 +60,16 @@ SELECT STRCMP(NULL, NULL) IS NULL        AS null_both;
 SELECT STRCMP(1, 1)                      AS int_equal;
 SELECT STRCMP(1, 2)                      AS int_less;
 SELECT STRCMP('10', 10)                  AS string_vs_int;
+# Float stringification via value_to_sql_string: locks the
+# format choice. Float `1.5` stringifies to "1.5", which equals
+# the string literal '1.5' byte-for-byte.
+SELECT STRCMP(1.5, '1.5')                AS float_str_format;
+
+--echo === STRCMP: multi-byte UTF-8 byte-level compare ===
+
+# 'é' (UTF-8: 0xC3 0xA9) vs 'e' (0x65): byte-level cmp gives
+# 'é' > 'e' (0xC3 > 0x65). Pins byte-level (not codepoint).
+SELECT STRCMP('é', 'e')                  AS utf8_byte_cmp;
 
 --echo === STRCMP: arity ===
 
@@ -76,6 +86,10 @@ SELECT TIMESTAMPDIFF(MICROSECOND, '2024-01-01 00:00:00', '2024-01-01 00:00:01') 
 SELECT TIMESTAMPDIFF(SECOND,      '2024-01-01 00:00:00', '2024-01-01 00:01:00') AS sec_one_min;
 SELECT TIMESTAMPDIFF(MINUTE,      '2024-01-01 00:00:00', '2024-01-01 01:00:00') AS min_one_hr;
 SELECT TIMESTAMPDIFF(HOUR,        '2024-01-01 00:00:00', '2024-01-02 00:00:00') AS hr_one_day;
+# Fractional-second timestamp: exercises parse_timestamp's
+# microsecond-precision path.
+SELECT TIMESTAMPDIFF(MICROSECOND, '2024-01-01 00:00:00.000000',
+                                  '2024-01-01 00:00:00.500000')        AS us_half_sec;
 
 --echo === TIMESTAMPDIFF: DAY / WEEK ===
 
@@ -105,6 +119,21 @@ SELECT TIMESTAMPDIFF(MONTH, '2024-04-01', '2024-01-01')                AS neg_mo
 SELECT TIMESTAMPDIFF(day,  '2024-01-01', '2024-01-02')                 AS unit_lower;
 SELECT TIMESTAMPDIFF(Day,  '2024-01-01', '2024-01-02')                 AS unit_mixed;
 
+--echo === TIMESTAMPDIFF: invalid unit identifier ===
+
+# A non-canonical unit (not in is_mysql_timestamp_unit) skips
+# the rewrite at parse time → bare identifier lookup → 1054.
+# Asymmetric vs. an executor "unsupported unit" 1105 — pinning.
+--error 1054
+SELECT TIMESTAMPDIFF(FOOBAR, '2024-01-01', '2024-01-02');
+
+--echo === TIMESTAMPDIFF: cross-year reverse ===
+
+# Exercises year-boundary delta combined with the reverse
+# branch (start > end across year boundary).
+SELECT TIMESTAMPDIFF(MONTH, '2024-02-01', '2022-11-01')              AS cross_year_reverse;
+SELECT TIMESTAMPDIFF(YEAR,  '2024-02-01', '2022-11-01')              AS cross_year_reverse_year;
+
 --echo === TIMESTAMPDIFF: NULL on any arg ===
 
 SELECT TIMESTAMPDIFF(NULL, '2024-01-01', '2024-01-02') IS NULL         AS null_unit;
@@ -114,10 +143,13 @@ SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', NULL)         IS NULL         AS null_e
 --echo === TIMESTAMPDIFF: arity ===
 
 # Note: TIMESTAMPDIFF's unit identifier (DAY, MONTH, etc.) is
-# special-cased only inside the canonical 3-arg form. For any
-# other arity, the bare identifier falls back to a column-name
-# lookup and surfaces as 1054 ("column not found: DAY"). The
-# 0-arg form reaches the executor arity guard → 1105.
+# special-cased only inside the canonical 3-arg form. The
+# parser-side rewrite gate
+# (zeta-parser::convert: is_mysql_timestamp_unit + `args.len()
+# == 3`) means ANY arity other than exactly 3 keeps `DAY` as an
+# Expr::Column and the resolver yields 1054 ("column not found:
+# DAY") before the executor's arity guard fires. Only the
+# 0-arg form actually reaches the executor → 1105.
 --error 1105
 SELECT TIMESTAMPDIFF();
 --error 1054

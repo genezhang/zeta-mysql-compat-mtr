@@ -57,6 +57,13 @@ int_less
 SELECT STRCMP('10', 10)                  AS string_vs_int;
 string_vs_int
 0
+SELECT STRCMP(1.5, '1.5')                AS float_str_format;
+float_str_format
+0
+=== STRCMP: multi-byte UTF-8 byte-level compare ===
+SELECT STRCMP('é', 'e')                  AS utf8_byte_cmp;
+utf8_byte_cmp
+1
 === STRCMP: arity ===
 SELECT STRCMP();
 ERROR 1105: execution error: STRCMP requires 2 arguments
@@ -77,6 +84,10 @@ min_one_hr
 SELECT TIMESTAMPDIFF(HOUR,        '2024-01-01 00:00:00', '2024-01-02 00:00:00') AS hr_one_day;
 hr_one_day
 24
+SELECT TIMESTAMPDIFF(MICROSECOND, '2024-01-01 00:00:00.000000',
+                                  '2024-01-01 00:00:00.500000')        AS us_half_sec;
+us_half_sec
+500000
 === TIMESTAMPDIFF: DAY / WEEK ===
 SELECT TIMESTAMPDIFF(DAY,  '2024-01-01', '2024-01-08')                 AS day_one_week;
 day_one_week
@@ -120,6 +131,16 @@ unit_lower
 SELECT TIMESTAMPDIFF(Day,  '2024-01-01', '2024-01-02')                 AS unit_mixed;
 unit_mixed
 1
+=== TIMESTAMPDIFF: invalid unit identifier ===
+SELECT TIMESTAMPDIFF(FOOBAR, '2024-01-01', '2024-01-02');
+ERROR 1054: column not found: FOOBAR
+=== TIMESTAMPDIFF: cross-year reverse ===
+SELECT TIMESTAMPDIFF(MONTH, '2024-02-01', '2022-11-01')              AS cross_year_reverse;
+cross_year_reverse
+-15
+SELECT TIMESTAMPDIFF(YEAR,  '2024-02-01', '2022-11-01')              AS cross_year_reverse_year;
+cross_year_reverse_year
+-1
 === TIMESTAMPDIFF: NULL on any arg ===
 SELECT TIMESTAMPDIFF(NULL, '2024-01-01', '2024-01-02') IS NULL         AS null_unit;
 null_unit
