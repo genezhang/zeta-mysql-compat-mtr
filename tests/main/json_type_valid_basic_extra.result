@@ -1,0 +1,188 @@
+=== JSON_TYPE — inline scalar walk (each JsonbType variant) ===
+SELECT JSON_TYPE('{"a":1}')                   AS object_tag;
+object_tag
+OBJECT
+SELECT JSON_TYPE('[1,2,3]')                   AS array_tag;
+array_tag
+ARRAY
+SELECT JSON_TYPE('"hello"')                   AS string_tag;
+string_tag
+STRING
+SELECT JSON_TYPE('true')                      AS boolean_true_tag;
+boolean_true_tag
+BOOLEAN
+SELECT JSON_TYPE('false')                     AS boolean_false_tag;
+boolean_false_tag
+BOOLEAN
+SELECT JSON_TYPE('42')                        AS integer_pos_tag;
+integer_pos_tag
+INTEGER
+SELECT JSON_TYPE('-99')                       AS integer_neg_tag;
+integer_neg_tag
+INTEGER
+SELECT JSON_TYPE('3.14')                      AS double_tag;
+double_tag
+DOUBLE
+SELECT JSON_TYPE('1e10')                      AS exp_notation_collapses_to_integer;
+exp_notation_collapses_to_integer
+INTEGER
+=== JSON_TYPE — JSON 'null' returns STRING "NULL" (not SQL NULL) ===
+SELECT JSON_TYPE('null')                      AS json_null_returns_string_tag;
+json_null_returns_string_tag
+NULL
+SELECT JSON_TYPE('null') = 'NULL'             AS json_null_eq_string_NULL;
+json_null_eq_string_NULL
+1
+SELECT JSON_TYPE(NULL)   IS NULL              AS sql_null_returns_sql_null;
+sql_null_returns_sql_null
+1
+SELECT JSON_TYPE(NULL)   = 'NULL'             AS sql_null_not_eq_string_NULL;
+sql_null_not_eq_string_NULL
+NULL
+=== JSON_TYPE — INTEGER vs DOUBLE storage-driven divergence ===
+SELECT JSON_TYPE('1.0')                       AS one_point_zero_is_integer;
+one_point_zero_is_integer
+INTEGER
+SELECT JSON_TYPE('0.0')                       AS zero_point_zero_is_integer;
+zero_point_zero_is_integer
+INTEGER
+SELECT JSON_TYPE('1e0')                       AS one_exp_zero_is_integer;
+one_exp_zero_is_integer
+INTEGER
+SELECT JSON_TYPE('5e0')                       AS five_exp_zero_is_integer;
+five_exp_zero_is_integer
+INTEGER
+SELECT JSON_TYPE('1.5e2')                     AS fraction_exp_evaluates_to_integer;
+fraction_exp_evaluates_to_integer
+INTEGER
+SELECT JSON_TYPE('1.5')                       AS true_fraction_stays_double;
+true_fraction_stays_double
+DOUBLE
+SELECT JSON_TYPE('0.1')                       AS small_fraction_stays_double;
+small_fraction_stays_double
+DOUBLE
+=== JSON_TYPE — empty containers retain container tag ===
+SELECT JSON_TYPE('[]')                        AS empty_array_still_array;
+empty_array_still_array
+ARRAY
+SELECT JSON_TYPE('{}')                        AS empty_object_still_object;
+empty_object_still_object
+OBJECT
+=== JSON_TYPE — invalid JSON → ERROR (zeta strict; MySQL NULL) ===
+SELECT JSON_TYPE('not json');
+ERROR 1105: execution error: JSON_TYPE first argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_TYPE('{a:1}');
+ERROR 1105: execution error: JSON_TYPE first argument is not valid JSON: JSONB error: expected string key at position 1
+=== JSON_TYPE — non-JSON-typed arg → ERROR ===
+SELECT JSON_TYPE(42);
+ERROR 1105: execution error: JSON_TYPE requires a JSON-typed argument
+SELECT JSON_TYPE(3.14);
+ERROR 1105: execution error: JSON_TYPE requires a JSON-typed argument
+SELECT JSON_TYPE(TRUE);
+ERROR 1105: execution error: JSON_TYPE requires a JSON-typed argument
+=== JSON_TYPE — arity ===
+SELECT JSON_TYPE();
+ERROR 1105: execution error: JSON_TYPE requires 1 argument
+SELECT JSON_TYPE('{}', '$');
+ERROR 1105: execution error: JSON_TYPE requires 1 argument
+=== JSON_VALID — valid scalar / container values → 1 ===
+SELECT JSON_VALID('null')                     AS valid_json_null;
+valid_json_null
+1
+SELECT JSON_VALID('true')                     AS valid_true;
+valid_true
+1
+SELECT JSON_VALID('false')                    AS valid_false;
+valid_false
+1
+SELECT JSON_VALID('42')                       AS valid_int;
+valid_int
+1
+SELECT JSON_VALID('-1')                       AS valid_neg_int;
+valid_neg_int
+1
+SELECT JSON_VALID('3.14')                     AS valid_decimal;
+valid_decimal
+1
+SELECT JSON_VALID('1e10')                     AS valid_exponent;
+valid_exponent
+1
+SELECT JSON_VALID('"abc"')                    AS valid_string;
+valid_string
+1
+SELECT JSON_VALID('""')                       AS valid_empty_string;
+valid_empty_string
+1
+SELECT JSON_VALID('[]')                       AS valid_empty_array;
+valid_empty_array
+1
+SELECT JSON_VALID('{}')                       AS valid_empty_object;
+valid_empty_object
+1
+SELECT JSON_VALID('[[[1]]]')                  AS valid_nested_array;
+valid_nested_array
+1
+SELECT JSON_VALID('{"a":{"b":1}}')            AS valid_nested_object;
+valid_nested_object
+1
+=== JSON_VALID — common malformed shapes → 0 ===
+SELECT JSON_VALID('{a:1}')                    AS bad_unquoted_key;
+bad_unquoted_key
+0
+SELECT JSON_VALID('{"a":''bad''}')            AS bad_single_quoted_value;
+bad_single_quoted_value
+0
+SELECT JSON_VALID('[1,2,]')                   AS bad_trailing_comma_arr;
+bad_trailing_comma_arr
+0
+SELECT JSON_VALID('{"a":1,}')                 AS bad_trailing_comma_obj;
+bad_trailing_comma_obj
+0
+SELECT JSON_VALID('[1,2,3}')                  AS bad_mismatched_bracket;
+bad_mismatched_bracket
+0
+SELECT JSON_VALID('')                         AS bad_empty_string;
+bad_empty_string
+0
+SELECT JSON_VALID('   ')                      AS bad_whitespace_only;
+bad_whitespace_only
+0
+SELECT JSON_VALID('{"a":')                    AS bad_truncated;
+bad_truncated
+0
+=== JSON_VALID — NULL passthrough ===
+SELECT JSON_VALID(NULL) IS NULL               AS sql_null_passthrough;
+sql_null_passthrough
+1
+=== JSON_VALID — non-string non-JSON types → 0 (silent fallback) ===
+SELECT JSON_VALID(42)                         AS int_input_zero;
+int_input_zero
+0
+SELECT JSON_VALID(3.14)                       AS double_input_zero;
+double_input_zero
+0
+SELECT JSON_VALID(TRUE)                       AS bool_input_zero;
+bool_input_zero
+0
+=== JSON_VALID — already-typed JSONB → always 1 ===
+SELECT JSON_VALID(CAST('{"a":1}' AS JSONB))   AS jsonb_obj_valid;
+jsonb_obj_valid
+1
+SELECT JSON_VALID(CAST('null'     AS JSONB))  AS jsonb_null_valid;
+jsonb_null_valid
+1
+SELECT JSON_VALID(CAST('[]'       AS JSONB))  AS jsonb_empty_valid;
+jsonb_empty_valid
+1
+=== JSON_VALID — arity ===
+SELECT JSON_VALID();
+ERROR 1105: execution error: JSON_VALID requires 1 argument
+SELECT JSON_VALID('{}', '$');
+ERROR 1105: execution error: JSON_VALID requires 1 argument
+=== Determinism ===
+SELECT JSON_TYPE('[1,2,3]')   = JSON_TYPE('[1,2,3]')   AS type_det;
+type_det
+1
+SELECT JSON_VALID('{"a":1}')  = JSON_VALID('{"a":1}')  AS valid_det;
+valid_det
+1
