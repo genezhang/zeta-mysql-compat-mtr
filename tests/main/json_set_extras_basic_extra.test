@@ -1,0 +1,140 @@
+# Independently authored JSON_SET extras smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_set_insert_replace_basic_extra.test: differential
+#     SET vs INSERT vs REPLACE on missing/existing paths,
+#     value-type matrix, NULL target/path, array-index path,
+#     bad-syntax path, arity, nested keys, scalar target,
+#     idempotency.
+#
+# This slice pins what that slice DOES NOT:
+#   - Already-typed JSONB target (CAST AS JSONB) — exercises
+#     the Value::Jsonb arm of the coerce block, currently
+#     unreached by the existing slice (always passes STRING).
+#   - Wrong-type target (INT, FLOAT, BOOLEAN) → 1105.
+#   - Auto-creation of intermediate objects — the impl calls
+#     `set_path(keys, value, create=true)`, so `JSON_SET('{}',
+#     '$.a.b.c', 1)` should walk down creating missing keys.
+#     This is a key feature of the impl that is never pinned.
+#   - Multi-pair chain where later pairs SEE earlier mutations
+#     (the existing chain test uses independent paths only).
+#   - Root path `$`: empty steps vector → set_path(&[], ...);
+#     pin the actual behavior.
+#   - Mid-path array index (`$.a[0]`) rejected → NULL (distinct
+#     from root array index already pinned).
+#   - Explicit wildcard path rejection (`$.*` / `$[*]`).
+#
+# Big-picture finding:
+#   The `set_path` call with create=true means JSON_SET is also
+#   a path-builder: missing intermediate keys are auto-created
+#   as nested objects, so a single SET can materialize an
+#   arbitrarily deep object spine. This is the most powerful
+#   non-obvious behavior in the function and was not previously
+#   pinned anywhere in compat-mtr.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON and JSONB are PARSER ALIASES — CAST AS
+#     JSON and CAST AS JSONB route through the same arm.
+#   # zeta-adapt: Wrong-type target → 1105 with the per-function
+#     message 'JSON_SET target must be JSON'.
+#   # zeta-adapt: Array-index ANYWHERE in a path (root or
+#     mid-path) currently aborts the WHOLE call with NULL —
+#     under-claim rather than silently mis-write.
+
+--echo === Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+
+SELECT JSON_TYPE(CAST('{"a":1}' AS JSONB))                    AS jsonb_cast_lands_as_object;
+
+--echo === JSON_SET on already-typed JSONB target ===
+
+SELECT JSON_EXTRACT(
+  JSON_SET(CAST('{"a":1}' AS JSONB), '$.b', 2),
+  '$.a', '$.b')                                               AS typed_set_extract_both;
+SELECT JSON_LENGTH(
+  JSON_SET(CAST('{"a":1}' AS JSONB), '$.b', 2))               AS typed_set_len;
+
+--echo === Wrong-type target → ERROR ===
+
+# Each hits the `_ => Err('JSON_SET target must be JSON')` arm
+# at lib.rs JSON_SET impl. One row per representative type.
+--error 1105
+SELECT JSON_SET(42, '$.a', 1);
+--error 1105
+SELECT JSON_SET(3.14, '$.a', 1);
+--error 1105
+SELECT JSON_SET(TRUE, '$.a', 1);
+
+--echo === Auto-create intermediate objects (set_path create=true) ===
+
+# Setting a deeply-nested path on an empty object materializes
+# the whole spine. Existing slice tested nested paths only on
+# targets where the intermediate already exists.
+SELECT JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a.b.c')
+                                                              AS deep_create_leaf;
+# JSON_DEPTH proves the spine was created: root → a → b → c
+# = depth 4. Companion JSON_TYPE rows pin that the
+# intermediates are OBJECT, NOT array — guards the spine
+# claim against JSON_DEPTH semantics drift.
+SELECT JSON_DEPTH(JSON_SET('{}', '$.a.b.c', 1))               AS deep_create_depth;
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a'))
+                                                              AS deep_create_a_is_object;
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a.b'))
+                                                              AS deep_create_ab_is_object;
+# Sibling-preservation: set $.x.y when $.x already exists with
+# its own key 'z'. The 'y' key is added without clobbering 'z'.
+# (Existing slice already pins leaf creation at
+# set_nested_missing; this row pins SIBLING preservation
+# specifically.)
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x'))              AS partial_create_sibling_preserved;
+
+--echo === Multi-pair chain: later pairs see earlier mutations ===
+
+# Same path twice — second write wins (LAST WINS semantics).
+SELECT JSON_EXTRACT(
+  JSON_SET('{"a":1}', '$.a', 2, '$.a', 3), '$.a')             AS chain_same_path_last_wins;
+# Sharper "later sees earlier" differential. First pair sets
+# $.outer to a SCALAR. Second pair sets $.outer.inner=42.
+# Whatever the impl does (overwrite scalar with object,
+# silently no-op, error, etc.), the recording pins the actual
+# multi-pair-chain behavior. This row is meaningful for the
+# "chained" claim in a way the previous version was not: under
+# "fresh target each pair" semantics the answer would always
+# be 42, irrespective of pair 1.
+SELECT JSON_EXTRACT(
+  JSON_SET('{}', '$.outer', 'scalar',
+                  '$.outer.inner', 42),
+  '$.outer.inner')                                            AS chain_scalar_then_nested_set;
+# Companion: what's $.outer after the chained pair?
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_SET('{}', '$.outer', 'scalar',
+                  '$.outer.inner', 42),
+  '$.outer'))                                                 AS chain_scalar_then_nested_outer_type;
+
+--echo === Root path '$' replaces target entirely ===
+
+# Empty key vector → set_path(&[], &new_val, true) — the impl
+# replaces the whole target with new_val. JSON_TYPE confirms.
+SELECT JSON_TYPE(JSON_SET('{"a":1}', '$', 42))                AS root_replace_with_int;
+SELECT JSON_TYPE(JSON_SET('{"a":1}', '$',
+                          CAST('[1,2,3]' AS JSONB)))          AS root_replace_with_array;
+SELECT JSON_LENGTH(JSON_SET('{"a":1}', '$',
+                            CAST('{"x":1,"y":2}' AS JSONB)))  AS root_replace_with_object_len;
+
+--echo === Mid-path array index → NULL (under-claim) ===
+
+# Distinct from root-array path (already pinned). Here the
+# array index appears mid-path. The MySqlJsonPathStep::Index
+# guard at lib.rs:53943 aborts the whole call with NULL.
+SELECT JSON_SET('{"a":[1,2,3]}', '$.a[0]', 9) IS NULL         AS mid_path_index_null;
+# Even when the rest of the path is valid object-keys.
+SELECT JSON_SET('{"a":{"b":[1,2]}}', '$.a.b[0]', 9) IS NULL   AS deep_mid_path_index_null;
+
+--echo === Wildcard path rejection ===
+
+# Wildcards are rejected by parse_mysql_json_path → None →
+# whole call returns NULL.
+SELECT JSON_SET('{"a":1,"b":2}', '$.*', 99) IS NULL           AS wildcard_object_null;
+SELECT JSON_SET('[1,2,3]', '$[*]', 99) IS NULL                AS wildcard_array_null;
