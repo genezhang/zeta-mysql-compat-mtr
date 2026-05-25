@@ -25,6 +25,14 @@
 #     (matches MySQL).
 #   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
 #     differ, behavior (reject) matches.
+#
+# Gap surfaced during recording (worth a separate issue):
+#   BIN/OCT/BIT_COUNT silently return NULL for Decimal/Numeric
+#   inputs (SQL literal `2.7` parses as Decimal, not Float64;
+#   the catchall fires). CONV handles Decimal explicitly via
+#   `d.trunc()`. The three companions should match CONV's
+#   explicit Decimal arm. Locked in by the
+#   "Float input divergence" block below.
 
 --echo === BIN: known small values ===
 
@@ -97,6 +105,46 @@ SELECT CONV(-1, 10, 16)                  AS neg_unsigned_to;
 # Negative to_base: signed interpretation. -1 stays -1.
 SELECT CONV(-1, 10, -10)                 AS neg_signed_to;
 SELECT CONV(-255, 10, -16)               AS neg_signed_hex;
+# Signed binary base (-2) — natural complement to BIN(-1)'s
+# unsigned 64-ones output. Tests smallest-magnitude signed base.
+SELECT CONV(-5, 10, -2)                  AS neg_signed_binary;
+
+--echo === CONV: leading-whitespace input (impl s.trim()s) ===
+
+SELECT CONV('  FF  ', 16, 10)            AS leading_trailing_ws;
+SELECT CONV('  FF  ', 16, 10) = '255'    AS ws_strips_clean;
+
+--echo === CONV: empty / bare-sign input → 0 ===
+
+# Empty string: no digits → 0.
+SELECT CONV('', 10, 10)                  AS empty_str;
+SELECT CONV('-', 10, -10)                AS bare_minus;
+SELECT CONV('+', 10, 10)                 AS bare_plus;
+
+--echo === Float input divergence (BIN/OCT/BIT_COUNT vs CONV) ===
+
+# Real zeta-internal inconsistency surfaced during recording:
+# the SQL literal `2.7` parses as Decimal (NUMERIC), not Float64.
+# BIN/OCT/BIT_COUNT only handle Int32/Int64/UInt64/Float64 then
+# return NULL via the catchall. CONV has an explicit
+# `Value::Decimal(d) => d.trunc().to_string()` arm. Net:
+#   BIN(2.7)        → NULL   (impl's Float64 arm unreachable
+#                              from SQL float literal)
+#   OCT(8.9)        → NULL   (same)
+#   BIT_COUNT(7.9)  → NULL   (same)
+#   CONV(255.9, 10, 16) → 'FF'  (explicit Decimal arm)
+# Worth filing as a separate issue: the three companions should
+# match CONV's explicit Decimal handling.
+SELECT BIN(2.7)        IS NULL           AS bin_decimal_unreachable;
+SELECT OCT(8.9)        IS NULL           AS oct_decimal_unreachable;
+SELECT BIT_COUNT(7.9)  IS NULL           AS bc_decimal_unreachable;
+# CONV works as expected — explicit Decimal arm truncates.
+SELECT CONV(255.9, 10, 16)               AS conv_decimal_trunc;
+SELECT CONV(255.9, 10, 16) = 'FF'        AS conv_decimal_trunc_value;
+
+--echo === BIT_COUNT near i64::MAX (= 63 ones in two's complement) ===
+
+SELECT BIT_COUNT(9223372036854775807)    AS i64_max_bits;
 
 --echo === CONV: invalid bases → NULL ===
 

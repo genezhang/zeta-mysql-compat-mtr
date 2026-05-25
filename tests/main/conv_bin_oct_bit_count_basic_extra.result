@@ -114,6 +114,46 @@ neg_signed_to
 SELECT CONV(-255, 10, -16)               AS neg_signed_hex;
 neg_signed_hex
 -FF
+SELECT CONV(-5, 10, -2)                  AS neg_signed_binary;
+neg_signed_binary
+-101
+=== CONV: leading-whitespace input (impl s.trim()s) ===
+SELECT CONV('  FF  ', 16, 10)            AS leading_trailing_ws;
+leading_trailing_ws
+255
+SELECT CONV('  FF  ', 16, 10) = '255'    AS ws_strips_clean;
+ws_strips_clean
+1
+=== CONV: empty / bare-sign input → 0 ===
+SELECT CONV('', 10, 10)                  AS empty_str;
+empty_str
+0
+SELECT CONV('-', 10, -10)                AS bare_minus;
+bare_minus
+0
+SELECT CONV('+', 10, 10)                 AS bare_plus;
+bare_plus
+0
+=== Float input divergence (BIN/OCT/BIT_COUNT vs CONV) ===
+SELECT BIN(2.7)        IS NULL           AS bin_decimal_unreachable;
+bin_decimal_unreachable
+1
+SELECT OCT(8.9)        IS NULL           AS oct_decimal_unreachable;
+oct_decimal_unreachable
+1
+SELECT BIT_COUNT(7.9)  IS NULL           AS bc_decimal_unreachable;
+bc_decimal_unreachable
+1
+SELECT CONV(255.9, 10, 16)               AS conv_decimal_trunc;
+conv_decimal_trunc
+FF
+SELECT CONV(255.9, 10, 16) = 'FF'        AS conv_decimal_trunc_value;
+conv_decimal_trunc_value
+1
+=== BIT_COUNT near i64::MAX (= 63 ones in two's complement) ===
+SELECT BIT_COUNT(9223372036854775807)    AS i64_max_bits;
+i64_max_bits
+63
 === CONV: invalid bases → NULL ===
 SELECT CONV(255, 1, 16)  IS NULL         AS from_base_too_low;
 from_base_too_low
