@@ -28,16 +28,25 @@ pad_extra
 SELECT FORMAT(123456789, 3)         AS pad_big_int;
 pad_big_int
 123,456,789.000
-=== Decimal truncation (rounding, not just chopping) ===
-SELECT FORMAT(1.235, 2)             AS round_half_up;
-round_half_up
-1.24
-SELECT FORMAT(1.234, 2)             AS round_down;
-round_down
+=== Decimal truncation (rust_decimal bankers rounding) ===
+SELECT FORMAT(1.234, 2)             AS round_down_nontie;
+round_down_nontie
 1.23
-SELECT FORMAT(1.5, 0)               AS round_half_to_int;
-round_half_to_int
+SELECT FORMAT(1.5, 0)               AS tie_1_5_to_even;
+tie_1_5_to_even
 2
+SELECT FORMAT(2.5, 0)               AS tie_2_5_to_even;
+tie_2_5_to_even
+2
+SELECT FORMAT(0.5, 0)               AS tie_0_5_to_even;
+tie_0_5_to_even
+0
+SELECT FORMAT(1.225, 2)             AS tie_1_225_to_even;
+tie_1_225_to_even
+1.22
+SELECT FORMAT(1.245, 2)             AS tie_1_245_to_even;
+tie_1_245_to_even
+1.24
 === Large numbers (grouping every 3 digits) ===
 SELECT FORMAT(1000, 0)              AS thousand;
 thousand
@@ -51,6 +60,10 @@ billion
 SELECT FORMAT(1234567890123, 2)     AS trillion_plus;
 trillion_plus
 1,234,567,890,123.00
+=== Large-integer precision loss (i64 → f64) ===
+SELECT FORMAT(9223372036854775807, 0) AS int_max_f64_precision_loss;
+int_max_f64_precision_loss
+9,223,372,036,854,775,808
 === 3-arg locale form (locale silently ignored) ===
 SELECT FORMAT(1234.5, 2, 'en_US') = FORMAT(1234.5, 2) AS locale_en_us_noop;
 locale_en_us_noop
@@ -69,8 +82,14 @@ SELECT LENGTH(FORMAT(1, 99)) = 32   AS clamped_to_30;
 clamped_to_30
 1
 === Non-finite f64 → NULL ===
-SELECT FORMAT(0.0 / NULLIF(0, 0), 2) IS NULL AS nan_returns_null;
+SELECT FORMAT(CAST('NaN' AS DOUBLE PRECISION),       2) IS NULL AS nan_returns_null;
 nan_returns_null
+1
+SELECT FORMAT(CAST('Infinity' AS DOUBLE PRECISION),  2) IS NULL AS inf_returns_null;
+inf_returns_null
+1
+SELECT FORMAT(CAST('-Infinity' AS DOUBLE PRECISION), 2) IS NULL AS neg_inf_returns_null;
+neg_inf_returns_null
 1
 === NULL passthrough ===
 SELECT FORMAT(NULL, 2)        IS NULL AS null_n;
