@@ -1,0 +1,109 @@
+=== DATE_ADD value-coercive equality across DATE / TIMESTAMP ===
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY)
+     = TIMESTAMP '2024-03-16 00:00:00'                        AS adds_eq_ts_midnight;
+adds_eq_ts_midnight
+1
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY)
+     = DATE '2024-03-16'                                      AS adds_eq_date_value_coerce;
+adds_eq_date_value_coerce
+1
+SELECT EXTRACT(SECOND FROM DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY))
+                                                              AS seconds_is_0;
+seconds_is_0
+0
+=== ADDDATE(int, int) is INTEGER ARITHMETIC (parser quirk) ===
+SELECT ADDDATE(42, 1)                                         AS adddate_int_int_is_arith;
+adddate_int_int_is_arith
+43
+SELECT ADDDATE(42, 1) = 43                                    AS adddate_int_arith_eq_43;
+adddate_int_arith_eq_43
+1
+SELECT SUBDATE(42, 1) = 41                                    AS subdate_int_arith_eq_41;
+subdate_int_arith_eq_41
+1
+=== Wrong-type first arg with INTERVAL → ERROR (parser arithmetic path) ===
+SELECT DATE_ADD(42, INTERVAL 1 DAY);
+ERROR 1105: execution error: arithmetic op requires numbers
+SELECT DATE_SUB(42, INTERVAL 1 DAY);
+ERROR 1105: execution error: arithmetic op requires numbers
+SELECT DATE_SUB('not a date', INTERVAL 1 DAY);
+ERROR 1105: execution error: arithmetic op requires numbers
+SELECT ADDDATE('not a date', 1);
+ERROR 1105: execution error: cannot cast 'not a date' to TIMESTAMP: invalid timestamp: not a date
+=== DATE_ADD also accepts INT shorthand (parser arith rewrite) ===
+SELECT DATE_ADD(DATE '2024-03-15', 7)
+     = ADDDATE(DATE '2024-03-15', 7)                          AS date_add_int_eq_adddate;
+date_add_int_eq_adddate
+1
+SELECT DATE_SUB(DATE '2024-03-15', 7)
+     = SUBDATE(DATE '2024-03-15', 7)                          AS date_sub_int_eq_subdate;
+date_sub_int_eq_subdate
+1
+=== Wrong-type second arg → ERROR ===
+SELECT DATE_ADD(DATE '2024-03-15', '7');
+ERROR 1105: execution error: arithmetic op requires numbers
+SELECT ADDDATE(DATE '2024-03-15', '7');
+ERROR 1105: execution error: arithmetic op requires numbers
+=== ADDDATE/SUBDATE: Int64 day count overflow ===
+SELECT ADDDATE(DATE '2024-03-15', 3000000000);
+ERROR 1105: execution error: integer overflow in date arithmetic: 3000000000
+SELECT SUBDATE(DATE '2024-03-15', 3000000000);
+ERROR 1105: execution error: integer overflow in date arithmetic: 3000000000
+SELECT ADDDATE(DATE '2024-03-15', -3000000000);
+ERROR 1105: execution error: integer overflow in date arithmetic: -3000000000
+=== Unit-variant walk (YEAR/MONTH/WEEK/DAY/HOUR/MINUTE/SECOND) ===
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 YEAR)
+     = TIMESTAMP '2025-03-15 00:00:00'                        AS plus_1_year;
+plus_1_year
+1
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 MONTH)
+     = TIMESTAMP '2024-04-15 00:00:00'                        AS plus_1_month;
+plus_1_month
+1
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 WEEK)
+     = TIMESTAMP '2024-03-22 00:00:00'                        AS plus_1_week;
+plus_1_week
+1
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 1 HOUR)
+     = TIMESTAMP '2024-03-15 15:30:00'                        AS plus_1_hour;
+plus_1_hour
+1
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 30 MINUTE)
+     = TIMESTAMP '2024-03-15 15:00:00'                        AS plus_30_min;
+plus_30_min
+1
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 45 SECOND)
+     = TIMESTAMP '2024-03-15 14:30:45'                        AS plus_45_sec;
+plus_45_sec
+1
+=== Unit-variant GAPS: QUARTER + MICROSECOND parser-rejected ===
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 QUARTER);
+ERROR 1064: SQL parse error: unsupported interval field: QUARTER
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 1 MICROSECOND);
+ERROR 1064: SQL parse error: unsupported interval field: MICROSECOND
+=== Pre-1970 date arithmetic ===
+SELECT DATE_ADD(DATE '1900-01-01', INTERVAL 1 YEAR)
+     = TIMESTAMP '1901-01-01 00:00:00'                        AS pre_1970_plus_year;
+pre_1970_plus_year
+1
+SELECT DATE_SUB(DATE '1900-01-01', INTERVAL 1 DAY)
+     = TIMESTAMP '1899-12-31 00:00:00'                        AS pre_1970_year_boundary;
+pre_1970_year_boundary
+1
+SELECT DATE_ADD(DATE '1969-12-31', INTERVAL 2 DAY)
+     = TIMESTAMP '1970-01-02 00:00:00'                        AS crosses_epoch;
+crosses_epoch
+1
+=== Symmetry: DATE_ADD(d, INTERVAL -n) = DATE_SUB(d, INTERVAL n) ===
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL -7 DAY)
+     = DATE_SUB(DATE '2024-03-15', INTERVAL 7 DAY)            AS neg_interval_eq_sub;
+neg_interval_eq_sub
+1
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL -1 MONTH)
+     = DATE_SUB(DATE '2024-03-15', INTERVAL 1 MONTH)          AS neg_month_eq_sub;
+neg_month_eq_sub
+1
+SELECT ADDDATE(DATE '2024-03-15', -7)
+     = SUBDATE(DATE '2024-03-15', 7)                          AS adddate_neg_eq_subdate;
+adddate_neg_eq_subdate
+1
