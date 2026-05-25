@@ -21,6 +21,27 @@ SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 0))
        AS swap_zero_matches_default;
 swap_zero_matches_default
 1
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 2))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))
+       AS swap_two_truthy;
+swap_two_truthy
+1
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', TRUE))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))
+       AS swap_true_bool;
+swap_true_bool
+1
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', FALSE))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS swap_false_bool;
+swap_false_bool
+1
+=== UUID_TO_BIN: mixed-case hex input accepted ===
+SELECT HEX(UUID_TO_BIN('6CcD780c-BaBa-1026-9564-5B8c656024dB'))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS mixed_case_equiv;
+mixed_case_equiv
+1
 === UUID_TO_BIN: NULL passthrough ===
 SELECT UUID_TO_BIN(NULL)    IS NULL AS null_arg;
 null_arg

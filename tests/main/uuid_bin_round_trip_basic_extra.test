@@ -68,6 +68,27 @@ SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1)) AS swapped;
 SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 0))
      = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
        AS swap_zero_matches_default;
+# Truthy-non-1 must also swap — impl uses `*n != 0`, not `== 1`.
+# Pinning this guards against an over-tightened future check.
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 2))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))
+       AS swap_two_truthy;
+# Boolean swap_flag (TRUE = swap, FALSE = no-swap) — impl
+# explicitly handles Value::Bool.
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', TRUE))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))
+       AS swap_true_bool;
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', FALSE))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS swap_false_bool;
+
+--echo === UUID_TO_BIN: mixed-case hex input accepted ===
+
+# Impl strips dashes and calls u8::from_str_radix, which accepts
+# both cases. Lock in so a future case-strict variant breaks here.
+SELECT HEX(UUID_TO_BIN('6CcD780c-BaBa-1026-9564-5B8c656024dB'))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS mixed_case_equiv;
 
 --echo === UUID_TO_BIN: NULL passthrough ===
 
