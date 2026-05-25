@@ -86,12 +86,20 @@ SELECT POWER(2, 8)                       AS power_alias;
 
 SELECT POW(NULL, 2)        IS NULL       AS null_base;
 SELECT POW(2, NULL)        IS NULL       AS null_exp;
+SELECT POW(NULL, NULL)     IS NULL       AS null_both;
 --error 1105
 SELECT POW();
 --error 1105
 SELECT POW(2);
 --error 1105
 SELECT POW(2, 3, 4);
+
+--echo === POW: overflow → 1105 (check_float_overflow guard) ===
+
+# 10^1000 vastly exceeds f64::MAX (~1.8e308) → check_float_overflow
+# rejects. Pins the overflow guard.
+--error 1105
+SELECT POW(10, 1000);
 
 --echo === MOD: basic + sign behavior ===
 
@@ -131,10 +139,27 @@ SELECT SIGN(0.0)                         AS zero_dec;
 --echo === SIGN: NULL + arity ===
 
 SELECT SIGN(NULL) IS NULL                AS null_passes;
+# SIGN(NaN) preserves NaN per the impl's explicit branch
+# (lib.rs:46789-46790). Manufactured via CAST.
+SELECT SIGN(CAST('NaN' AS DOUBLE PRECISION))            AS sign_nan;
 --error 1105
 SELECT SIGN();
 --error 1105
 SELECT SIGN(1, 2);
+
+--echo === MOD: mixed Int32 / Int64 arms ===
+
+# Impl has explicit (Int32, Int64) and (Int64, Int32) cases
+# that coerce to Int64. Pin both directions.
+SELECT MOD(CAST(10 AS INT), CAST(3 AS BIGINT))  AS mod_i32_i64;
+SELECT MOD(CAST(10 AS BIGINT), CAST(3 AS INT))  AS mod_i64_i32;
+
+--echo === GREATEST / LEAST: mixed-type args ===
+
+# Mixed int + string: comparison goes through compare_values
+# which coerces.
+SELECT GREATEST(1, '2', 3)                              AS mixed_int_str;
+SELECT LEAST(1, '2', 3)                                 AS mixed_int_str_least;
 
 --echo === Determinism ===
 

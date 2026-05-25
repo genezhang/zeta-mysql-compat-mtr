@@ -88,12 +88,18 @@ null_base
 SELECT POW(2, NULL)        IS NULL       AS null_exp;
 null_exp
 1
+SELECT POW(NULL, NULL)     IS NULL       AS null_both;
+null_both
+1
 SELECT POW();
 ERROR 1105: execution error: POW requires 2 arguments
 SELECT POW(2);
 ERROR 1105: execution error: POW requires 2 arguments
 SELECT POW(2, 3, 4);
 ERROR 1105: execution error: POW requires 2 arguments
+=== POW: overflow → 1105 (check_float_overflow guard) ===
+SELECT POW(10, 1000);
+ERROR 1105: execution error: value out of range: overflow in POW
 === MOD: basic + sign behavior ===
 SELECT MOD(10, 3)                        AS basic;
 basic
@@ -149,10 +155,27 @@ zero_dec
 SELECT SIGN(NULL) IS NULL                AS null_passes;
 null_passes
 1
+SELECT SIGN(CAST('NaN' AS DOUBLE PRECISION))            AS sign_nan;
+sign_nan
+NaN
 SELECT SIGN();
 ERROR 1105: execution error: SIGN requires 1 argument
 SELECT SIGN(1, 2);
 ERROR 1105: execution error: SIGN requires 1 argument
+=== MOD: mixed Int32 / Int64 arms ===
+SELECT MOD(CAST(10 AS INT), CAST(3 AS BIGINT))  AS mod_i32_i64;
+mod_i32_i64
+1
+SELECT MOD(CAST(10 AS BIGINT), CAST(3 AS INT))  AS mod_i64_i32;
+mod_i64_i32
+1
+=== GREATEST / LEAST: mixed-type args ===
+SELECT GREATEST(1, '2', 3)                              AS mixed_int_str;
+mixed_int_str
+3
+SELECT LEAST(1, '2', 3)                                 AS mixed_int_str_least;
+mixed_int_str_least
+1
 === Determinism ===
 SELECT GREATEST(1,2) = GREATEST(1,2)     AS greatest_det;
 greatest_det
