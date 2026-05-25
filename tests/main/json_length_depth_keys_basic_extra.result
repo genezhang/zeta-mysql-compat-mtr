@@ -1,0 +1,154 @@
+=== JSON-null vs SQL-null asymmetry (LENGTH vs DEPTH) ===
+SELECT JSON_LENGTH('null') IS NULL           AS length_json_null_is_sql_null;
+length_json_null_is_sql_null
+1
+SELECT JSON_DEPTH('null')                    AS depth_json_null_is_1;
+depth_json_null_is_1
+1
+SELECT JSON_LENGTH(NULL)   IS NULL           AS length_sql_null;
+length_sql_null
+1
+SELECT JSON_DEPTH(NULL)    IS NULL           AS depth_sql_null;
+depth_sql_null
+1
+=== JSON_LENGTH on the full scalar matrix → 1 ===
+SELECT JSON_LENGTH('"hello"')                AS scalar_string_1;
+scalar_string_1
+1
+SELECT JSON_LENGTH('true')                   AS scalar_bool_true_1;
+scalar_bool_true_1
+1
+SELECT JSON_LENGTH('false')                  AS scalar_bool_false_1;
+scalar_bool_false_1
+1
+SELECT JSON_LENGTH('42')                     AS scalar_int_1;
+scalar_int_1
+1
+SELECT JSON_LENGTH('3.14')                   AS scalar_double_1;
+scalar_double_1
+1
+=== JSON_LENGTH on empty container → 0 ===
+SELECT JSON_LENGTH('[]')                     AS empty_array_0;
+empty_array_0
+0
+SELECT JSON_LENGTH('{}')                     AS empty_object_0;
+empty_object_0
+0
+=== JSON_LENGTH on container with one element → 1 ===
+SELECT JSON_LENGTH('[1]')                    AS one_elem_array;
+one_elem_array
+1
+SELECT JSON_LENGTH('{"a":1}')                AS one_key_object;
+one_key_object
+1
+SELECT JSON_LENGTH('{"a":[1,2,3,4,5]}')      AS object_one_complex_value;
+object_one_complex_value
+1
+=== JSON_DEPTH formula walk ===
+SELECT JSON_DEPTH('42')                      AS depth_scalar;
+depth_scalar
+1
+SELECT JSON_DEPTH('"x"')                     AS depth_string;
+depth_string
+1
+SELECT JSON_DEPTH('true')                    AS depth_bool;
+depth_bool
+1
+SELECT JSON_DEPTH('[]')                      AS depth_empty_array;
+depth_empty_array
+1
+SELECT JSON_DEPTH('{}')                      AS depth_empty_object;
+depth_empty_object
+1
+SELECT JSON_DEPTH('[1]')                     AS depth_arr_1;
+depth_arr_1
+2
+SELECT JSON_DEPTH('[[1]]')                   AS depth_arr_2;
+depth_arr_2
+3
+SELECT JSON_DEPTH('[[[1]]]')                 AS depth_arr_3;
+depth_arr_3
+4
+SELECT JSON_DEPTH('[[[[1]]]]')               AS depth_arr_4;
+depth_arr_4
+5
+SELECT JSON_DEPTH('{"a":1}')                 AS depth_obj_2;
+depth_obj_2
+2
+SELECT JSON_DEPTH('{"a":{"b":1}}')           AS depth_obj_3;
+depth_obj_3
+3
+=== JSON_DEPTH with mixed-shape nesting ===
+SELECT JSON_DEPTH('{"a":[1,2]}')             AS mixed_oa_3;
+mixed_oa_3
+3
+SELECT JSON_DEPTH('[{"a":1}]')               AS mixed_ao_3;
+mixed_ao_3
+3
+SELECT JSON_DEPTH('{"a":[{"b":[1,2]}]}')     AS mixed_oaoa_5;
+mixed_oaoa_5
+5
+SELECT JSON_DEPTH('{"a":1, "b":[1,[2]]}')    AS depth_max_over_siblings;
+depth_max_over_siblings
+4
+=== JSON_KEYS empty-object → empty JSON ARRAY (not SQL NULL) ===
+SELECT JSON_KEYS('{}')                       AS empty_obj_keys;
+empty_obj_keys
+[]
+SELECT JSON_LENGTH(JSON_KEYS('{}'))          AS empty_obj_keys_len_0;
+empty_obj_keys_len_0
+0
+SELECT JSON_KEYS('{}') IS NULL               AS empty_obj_keys_not_null;
+empty_obj_keys_not_null
+0
+=== JSON_KEYS sort order — alphabetic (zeta-jsonb binary) ===
+SELECT JSON_KEYS('{"z":1,"a":2,"m":3}')      AS sorted_alpha;
+sorted_alpha
+["a","m","z"]
+SELECT JSON_KEYS('{"banana":1,"apple":2,"cherry":3}')
+                                              AS sorted_alpha_words;
+sorted_alpha_words
+["apple","banana","cherry"]
+SELECT JSON_KEYS('{"2":1,"1":2,"10":3}')     AS sorted_alpha_numeric_keys;
+sorted_alpha_numeric_keys
+["1","10","2"]
+=== JSON_KEYS on non-object root → SQL NULL ===
+SELECT JSON_KEYS('[1,2,3]')   IS NULL        AS array_root_null;
+array_root_null
+1
+SELECT JSON_KEYS('"hello"')   IS NULL        AS scalar_string_null;
+scalar_string_null
+1
+SELECT JSON_KEYS('42')        IS NULL        AS scalar_int_null;
+scalar_int_null
+1
+SELECT JSON_KEYS('null')      IS NULL        AS json_null_null;
+json_null_null
+1
+=== Invalid JSON → ERROR (zeta strict; MySQL NULLs) ===
+SELECT JSON_LENGTH('not json');
+ERROR 1105: execution error: JSON_LENGTH first argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_DEPTH('not json');
+ERROR 1105: execution error: JSON_DEPTH first argument is not valid JSON: JSONB error: expected 'null' at position 1
+SELECT JSON_KEYS('not json');
+ERROR 1105: execution error: JSON_KEYS first argument is not valid JSON: JSONB error: expected 'null' at position 1
+=== Arity errors ===
+SELECT JSON_LENGTH();
+ERROR 1105: execution error: JSON_LENGTH requires 1 argument
+SELECT JSON_DEPTH();
+ERROR 1105: execution error: JSON_DEPTH requires 1 argument
+SELECT JSON_DEPTH('{"a":1}', '$.a');
+ERROR 1105: execution error: JSON_DEPTH requires 1 argument
+=== Determinism ===
+SELECT JSON_LENGTH('{"a":1,"b":2}')
+     = JSON_LENGTH('{"a":1,"b":2}')          AS length_det;
+length_det
+1
+SELECT JSON_DEPTH('{"a":[1,2]}')
+     = JSON_DEPTH('{"a":[1,2]}')             AS depth_det;
+depth_det
+1
+SELECT JSON_KEYS('{"a":1,"b":2}')
+     = JSON_KEYS('{"a":1,"b":2}')            AS keys_det;
+keys_det
+1
