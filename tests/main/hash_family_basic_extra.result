@@ -18,6 +18,26 @@ md5_len
 SELECT MD5('zeta') = LOWER(MD5('zeta'))       AS md5_lowercase;
 md5_lowercase
 1
+=== Binary input via UNHEX (exercises Value::Bytes arm) ===
+SELECT MD5(UNHEX('DEADBEEF'))           AS md5_unhex;
+md5_unhex
+2f249230a8e7c2bf6005ccd2679259ec
+SELECT SHA1(UNHEX('DEADBEEF'))          AS sha1_unhex;
+sha1_unhex
+d78f8bb992a56a597f6c7a1fb918bb78271367eb
+SELECT SHA2(UNHEX('DEADBEEF'), 256)     AS sha256_unhex;
+sha256_unhex
+5f78c33274e43fa9de5659265c1d917e25c03722dcb0b8d27db8d5feaa813953
+=== Multi-byte UTF-8 input ===
+SELECT MD5('café') <> MD5('cafe')       AS md5_utf8_distinct;
+md5_utf8_distinct
+1
+SELECT SHA1('café') <> SHA1('cafe')     AS sha1_utf8_distinct;
+sha1_utf8_distinct
+1
+SELECT SHA2('café', 256) <> SHA2('cafe', 256) AS sha256_utf8_distinct;
+sha256_utf8_distinct
+1
 === SHA1 / SHA: known vector + alias parity ===
 SELECT SHA1('abc')         AS sha1_abc;
 sha1_abc
@@ -88,6 +108,16 @@ sha2_null_str
 1
 SELECT SHA2('zeta', NULL) IS NULL AS sha2_null_bits;
 sha2_null_bits
+1
+SELECT SHA2(NULL, NULL) IS NULL AS sha2_null_both;
+sha2_null_both
+1
+=== SHA2: non-integer bits coerces to NULL (not error) ===
+SELECT SHA2('zeta', 256.0) IS NULL AS sha2_float_bits_null;
+sha2_float_bits_null
+1
+SELECT SHA2('zeta', 'abc') IS NULL AS sha2_string_bits_null;
+sha2_string_bits_null
 1
 === Determinism: same input → same output ===
 SELECT MD5('repeat') = MD5('repeat')       AS md5_det;

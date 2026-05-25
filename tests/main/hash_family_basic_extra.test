@@ -19,8 +19,8 @@
 #     the engine's known empty-string digest (e.g. MD5('') =
 #     d41d8cd98f00b204e9800998ecf8427e). Tested here.
 #   # zeta-adapt: NULL → NULL on all three (matches MySQL).
-#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Same
-#     direction (rejects).
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). The error
+#     codes differ; the behavior (reject) matches.
 
 --echo === MD5: known vectors ===
 
@@ -35,6 +35,22 @@ SELECT MD5('The quick brown fox jumps over the lazy dog') AS md5_pangram;
 
 SELECT LENGTH(MD5('zeta'))               = 32 AS md5_len;
 SELECT MD5('zeta') = LOWER(MD5('zeta'))       AS md5_lowercase;
+
+--echo === Binary input via UNHEX (exercises Value::Bytes arm) ===
+
+# Non-UTF-8 bytes — the impl's `Value::Bytes => b` branch must
+# hash the raw bytes, not error or stringify.
+SELECT MD5(UNHEX('DEADBEEF'))           AS md5_unhex;
+SELECT SHA1(UNHEX('DEADBEEF'))          AS sha1_unhex;
+SELECT SHA2(UNHEX('DEADBEEF'), 256)     AS sha256_unhex;
+
+--echo === Multi-byte UTF-8 input ===
+
+# Hash operates on UTF-8 bytes. 'café' is 5 bytes (c,a,f,0xC3,0xA9);
+# the digest should differ from 'cafe' (4 ASCII bytes).
+SELECT MD5('café') <> MD5('cafe')       AS md5_utf8_distinct;
+SELECT SHA1('café') <> SHA1('cafe')     AS sha1_utf8_distinct;
+SELECT SHA2('café', 256) <> SHA2('cafe', 256) AS sha256_utf8_distinct;
 
 --echo === SHA1 / SHA: known vector + alias parity ===
 
@@ -76,6 +92,18 @@ SELECT SHA1(NULL)    IS NULL AS sha1_null;
 SELECT SHA(NULL)     IS NULL AS sha_null;
 SELECT SHA2(NULL, 256) IS NULL AS sha2_null_str;
 SELECT SHA2('zeta', NULL) IS NULL AS sha2_null_bits;
+# Both NULL — pins short-circuit ordering (str-arg NULL check
+# fires first per the impl; result is NULL either way but the
+# code path matters for future divergence).
+SELECT SHA2(NULL, NULL) IS NULL AS sha2_null_both;
+
+--echo === SHA2: non-integer bits coerces to NULL (not error) ===
+
+# Impl's match arm: Int32/Int64 → use; Null → return NULL;
+# `_` → return NULL. Pinning float here so a future tightening
+# (e.g. erroring on float bits) breaks visibly.
+SELECT SHA2('zeta', 256.0) IS NULL AS sha2_float_bits_null;
+SELECT SHA2('zeta', 'abc') IS NULL AS sha2_string_bits_null;
 
 --echo === Determinism: same input → same output ===
 
