@@ -1,0 +1,152 @@
+# Independently authored INSTR / LOCATE / POSITION smoke for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. All three substring-find functions are
+# implemented in zeta but had no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   POSITION(needle IN haystack)       — 1-based char index, 0 if
+#                                        not found, NULL on NULL.
+#   INSTR(haystack, needle)            — same semantics, arg order
+#                                        reversed (haystack first).
+#   LOCATE(needle, haystack)           — same semantics as POSITION
+#                                        but comma-separated args.
+#   LOCATE(needle, haystack, start)    — start search at `start`
+#                                        (1-based). start < 1 → 0.
+#
+# Three-way arg-order matrix:
+#   POSITION('b' IN 'abc')   = 2
+#   INSTR('abc', 'b')        = 2
+#   LOCATE('b', 'abc')       = 2
+#
+# Adaptation notes:
+#   # zeta-adapt: All three are character-position (1-based, NOT
+#     byte-position). Multi-byte UTF-8 returns char-count math.
+#   # zeta-adapt: Empty-needle semantics DIVERGE between POSITION
+#     and INSTR/LOCATE in zeta (real internal inconsistency worth
+#     locking in for future cleanup):
+#       POSITION('' IN 'abc')  = 1   (find on non-empty hay)
+#       POSITION('' IN '')     = 0   (no explicit empty special-case
+#                                     in the impl; char_indices() of
+#                                     empty yields nothing)
+#       INSTR('abc', '')       = 1   (explicit `if nee.is_empty()`)
+#       INSTR('', '')          = 1   (same special case)
+#       LOCATE('', 'abc')      = 1
+#     MySQL returns 1 for all of these — POSITION('' IN '') = 0 is
+#     the zeta-specific divergence.
+#   # zeta-adapt: LOCATE with `start < 1` returns 0 (per MySQL
+#     docs; zeta does NOT clamp).
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === POSITION: basic 1-based search ===
+
+SELECT POSITION('b' IN 'abc')            AS hit_middle;
+SELECT POSITION('a' IN 'abc')            AS hit_first;
+SELECT POSITION('c' IN 'abc')            AS hit_last;
+SELECT POSITION('z' IN 'abc')            AS miss;
+SELECT POSITION('hello' IN 'say hello world') AS multi_char;
+
+--echo === POSITION: empty needle / haystack ===
+
+# Empty needle: position 1 in any haystack (including empty).
+SELECT POSITION('' IN 'abc')             AS empty_needle;
+SELECT POSITION('' IN '')                AS empty_both;
+# Empty haystack with non-empty needle → 0.
+SELECT POSITION('a' IN '')               AS empty_hay;
+
+--echo === POSITION: NULL on either side → NULL ===
+
+SELECT POSITION(NULL IN 'abc') IS NULL   AS null_needle;
+SELECT POSITION('a' IN NULL)   IS NULL   AS null_hay;
+
+--echo === INSTR: arg-order parity with POSITION ===
+
+SELECT INSTR('abc', 'b')                 AS hit_middle;
+SELECT INSTR('abc', 'a')                 AS hit_first;
+SELECT INSTR('abc', 'c')                 AS hit_last;
+SELECT INSTR('abc', 'z')                 AS miss;
+# Cross-check: INSTR and POSITION agree on every example.
+SELECT INSTR('say hello world', 'hello') = POSITION('hello' IN 'say hello world')
+       AS instr_position_parity;
+
+--echo === INSTR: empty needle → 1 (matches at start) ===
+
+SELECT INSTR('abc', '')                  AS empty_needle;
+SELECT INSTR('', '')                     AS empty_both;
+SELECT INSTR('', 'a')                    AS empty_hay;
+
+--echo === INSTR: NULL → NULL ===
+
+SELECT INSTR(NULL, 'a') IS NULL          AS null_hay;
+SELECT INSTR('abc', NULL) IS NULL        AS null_needle;
+
+--echo === LOCATE: 2-arg form (POSITION-equivalent) ===
+
+SELECT LOCATE('b', 'abc')                AS hit_middle;
+SELECT LOCATE('a', 'abc')                AS hit_first;
+SELECT LOCATE('z', 'abc')                AS miss;
+# Three-way parity: POSITION, INSTR, LOCATE all agree.
+SELECT LOCATE('b', 'abc') = INSTR('abc', 'b')
+   AND LOCATE('b', 'abc') = POSITION('b' IN 'abc')
+       AS three_way_parity;
+
+--echo === LOCATE: 3-arg form (start offset) ===
+
+# 'abcabc' has 'b' at positions 2 and 5. Starting at 3, the
+# first hit is at position 5.
+SELECT LOCATE('b', 'abcabc', 3)          AS start_skips_first;
+SELECT LOCATE('b', 'abcabc', 1)          AS start_at_1_finds_first;
+# Start beyond end of haystack with non-empty needle → 0.
+SELECT LOCATE('a', 'abc', 99)            AS start_past_end;
+
+--echo === LOCATE: 3-arg empty needle behavior ===
+
+# Empty needle + start in-range → start position.
+SELECT LOCATE('', 'abc', 2)              AS empty_needle_start_2;
+SELECT LOCATE('', 'abc', 4)              AS empty_needle_start_strlen_plus_one;
+# Empty needle + start past end → 0.
+SELECT LOCATE('', 'abc', 5)              AS empty_needle_past_end;
+
+--echo === LOCATE: start < 1 returns 0 (MySQL docs) ===
+
+SELECT LOCATE('a', 'abc', 0)             AS start_zero;
+SELECT LOCATE('a', 'abc', -5)            AS start_negative;
+
+--echo === LOCATE: NULL on any arg → NULL ===
+
+SELECT LOCATE(NULL, 'abc') IS NULL       AS null_needle;
+SELECT LOCATE('a', NULL)   IS NULL       AS null_hay;
+SELECT LOCATE('a', 'abc', NULL) IS NULL  AS null_start;
+
+--echo === Multi-byte UTF-8 char position (not byte position) ===
+
+# 'café' is 4 chars / 5 bytes. 'é' is at char position 4 (byte
+# offset 3 because 'c','a','f' are 1 byte each).
+SELECT POSITION('é' IN 'café')           AS pos_utf8;
+SELECT INSTR('café', 'é')                AS instr_utf8;
+SELECT LOCATE('é', 'café')               AS locate_utf8;
+# After-multibyte indexing: in 'caféx', 'x' is at char position 5.
+SELECT POSITION('x' IN 'caféx')          AS pos_after_utf8;
+SELECT INSTR('caféx', 'x')               AS instr_after_utf8;
+SELECT LOCATE('x', 'caféx')              AS locate_after_utf8;
+
+--echo === Determinism ===
+
+SELECT POSITION('a' IN 'abc') = POSITION('a' IN 'abc') AS pos_det;
+SELECT INSTR('abc', 'a')      = INSTR('abc', 'a')      AS instr_det;
+SELECT LOCATE('a', 'abc')     = LOCATE('a', 'abc')     AS locate_det;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT INSTR();
+--error 1105
+SELECT INSTR('abc');
+--error 1105
+SELECT INSTR('abc', 'b', 'extra');
+--error 1105
+SELECT LOCATE();
+--error 1105
+SELECT LOCATE('a');
+--error 1105
+SELECT LOCATE('a', 'abc', 1, 'extra');

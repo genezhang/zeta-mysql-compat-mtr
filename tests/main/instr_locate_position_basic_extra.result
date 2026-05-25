@@ -1,0 +1,161 @@
+=== POSITION: basic 1-based search ===
+SELECT POSITION('b' IN 'abc')            AS hit_middle;
+hit_middle
+2
+SELECT POSITION('a' IN 'abc')            AS hit_first;
+hit_first
+1
+SELECT POSITION('c' IN 'abc')            AS hit_last;
+hit_last
+3
+SELECT POSITION('z' IN 'abc')            AS miss;
+miss
+0
+SELECT POSITION('hello' IN 'say hello world') AS multi_char;
+multi_char
+5
+=== POSITION: empty needle / haystack ===
+SELECT POSITION('' IN 'abc')             AS empty_needle;
+empty_needle
+1
+SELECT POSITION('' IN '')                AS empty_both;
+empty_both
+0
+SELECT POSITION('a' IN '')               AS empty_hay;
+empty_hay
+0
+=== POSITION: NULL on either side → NULL ===
+SELECT POSITION(NULL IN 'abc') IS NULL   AS null_needle;
+null_needle
+1
+SELECT POSITION('a' IN NULL)   IS NULL   AS null_hay;
+null_hay
+1
+=== INSTR: arg-order parity with POSITION ===
+SELECT INSTR('abc', 'b')                 AS hit_middle;
+hit_middle
+2
+SELECT INSTR('abc', 'a')                 AS hit_first;
+hit_first
+1
+SELECT INSTR('abc', 'c')                 AS hit_last;
+hit_last
+3
+SELECT INSTR('abc', 'z')                 AS miss;
+miss
+0
+SELECT INSTR('say hello world', 'hello') = POSITION('hello' IN 'say hello world')
+       AS instr_position_parity;
+instr_position_parity
+1
+=== INSTR: empty needle → 1 (matches at start) ===
+SELECT INSTR('abc', '')                  AS empty_needle;
+empty_needle
+1
+SELECT INSTR('', '')                     AS empty_both;
+empty_both
+1
+SELECT INSTR('', 'a')                    AS empty_hay;
+empty_hay
+0
+=== INSTR: NULL → NULL ===
+SELECT INSTR(NULL, 'a') IS NULL          AS null_hay;
+null_hay
+1
+SELECT INSTR('abc', NULL) IS NULL        AS null_needle;
+null_needle
+1
+=== LOCATE: 2-arg form (POSITION-equivalent) ===
+SELECT LOCATE('b', 'abc')                AS hit_middle;
+hit_middle
+2
+SELECT LOCATE('a', 'abc')                AS hit_first;
+hit_first
+1
+SELECT LOCATE('z', 'abc')                AS miss;
+miss
+0
+SELECT LOCATE('b', 'abc') = INSTR('abc', 'b')
+   AND LOCATE('b', 'abc') = POSITION('b' IN 'abc')
+       AS three_way_parity;
+three_way_parity
+1
+=== LOCATE: 3-arg form (start offset) ===
+SELECT LOCATE('b', 'abcabc', 3)          AS start_skips_first;
+start_skips_first
+5
+SELECT LOCATE('b', 'abcabc', 1)          AS start_at_1_finds_first;
+start_at_1_finds_first
+2
+SELECT LOCATE('a', 'abc', 99)            AS start_past_end;
+start_past_end
+0
+=== LOCATE: 3-arg empty needle behavior ===
+SELECT LOCATE('', 'abc', 2)              AS empty_needle_start_2;
+empty_needle_start_2
+2
+SELECT LOCATE('', 'abc', 4)              AS empty_needle_start_strlen_plus_one;
+empty_needle_start_strlen_plus_one
+4
+SELECT LOCATE('', 'abc', 5)              AS empty_needle_past_end;
+empty_needle_past_end
+0
+=== LOCATE: start < 1 returns 0 (MySQL docs) ===
+SELECT LOCATE('a', 'abc', 0)             AS start_zero;
+start_zero
+0
+SELECT LOCATE('a', 'abc', -5)            AS start_negative;
+start_negative
+0
+=== LOCATE: NULL on any arg → NULL ===
+SELECT LOCATE(NULL, 'abc') IS NULL       AS null_needle;
+null_needle
+1
+SELECT LOCATE('a', NULL)   IS NULL       AS null_hay;
+null_hay
+1
+SELECT LOCATE('a', 'abc', NULL) IS NULL  AS null_start;
+null_start
+1
+=== Multi-byte UTF-8 char position (not byte position) ===
+SELECT POSITION('é' IN 'café')           AS pos_utf8;
+pos_utf8
+4
+SELECT INSTR('café', 'é')                AS instr_utf8;
+instr_utf8
+4
+SELECT LOCATE('é', 'café')               AS locate_utf8;
+locate_utf8
+4
+SELECT POSITION('x' IN 'caféx')          AS pos_after_utf8;
+pos_after_utf8
+5
+SELECT INSTR('caféx', 'x')               AS instr_after_utf8;
+instr_after_utf8
+5
+SELECT LOCATE('x', 'caféx')              AS locate_after_utf8;
+locate_after_utf8
+5
+=== Determinism ===
+SELECT POSITION('a' IN 'abc') = POSITION('a' IN 'abc') AS pos_det;
+pos_det
+1
+SELECT INSTR('abc', 'a')      = INSTR('abc', 'a')      AS instr_det;
+instr_det
+1
+SELECT LOCATE('a', 'abc')     = LOCATE('a', 'abc')     AS locate_det;
+locate_det
+1
+=== Arity errors ===
+SELECT INSTR();
+ERROR 1105: execution error: INSTR requires 2 arguments (haystack, needle)
+SELECT INSTR('abc');
+ERROR 1105: execution error: INSTR requires 2 arguments (haystack, needle)
+SELECT INSTR('abc', 'b', 'extra');
+ERROR 1105: execution error: INSTR requires 2 arguments (haystack, needle)
+SELECT LOCATE();
+ERROR 1105: execution error: LOCATE requires 2 or 3 arguments (needle, haystack [, start])
+SELECT LOCATE('a');
+ERROR 1105: execution error: LOCATE requires 2 or 3 arguments (needle, haystack [, start])
+SELECT LOCATE('a', 'abc', 1, 'extra');
+ERROR 1105: execution error: LOCATE requires 2 or 3 arguments (needle, haystack [, start])
