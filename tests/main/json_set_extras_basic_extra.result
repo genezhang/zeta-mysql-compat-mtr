@@ -27,13 +27,17 @@ deep_create_leaf
 SELECT JSON_DEPTH(JSON_SET('{}', '$.a.b.c', 1))               AS deep_create_depth;
 deep_create_depth
 4
-SELECT JSON_EXTRACT(JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x.y')
-                                                              AS partial_create_leaf;
-partial_create_leaf
-9
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a'))
+                                                              AS deep_create_a_is_object;
+deep_create_a_is_object
+OBJECT
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a.b'))
+                                                              AS deep_create_ab_is_object;
+deep_create_ab_is_object
+OBJECT
 SELECT JSON_LENGTH(JSON_EXTRACT(
-  JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x'))              AS partial_create_x_len;
-partial_create_x_len
+  JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x'))              AS partial_create_sibling_preserved;
+partial_create_sibling_preserved
 2
 === Multi-pair chain: later pairs see earlier mutations ===
 SELECT JSON_EXTRACT(
@@ -41,11 +45,17 @@ SELECT JSON_EXTRACT(
 chain_same_path_last_wins
 3
 SELECT JSON_EXTRACT(
-  JSON_SET('{}', '$.outer', CAST('{}' AS JSONB),
+  JSON_SET('{}', '$.outer', 'scalar',
                   '$.outer.inner', 42),
-  '$.outer.inner')                                            AS chain_create_then_set;
-chain_create_then_set
-42
+  '$.outer.inner')                                            AS chain_scalar_then_nested_set;
+chain_scalar_then_nested_set
+NULL
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_SET('{}', '$.outer', 'scalar',
+                  '$.outer.inner', 42),
+  '$.outer'))                                                 AS chain_scalar_then_nested_outer_type;
+chain_scalar_then_nested_outer_type
+STRING
 === Root path '$' replaces target entirely ===
 SELECT JSON_TYPE(JSON_SET('{"a":1}', '$', 42))                AS root_replace_with_int;
 root_replace_with_int

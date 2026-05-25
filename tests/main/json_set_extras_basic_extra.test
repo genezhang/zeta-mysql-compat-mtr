@@ -74,27 +74,44 @@ SELECT JSON_SET(TRUE, '$.a', 1);
 SELECT JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a.b.c')
                                                               AS deep_create_leaf;
 # JSON_DEPTH proves the spine was created: root → a → b → c
-# = depth 4.
+# = depth 4. Companion JSON_TYPE rows pin that the
+# intermediates are OBJECT, NOT array — guards the spine
+# claim against JSON_DEPTH semantics drift.
 SELECT JSON_DEPTH(JSON_SET('{}', '$.a.b.c', 1))               AS deep_create_depth;
-# Sibling-key version: set $.x.y when $.x already exists. The
-# 'y' key is auto-created under the existing 'x'.
-SELECT JSON_EXTRACT(JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x.y')
-                                                              AS partial_create_leaf;
-# Length of x after partial create: original 'z' + new 'y' = 2.
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a'))
+                                                              AS deep_create_a_is_object;
+SELECT JSON_TYPE(JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a.b'))
+                                                              AS deep_create_ab_is_object;
+# Sibling-preservation: set $.x.y when $.x already exists with
+# its own key 'z'. The 'y' key is added without clobbering 'z'.
+# (Existing slice already pins leaf creation at
+# set_nested_missing; this row pins SIBLING preservation
+# specifically.)
 SELECT JSON_LENGTH(JSON_EXTRACT(
-  JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x'))              AS partial_create_x_len;
+  JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x'))              AS partial_create_sibling_preserved;
 
 --echo === Multi-pair chain: later pairs see earlier mutations ===
 
 # Same path twice — second write wins (LAST WINS semantics).
 SELECT JSON_EXTRACT(
   JSON_SET('{"a":1}', '$.a', 2, '$.a', 3), '$.a')             AS chain_same_path_last_wins;
-# First pair creates a nested object; second pair sets a key
-# inside the newly-created object. Both succeed in one call.
+# Sharper "later sees earlier" differential. First pair sets
+# $.outer to a SCALAR. Second pair sets $.outer.inner=42.
+# Whatever the impl does (overwrite scalar with object,
+# silently no-op, error, etc.), the recording pins the actual
+# multi-pair-chain behavior. This row is meaningful for the
+# "chained" claim in a way the previous version was not: under
+# "fresh target each pair" semantics the answer would always
+# be 42, irrespective of pair 1.
 SELECT JSON_EXTRACT(
-  JSON_SET('{}', '$.outer', CAST('{}' AS JSONB),
+  JSON_SET('{}', '$.outer', 'scalar',
                   '$.outer.inner', 42),
-  '$.outer.inner')                                            AS chain_create_then_set;
+  '$.outer.inner')                                            AS chain_scalar_then_nested_set;
+# Companion: what's $.outer after the chained pair?
+SELECT JSON_TYPE(JSON_EXTRACT(
+  JSON_SET('{}', '$.outer', 'scalar',
+                  '$.outer.inner', 42),
+  '$.outer'))                                                 AS chain_scalar_then_nested_outer_type;
 
 --echo === Root path '$' replaces target entirely ===
 
