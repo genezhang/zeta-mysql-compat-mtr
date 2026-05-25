@@ -1,0 +1,119 @@
+# Independently authored SOUNDEX smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+# SOUNDEX is implemented in zeta but had no compat-mtr coverage
+# yet.
+#
+# Big-picture finding:
+#   SOUNDEX(s) — American Soundex phonetic code, MySQL flavor:
+#     - First letter uppercased + 3 digits (always padded with
+#       trailing '0' to length 4).
+#     - Digit map: BFPV=1, CGJKQSXZ=2, DT=3, L=4, MN=5, R=6.
+#     - Vowels (AEIOUY) reset the "last code" so a same-code
+#       letter on the other side gets emitted (separator effect).
+#     - H/W are completely ignored (NOT separators).
+#     - Adjacent same-code letters collapse.
+#     - Non-ASCII-alphabetic chars are skipped before the
+#       algorithm starts.
+#     - Empty input (or no ASCII letters) → empty string (NOT
+#       NULL).
+#     - NULL → NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta uses ASCII-only Soundex (matches MySQL
+#     and SQL Server). 'É'-style accented letters are silently
+#     skipped rather than folded — pinned by the non-ASCII test.
+#   # zeta-adapt: zeta returns empty string for inputs with no
+#     ASCII letters. MySQL behavior is the same.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). The error
+#     codes differ; the behavior (reject) matches.
+
+--echo === Classic phonetic vectors ===
+
+# Standard textbook Soundex examples — these values are stable
+# across every American-Soundex implementation (NARA, PostgreSQL,
+# MySQL, SQL Server).
+SELECT SOUNDEX('Robert')   AS r163;
+SELECT SOUNDEX('Rupert')   AS r163_alt;
+SELECT SOUNDEX('Rubin')    AS r150;
+SELECT SOUNDEX('Ashcraft') AS a261;
+SELECT SOUNDEX('Tymczak')  AS t522;
+
+--echo === H/W are silently skipped (NOT separators) ===
+
+# Honeyman: H is dropped entirely → H555 (H,_,N,_,M,_,N).
+# Actually: H + (o-vowel) + N(5) + (e-vowel) + Y-vowel + M(5) + A-vowel + N(5)
+# So result is H555. If H were a separator the same-code
+# collapsing rule for 5s would NOT apply.
+SELECT SOUNDEX('Honeyman') AS honeyman;
+# Wright: W is dropped entirely → W623 (W,_,R,_,I,GH→G→2,H,T)
+# Actually W+R(6)+I+G(2)+H(skip)+T(3) → W623.
+SELECT SOUNDEX('Wright')   AS wright;
+
+--echo === Padding to length 4 ===
+
+# Single-letter input → letter + 000.
+SELECT SOUNDEX('A')          AS single_a;
+SELECT SOUNDEX('B')          AS single_b;
+# Three-letter input where the algorithm yields < 4 chars.
+SELECT SOUNDEX('Lee')        AS lee;
+# Length must always be exactly 4 for any non-empty alpha input.
+SELECT LENGTH(SOUNDEX('A'))             = 4 AS pad_len_a;
+SELECT LENGTH(SOUNDEX('Lee'))           = 4 AS pad_len_lee;
+SELECT LENGTH(SOUNDEX('Robert'))        = 4 AS pad_len_robert;
+SELECT LENGTH(SOUNDEX('Ashcraft'))      = 4 AS pad_len_ashcraft;
+
+--echo === Vowel separation: lets adjacent same-code through ===
+
+# Without the vowel reset, the second 'B' (code 1) would be
+# suppressed as a same-code-as-prior. The 'a' in between resets
+# the state, so the output has two 1s.
+SELECT SOUNDEX('Baba')   AS baba;
+SELECT SOUNDEX('Bob')    AS bob;
+
+--echo === Truncation to 4 chars ===
+
+# Very long input: still exactly 4 chars output.
+SELECT SOUNDEX('Pfister') AS pfister;
+SELECT LENGTH(SOUNDEX('PfizerJohnson')) = 4 AS long_input_trunc;
+
+--echo === Empty / no-letter input → empty string (NOT NULL) ===
+
+SELECT SOUNDEX('')          AS empty_str;
+SELECT SOUNDEX('12345')     AS digits_only;
+SELECT SOUNDEX('!!!')       AS symbols_only;
+SELECT SOUNDEX('') IS NULL          AS empty_not_null;
+SELECT LENGTH(SOUNDEX('12345')) = 0 AS digits_zero_len;
+
+--echo === Non-ASCII letters skipped (NOT folded) ===
+
+# 'É' is non-ASCII; algorithm skips it. With the only letters
+# being 'É' + 'a' + 'B', the first ASCII letter is 'a',
+# remainder is 'B' → A100.
+SELECT SOUNDEX('ÉaB')       AS non_ascii_skipped;
+
+--echo === Case-insensitive ===
+
+SELECT SOUNDEX('ROBERT')    = SOUNDEX('robert') AS case_invariant;
+SELECT SOUNDEX('RoBeRt')    = SOUNDEX('Robert') AS mixed_case;
+
+--echo === NULL passthrough ===
+
+SELECT SOUNDEX(NULL) IS NULL AS null_passes;
+
+--echo === Numeric coercion ===
+
+# Non-string input is stringified first; '1' has no ASCII letters
+# so result is empty string.
+SELECT SOUNDEX(123)         AS numeric_in;
+
+--echo === Determinism ===
+
+SELECT SOUNDEX('repeat') = SOUNDEX('repeat') AS deterministic;
+SELECT SOUNDEX('a') <> SOUNDEX('z')          AS distinct_inputs;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT SOUNDEX();
+--error 1105
+SELECT SOUNDEX('a', 'b');
