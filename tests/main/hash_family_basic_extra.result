@@ -1,0 +1,129 @@
+=== MD5: known vectors ===
+SELECT MD5('')             AS md5_empty;
+md5_empty
+d41d8cd98f00b204e9800998ecf8427e
+SELECT MD5('a')            AS md5_a;
+md5_a
+0cc175b9c0f1b6a831c399e269772661
+SELECT MD5('abc')           AS md5_abc;
+md5_abc
+900150983cd24fb0d6963f7d28e17f72
+SELECT MD5('The quick brown fox jumps over the lazy dog') AS md5_pangram;
+md5_pangram
+9e107d9d372bb6826bd81d3542a419d6
+=== MD5: output shape (32 lowercase hex chars) ===
+SELECT LENGTH(MD5('zeta'))               = 32 AS md5_len;
+md5_len
+1
+SELECT MD5('zeta') = LOWER(MD5('zeta'))       AS md5_lowercase;
+md5_lowercase
+1
+=== SHA1 / SHA: known vector + alias parity ===
+SELECT SHA1('abc')         AS sha1_abc;
+sha1_abc
+a9993e364706816aba3e25717850c26c9cd0d89d
+SELECT SHA('abc')          AS sha_abc_alias;
+sha_abc_alias
+a9993e364706816aba3e25717850c26c9cd0d89d
+SELECT SHA1('abc') = SHA('abc') AS sha_is_sha1_alias;
+sha_is_sha1_alias
+1
+SELECT SHA1('')            AS sha1_empty;
+sha1_empty
+da39a3ee5e6b4b0d3255bfef95601890afd80709
+SELECT LENGTH(SHA1('zeta')) = 40 AS sha1_len;
+sha1_len
+1
+=== SHA2: bit-width matrix + lengths ===
+SELECT SHA2('', 224) AS sha224_empty;
+sha224_empty
+d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f
+SELECT SHA2('', 256) AS sha256_empty;
+sha256_empty
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+SELECT SHA2('', 384) AS sha384_empty;
+sha384_empty
+38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b
+SELECT SHA2('', 512) AS sha512_empty;
+sha512_empty
+cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e
+SELECT LENGTH(SHA2('zeta', 224)) = 56  AS sha224_len;
+sha224_len
+1
+SELECT LENGTH(SHA2('zeta', 256)) = 64  AS sha256_len;
+sha256_len
+1
+SELECT LENGTH(SHA2('zeta', 384)) = 96  AS sha384_len;
+sha384_len
+1
+SELECT LENGTH(SHA2('zeta', 512)) = 128 AS sha512_len;
+sha512_len
+1
+=== SHA2: 0 means 256 (MySQL convention) ===
+SELECT SHA2('zeta', 0) = SHA2('zeta', 256) AS zero_is_256;
+zero_is_256
+1
+=== SHA2: invalid bit-width → NULL (not error) ===
+SELECT SHA2('zeta', 100) IS NULL AS bad_bits;
+bad_bits
+1
+SELECT SHA2('zeta', -1)  IS NULL AS neg_bits;
+neg_bits
+1
+SELECT SHA2('zeta', 257) IS NULL AS off_by_one;
+off_by_one
+1
+=== NULL passthrough on all three ===
+SELECT MD5(NULL)     IS NULL AS md5_null;
+md5_null
+1
+SELECT SHA1(NULL)    IS NULL AS sha1_null;
+sha1_null
+1
+SELECT SHA(NULL)     IS NULL AS sha_null;
+sha_null
+1
+SELECT SHA2(NULL, 256) IS NULL AS sha2_null_str;
+sha2_null_str
+1
+SELECT SHA2('zeta', NULL) IS NULL AS sha2_null_bits;
+sha2_null_bits
+1
+=== Determinism: same input → same output ===
+SELECT MD5('repeat') = MD5('repeat')       AS md5_det;
+md5_det
+1
+SELECT SHA1('repeat') = SHA1('repeat')     AS sha1_det;
+sha1_det
+1
+SELECT SHA2('repeat', 256) = SHA2('repeat', 256) AS sha2_det;
+sha2_det
+1
+=== Distinct inputs → distinct outputs ===
+SELECT MD5('a') <> MD5('b')               AS md5_distinct;
+md5_distinct
+1
+SELECT SHA1('a') <> SHA1('b')             AS sha1_distinct;
+sha1_distinct
+1
+SELECT SHA2('a', 256) <> SHA2('b', 256)   AS sha2_distinct;
+sha2_distinct
+1
+SELECT SHA2('zeta', 256) <> SHA2('zeta', 512) AS sha2_widths_distinct;
+sha2_widths_distinct
+1
+=== Arity errors ===
+SELECT MD5();
+ERROR 1105: execution error: MD5 requires 1 argument
+SELECT MD5('a', 'b');
+ERROR 1105: execution error: MD5 requires 1 argument
+SELECT SHA1();
+ERROR 1105: execution error: SHA1 requires 1 argument
+SELECT SHA1('a', 'b');
+ERROR 1105: execution error: SHA1 requires 1 argument
+SELECT SHA2();
+ERROR 1105: execution error: SHA2 requires 2 arguments (string, bits)
+SELECT SHA2('a');
+ERROR 1105: execution error: SHA2 requires 2 arguments (string, bits)
+SELECT SHA2('a', 256, 'extra');
+ERROR 1105: execution error: SHA2 requires 2 arguments (string, bits)
