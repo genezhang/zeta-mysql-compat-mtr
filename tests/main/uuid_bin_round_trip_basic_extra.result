@@ -1,0 +1,83 @@
+=== UUID_TO_BIN: canonical 36-char form ===
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db')) AS canonical;
+canonical
+6CCD780CBABA102695645B8C656024DB
+SELECT HEX(UUID_TO_BIN('00000000-0000-0000-0000-000000000000')) AS all_zero;
+all_zero
+00000000000000000000000000000000
+SELECT HEX(UUID_TO_BIN('ffffffff-ffff-ffff-ffff-ffffffffffff')) AS all_ones;
+all_ones
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+=== UUID_TO_BIN: 32-char no-dash form (zeta convenience) ===
+SELECT HEX(UUID_TO_BIN('6ccd780cbaba102695645b8c656024db')) AS no_dash;
+no_dash
+6CCD780CBABA102695645B8C656024DB
+=== UUID_TO_BIN with swap=1: time-low ↔ time-hi reorder ===
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1)) AS swapped;
+swapped
+1026BABA6CCD780C95645B8C656024DB
+SELECT HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 0))
+     = HEX(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+       AS swap_zero_matches_default;
+swap_zero_matches_default
+1
+=== UUID_TO_BIN: NULL passthrough ===
+SELECT UUID_TO_BIN(NULL)    IS NULL AS null_arg;
+null_arg
+1
+SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', NULL) IS NULL AS null_swap;
+null_swap
+1
+=== BIN_TO_UUID: canonical decode ===
+SELECT BIN_TO_UUID(UNHEX('6CCD780CBABA102695645B8C656024DB')) AS decode_canonical;
+decode_canonical
+6ccd780c-baba-1026-9564-5b8c656024db
+SELECT BIN_TO_UUID(UNHEX('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF')) AS decode_ones;
+decode_ones
+ffffffff-ffff-ffff-ffff-ffffffffffff
+=== BIN_TO_UUID with swap=1: undo the swap ===
+SELECT BIN_TO_UUID(UNHEX('1026BABA6CCD780C95645B8C656024DB'), 1) AS unswapped;
+unswapped
+6ccd780c-baba-1026-9564-5b8c656024db
+=== BIN_TO_UUID: NULL passthrough ===
+SELECT BIN_TO_UUID(NULL)               IS NULL AS null_arg;
+null_arg
+1
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), NULL) IS NULL AS null_swap;
+null_swap
+1
+=== Inverse round-trip ===
+SELECT BIN_TO_UUID(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
+     = '6ccd780c-baba-1026-9564-5b8c656024db' AS rt_default;
+rt_default
+1
+SELECT BIN_TO_UUID(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1), 1)
+     = '6ccd780c-baba-1026-9564-5b8c656024db' AS rt_swap;
+rt_swap
+1
+SELECT LENGTH(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))      = 16 AS rt_len_default;
+rt_len_default
+1
+SELECT LENGTH(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', 1))   = 16 AS rt_len_swap;
+rt_len_swap
+1
+=== Bad input rejected ===
+SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564');
+ERROR 1105: execution error: UUID_TO_BIN: "6ccd780c-baba-1026-9564" is not a valid UUID (expected 32 hex digits)
+SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db-extra');
+ERROR 1105: execution error: UUID_TO_BIN: "6ccd780c-baba-1026-9564-5b8c656024db-extra" is not a valid UUID (expected 32 hex digits)
+SELECT UUID_TO_BIN('zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz');
+ERROR 1105: execution error: UUID_TO_BIN: "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz" contains non-hex characters
+SELECT BIN_TO_UUID(UNHEX('00112233'));
+ERROR 1105: execution error: BIN_TO_UUID first argument must be a 16-byte binary
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFFAA'));
+ERROR 1105: execution error: BIN_TO_UUID: input must be exactly 16 bytes (got 17)
+=== Arity errors ===
+SELECT UUID_TO_BIN();
+ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+SELECT UUID_TO_BIN('a', 'b', 'c');
+ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+SELECT BIN_TO_UUID();
+ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
+SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), 1, 2);
+ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
