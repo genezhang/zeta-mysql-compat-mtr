@@ -1,0 +1,210 @@
+# Independently authored DATE_ADD / DATE_SUB / ADDDATE /
+# SUBDATE extras smoke for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - adddate_subdate_basic_extra.test: ADDDATE/SUBDATE
+#     INTERVAL form + integer-shorthand form, DATE_ADD/SUB
+#     equivalence, NULL, arity.
+#   - temporal_arithmetic_basic_extra.test: DATE_ADD/SUB
+#     basics, DATEDIFF/TIMESTAMPDIFF, DATE_PART, FROM_UNIXTIME,
+#     UNIX_TIMESTAMP. Header notes the DATE→TIMESTAMP
+#     divergence but doesn't pin a type-explicit assertion.
+#   - date_arith_edges_basic_extra.test: edge cases — range
+#     overflow, DATE-DATE subtraction, INTERVAL mul/div/neg,
+#     interval comparison, interval+/-interval, year-month.
+#
+# This slice pins what those slices DO NOT:
+#   - Wrong-type first arg (Int, String "not a date") → 1105.
+#   - Wrong-type second arg in DATE_ADD/SUB (Int — not
+#     allowed; integer shorthand is ADDDATE/SUBDATE-only) → 1105.
+#   - DATE input → TIMESTAMP output divergence pinned via
+#     direct value comparison (matches TIMESTAMP literal, NOT
+#     DATE literal).
+#   - ADDDATE Int64 overflow → 1105 ('day count out of i32
+#     range').
+#   - Unit-variant walk: YEAR/MONTH/WEEK/DAY/HOUR/MINUTE/
+#     SECOND. (QUARTER/MICROSECOND parser-gap sentinels below;
+#     they duplicate temporal_arithmetic_basic_extra.test:166-
+#     172 deliberately as sentinels for the DATE_ADD-wrapped
+#     path.) Existing slices mostly use DAY/MONTH.
+#   - Pre-1970 date arithmetic.
+#   - Symmetry: DATE_ADD(d, INTERVAL -n unit) = DATE_SUB(d,
+#     INTERVAL n unit).
+#
+# Big-picture finding:
+#   The whole family (DATE_ADD/DATE_SUB/ADDDATE/SUBDATE) is
+#   REWRITTEN AT PARSE TIME into ordinary arithmetic
+#   operations (target +/- second_arg). The named-function
+#   impl arm at zeta-server/src/lib.rs DATE_ADD is reachable
+#   only through paths that bypass the parser rewrite (e.g.,
+#   programmatic invocation).
+#
+#   Consequences observed:
+#     - All 4 functions accept BOTH (date, INTERVAL) and
+#       (date, INT). DATE_ADD does NOT actually require an
+#       explicit INTERVAL despite the named-arm impl comment.
+#     - When BOTH args are integers (e.g. ADDDATE(42, 1)),
+#       the call is plain integer arithmetic — '43', not a
+#       date. Major footgun.
+#     - DATE first arg becomes Timestamp before the math; the
+#       returned value is Timestamp, NOT Date. Documented
+#       divergence vs MySQL/PG (both return DATE for
+#       date + interval-day).
+#     - Error messages come from the arithmetic operator
+#       layer ('arithmetic op requires numbers', 'integer
+#       overflow in date arithmetic') NOT the named-function
+#       arm ('first argument must be a DATE or TIMESTAMP').
+#
+# Adaptation notes:
+#   # zeta-adapt: DATE_ADD/SUB on a DATE returns TIMESTAMP
+#     (with .000000 padding). MySQL/PG return DATE. Pinned
+#     below by comparing to a TIMESTAMP literal.
+#   # zeta-adapt: Wrong-type first arg → 1105 'first argument
+#     must be a DATE or TIMESTAMP'.
+#   # zeta-adapt: Wrong-type second arg in DATE_ADD/SUB →
+#     1105 'second argument must be an INTERVAL'.
+#   # zeta-adapt: ADDDATE/SUBDATE wrong second arg → 1105
+#     'second argument must be an INTERVAL or integer days'.
+#   # zeta-adapt: ADDDATE Int64 overflow (> i32::MAX days) →
+#     1105 'integer overflow in date arithmetic: <value>'.
+#     The named-function impl arm at lib.rs:52400 would emit
+#     'day count out of i32 range' but is unreachable (parser
+#     rewrite intercepts).
+
+--echo === DATE_ADD value-coercive equality across DATE / TIMESTAMP ===
+
+# Surprise finding (caught during recording): DATE_ADD result
+# compares EQUAL to BOTH a TIMESTAMP-at-midnight literal AND
+# a DATE literal. Zeta's `=` operator is VALUE-COERCIVE
+# across these two types, not type-strict. So we cannot use
+# `result = DATE 'x'` as a 'not date typed' test.
+# Pin both equalities so a future shift toward type-strict
+# equality (which would break one of these) is caught.
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY)
+     = TIMESTAMP '2024-03-16 00:00:00'                        AS adds_eq_ts_midnight;
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY)
+     = DATE '2024-03-16'                                      AS adds_eq_date_value_coerce;
+# Extract SECOND from the result: 0 (no seconds-of-day shift
+# expected for INTERVAL DAY).
+SELECT EXTRACT(SECOND FROM DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY))
+                                                              AS seconds_is_0;
+
+--echo === ADDDATE(int, int) is INTEGER ARITHMETIC (parser quirk) ===
+
+# STRIKING FINDING: when BOTH args are integers, ADDDATE
+# behaves as PLAIN ADDITION — `ADDDATE(42, 1) = 43`. The
+# parser rewrites the call to `42 + 1` arithmetic, never
+# reaching the date-arithmetic impl arm. Same for SUBDATE
+# (becomes subtraction). This is unique to the integer-only
+# call shape and is almost certainly a footgun for anyone
+# using ADDDATE/SUBDATE programmatically with computed args.
+SELECT ADDDATE(42, 1)                                         AS adddate_int_int_is_arith;
+SELECT ADDDATE(42, 1) = 43                                    AS adddate_int_arith_eq_43;
+SELECT SUBDATE(42, 1) = 41                                    AS subdate_int_arith_eq_41;
+
+--echo === Wrong-type first arg with INTERVAL → ERROR (parser arithmetic path) ===
+
+# DATE_ADD/SUB and ADDDATE/SUBDATE with INTERVAL get rewritten
+# to `target +/- interval` at parse time. INT + INTERVAL fails
+# as 'arithmetic op requires numbers' (the arithmetic operator
+# rejects type-mismatch, NOT the function arm).
+--error 1105
+SELECT DATE_ADD(42, INTERVAL 1 DAY);
+--error 1105
+SELECT DATE_SUB(42, INTERVAL 1 DAY);
+# String first arg that doesn't parse as date: cast-fail at
+# the cast site, before the arithmetic.
+--error 1105
+SELECT DATE_SUB('not a date', INTERVAL 1 DAY);
+--error 1105
+SELECT ADDDATE('not a date', 1);
+
+--echo === DATE_ADD also accepts INT shorthand (parser arith rewrite) ===
+
+# Contrary to common documentation, zeta's DATE_ADD does NOT
+# require an explicit INTERVAL. With (DATE, INT), the parser
+# rewrites to DATE + INT day-arithmetic. Same result as
+# ADDDATE shorthand.
+SELECT DATE_ADD(DATE '2024-03-15', 7)
+     = ADDDATE(DATE '2024-03-15', 7)                          AS date_add_int_eq_adddate;
+SELECT DATE_SUB(DATE '2024-03-15', 7)
+     = SUBDATE(DATE '2024-03-15', 7)                          AS date_sub_int_eq_subdate;
+
+--echo === Wrong-type second arg → ERROR ===
+
+# String second arg fails 'arithmetic op requires numbers'
+# (parser rewrites to date + string which arithmetic rejects).
+--error 1105
+SELECT DATE_ADD(DATE '2024-03-15', '7');
+--error 1105
+SELECT ADDDATE(DATE '2024-03-15', '7');
+
+--echo === ADDDATE/SUBDATE: Int64 day count overflow ===
+
+# Different error message than the named-function arm
+# documents: parser-side arithmetic emits 'integer overflow
+# in date arithmetic: <value>' instead of 'day count out of
+# i32 range'. Pinned at the actual surface behavior.
+--error 1105
+SELECT ADDDATE(DATE '2024-03-15', 3000000000);
+--error 1105
+SELECT SUBDATE(DATE '2024-03-15', 3000000000);
+--error 1105
+SELECT ADDDATE(DATE '2024-03-15', -3000000000);
+
+--echo === Unit-variant walk (YEAR/MONTH/WEEK/DAY/HOUR/MINUTE/SECOND) ===
+
+# YEAR: +1 year to 2024-03-15 = 2025-03-15.
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 YEAR)
+     = TIMESTAMP '2025-03-15 00:00:00'                        AS plus_1_year;
+# MONTH: +1 month = 2024-04-15.
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 MONTH)
+     = TIMESTAMP '2024-04-15 00:00:00'                        AS plus_1_month;
+# WEEK: +1 week = 7 days = 2024-03-22.
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 WEEK)
+     = TIMESTAMP '2024-03-22 00:00:00'                        AS plus_1_week;
+# HOUR: +1 hour to 14:30 = 15:30.
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 1 HOUR)
+     = TIMESTAMP '2024-03-15 15:30:00'                        AS plus_1_hour;
+# MINUTE: +30 minutes.
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 30 MINUTE)
+     = TIMESTAMP '2024-03-15 15:00:00'                        AS plus_30_min;
+# SECOND: +45 seconds.
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 45 SECOND)
+     = TIMESTAMP '2024-03-15 14:30:45'                        AS plus_45_sec;
+
+--echo === Unit-variant GAPS: QUARTER + MICROSECOND parser-rejected ===
+
+# Both MySQL INTERVAL units rejected at the parser layer
+# (1064, not 1105). temporal_arithmetic_basic_extra.test:166-
+# 172 already pins the bare-INTERVAL variants; these wrap them
+# in DATE_ADD as sentinels for the rewrite path so a future
+# fix that lands one but not the other is caught.
+--error 1064
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 QUARTER);
+--error 1064
+SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 1 MICROSECOND);
+
+--echo === Pre-1970 date arithmetic ===
+
+# Date before unix epoch. Negative epoch-days arithmetic.
+SELECT DATE_ADD(DATE '1900-01-01', INTERVAL 1 YEAR)
+     = TIMESTAMP '1901-01-01 00:00:00'                        AS pre_1970_plus_year;
+SELECT DATE_SUB(DATE '1900-01-01', INTERVAL 1 DAY)
+     = TIMESTAMP '1899-12-31 00:00:00'                        AS pre_1970_year_boundary;
+# Cross the unix epoch from below.
+SELECT DATE_ADD(DATE '1969-12-31', INTERVAL 2 DAY)
+     = TIMESTAMP '1970-01-02 00:00:00'                        AS crosses_epoch;
+
+--echo === Symmetry: DATE_ADD(d, INTERVAL -n) = DATE_SUB(d, INTERVAL n) ===
+
+# Negating the interval makes ADD behave like SUB.
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL -7 DAY)
+     = DATE_SUB(DATE '2024-03-15', INTERVAL 7 DAY)            AS neg_interval_eq_sub;
+# Same for MONTH.
+SELECT DATE_ADD(DATE '2024-03-15', INTERVAL -1 MONTH)
+     = DATE_SUB(DATE '2024-03-15', INTERVAL 1 MONTH)          AS neg_month_eq_sub;
+# Symmetry between ADDDATE int shorthand and SUBDATE:
+SELECT ADDDATE(DATE '2024-03-15', -7)
+     = SUBDATE(DATE '2024-03-15', 7)                          AS adddate_neg_eq_subdate;
