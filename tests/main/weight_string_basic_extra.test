@@ -1,0 +1,64 @@
+# Independently authored WEIGHT_STRING smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. WEIGHT_STRING errored "unknown function" in
+# zeta before zeta PR #1273; this slice locks in the 1-arg
+# binary-collation form.
+#
+# Big-picture finding:
+#   WEIGHT_STRING(s) returns the collation weight bytes used
+#   for sorting (VARBINARY). zeta first-pass uses binary
+#   semantics: returns input bytes as-is. Properties:
+#     - empty input → empty bytes (NOT NULL)
+#     - same input → same bytes (deterministic)
+#     - byte-preserving (UNHEX round-trip)
+#     - SQL NULL → SQL NULL
+#
+# Adaptation notes:
+#   # zeta-adapt: MySQL's default utf8mb4_0900_ai_ci would
+#     case-fold so WEIGHT_STRING('A') == WEIGHT_STRING('a').
+#     zeta uses BINARY semantics, so they differ (0x41 vs
+#     0x61). Tests assert PROPERTIES (byte-preservation,
+#     determinism) instead of literal weight values where
+#     the divergence would matter. The zeta-binary case
+#     ('A' != 'a') is tested in zeta's integration suite.
+#   # zeta-adapt: AS CHAR(N) / AS BINARY(N) / LEVEL clauses
+#     are out of scope (need parser grammar). MySQL ships
+#     these; zeta will follow in separate slices.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1064). Same
+#     direction (rejects).
+#
+# Wrappers: VARBINARY rows charset-mangle on the wire for
+# non-ASCII bytes, so all assertions go through HEX().
+
+--echo === ASCII byte preservation ===
+
+SELECT HEX(WEIGHT_STRING('abc'))    AS ascii_bytes;
+SELECT HEX(WEIGHT_STRING('hello'))  AS ascii_hello;
+
+--echo === Empty string → empty bytes (NOT NULL) ===
+
+SELECT HEX(WEIGHT_STRING(''))             AS empty_hex;
+SELECT WEIGHT_STRING('') IS NULL          AS empty_not_null;
+SELECT LENGTH(WEIGHT_STRING('')) = 0      AS empty_zero_length;
+
+--echo === Binary-input round-trip (byte preservation) ===
+
+# WEIGHT_STRING(UNHEX('DEADBEEF')) — receives raw bytes, returns same.
+SELECT HEX(WEIGHT_STRING(UNHEX('DEADBEEF'))) AS round_trip;
+SELECT HEX(WEIGHT_STRING(UNHEX('00FF')))     AS edge_bytes;
+
+--echo === Same input → same bytes (deterministic) ===
+
+SELECT HEX(WEIGHT_STRING('repeat'))
+     = HEX(WEIGHT_STRING('repeat')) AS deterministic;
+
+--echo === SQL NULL → SQL NULL ===
+
+SELECT WEIGHT_STRING(NULL) IS NULL AS null_propagates;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT WEIGHT_STRING();
+--error 1105
+SELECT WEIGHT_STRING('a', 'b');
