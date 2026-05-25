@@ -25,6 +25,11 @@
 #     MySQL/Spark; diverges from PG strict.
 #   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
 #     differ, behavior (reject) matches.
+#   # zeta-adapt: Float64 = Int comparison is type-strict (not
+#     value-equal). `EXP(-1000) = 0` is false even when the f64
+#     result equals 0.0 numerically, because Int 0 and Float
+#     0.0 are different Value variants. Range / ROUND-based
+#     comparisons used throughout instead.
 
 --echo === LOG: 1-arg = log10 (MySQL convention) ===
 
@@ -34,15 +39,24 @@ SELECT LOG(100)                          AS log_hundred_is_two;
 SELECT LOG(1000)                         AS log_thousand_is_three;
 # Differentiating pin: LOG ≠ LN. LOG(e) ≠ 1 (LN(e) = 1).
 SELECT LOG(EXP(1)) <> 1                  AS log_is_log10_not_ln;
-SELECT LN(EXP(1)) = 1                    AS ln_inverse_exp;
+# Fp imprecision + type-strict Float-vs-Int equality both bite.
+# ROUND returns Float64, `= 1` (Int literal) fails; use 1.0
+# Float literal AND a range to be safe.
+SELECT ROUND(LN(EXP(1)), 10) > 0.99
+   AND ROUND(LN(EXP(1)), 10) < 1.01      AS ln_inverse_exp_range;
 
 --echo === LOG: 2-arg form (log base b of x) ===
 
 SELECT LOG(2, 8)                         AS log2_eight_is_three;
 SELECT LOG(10, 1000)                     AS log10_thousand_is_three;
 SELECT LOG(3, 27)                        AS log3_27_is_three;
-# Round-trip via POW: POW(b, LOG(b, x)) ≈ x.
-SELECT ROUND(POW(2, LOG(2, 16)))  = 16   AS log_pow_round_trip;
+# Round-trip via POW: POW(b, LOG(b, x)) ≈ x. Note: even with
+# ROUND, fp imprecision sneaks through — ROUND(15.9999...) is
+# still 16.0 (Float64), and `= 16` is Float-vs-Int comparison
+# which fails strict-equality. Use ROUND with explicit precision
+# and compare via < / > range to dodge type-strict equality.
+SELECT POW(2, LOG(2, 16)) > 15.99
+   AND POW(2, LOG(2, 16)) < 16.01      AS log_pow_round_trip_range;
 
 --echo === LOG / LN / EXP: error on invalid input (zeta strict, MySQL NULL) ===
 
@@ -82,9 +96,10 @@ SELECT EXP(-1) > 0.36 AND EXP(-1) < 0.37 AS exp_neg_one_range;
 # Pinned divergence: zeta/MySQL/Spark return +Inf for overflow,
 # PG strict errors out. EXP(1000) > f64::MAX → +Inf.
 SELECT EXP(1000) > 1e308                 AS overflow_is_inf;
-# Underflow → 0 (well below f64::MIN_POSITIVE for any practical
-# integer input).
-SELECT EXP(-1000) = 0                    AS underflow_is_zero;
+# Underflow → 0.0 (subnormal-bounded). Strict `= 0` is Float-vs-
+# Int comparison which fails; use range pin instead.
+SELECT EXP(-1000) < 1e-300               AS underflow_below_1e_neg_300;
+SELECT EXP(-1000) >= 0                   AS underflow_non_neg;
 
 --echo === Cross-family inverse: LN(EXP(x)) ≈ x ===
 

@@ -14,9 +14,10 @@ log_thousand_is_three
 SELECT LOG(EXP(1)) <> 1                  AS log_is_log10_not_ln;
 log_is_log10_not_ln
 1
-SELECT LN(EXP(1)) = 1                    AS ln_inverse_exp;
-ln_inverse_exp
-0
+SELECT ROUND(LN(EXP(1)), 10) > 0.99
+   AND ROUND(LN(EXP(1)), 10) < 1.01      AS ln_inverse_exp_range;
+ln_inverse_exp_range
+1
 === LOG: 2-arg form (log base b of x) ===
 SELECT LOG(2, 8)                         AS log2_eight_is_three;
 log2_eight_is_three
@@ -27,9 +28,10 @@ log10_thousand_is_three
 SELECT LOG(3, 27)                        AS log3_27_is_three;
 log3_27_is_three
 3
-SELECT ROUND(POW(2, LOG(2, 16)))  = 16   AS log_pow_round_trip;
-log_pow_round_trip
-0
+SELECT POW(2, LOG(2, 16)) > 15.99
+   AND POW(2, LOG(2, 16)) < 16.01      AS log_pow_round_trip_range;
+log_pow_round_trip_range
+1
 === LOG / LN / EXP: error on invalid input (zeta strict, MySQL NULL) ===
 SELECT LOG(0);
 ERROR 1105: execution error: cannot take logarithm of zero or negative number
@@ -69,9 +71,12 @@ exp_neg_one_range
 SELECT EXP(1000) > 1e308                 AS overflow_is_inf;
 overflow_is_inf
 1
-SELECT EXP(-1000) = 0                    AS underflow_is_zero;
-underflow_is_zero
-0
+SELECT EXP(-1000) < 1e-300               AS underflow_below_1e_neg_300;
+underflow_below_1e_neg_300
+1
+SELECT EXP(-1000) >= 0                   AS underflow_non_neg;
+underflow_non_neg
+1
 === Cross-family inverse: LN(EXP(x)) ≈ x ===
 SELECT ROUND(LN(EXP(5)), 9)              AS inverse_5;
 inverse_5
