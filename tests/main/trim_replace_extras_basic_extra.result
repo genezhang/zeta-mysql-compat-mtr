@@ -1,0 +1,86 @@
+=== SQL-standard TRIM qualifier rewriting ===
+SELECT TRIM(LEADING 'x' FROM 'xxxhellox')
+     = LTRIM('xxxhellox', 'x')                                AS leading_eq_ltrim;
+leading_eq_ltrim
+1
+SELECT TRIM(TRAILING 'x' FROM 'xhelloxxx')
+     = RTRIM('xhelloxxx', 'x')                                AS trailing_eq_rtrim;
+trailing_eq_rtrim
+1
+SELECT TRIM(BOTH 'x' FROM 'xxhelloxx')
+     =      TRIM('x' FROM 'xxhelloxx')                        AS both_eq_default;
+both_eq_default
+1
+SELECT TRIM(LEADING 'x' FROM 'xxxhellox')                     AS leading_recorded;
+leading_recorded
+hellox
+SELECT TRIM(TRAILING 'x' FROM 'xhelloxxx')                    AS trailing_recorded;
+trailing_recorded
+xhello
+SELECT TRIM(BOTH 'x' FROM 'xxhelloxx')                        AS both_recorded;
+both_recorded
+hello
+=== TRIM(BOTH FROM s) — no trim_what, defaults to whitespace ===
+SELECT TRIM(BOTH FROM '  hello  ')                            AS both_no_what_strips_ws;
+both_no_what_strips_ws
+hello
+SELECT TRIM(BOTH FROM '  hello  ')   = 'hello'                AS both_no_what_eq_default;
+both_no_what_eq_default
+1
+=== TRIM/LTRIM/RTRIM with non-string input (bool coercion) ===
+SELECT TRIM(TRUE)                                             AS trim_bool_true;
+trim_bool_true
+true
+SELECT TRIM(FALSE)                                            AS trim_bool_false;
+trim_bool_false
+false
+SELECT LTRIM(TRUE)                                            AS ltrim_bool;
+ltrim_bool
+true
+SELECT RTRIM(FALSE)                                           AS rtrim_bool;
+rtrim_bool
+false
+SELECT LTRIM(TRUE, 't')                                       AS ltrim_bool_with_chars;
+ltrim_bool_with_chars
+rue
+=== TRIM/LTRIM/RTRIM with date input (coerce via Display) ===
+SELECT TRIM('-' FROM DATE '2024-03-15')                       AS trim_date_dashes;
+trim_date_dashes
+2024-03-15
+SELECT LTRIM(DATE '2024-03-15', '2')                          AS ltrim_date_leading_2;
+ltrim_date_leading_2
+024-03-15
+SELECT RTRIM(DATE '2024-03-15', '5')                          AS rtrim_date_trailing_5;
+rtrim_date_trailing_5
+2024-03-1
+=== TRIM with timestamp input (note .000000 padding) ===
+SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45', '0')            AS rtrim_timestamp_zeros;
+rtrim_timestamp_zeros
+2024-03-15 14:30:45.
+=== REPLACE with bool input ===
+SELECT REPLACE(TRUE, 'tr', 'TR')                              AS replace_bool_true;
+replace_bool_true
+TRue
+SELECT REPLACE(FALSE, 'al', 'AL')                             AS replace_bool_false;
+replace_bool_false
+fALse
+=== REPLACE with date input ===
+SELECT REPLACE(DATE '2024-03-15', '-', '/')                   AS replace_date_dashes;
+replace_date_dashes
+2024/03/15
+SELECT REPLACE('birthday: 2024-03-15', DATE '2024-03-15', 'TODAY')
+                                                              AS replace_date_in_str;
+replace_date_in_str
+birthday: TODAY
+=== REPLACE with timestamp input ===
+SELECT REPLACE(TIMESTAMP '2024-03-15 14:30:45', '.000000', '')
+                                                              AS replace_ts_strip_us;
+replace_ts_strip_us
+2024-03-15 14:30:45
+=== REPLACE empty-from + empty-to combo on non-empty input ===
+SELECT REPLACE('abc', '', '')                                 AS replace_empty_from_empty_to;
+replace_empty_from_empty_to
+abc
+SELECT LENGTH(REPLACE('abc', '', '')) = 3                     AS replace_empty_both_len_unchanged;
+replace_empty_both_len_unchanged
+1
