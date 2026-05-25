@@ -1,0 +1,38 @@
+=== ASCII byte preservation ===
+SELECT HEX(WEIGHT_STRING('abc'))    AS ascii_bytes;
+ascii_bytes
+616263
+SELECT HEX(WEIGHT_STRING('hello'))  AS ascii_hello;
+ascii_hello
+68656C6C6F
+=== Empty string → empty bytes (NOT NULL) ===
+SELECT HEX(WEIGHT_STRING(''))             AS empty_hex;
+empty_hex
+
+SELECT WEIGHT_STRING('') IS NULL          AS empty_not_null;
+empty_not_null
+0
+SELECT LENGTH(WEIGHT_STRING('')) = 0      AS empty_zero_length;
+empty_zero_length
+1
+=== Binary-input round-trip (byte preservation) ===
+SELECT HEX(WEIGHT_STRING(UNHEX('DEADBEEF'))) AS round_trip;
+round_trip
+DEADBEEF
+SELECT HEX(WEIGHT_STRING(UNHEX('00FF')))     AS edge_bytes;
+edge_bytes
+00FF
+=== Same input → same bytes (deterministic) ===
+SELECT HEX(WEIGHT_STRING('repeat'))
+     = HEX(WEIGHT_STRING('repeat')) AS deterministic;
+deterministic
+1
+=== SQL NULL → SQL NULL ===
+SELECT WEIGHT_STRING(NULL) IS NULL AS null_propagates;
+null_propagates
+1
+=== Arity errors ===
+SELECT WEIGHT_STRING();
+ERROR 1105: execution error: WEIGHT_STRING requires 1 argument (extended forms AS CHAR(N) / AS BINARY(N) / LEVEL ... are out of scope)
+SELECT WEIGHT_STRING('a', 'b');
+ERROR 1105: execution error: WEIGHT_STRING requires 1 argument (extended forms AS CHAR(N) / AS BINARY(N) / LEVEL ... are out of scope)
