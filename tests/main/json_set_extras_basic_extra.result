@@ -1,0 +1,74 @@
+=== Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+SELECT JSON_TYPE(CAST('{"a":1}' AS JSONB))                    AS jsonb_cast_lands_as_object;
+jsonb_cast_lands_as_object
+OBJECT
+=== JSON_SET on already-typed JSONB target ===
+SELECT JSON_EXTRACT(
+  JSON_SET(CAST('{"a":1}' AS JSONB), '$.b', 2),
+  '$.a', '$.b')                                               AS typed_set_extract_both;
+typed_set_extract_both
+[1,2]
+SELECT JSON_LENGTH(
+  JSON_SET(CAST('{"a":1}' AS JSONB), '$.b', 2))               AS typed_set_len;
+typed_set_len
+2
+=== Wrong-type target → ERROR ===
+SELECT JSON_SET(42, '$.a', 1);
+ERROR 1105: execution error: JSON_SET target must be JSON
+SELECT JSON_SET(3.14, '$.a', 1);
+ERROR 1105: execution error: JSON_SET target must be JSON
+SELECT JSON_SET(TRUE, '$.a', 1);
+ERROR 1105: execution error: JSON_SET target must be JSON
+=== Auto-create intermediate objects (set_path create=true) ===
+SELECT JSON_EXTRACT(JSON_SET('{}', '$.a.b.c', 1), '$.a.b.c')
+                                                              AS deep_create_leaf;
+deep_create_leaf
+1
+SELECT JSON_DEPTH(JSON_SET('{}', '$.a.b.c', 1))               AS deep_create_depth;
+deep_create_depth
+4
+SELECT JSON_EXTRACT(JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x.y')
+                                                              AS partial_create_leaf;
+partial_create_leaf
+9
+SELECT JSON_LENGTH(JSON_EXTRACT(
+  JSON_SET('{"x":{"z":1}}', '$.x.y', 9), '$.x'))              AS partial_create_x_len;
+partial_create_x_len
+2
+=== Multi-pair chain: later pairs see earlier mutations ===
+SELECT JSON_EXTRACT(
+  JSON_SET('{"a":1}', '$.a', 2, '$.a', 3), '$.a')             AS chain_same_path_last_wins;
+chain_same_path_last_wins
+3
+SELECT JSON_EXTRACT(
+  JSON_SET('{}', '$.outer', CAST('{}' AS JSONB),
+                  '$.outer.inner', 42),
+  '$.outer.inner')                                            AS chain_create_then_set;
+chain_create_then_set
+42
+=== Root path '$' replaces target entirely ===
+SELECT JSON_TYPE(JSON_SET('{"a":1}', '$', 42))                AS root_replace_with_int;
+root_replace_with_int
+INTEGER
+SELECT JSON_TYPE(JSON_SET('{"a":1}', '$',
+                          CAST('[1,2,3]' AS JSONB)))          AS root_replace_with_array;
+root_replace_with_array
+ARRAY
+SELECT JSON_LENGTH(JSON_SET('{"a":1}', '$',
+                            CAST('{"x":1,"y":2}' AS JSONB)))  AS root_replace_with_object_len;
+root_replace_with_object_len
+2
+=== Mid-path array index → NULL (under-claim) ===
+SELECT JSON_SET('{"a":[1,2,3]}', '$.a[0]', 9) IS NULL         AS mid_path_index_null;
+mid_path_index_null
+1
+SELECT JSON_SET('{"a":{"b":[1,2]}}', '$.a.b[0]', 9) IS NULL   AS deep_mid_path_index_null;
+deep_mid_path_index_null
+1
+=== Wildcard path rejection ===
+SELECT JSON_SET('{"a":1,"b":2}', '$.*', 99) IS NULL           AS wildcard_object_null;
+wildcard_object_null
+1
+SELECT JSON_SET('[1,2,3]', '$[*]', 99) IS NULL                AS wildcard_array_null;
+wildcard_array_null
+1
