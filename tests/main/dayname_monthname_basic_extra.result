@@ -1,0 +1,107 @@
+=== DAYNAME: all 7 days from 2024-01-07 (Sunday) ===
+SELECT DAYNAME('2024-01-07')             AS sunday;
+sunday
+Sunday
+SELECT DAYNAME('2024-01-08')             AS monday;
+monday
+Monday
+SELECT DAYNAME('2024-01-09')             AS tuesday;
+tuesday
+Tuesday
+SELECT DAYNAME('2024-01-10')             AS wednesday;
+wednesday
+Wednesday
+SELECT DAYNAME('2024-01-11')             AS thursday;
+thursday
+Thursday
+SELECT DAYNAME('2024-01-12')             AS friday;
+friday
+Friday
+SELECT DAYNAME('2024-01-13')             AS saturday;
+saturday
+Saturday
+SELECT DAYNAME('1970-01-01')             AS epoch_thursday;
+epoch_thursday
+Thursday
+=== MONTHNAME: all 12 months ===
+SELECT MONTHNAME('2024-01-15')           AS jan;
+jan
+January
+SELECT MONTHNAME('2024-02-15')           AS feb;
+feb
+February
+SELECT MONTHNAME('2024-03-15')           AS mar;
+mar
+March
+SELECT MONTHNAME('2024-04-15')           AS apr;
+apr
+April
+SELECT MONTHNAME('2024-05-15')           AS may;
+may
+May
+SELECT MONTHNAME('2024-06-15')           AS jun;
+jun
+June
+SELECT MONTHNAME('2024-07-15')           AS jul;
+jul
+July
+SELECT MONTHNAME('2024-08-15')           AS aug;
+aug
+August
+SELECT MONTHNAME('2024-09-15')           AS sep;
+sep
+September
+SELECT MONTHNAME('2024-10-15')           AS oct;
+oct
+October
+SELECT MONTHNAME('2024-11-15')           AS nov;
+nov
+November
+SELECT MONTHNAME('2024-12-15')           AS dec_month;
+dec_month
+December
+=== Timestamp input (time portion ignored) ===
+SELECT DAYNAME('2024-03-15 14:30:00')    AS ts_friday;
+ts_friday
+Friday
+SELECT MONTHNAME('2024-03-15 14:30:00')  AS ts_march;
+ts_march
+March
+=== Pre-1970 dates (negative epoch days) ===
+SELECT DAYNAME('1900-01-01')             AS pre_1970_monday;
+pre_1970_monday
+Monday
+SELECT MONTHNAME('1900-01-01')           AS pre_1970_january;
+pre_1970_january
+January
+=== Length pins (English name lengths are well-defined) ===
+SELECT LENGTH(DAYNAME('2024-01-10'))     = 9 AS wednesday_len_9;
+wednesday_len_9
+1
+SELECT LENGTH(MONTHNAME('2024-09-15'))   = 9 AS september_len_9;
+september_len_9
+1
+=== NULL passthrough ===
+SELECT DAYNAME(NULL)    IS NULL          AS dn_null;
+dn_null
+1
+SELECT MONTHNAME(NULL)  IS NULL          AS mn_null;
+mn_null
+1
+=== Unparseable string → ERROR (impl reject path) ===
+SELECT DAYNAME('not a date');
+ERROR 1105: execution error: DAYNAME: cannot parse "not a date" as a date or timestamp
+SELECT MONTHNAME('not a date');
+ERROR 1105: execution error: MONTHNAME: cannot parse "not a date" as a date or timestamp
+=== Arity errors ===
+SELECT DAYNAME();
+ERROR 1105: execution error: DAYNAME requires 1 argument
+SELECT MONTHNAME();
+ERROR 1105: execution error: MONTHNAME requires 1 argument
+=== Determinism ===
+SELECT DAYNAME('2024-03-15')   = DAYNAME('2024-03-15')   AS dn_det;
+dn_det
+1
+SELECT MONTHNAME('2024-03-15') = MONTHNAME('2024-03-15') AS mn_det;
+mn_det
+1
