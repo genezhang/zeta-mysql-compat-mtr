@@ -113,6 +113,17 @@ emoji_char_pres_explicit
 SELECT REVERSE('🎯ab') = 'ba🎯' AS emoji_codepoint_intact;
 emoji_codepoint_intact
 1
+=== REVERSE: combining marks detach from base ===
+SELECT CHAR_LENGTH('cafe' || CHR(769))           = 5 AS decomposed_chars;
+decomposed_chars
+1
+SELECT CHAR_LENGTH(REVERSE('cafe' || CHR(769)))  = 5 AS decomposed_reversed_chars;
+decomposed_reversed_chars
+1
+SELECT SUBSTRING(REVERSE('cafe' || CHR(769)), 1, 1) = CHR(769)
+       AS combining_mark_detached;
+combining_mark_detached
+1
 === REVERSE: NULL passthrough ===
 SELECT REVERSE(NULL) IS NULL             AS null_passes;
 null_passes

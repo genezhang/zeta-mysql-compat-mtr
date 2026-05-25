@@ -120,12 +120,32 @@ SELECT CHAR_LENGTH(REVERSE('🎯ab'))  = 3 AS emoji_char_pres_explicit;
 # (a + b reversed to b + a, then emoji at end).
 SELECT REVERSE('🎯ab') = 'ba🎯' AS emoji_codepoint_intact;
 
+--echo === REVERSE: combining marks detach from base ===
+
+# 'café' written as base 'cafe' + combining acute (U+0301) is
+# 5 code points: c, a, f, e, ́. REVERSE reverses by code point,
+# so the combining mark ends up at the FRONT, decoupled from
+# 'e'. Pinning the divergence: composed and decomposed forms
+# behave differently — applications that need glyph-cluster-
+# aware reversal would need to normalize first.
+SELECT CHAR_LENGTH('cafe' || CHR(769))           = 5 AS decomposed_chars;
+SELECT CHAR_LENGTH(REVERSE('cafe' || CHR(769)))  = 5 AS decomposed_reversed_chars;
+# Property: after REVERSE, the first code point is the combining
+# mark (U+0301), separated from any base char.
+SELECT SUBSTRING(REVERSE('cafe' || CHR(769)), 1, 1) = CHR(769)
+       AS combining_mark_detached;
+
 --echo === REVERSE: NULL passthrough ===
 
 SELECT REVERSE(NULL) IS NULL             AS null_passes;
 
 --echo === REVERSE: numeric coercion ===
 
+# Non-string inputs are stringified first, then reversed. Two
+# incidental but worth-pinning behaviors:
+#   REVERSE(123)  → '321'  (digits reversed)
+#   REVERSE(TRUE) → 'eurt' (the stringified 'true' reversed —
+#                  NOT a typo)
 SELECT REVERSE(123)                      AS int_in;
 SELECT REVERSE(TRUE)                     AS bool_in;
 
