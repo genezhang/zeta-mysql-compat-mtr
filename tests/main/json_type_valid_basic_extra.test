@@ -1,0 +1,221 @@
+# Independently authored JSON_TYPE / JSON_VALID combined smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_funcs.test (json/ suite): table-shape JSON_TYPE
+#     walking all 7 tag variants
+#   - json_search.test (json/ suite): 3-line JSON_VALID
+#     (valid, invalid, NULL)
+#   - json_basic.test: 1 row each
+#   - json_path_basic_extra.test: 1 row each
+#
+# This slice pins what those slices DO NOT:
+#   - Inline-literal JSON_TYPE walk (easier to bisect than the
+#     table-shape variants).
+#   - The INTEGER-vs-DOUBLE storage-driven divergence (1.0,
+#     1e0, 0.0 all parse to JsonbType::Integer per
+#     JsonbValue::from_decimal — documented in the impl but
+#     never previously pinned in any compat-mtr slice).
+#   - JSON_TYPE distinction between SQL NULL → SQL NULL and
+#     JSON 'null' → STRING "NULL". Catastrophic to silently
+#     conflate.
+#   - JSON_TYPE rejection paths (invalid JSON, non-JSON-typed
+#     arg, arity).
+#   - JSON_VALID's silent-fallback behavior for non-string
+#     non-JSON types: returns 0, NOT an error. Surprising and
+#     should be locked down.
+#   - JSON_VALID on already-typed JSONB (via CAST) → always 1.
+#   - JSON_VALID matrix on JSON-valid edge values (scalars,
+#     empty containers, negative/exponent numbers).
+#   - JSON_VALID matrix on common JSON-malformed shapes.
+#
+# Big-picture finding:
+#   JSON_TYPE on JSON 'null' returns the STRING "NULL", not
+#   SQL NULL. JSON_TYPE on SQL NULL returns SQL NULL. The
+#   distinction is the whole reason MySQL spells the tag
+#   "NULL" instead of NULL — pin it loudly.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON_TYPE returns 7 tag variants (OBJECT,
+#     ARRAY, STRING, BOOLEAN, NULL, INTEGER, DOUBLE). MySQL's
+#     binary-only tags (BLOB, DATE, TIME, DATETIME, TIMESTAMP,
+#     DECIMAL, OPAQUE) are NOT emitted — zeta's JsonbType
+#     doesn't carry them.
+#   # zeta-adapt: Any JSON number whose NUMERIC VALUE is a whole
+#     integer in i64 range normalizes to JsonbType::Integer via
+#     JsonbValue::from_decimal — regardless of lexical form. So
+#     '1.0', '1e0', '0.0', '1e10', '1.5e2' (=150) all return
+#     "INTEGER". MySQL would distinguish based on lexical form.
+#     Pin in the divergence section below.
+#   # zeta-adapt: JSON_VALID on a non-string non-JSON arg
+#     returns 0 (silent fallback). MySQL would also return 0 —
+#     behavior matches by accident; pin it so a refactor that
+#     adds error-on-wrong-type is caught.
+#   # zeta-adapt: JSON_TYPE on invalid JSON → 1105. MySQL would
+#     return NULL.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === JSON_TYPE — inline scalar walk (each JsonbType variant) ===
+
+SELECT JSON_TYPE('{"a":1}')                   AS object_tag;
+SELECT JSON_TYPE('[1,2,3]')                   AS array_tag;
+SELECT JSON_TYPE('"hello"')                   AS string_tag;
+SELECT JSON_TYPE('true')                      AS boolean_true_tag;
+SELECT JSON_TYPE('false')                     AS boolean_false_tag;
+SELECT JSON_TYPE('42')                        AS integer_pos_tag;
+SELECT JSON_TYPE('-99')                       AS integer_neg_tag;
+SELECT JSON_TYPE('3.14')                      AS double_tag;
+# Surprise: 1e10 = 10,000,000,000 fits in i64 with scale 0, so
+# from_decimal normalizes to JsonbType::Integer. The "exponent
+# notation always means DOUBLE" intuition is wrong here. See
+# the divergence section below for the full picture.
+SELECT JSON_TYPE('1e10')                      AS exp_notation_collapses_to_integer;
+
+--echo === JSON_TYPE — JSON 'null' returns STRING "NULL" (not SQL NULL) ===
+
+# This is the critical distinction. SQL NULL → SQL NULL;
+# JSON 'null' value → the 4-character STRING "NULL". A query
+# distinguishing the two breaks if either side flips.
+SELECT JSON_TYPE('null')                      AS json_null_returns_string_tag;
+SELECT JSON_TYPE('null') = 'NULL'             AS json_null_eq_string_NULL;
+SELECT JSON_TYPE(NULL)   IS NULL              AS sql_null_returns_sql_null;
+# Under SQL 3VL, NULL = 'NULL' is UNKNOWN (NULL), not FALSE.
+# The point of pinning this is that JSON_TYPE(NULL) does NOT
+# return the STRING 'NULL' — it returns SQL NULL, so the
+# equality comparison itself is unknown. Asserting the 3VL
+# result via `IS NULL` keeps the label and pinned value
+# consistent.
+SELECT (JSON_TYPE(NULL) = 'NULL') IS NULL     AS sql_null_eq_string_NULL_is_unknown;
+
+--echo === JSON_TYPE — INTEGER vs DOUBLE storage-driven divergence ===
+
+# These all LOOK like doubles textually, but zeta-jsonb's
+# from_decimal normalizes anything that fits in i64 with scale
+# 0 to JsonbType::Integer. So JSON_TYPE returns "INTEGER" for
+# 1.0, 1e0, 0.0, 5e0 — diverging from MySQL's lexical "DOUBLE".
+# Documented in impl (JSON_TYPE arm comments) but never
+# previously pinned. Critical for round-trip-typed code.
+SELECT JSON_TYPE('1.0')                       AS one_point_zero_is_integer;
+SELECT JSON_TYPE('0.0')                       AS zero_point_zero_is_integer;
+SELECT JSON_TYPE('1e0')                       AS one_exp_zero_is_integer;
+SELECT JSON_TYPE('5e0')                       AS five_exp_zero_is_integer;
+# Confirming the impl comment in practice: a "fraction-with-
+# exponent" form that EVALUATES TO an integer collapses to
+# INTEGER. 1.5e2 = 150, which fits i64 with scale 0 →
+# JsonbType::Integer. The divergence is value-driven, not
+# lexical-form-driven, as the impl already documents.
+SELECT JSON_TYPE('1.5e2')                     AS fraction_exp_evaluates_to_integer;
+# True doubles (non-integer value, or beyond i64 with scale 0)
+# stay DOUBLE.
+SELECT JSON_TYPE('1.5')                       AS true_fraction_stays_double;
+SELECT JSON_TYPE('0.1')                       AS small_fraction_stays_double;
+
+--echo === JSON_TYPE — empty containers retain container tag ===
+
+# Length is 0 but the tag is still ARRAY / OBJECT.
+SELECT JSON_TYPE('[]')                        AS empty_array_still_array;
+SELECT JSON_TYPE('{}')                        AS empty_object_still_object;
+
+--echo === JSON_TYPE — already-typed JSONB input (Value::Jsonb arm) ===
+
+# Without CAST, every input goes through the String arm
+# (from_json_str). CAST AS JSONB exercises the Value::Jsonb
+# arm so a refactor that breaks the typed-value branch is
+# caught.
+SELECT JSON_TYPE(CAST('{"a":1}' AS JSONB))    AS typed_object;
+SELECT JSON_TYPE(CAST('[1,2,3]' AS JSONB))    AS typed_array;
+SELECT JSON_TYPE(CAST('42'      AS JSONB))    AS typed_integer;
+SELECT JSON_TYPE(CAST('null'    AS JSONB))    AS typed_json_null;
+
+--echo === JSON_TYPE — invalid JSON → ERROR (zeta strict; MySQL NULL) ===
+
+--error 1105
+SELECT JSON_TYPE('not json');
+--error 1105
+SELECT JSON_TYPE('{a:1}');
+
+--echo === JSON_TYPE — non-JSON-typed arg → ERROR ===
+
+--error 1105
+SELECT JSON_TYPE(42);
+--error 1105
+SELECT JSON_TYPE(3.14);
+--error 1105
+SELECT JSON_TYPE(TRUE);
+
+--echo === JSON_TYPE — arity ===
+
+--error 1105
+SELECT JSON_TYPE();
+--error 1105
+SELECT JSON_TYPE('{}', '$');
+
+--echo === JSON_VALID — valid scalar / container values → 1 ===
+
+SELECT JSON_VALID('null')                     AS valid_json_null;
+SELECT JSON_VALID('true')                     AS valid_true;
+SELECT JSON_VALID('false')                    AS valid_false;
+SELECT JSON_VALID('42')                       AS valid_int;
+SELECT JSON_VALID('-1')                       AS valid_neg_int;
+SELECT JSON_VALID('3.14')                     AS valid_decimal;
+SELECT JSON_VALID('1e10')                     AS valid_exponent;
+SELECT JSON_VALID('"abc"')                    AS valid_string;
+SELECT JSON_VALID('""')                       AS valid_empty_string;
+SELECT JSON_VALID('[]')                       AS valid_empty_array;
+SELECT JSON_VALID('{}')                       AS valid_empty_object;
+SELECT JSON_VALID('[[[1]]]')                  AS valid_nested_array;
+SELECT JSON_VALID('{"a":{"b":1}}')            AS valid_nested_object;
+
+--echo === JSON_VALID — common malformed shapes → 0 ===
+
+# Unquoted key.
+SELECT JSON_VALID('{a:1}')                    AS bad_unquoted_key;
+# Single-quoted string (JSON requires double quotes).
+SELECT JSON_VALID('{"a":''bad''}')            AS bad_single_quoted_value;
+# Trailing comma in array.
+SELECT JSON_VALID('[1,2,]')                   AS bad_trailing_comma_arr;
+# Trailing comma in object.
+SELECT JSON_VALID('{"a":1,}')                 AS bad_trailing_comma_obj;
+# Mismatched bracket.
+SELECT JSON_VALID('[1,2,3}')                  AS bad_mismatched_bracket;
+# Empty string is NOT valid JSON.
+SELECT JSON_VALID('')                         AS bad_empty_string;
+# Pure whitespace.
+SELECT JSON_VALID('   ')                      AS bad_whitespace_only;
+# Truncated.
+SELECT JSON_VALID('{"a":')                    AS bad_truncated;
+
+--echo === JSON_VALID — NULL passthrough ===
+
+SELECT JSON_VALID(NULL) IS NULL               AS sql_null_passthrough;
+
+--echo === JSON_VALID — non-string non-JSON types → 0 (silent fallback) ===
+
+# Impl: `_ => Ok(Value::Int32(0))`. This is silent — no error.
+# Pin it so a refactor that swaps to "error on wrong type"
+# is caught by this slice.
+SELECT JSON_VALID(42)                         AS int_input_zero;
+SELECT JSON_VALID(3.14)                       AS double_input_zero;
+SELECT JSON_VALID(TRUE)                       AS bool_input_zero;
+
+--echo === JSON_VALID — already-typed JSONB → always 1 ===
+
+# CAST(... AS JSONB) lands a Value::Jsonb; impl returns 1
+# unconditionally (well-formed by construction).
+SELECT JSON_VALID(CAST('{"a":1}' AS JSONB))   AS jsonb_obj_valid;
+SELECT JSON_VALID(CAST('null'     AS JSONB))  AS jsonb_null_valid;
+SELECT JSON_VALID(CAST('[]'       AS JSONB))  AS jsonb_empty_valid;
+
+--echo === JSON_VALID — arity ===
+
+--error 1105
+SELECT JSON_VALID();
+--error 1105
+SELECT JSON_VALID('{}', '$');
+
+--echo === Determinism ===
+
+SELECT JSON_TYPE('[1,2,3]')   = JSON_TYPE('[1,2,3]')   AS type_det;
+SELECT JSON_VALID('{"a":1}')  = JSON_VALID('{"a":1}')  AS valid_det;
