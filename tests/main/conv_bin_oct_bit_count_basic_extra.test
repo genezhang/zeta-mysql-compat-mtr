@@ -1,0 +1,144 @@
+# Independently authored BIN / OCT / CONV / BIT_COUNT smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/. All four numeric-base / bit functions
+# are implemented in zeta but had no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   BIN(n)       — binary string of n's 64-bit two's-complement
+#                  representation. Negative → upper unsigned bits.
+#   OCT(n)       — same, octal.
+#   CONV(n, f, t) — render n (parsed in base `f`) in base `t`.
+#                  Bases 2..36. Negative to_base → signed result.
+#                  Invalid digits stop parse (returns whatever was
+#                  parsed up to that point, or 0 if nothing).
+#   BIT_COUNT(n) — population count of n's 64-bit two's-complement
+#                  representation (Rust `count_ones`).
+#
+# Adaptation notes:
+#   # zeta-adapt: BIN/OCT cast i64 to u64 via `as`, so negative n
+#     surfaces as a very large unsigned value (matches MySQL).
+#   # zeta-adapt: CONV is case-insensitive for input digits
+#     (a-z and A-Z both work); output is always upper-case.
+#   # zeta-adapt: CONV invalid bases (outside 2..36) → NULL,
+#     NOT an error. Matches MySQL.
+#   # zeta-adapt: CONV string-input parse-until-invalid-digit
+#     (matches MySQL).
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === BIN: known small values ===
+
+SELECT BIN(0)                            AS zero;
+SELECT BIN(1)                            AS one;
+SELECT BIN(2)                            AS two;
+SELECT BIN(5)                            AS five;
+SELECT BIN(255)                          AS byte_max;
+SELECT BIN(1024)                         AS kilo;
+
+--echo === BIN: negative → 64-bit two's complement (large unsigned) ===
+
+# BIN(-1) is all-1s = 64 ones.
+SELECT BIN(-1)                           AS neg_one;
+SELECT LENGTH(BIN(-1)) = 64              AS neg_one_len_64;
+
+--echo === BIN: NULL passthrough + arity ===
+
+SELECT BIN(NULL) IS NULL                 AS null_passes;
+--error 1105
+SELECT BIN();
+--error 1105
+SELECT BIN(1, 2);
+
+--echo === OCT: known small values ===
+
+SELECT OCT(0)                            AS zero;
+SELECT OCT(8)                            AS eight;
+SELECT OCT(64)                           AS sixty_four;
+SELECT OCT(511)                          AS three_digit;
+SELECT OCT(4096)                         AS five_digit;
+SELECT OCT(NULL) IS NULL                 AS null_passes;
+
+--echo === BIT_COUNT: known small values ===
+
+SELECT BIT_COUNT(0)                      AS zero_bits;
+SELECT BIT_COUNT(1)                      AS one_bit;
+SELECT BIT_COUNT(7)                      AS three_bits;
+SELECT BIT_COUNT(15)                     AS four_bits;
+SELECT BIT_COUNT(255)                    AS eight_bits;
+SELECT BIT_COUNT(1023)                   AS ten_bits;
+# Power of two has exactly one bit set.
+SELECT BIT_COUNT(1024)                   AS one_bit_pow2;
+# -1 is all-1s → 64.
+SELECT BIT_COUNT(-1)                     AS minus_one_64_bits;
+SELECT BIT_COUNT(NULL) IS NULL           AS null_passes;
+--error 1105
+SELECT BIT_COUNT();
+
+--echo === CONV: classic vectors ===
+
+# decimal → hex
+SELECT CONV(255, 10, 16)                 AS dec_to_hex;
+SELECT CONV(15, 10, 2)                   AS dec_to_bin;
+# hex → decimal (case-insensitive input)
+SELECT CONV('ff', 16, 10)                AS hex_lower_to_dec;
+SELECT CONV('FF', 16, 10)                AS hex_upper_to_dec;
+# Cross-base round-trip identity (decimal → hex → decimal).
+SELECT CONV(CONV(1234, 10, 16), 16, 10)  AS round_trip;
+
+--echo === CONV: output is always upper-case ===
+
+SELECT CONV(255, 10, 16)                  = 'FF' AS upper_hex;
+SELECT CONV(11259375, 10, 16)             = 'ABCDEF' AS upper_hex_long;
+
+--echo === CONV: signed vs unsigned to_base ===
+
+# Positive to_base: unsigned interpretation. -1 wraps in 2^64.
+SELECT CONV(-1, 10, 16)                  AS neg_unsigned_to;
+# Negative to_base: signed interpretation. -1 stays -1.
+SELECT CONV(-1, 10, -10)                 AS neg_signed_to;
+SELECT CONV(-255, 10, -16)               AS neg_signed_hex;
+
+--echo === CONV: invalid bases → NULL ===
+
+# Bases must be in 2..36 (abs). Anything else → NULL.
+SELECT CONV(255, 1, 16)  IS NULL         AS from_base_too_low;
+SELECT CONV(255, 37, 16) IS NULL         AS from_base_too_high;
+SELECT CONV(255, 10, 1)  IS NULL         AS to_base_too_low;
+SELECT CONV(255, 10, 37) IS NULL         AS to_base_too_high;
+SELECT CONV(255, 0, 16)  IS NULL         AS from_zero;
+SELECT CONV(255, 10, 0)  IS NULL         AS to_zero;
+
+--echo === CONV: parse-until-invalid-digit ===
+
+# MySQL stops at the first digit that's not valid in from_base.
+# 'F' is not valid in base 10, so '12F3' parses as 12.
+SELECT CONV('12F3', 10, 10)              AS parse_until_invalid;
+# '1z' in base 16 — 'z' is invalid in base 16 (digits 0-f only)
+# so just '1' is parsed.
+SELECT CONV('1z', 16, 10)                AS hex_invalid_z;
+# No valid prefix at all → 0.
+SELECT CONV('zzz', 10, 10)               AS no_valid_prefix;
+
+--echo === CONV: NULL on any arg ===
+
+SELECT CONV(NULL, 10, 16) IS NULL        AS null_n;
+SELECT CONV(255, NULL, 16) IS NULL       AS null_from;
+SELECT CONV(255, 10, NULL) IS NULL       AS null_to;
+
+--echo === CONV: arity errors ===
+
+--error 1105
+SELECT CONV();
+--error 1105
+SELECT CONV(255);
+--error 1105
+SELECT CONV(255, 10);
+--error 1105
+SELECT CONV(255, 10, 16, 'extra');
+
+--echo === Determinism (cross-family) ===
+
+SELECT BIN(5)        = BIN(5)            AS bin_det;
+SELECT OCT(8)        = OCT(8)            AS oct_det;
+SELECT BIT_COUNT(7)  = BIT_COUNT(7)      AS bc_det;
+SELECT CONV(255, 10, 16) = CONV(255, 10, 16) AS conv_det;

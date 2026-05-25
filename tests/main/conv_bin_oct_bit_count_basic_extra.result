@@ -1,0 +1,177 @@
+=== BIN: known small values ===
+SELECT BIN(0)                            AS zero;
+zero
+0
+SELECT BIN(1)                            AS one;
+one
+1
+SELECT BIN(2)                            AS two;
+two
+10
+SELECT BIN(5)                            AS five;
+five
+101
+SELECT BIN(255)                          AS byte_max;
+byte_max
+11111111
+SELECT BIN(1024)                         AS kilo;
+kilo
+10000000000
+=== BIN: negative → 64-bit two's complement (large unsigned) ===
+SELECT BIN(-1)                           AS neg_one;
+neg_one
+1111111111111111111111111111111111111111111111111111111111111111
+SELECT LENGTH(BIN(-1)) = 64              AS neg_one_len_64;
+neg_one_len_64
+1
+=== BIN: NULL passthrough + arity ===
+SELECT BIN(NULL) IS NULL                 AS null_passes;
+null_passes
+1
+SELECT BIN();
+ERROR 1105: execution error: BIN requires 1 argument
+SELECT BIN(1, 2);
+ERROR 1105: execution error: BIN requires 1 argument
+=== OCT: known small values ===
+SELECT OCT(0)                            AS zero;
+zero
+0
+SELECT OCT(8)                            AS eight;
+eight
+10
+SELECT OCT(64)                           AS sixty_four;
+sixty_four
+100
+SELECT OCT(511)                          AS three_digit;
+three_digit
+777
+SELECT OCT(4096)                         AS five_digit;
+five_digit
+10000
+SELECT OCT(NULL) IS NULL                 AS null_passes;
+null_passes
+1
+=== BIT_COUNT: known small values ===
+SELECT BIT_COUNT(0)                      AS zero_bits;
+zero_bits
+0
+SELECT BIT_COUNT(1)                      AS one_bit;
+one_bit
+1
+SELECT BIT_COUNT(7)                      AS three_bits;
+three_bits
+3
+SELECT BIT_COUNT(15)                     AS four_bits;
+four_bits
+4
+SELECT BIT_COUNT(255)                    AS eight_bits;
+eight_bits
+8
+SELECT BIT_COUNT(1023)                   AS ten_bits;
+ten_bits
+10
+SELECT BIT_COUNT(1024)                   AS one_bit_pow2;
+one_bit_pow2
+1
+SELECT BIT_COUNT(-1)                     AS minus_one_64_bits;
+minus_one_64_bits
+64
+SELECT BIT_COUNT(NULL) IS NULL           AS null_passes;
+null_passes
+1
+SELECT BIT_COUNT();
+ERROR 1105: execution error: BIT_COUNT requires 1 argument
+=== CONV: classic vectors ===
+SELECT CONV(255, 10, 16)                 AS dec_to_hex;
+dec_to_hex
+FF
+SELECT CONV(15, 10, 2)                   AS dec_to_bin;
+dec_to_bin
+1111
+SELECT CONV('ff', 16, 10)                AS hex_lower_to_dec;
+hex_lower_to_dec
+255
+SELECT CONV('FF', 16, 10)                AS hex_upper_to_dec;
+hex_upper_to_dec
+255
+SELECT CONV(CONV(1234, 10, 16), 16, 10)  AS round_trip;
+round_trip
+1234
+=== CONV: output is always upper-case ===
+SELECT CONV(255, 10, 16)                  = 'FF' AS upper_hex;
+upper_hex
+1
+SELECT CONV(11259375, 10, 16)             = 'ABCDEF' AS upper_hex_long;
+upper_hex_long
+1
+=== CONV: signed vs unsigned to_base ===
+SELECT CONV(-1, 10, 16)                  AS neg_unsigned_to;
+neg_unsigned_to
+FFFFFFFFFFFFFFFF
+SELECT CONV(-1, 10, -10)                 AS neg_signed_to;
+neg_signed_to
+-1
+SELECT CONV(-255, 10, -16)               AS neg_signed_hex;
+neg_signed_hex
+-FF
+=== CONV: invalid bases → NULL ===
+SELECT CONV(255, 1, 16)  IS NULL         AS from_base_too_low;
+from_base_too_low
+1
+SELECT CONV(255, 37, 16) IS NULL         AS from_base_too_high;
+from_base_too_high
+1
+SELECT CONV(255, 10, 1)  IS NULL         AS to_base_too_low;
+to_base_too_low
+1
+SELECT CONV(255, 10, 37) IS NULL         AS to_base_too_high;
+to_base_too_high
+1
+SELECT CONV(255, 0, 16)  IS NULL         AS from_zero;
+from_zero
+1
+SELECT CONV(255, 10, 0)  IS NULL         AS to_zero;
+to_zero
+1
+=== CONV: parse-until-invalid-digit ===
+SELECT CONV('12F3', 10, 10)              AS parse_until_invalid;
+parse_until_invalid
+12
+SELECT CONV('1z', 16, 10)                AS hex_invalid_z;
+hex_invalid_z
+1
+SELECT CONV('zzz', 10, 10)               AS no_valid_prefix;
+no_valid_prefix
+0
+=== CONV: NULL on any arg ===
+SELECT CONV(NULL, 10, 16) IS NULL        AS null_n;
+null_n
+1
+SELECT CONV(255, NULL, 16) IS NULL       AS null_from;
+null_from
+1
+SELECT CONV(255, 10, NULL) IS NULL       AS null_to;
+null_to
+1
+=== CONV: arity errors ===
+SELECT CONV();
+ERROR 1105: execution error: CONV requires 3 arguments
+SELECT CONV(255);
+ERROR 1105: execution error: CONV requires 3 arguments
+SELECT CONV(255, 10);
+ERROR 1105: execution error: CONV requires 3 arguments
+SELECT CONV(255, 10, 16, 'extra');
+ERROR 1105: execution error: CONV requires 3 arguments
+=== Determinism (cross-family) ===
+SELECT BIN(5)        = BIN(5)            AS bin_det;
+bin_det
+1
+SELECT OCT(8)        = OCT(8)            AS oct_det;
+oct_det
+1
+SELECT BIT_COUNT(7)  = BIT_COUNT(7)      AS bc_det;
+bc_det
+1
+SELECT CONV(255, 10, 16) = CONV(255, 10, 16) AS conv_det;
+conv_det
+1
