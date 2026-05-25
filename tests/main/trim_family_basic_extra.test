@@ -22,8 +22,12 @@
 #     points (any char in `chars` is trimmable in any position).
 #     Matches MySQL behavior for ASCII; UTF-8 chars work the
 #     same way.
-#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
-#     differ, behavior (reject) matches.
+#   # zeta-adapt: Arity errors split by code: TRIM() is a
+#     SQL-standard keyword with its own grammar, so the parser
+#     rejects with 1064. LTRIM()/RTRIM() are regular function
+#     calls, so the executor arity guard rejects with 1105.
+#     MySQL would use 1582 for both, but the behavior (reject)
+#     matches in all cases.
 
 --echo === TRIM: default whitespace (both ends) ===
 
@@ -67,10 +71,23 @@ SELECT TRIM('x' FROM 'hello')             AS no_match;
 SELECT TRIM('x' FROM 'xxxxx')             AS all_match;
 SELECT LENGTH(TRIM('x' FROM 'xxxxx')) = 0 AS all_match_zero_len;
 
+--echo === Empty char-set is a silent no-op (all three) ===
+
+# Vec<char>::contains over an empty vec is always false, so
+# nothing matches the trimmer — input passes through unchanged.
+SELECT TRIM('' FROM 'hello')              AS trim_empty_set;
+SELECT LTRIM('hello', '')                 AS ltrim_empty_set;
+SELECT RTRIM('hello', '')                 AS rtrim_empty_set;
+SELECT LENGTH(TRIM('' FROM '   hello   '))  = 11 AS trim_empty_set_keeps_ws;
+
 --echo === LTRIM / RTRIM: directionality (default whitespace) ===
 
 SELECT LTRIM('   hello   ')               AS ltrim_basic;
 SELECT RTRIM('   hello   ')               AS rtrim_basic;
+# Only-whitespace input for LTRIM/RTRIM (TRIM has the analog
+# above). Each side strips its end → empty regardless.
+SELECT LENGTH(LTRIM('     '))   = 0       AS ltrim_only_ws_zero_len;
+SELECT LENGTH(RTRIM('     '))   = 0       AS rtrim_only_ws_zero_len;
 # Length pins so we know exactly how much was stripped.
 SELECT LENGTH(LTRIM('   hello   '))   = 8 AS ltrim_keeps_trailing;
 SELECT LENGTH(RTRIM('   hello   '))   = 8 AS rtrim_keeps_leading;
@@ -115,6 +132,13 @@ SELECT RTRIM('hello', NULL)    IS NULL    AS rtrim_null_chars;
 SELECT TRIM('  x  ')  = TRIM('  x  ')     AS trim_det;
 SELECT LTRIM('  x  ') = LTRIM('  x  ')    AS ltrim_det;
 SELECT RTRIM('  x  ') = RTRIM('  x  ')    AS rtrim_det;
+
+--echo === Idempotency ===
+
+# Trimming a trimmed string is a no-op (all three).
+SELECT TRIM(TRIM('  hello  '))   = TRIM('  hello  ')   AS trim_idem;
+SELECT LTRIM(LTRIM('  hello  ')) = LTRIM('  hello  ')  AS ltrim_idem;
+SELECT RTRIM(RTRIM('  hello  ')) = RTRIM('  hello  ')  AS rtrim_idem;
 
 --echo === Arity errors ===
 

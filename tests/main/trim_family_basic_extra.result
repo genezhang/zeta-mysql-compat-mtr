@@ -57,6 +57,19 @@ all_match
 SELECT LENGTH(TRIM('x' FROM 'xxxxx')) = 0 AS all_match_zero_len;
 all_match_zero_len
 1
+=== Empty char-set is a silent no-op (all three) ===
+SELECT TRIM('' FROM 'hello')              AS trim_empty_set;
+trim_empty_set
+hello
+SELECT LTRIM('hello', '')                 AS ltrim_empty_set;
+ltrim_empty_set
+hello
+SELECT RTRIM('hello', '')                 AS rtrim_empty_set;
+rtrim_empty_set
+hello
+SELECT LENGTH(TRIM('' FROM '   hello   '))  = 11 AS trim_empty_set_keeps_ws;
+trim_empty_set_keeps_ws
+1
 === LTRIM / RTRIM: directionality (default whitespace) ===
 SELECT LTRIM('   hello   ')               AS ltrim_basic;
 ltrim_basic
@@ -64,6 +77,12 @@ hello
 SELECT RTRIM('   hello   ')               AS rtrim_basic;
 rtrim_basic
    hello
+SELECT LENGTH(LTRIM('     '))   = 0       AS ltrim_only_ws_zero_len;
+ltrim_only_ws_zero_len
+1
+SELECT LENGTH(RTRIM('     '))   = 0       AS rtrim_only_ws_zero_len;
+rtrim_only_ws_zero_len
+1
 SELECT LENGTH(LTRIM('   hello   '))   = 8 AS ltrim_keeps_trailing;
 ltrim_keeps_trailing
 1
@@ -140,6 +159,16 @@ ltrim_det
 1
 SELECT RTRIM('  x  ') = RTRIM('  x  ')    AS rtrim_det;
 rtrim_det
+1
+=== Idempotency ===
+SELECT TRIM(TRIM('  hello  '))   = TRIM('  hello  ')   AS trim_idem;
+trim_idem
+1
+SELECT LTRIM(LTRIM('  hello  ')) = LTRIM('  hello  ')  AS ltrim_idem;
+ltrim_idem
+1
+SELECT RTRIM(RTRIM('  hello  ')) = RTRIM('  hello  ')  AS rtrim_idem;
+rtrim_idem
 1
 === Arity errors ===
 SELECT TRIM();
