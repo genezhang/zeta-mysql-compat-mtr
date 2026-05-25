@@ -25,6 +25,10 @@ int_needle
 SELECT FIELD('2', 1, 2, 3)             AS string_needle_int_hay;
 string_needle_int_hay
 2
+=== FIELD: case sensitivity (zeta byte-equal divergence) ===
+SELECT FIELD('B', 'a', 'b', 'c')       AS case_byte_equal;
+case_byte_equal
+0
 === FIND_IN_SET: basic comma-split ===
 SELECT FIND_IN_SET('b', 'a,b,c')   AS hit_second;
 hit_second
@@ -61,6 +65,10 @@ null_needle
 SELECT FIND_IN_SET('a',  NULL)     IS NULL AS null_csv;
 null_csv
 1
+=== FIND_IN_SET: case sensitivity (zeta byte-equal divergence) ===
+SELECT FIND_IN_SET('B', 'a,b,c')   AS case_byte_equal;
+case_byte_equal
+0
 === ELT: 1-based pick ===
 SELECT ELT(1, 'a', 'b', 'c')   AS pick_first;
 pick_first
@@ -88,8 +96,11 @@ SELECT ELT(2, 'a', NULL)       IS NULL AS null_element;
 null_element
 1
 === ELT: non-integer N coerces to NULL (not error) ===
-SELECT ELT('abc', 'a', 'b')    IS NULL AS string_n;
-string_n
+SELECT ELT('abc', 'a', 'b')    IS NULL AS string_n_nonnum;
+string_n_nonnum
+1
+SELECT ELT('2',   'a', 'b')    IS NULL AS string_n_digits_zeta_null;
+string_n_digits_zeta_null
 1
 === Determinism cross-check ===
 SELECT FIELD('b', 'a', 'b') = FIELD('b', 'a', 'b')       AS field_det;

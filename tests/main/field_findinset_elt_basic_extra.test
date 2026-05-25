@@ -47,6 +47,15 @@ SELECT FIELD('b', 'a', NULL, 'b')      AS skips_null;
 SELECT FIELD(2, '1', '2', '3')         AS int_needle;
 SELECT FIELD('2', 1, 2, 3)             AS string_needle_int_hay;
 
+--echo === FIELD: case sensitivity (zeta byte-equal divergence) ===
+
+# Documented divergence: MySQL default (non-_bin) collation is
+# case-insensitive, so FIELD('B','a','b','c') = 2 in MySQL.
+# zeta compares via byte-equal value_to_sql_string, so 'B' != 'b'
+# and the answer is 0. Pinning the zeta semantic; if zeta later
+# follows MySQL collation, this will visibly change.
+SELECT FIELD('B', 'a', 'b', 'c')       AS case_byte_equal;
+
 --echo === FIND_IN_SET: basic comma-split ===
 
 SELECT FIND_IN_SET('b', 'a,b,c')   AS hit_second;
@@ -71,6 +80,12 @@ SELECT FIND_IN_SET('a,b', 'a,b,c') AS comma_needle;
 SELECT FIND_IN_SET(NULL, 'a,b')    IS NULL AS null_needle;
 SELECT FIND_IN_SET('a',  NULL)     IS NULL AS null_csv;
 
+--echo === FIND_IN_SET: case sensitivity (zeta byte-equal divergence) ===
+
+# Same story as FIELD: MySQL default = case-insensitive, zeta =
+# byte-equal. FIND_IN_SET('B','a,b,c') = 2 in MySQL, 0 in zeta.
+SELECT FIND_IN_SET('B', 'a,b,c')   AS case_byte_equal;
+
 --echo === ELT: 1-based pick ===
 
 SELECT ELT(1, 'a', 'b', 'c')   AS pick_first;
@@ -87,7 +102,12 @@ SELECT ELT(2, 'a', NULL)       IS NULL AS null_element;
 
 --echo === ELT: non-integer N coerces to NULL (not error) ===
 
-SELECT ELT('abc', 'a', 'b')    IS NULL AS string_n;
+# zeta's value_to_i64_opt rejects ALL non-numeric Value variants,
+# so any string-typed N — even a string of digits — coerces to
+# NULL. MySQL would string-to-int coerce '2' → 2 and return 'b'.
+# Pin both cases so the divergence is visible.
+SELECT ELT('abc', 'a', 'b')    IS NULL AS string_n_nonnum;
+SELECT ELT('2',   'a', 'b')    IS NULL AS string_n_digits_zeta_null;
 
 --echo === Determinism cross-check ===
 
