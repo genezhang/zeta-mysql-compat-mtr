@@ -1,0 +1,184 @@
+# Independently authored JSON_LENGTH / JSON_DEPTH / JSON_KEYS
+# quirks-and-asymmetries smoke for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_basic.test: table-shape basics, CAST(NULL AS JSON)
+#   - json_introspect.test (json/ suite): table-shape variants
+#   - json_keys_path_basic_extra.test: full path-arg matrix
+#   - json_path_basic_extra.test: 2-arg KNOWN-GAP, simple depth
+#
+# This slice pins what those slices DO NOT:
+#   - JSON null vs SQL NULL asymmetry between LENGTH and DEPTH
+#     (per impl comments in JSON_DEPTH / JSON_LENGTH arms).
+#   - JSON_LENGTH on the full scalar matrix (string, bool,
+#     integer, double, JSON null) — only the 'scalar_n' case
+#     in json_basic uses an integer scalar.
+#   - JSON_DEPTH formula walk — every step from scalar (1) up
+#     through alternating array/object nesting and a mixed-shape
+#     nested case.
+#   - JSON_KEYS empty-object behavior (empty JSON ARRAY, NOT
+#     SQL NULL — distinct from non-object → NULL).
+#   - JSON_KEYS ordering — alphabetic via zeta-jsonb's sorted
+#     binary, not insertion-order.
+#   - JSON_KEYS object keys containing special characters
+#     (quote, backslash) — round-trip through
+#     JsonbValue::from_str_value.
+#
+# Big-picture finding:
+#   The JSON-null handling is asymmetric:
+#     JSON_LENGTH(JSON null) → SQL NULL  (early-out in
+#                                          JSON_LENGTH arm)
+#     JSON_DEPTH (JSON null) → 1         (folds into the
+#                                          scalar _ => 1 arm
+#                                          of jsonb_depth)
+#   This asymmetry is intentional (impl comment) but worth
+#   pinning so a "consistency fix" doesn't silently change one.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSON_LENGTH does NOT support 2-arg path form
+#     (KNOWN GAP — pinned in json_path_basic_extra.test). This
+#     slice only covers the 1-arg form.
+#   # zeta-adapt: JSON_KEYS preserves no insertion order;
+#     zeta-jsonb's binary form sorts object keys alphabetically,
+#     so the keys array is alphabetic regardless of input order.
+#   # zeta-adapt: JSON_DEPTH on non-empty containers = 1 + max
+#     depth of children. JSON_DEPTH('{}')=1, JSON_DEPTH('{"a":1}')=2.
+#   # zeta-adapt: Invalid JSON → 1105 ERROR (MySQL would NULL).
+
+--echo === JSON-null vs SQL-null asymmetry (LENGTH vs DEPTH) ===
+
+# JSON literal 'null' — JSON_LENGTH treats as SQL NULL,
+# JSON_DEPTH treats as scalar → 1.
+SELECT JSON_LENGTH('null') IS NULL           AS length_json_null_is_sql_null;
+SELECT JSON_DEPTH('null')                    AS depth_json_null_is_1;
+# Sanity: SQL NULL doc → SQL NULL from both (same handling).
+SELECT JSON_LENGTH(NULL)   IS NULL           AS length_sql_null;
+SELECT JSON_DEPTH(NULL)    IS NULL           AS depth_sql_null;
+
+--echo === JSON_LENGTH on the full scalar matrix → 1 ===
+
+SELECT JSON_LENGTH('"hello"')                AS scalar_string_1;
+SELECT JSON_LENGTH('true')                   AS scalar_bool_true_1;
+SELECT JSON_LENGTH('false')                  AS scalar_bool_false_1;
+SELECT JSON_LENGTH('42')                     AS scalar_int_1;
+SELECT JSON_LENGTH('3.14')                   AS scalar_double_1;
+
+--echo === JSON_LENGTH on empty container → 0 ===
+
+SELECT JSON_LENGTH('[]')                     AS empty_array_0;
+SELECT JSON_LENGTH('{}')                     AS empty_object_0;
+
+--echo === JSON_LENGTH on container with one element → 1 ===
+
+# Single-element container has length 1, NOT 0 — pin the count.
+SELECT JSON_LENGTH('[1]')                    AS one_elem_array;
+SELECT JSON_LENGTH('{"a":1}')                AS one_key_object;
+# Object length = key count regardless of value shape.
+SELECT JSON_LENGTH('{"a":[1,2,3,4,5]}')      AS object_one_complex_value;
+
+--echo === JSON_DEPTH formula walk ===
+
+# Scalar = 1.
+SELECT JSON_DEPTH('42')                      AS depth_scalar;
+SELECT JSON_DEPTH('"x"')                     AS depth_string;
+SELECT JSON_DEPTH('true')                    AS depth_bool;
+# Empty containers = 1 (no children to recurse into).
+SELECT JSON_DEPTH('[]')                      AS depth_empty_array;
+SELECT JSON_DEPTH('{}')                      AS depth_empty_object;
+# 1 + max(child depth):
+#   [1]         → 1 + 1 = 2
+#   [[1]]       → 1 + 2 = 3
+#   [[[1]]]     → 1 + 3 = 4
+#   [[[[1]]]]   → 1 + 4 = 5
+SELECT JSON_DEPTH('[1]')                     AS depth_arr_1;
+SELECT JSON_DEPTH('[[1]]')                   AS depth_arr_2;
+SELECT JSON_DEPTH('[[[1]]]')                 AS depth_arr_3;
+SELECT JSON_DEPTH('[[[[1]]]]')               AS depth_arr_4;
+# Object nesting: {"a":1} → 2; {"a":{"b":1}} → 3; etc.
+SELECT JSON_DEPTH('{"a":1}')                 AS depth_obj_2;
+SELECT JSON_DEPTH('{"a":{"b":1}}')           AS depth_obj_3;
+
+--echo === JSON_DEPTH with mixed-shape nesting ===
+
+# Mix arrays and objects: depth counts both kinds uniformly.
+#   {"a":[1,2]} → 3 (object → array → scalar)
+#   [{"a":1}]   → 3 (array → object → scalar)
+#   {"a":[{"b":[1,2]}]} → 5
+SELECT JSON_DEPTH('{"a":[1,2]}')             AS mixed_oa_3;
+SELECT JSON_DEPTH('[{"a":1}]')               AS mixed_ao_3;
+SELECT JSON_DEPTH('{"a":[{"b":[1,2]}]}')     AS mixed_oaoa_5;
+# JSON_DEPTH takes the MAX over siblings, not the sum.
+# Object with two children of different depths: max wins.
+SELECT JSON_DEPTH('{"a":1, "b":[1,[2]]}')    AS depth_max_over_siblings;
+
+--echo === JSON_KEYS empty-object → empty JSON ARRAY (not SQL NULL) ===
+
+# Distinct from non-object → SQL NULL. Empty {} is still an
+# object, so JSON_KEYS returns the empty array '[]'.
+# (The JSON_LENGTH(JSON_KEYS('{}'))=0 wrapping pin lives in
+#  json_keys_path_basic_extra.test; not re-pinned here.)
+SELECT JSON_KEYS('{}')                       AS empty_obj_keys;
+SELECT JSON_KEYS('{}') IS NULL               AS empty_obj_keys_is_null_false;
+
+--echo === JSON_KEYS object keys with special chars ===
+
+# Keys flow through JsonbValue::from_str_value when packed back
+# into the keys array. Pin the round-trip for keys containing
+# quote and backslash (the two characters JSON string encoding
+# has to escape). MySQL escapes both as \" and \\.
+SELECT JSON_KEYS('{"a\"b":1,"c":2}')         AS key_with_quote;
+SELECT JSON_KEYS('{"a\\b":1,"c":2}')         AS key_with_backslash;
+
+--echo === JSON_KEYS sort order — alphabetic (zeta-jsonb binary) ===
+
+# zeta-jsonb stores objects with keys sorted lexicographically,
+# so JSON_KEYS returns them alphabetically REGARDLESS of input
+# order. MySQL preserves insertion order; documented divergence.
+SELECT JSON_KEYS('{"z":1,"a":2,"m":3}')      AS sorted_alpha;
+SELECT JSON_KEYS('{"banana":1,"apple":2,"cherry":3}')
+                                              AS sorted_alpha_words;
+# Numeric-ish keys still sort lexicographically (string-wise).
+# "10" < "2" lexicographically, so the order is "1","10","2".
+SELECT JSON_KEYS('{"2":1,"1":2,"10":3}')     AS sorted_alpha_numeric_keys;
+
+--echo === JSON_KEYS on non-object root → SQL NULL ===
+
+# Array root, scalar root, JSON-null root: all return SQL NULL
+# (one-arg form's "is the target an object" gate at lib.rs:53639).
+SELECT JSON_KEYS('[1,2,3]')   IS NULL        AS array_root_null;
+SELECT JSON_KEYS('"hello"')   IS NULL        AS scalar_string_null;
+SELECT JSON_KEYS('42')        IS NULL        AS scalar_int_null;
+SELECT JSON_KEYS('null')      IS NULL        AS json_null_null;
+
+--echo === Invalid JSON → ERROR (zeta strict; MySQL NULLs) ===
+
+--error 1105
+SELECT JSON_LENGTH('not json');
+--error 1105
+SELECT JSON_DEPTH('not json');
+--error 1105
+SELECT JSON_KEYS('not json');
+
+--echo === Arity errors ===
+
+# JSON_LENGTH: 1-arg only (2-arg path form documented as KNOWN
+# GAP in json_path_basic_extra.test — don't re-pin).
+--error 1105
+SELECT JSON_LENGTH();
+# JSON_DEPTH: 1-arg only.
+--error 1105
+SELECT JSON_DEPTH();
+--error 1105
+SELECT JSON_DEPTH('{"a":1}', '$.a');
+# JSON_KEYS: 1 or 2 args (3-arg form rejected — pinned in
+# json_keys_path_basic_extra.test, not re-pinned here).
+
+--echo === Determinism ===
+
+SELECT JSON_LENGTH('{"a":1,"b":2}')
+     = JSON_LENGTH('{"a":1,"b":2}')          AS length_det;
+SELECT JSON_DEPTH('{"a":[1,2]}')
+     = JSON_DEPTH('{"a":[1,2]}')             AS depth_det;
+SELECT JSON_KEYS('{"a":1,"b":2}')
+     = JSON_KEYS('{"a":1,"b":2}')            AS keys_det;
