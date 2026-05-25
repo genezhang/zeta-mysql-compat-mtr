@@ -1,0 +1,107 @@
+# Independently authored REPLACE smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+# Implemented in zeta but had no compat-mtr coverage yet.
+#
+# Big-picture finding:
+#   REPLACE(str, from, to) — replace every non-overlapping
+#       occurrence of `from` in `str` with `to`. Returns NULL
+#       if any of the three args is NULL.
+#
+# Adaptation notes:
+#   # zeta-adapt: zeta uses Rust's `str::replace` under the
+#     hood. This treats an EMPTY `from` as a position-between-
+#     every-char marker, so REPLACE('abc', '', 'X') = 'XaXbXcX'
+#     (4 insertions: before each char + at end). MySQL treats
+#     empty `from` as a no-op (returns 'abc'). Locked in as a
+#     real zeta-vs-MySQL divergence.
+#   # zeta-adapt: Case-sensitive byte-equal matching (same
+#     story as INSTR / FIND_IN_SET / FIELD). MySQL default
+#     would be case-insensitive.
+#   # zeta-adapt: REPLACE requires EXACTLY 3 args — no 2-arg
+#     form. Arity errors → 1105 (MySQL: 1582).
+
+--echo === REPLACE: basic ===
+
+SELECT REPLACE('hello world', 'world', 'earth') AS basic;
+SELECT REPLACE('abc', 'b', 'B')                  AS single_char;
+SELECT REPLACE('hello', 'x', 'Y')                AS no_match;
+
+--echo === REPLACE: all occurrences (not just first) ===
+
+SELECT REPLACE('aaaa', 'a', 'b')                 AS all_chars;
+SELECT REPLACE('ababab', 'a', 'X')               AS every_other;
+SELECT REPLACE('xxXxx', 'x', 'a')                AS case_sensitive_partial;
+
+--echo === REPLACE: empty 'to' = removal ===
+
+SELECT REPLACE('xhellox', 'x', '')               AS remove_x;
+SELECT REPLACE('aaaa', 'aa', '')                 AS remove_pair;
+SELECT REPLACE('foo bar baz', ' ', '')           AS remove_spaces;
+SELECT LENGTH(REPLACE('xxxxx', 'x', ''))    = 0  AS all_removed_zero_len;
+
+--echo === REPLACE: empty 'from' (zeta-vs-MySQL divergence) ===
+
+# Rust's str.replace("", "X") inserts X at every position
+# (char count + 1). 'abc' has 3 chars → 4 insertions → 'XaXbXcX'.
+# MySQL treats empty 'from' as a no-op (returns 'abc' unchanged).
+# Pinning the zeta divergence.
+SELECT REPLACE('abc', '', 'X')                   AS empty_from_inserts;
+SELECT LENGTH(REPLACE('abc', '', 'X')) = 7       AS empty_from_inserts_len;
+# Empty 'from' on empty input still inserts once.
+SELECT REPLACE('', '', 'X')                      AS empty_from_empty_in;
+SELECT LENGTH(REPLACE('', '', 'X')) = 1          AS empty_from_empty_in_len;
+
+--echo === REPLACE: case sensitivity (byte-equal, zeta divergence) ===
+
+# zeta is byte-equal; MySQL default collation would be case-
+# insensitive. REPLACE('ABC', 'b', 'X') = 'ABC' in zeta (no
+# match), 'AXC' in MySQL.
+SELECT REPLACE('ABC', 'b', 'X')                  AS case_byte_equal_lower;
+SELECT REPLACE('abc', 'B', 'X')                  AS case_byte_equal_upper;
+
+--echo === REPLACE: multi-byte UTF-8 ===
+
+# 'café' → replace 'é' with 'e' = 'cafe' (5 bytes → 4 bytes).
+SELECT REPLACE('café', 'é', 'e')                 AS utf8_replace;
+SELECT LENGTH(REPLACE('café', 'é', 'e'))    = 4  AS utf8_len_after;
+# Replace ASCII inside multi-byte string: 'caféfa' → 'cXféfX'
+SELECT REPLACE('cafefa', 'a', 'X')               AS utf8_replace_ascii;
+# Multi-byte 'from' AND 'to' together — both are 2-byte.
+SELECT REPLACE('été', 'é', 'á')                  AS utf8_to_from;
+
+--echo === REPLACE: non-overlapping (left-to-right) ===
+
+# 'aaa' replace 'aa' with 'b': left-to-right one-pass yields
+# 'ba' (consume aa, then 'a' remains). NOT 'ab'.
+SELECT REPLACE('aaa', 'aa', 'b')                 AS non_overlap;
+# Longer 'to' than 'from': string grows.
+SELECT REPLACE('a', 'a', 'longer')               AS to_longer_than_from;
+# Shorter 'to' than 'from': string shrinks.
+SELECT REPLACE('ababab', 'ab', 'X')              AS to_shorter_than_from;
+
+--echo === REPLACE: NULL propagation on any arg ===
+
+SELECT REPLACE(NULL,    'a', 'b')  IS NULL       AS null_str;
+SELECT REPLACE('abc',  NULL,  'b') IS NULL       AS null_from;
+SELECT REPLACE('abc',   'a', NULL) IS NULL       AS null_to;
+
+--echo === REPLACE: numeric coercion (value_to_sql_string) ===
+
+SELECT REPLACE(12345, '23', 'XY')                AS int_str;
+SELECT REPLACE('abc', 1, 'X')                    AS int_from;
+SELECT REPLACE('abc', 'a', 1)                    AS int_to;
+
+--echo === REPLACE: determinism ===
+
+SELECT REPLACE('hello', 'l', 'L') = REPLACE('hello', 'l', 'L') AS deterministic;
+
+--echo === REPLACE: arity errors ===
+
+--error 1105
+SELECT REPLACE();
+--error 1105
+SELECT REPLACE('a');
+--error 1105
+SELECT REPLACE('a', 'b');
+--error 1105
+SELECT REPLACE('a', 'b', 'c', 'd');

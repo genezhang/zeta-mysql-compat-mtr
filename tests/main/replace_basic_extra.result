@@ -1,0 +1,109 @@
+=== REPLACE: basic ===
+SELECT REPLACE('hello world', 'world', 'earth') AS basic;
+basic
+hello earth
+SELECT REPLACE('abc', 'b', 'B')                  AS single_char;
+single_char
+aBc
+SELECT REPLACE('hello', 'x', 'Y')                AS no_match;
+no_match
+hello
+=== REPLACE: all occurrences (not just first) ===
+SELECT REPLACE('aaaa', 'a', 'b')                 AS all_chars;
+all_chars
+bbbb
+SELECT REPLACE('ababab', 'a', 'X')               AS every_other;
+every_other
+XbXbXb
+SELECT REPLACE('xxXxx', 'x', 'a')                AS case_sensitive_partial;
+case_sensitive_partial
+aaXaa
+=== REPLACE: empty 'to' = removal ===
+SELECT REPLACE('xhellox', 'x', '')               AS remove_x;
+remove_x
+hello
+SELECT REPLACE('aaaa', 'aa', '')                 AS remove_pair;
+remove_pair
+
+SELECT REPLACE('foo bar baz', ' ', '')           AS remove_spaces;
+remove_spaces
+foobarbaz
+SELECT LENGTH(REPLACE('xxxxx', 'x', ''))    = 0  AS all_removed_zero_len;
+all_removed_zero_len
+1
+=== REPLACE: empty 'from' (zeta-vs-MySQL divergence) ===
+SELECT REPLACE('abc', '', 'X')                   AS empty_from_inserts;
+empty_from_inserts
+XaXbXcX
+SELECT LENGTH(REPLACE('abc', '', 'X')) = 7       AS empty_from_inserts_len;
+empty_from_inserts_len
+1
+SELECT REPLACE('', '', 'X')                      AS empty_from_empty_in;
+empty_from_empty_in
+X
+SELECT LENGTH(REPLACE('', '', 'X')) = 1          AS empty_from_empty_in_len;
+empty_from_empty_in_len
+1
+=== REPLACE: case sensitivity (byte-equal, zeta divergence) ===
+SELECT REPLACE('ABC', 'b', 'X')                  AS case_byte_equal_lower;
+case_byte_equal_lower
+ABC
+SELECT REPLACE('abc', 'B', 'X')                  AS case_byte_equal_upper;
+case_byte_equal_upper
+abc
+=== REPLACE: multi-byte UTF-8 ===
+SELECT REPLACE('café', 'é', 'e')                 AS utf8_replace;
+utf8_replace
+cafe
+SELECT LENGTH(REPLACE('café', 'é', 'e'))    = 4  AS utf8_len_after;
+utf8_len_after
+1
+SELECT REPLACE('cafefa', 'a', 'X')               AS utf8_replace_ascii;
+utf8_replace_ascii
+cXfefX
+SELECT REPLACE('été', 'é', 'á')                  AS utf8_to_from;
+utf8_to_from
+átá
+=== REPLACE: non-overlapping (left-to-right) ===
+SELECT REPLACE('aaa', 'aa', 'b')                 AS non_overlap;
+non_overlap
+ba
+SELECT REPLACE('a', 'a', 'longer')               AS to_longer_than_from;
+to_longer_than_from
+longer
+SELECT REPLACE('ababab', 'ab', 'X')              AS to_shorter_than_from;
+to_shorter_than_from
+XXX
+=== REPLACE: NULL propagation on any arg ===
+SELECT REPLACE(NULL,    'a', 'b')  IS NULL       AS null_str;
+null_str
+1
+SELECT REPLACE('abc',  NULL,  'b') IS NULL       AS null_from;
+null_from
+1
+SELECT REPLACE('abc',   'a', NULL) IS NULL       AS null_to;
+null_to
+1
+=== REPLACE: numeric coercion (value_to_sql_string) ===
+SELECT REPLACE(12345, '23', 'XY')                AS int_str;
+int_str
+1XY45
+SELECT REPLACE('abc', 1, 'X')                    AS int_from;
+int_from
+abc
+SELECT REPLACE('abc', 'a', 1)                    AS int_to;
+int_to
+1bc
+=== REPLACE: determinism ===
+SELECT REPLACE('hello', 'l', 'L') = REPLACE('hello', 'l', 'L') AS deterministic;
+deterministic
+1
+=== REPLACE: arity errors ===
+SELECT REPLACE();
+ERROR 1105: execution error: REPLACE requires 3 arguments
+SELECT REPLACE('a');
+ERROR 1105: execution error: REPLACE requires 3 arguments
+SELECT REPLACE('a', 'b');
+ERROR 1105: execution error: REPLACE requires 3 arguments
+SELECT REPLACE('a', 'b', 'c', 'd');
+ERROR 1105: execution error: REPLACE requires 3 arguments
