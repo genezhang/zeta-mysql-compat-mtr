@@ -1,0 +1,208 @@
+=== Year and month specifiers ===
+SELECT DATE_FORMAT('2024-03-15', '%Y')           AS year_4digit;
+year_4digit
+2024
+SELECT DATE_FORMAT('2024-03-15', '%y')           AS year_2digit;
+year_2digit
+24
+SELECT DATE_FORMAT('2024-03-15', '%m')           AS month_padded;
+month_padded
+03
+SELECT DATE_FORMAT('2024-03-15', '%c')           AS month_nopad;
+month_nopad
+3
+SELECT DATE_FORMAT('2024-03-15', '%M')           AS month_name;
+month_name
+March
+SELECT DATE_FORMAT('2024-03-15', '%b')           AS month_abbrev;
+month_abbrev
+Mar
+SELECT DATE_FORMAT('2024-09-01', '%m')           AS month_padded_sept;
+month_padded_sept
+09
+SELECT DATE_FORMAT('2024-09-01', '%c')           AS month_nopad_sept;
+month_nopad_sept
+9
+=== Day specifiers ===
+SELECT DATE_FORMAT('2024-03-15', '%d')           AS day_padded;
+day_padded
+15
+SELECT DATE_FORMAT('2024-03-15', '%e')           AS day_nopad;
+day_nopad
+15
+SELECT DATE_FORMAT('2024-03-01', '%d')           AS day_padded_first;
+day_padded_first
+01
+SELECT DATE_FORMAT('2024-03-01', '%e')           AS day_nopad_first;
+day_nopad_first
+1
+SELECT DATE_FORMAT('2024-03-01', '%D')           AS day_ordinal_first;
+day_ordinal_first
+1st
+SELECT DATE_FORMAT('2024-03-02', '%D')           AS day_ordinal_second;
+day_ordinal_second
+2nd
+SELECT DATE_FORMAT('2024-03-03', '%D')           AS day_ordinal_third;
+day_ordinal_third
+3rd
+SELECT DATE_FORMAT('2024-03-04', '%D')           AS day_ordinal_fourth;
+day_ordinal_fourth
+4th
+SELECT DATE_FORMAT('2024-03-11', '%D')           AS day_ordinal_eleventh;
+day_ordinal_eleventh
+11th
+SELECT DATE_FORMAT('2024-03-21', '%D')           AS day_ordinal_21st;
+day_ordinal_21st
+21st
+=== Hour specifiers (24h and 12h) ===
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%H')  AS hour_24_padded;
+hour_24_padded
+14
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%k')  AS hour_24_nopad;
+hour_24_nopad
+14
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%h')  AS hour_12_padded;
+hour_12_padded
+02
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%I')  AS hour_12_padded_alias;
+hour_12_padded_alias
+02
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%l')  AS hour_12_nopad;
+hour_12_nopad
+2
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%p')  AS am_pm;
+am_pm
+PM
+SELECT DATE_FORMAT('2024-03-15 00:30:00', '%h')  AS midnight_h12;
+midnight_h12
+12
+SELECT DATE_FORMAT('2024-03-15 12:30:00', '%h')  AS noon_h12;
+noon_h12
+12
+SELECT DATE_FORMAT('2024-03-15 00:30:00', '%p')  AS midnight_ampm;
+midnight_ampm
+AM
+SELECT DATE_FORMAT('2024-03-15 12:30:00', '%p')  AS noon_ampm;
+noon_ampm
+PM
+=== Minute / second / microsecond ===
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%i')  AS minute;
+minute
+30
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%S')  AS second_upper;
+second_upper
+45
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%s')  AS second_lower;
+second_lower
+45
+SELECT DATE_FORMAT('2024-03-15 14:30:45.123456', '%f') AS microsec;
+microsec
+123456
+SELECT DATE_FORMAT('2024-03-15', '%f')           AS microsec_date_only;
+microsec_date_only
+000000
+=== Composite time specifiers (%T, %r) ===
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%T')  AS time_24;
+time_24
+14:30:45
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%r')  AS time_12_ampm;
+time_12_ampm
+02:30:45 PM
+SELECT DATE_FORMAT('2024-03-15 00:30:00', '%r')  AS time_12_midnight;
+time_12_midnight
+12:30:00 AM
+=== Weekday specifiers ===
+SELECT DATE_FORMAT('2024-03-15', '%W')           AS weekday_full;
+weekday_full
+Friday
+SELECT DATE_FORMAT('2024-03-15', '%a')           AS weekday_abbrev;
+weekday_abbrev
+Fri
+SELECT DATE_FORMAT('2024-03-15', '%w')           AS weekday_numeric;
+weekday_numeric
+5
+=== Day-of-year (%j, zero-padded to 3) ===
+SELECT DATE_FORMAT('2024-01-01', '%j')           AS doy_1;
+doy_1
+001
+SELECT DATE_FORMAT('2024-02-29', '%j')           AS doy_leap_feb_29;
+doy_leap_feb_29
+060
+SELECT DATE_FORMAT('2024-12-31', '%j')           AS doy_leap_year_end;
+doy_leap_year_end
+366
+=== Weekday boundary days (%w 0=Sun..6=Sat) ===
+SELECT DATE_FORMAT('2024-01-07', '%w')           AS wday_sunday_0;
+wday_sunday_0
+0
+SELECT DATE_FORMAT('2024-01-13', '%w')           AS wday_saturday_6;
+wday_saturday_6
+6
+=== ISO week-year (%X, %v vs %X, %V) — year-boundary ===
+SELECT DATE_FORMAT('2024-12-30', '%x')           AS iso_week_year_2025;
+iso_week_year_2025
+2025
+SELECT DATE_FORMAT('2024-12-30', '%v')           AS iso_week_num_1;
+iso_week_num_1
+01
+SELECT DATE_FORMAT('2024-12-30', '%X')           AS sunday_week_year;
+sunday_week_year
+2025
+SELECT DATE_FORMAT('2024-12-30', '%V')           AS sunday_week_num;
+sunday_week_num
+01
+=== Pre-1970 date (negative-days path) ===
+SELECT DATE_FORMAT('1900-01-01', '%W')           AS pre_1970_weekday_name;
+pre_1970_weekday_name
+Monday
+SELECT DATE_FORMAT('1900-01-01', '%w')           AS pre_1970_weekday_num;
+pre_1970_weekday_num
+1
+SELECT DATE_FORMAT('1900-01-01', '%Y-%m-%d')     AS pre_1970_roundtrip;
+pre_1970_roundtrip
+1900-01-01
+=== Combined format strings ===
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S') AS iso_8601;
+iso_8601
+2024-03-15 14:30:45
+SELECT DATE_FORMAT('2024-03-15 14:30:45', '%a, %d %b %Y %T')   AS rfc_2822_ish;
+rfc_2822_ish
+Fri, 15 Mar 2024 14:30:45
+SELECT DATE_FORMAT('2024-03-15', '%M %D, %Y')                  AS pretty_date;
+pretty_date
+March 15th, 2024
+=== Literal text passthrough + %% escape ===
+SELECT DATE_FORMAT('2024-03-15', 'Year: %Y, Month: %M')   AS literal_text;
+literal_text
+Year: 2024, Month: March
+SELECT DATE_FORMAT('2024-03-15', '%Y%%')                  AS percent_escape;
+percent_escape
+2024%
+SELECT DATE_FORMAT('2024-03-15', '%Y%')                   AS trailing_percent;
+trailing_percent
+2024%
+=== Multi-byte UTF-8 in format string ===
+SELECT DATE_FORMAT('2024-03-15', '%Y é %m')               AS utf8_in_format;
+utf8_in_format
+2024 é 03
+=== Unknown specifier → ERROR (zeta divergence; MySQL emits verbatim) ===
+SELECT DATE_FORMAT('2024-03-15', '%z');
+ERROR 1105: execution error: DATE_FORMAT: unknown directive %z (see zeta #1093)
+=== NULL passthrough + arity ===
+SELECT DATE_FORMAT(NULL, '%Y')      IS NULL      AS null_date;
+null_date
+1
+SELECT DATE_FORMAT('2024-03-15', NULL) IS NULL   AS null_format;
+null_format
+1
+SELECT DATE_FORMAT();
+ERROR 1105: execution error: DATE_FORMAT requires 2 arguments
+SELECT DATE_FORMAT('2024-03-15');
+ERROR 1105: execution error: DATE_FORMAT requires 2 arguments
+SELECT DATE_FORMAT('2024-03-15', '%Y', 'extra');
+ERROR 1105: execution error: DATE_FORMAT requires 2 arguments
+=== Determinism ===
+SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d')
+     = DATE_FORMAT('2024-03-15', '%Y-%m-%d')                  AS deterministic;
+deterministic
+1
