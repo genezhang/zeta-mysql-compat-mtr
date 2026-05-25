@@ -1,0 +1,228 @@
+# Independently authored TRIG / MATH smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Covers the trig + extended-math family that had no
+# compat-mtr coverage:
+#   SIN / COS / TAN / COT
+#   ASIN / ACOS / ATAN / ATAN2
+#   SINH / COSH / TANH / ASINH / ACOSH / ATANH
+#   DEGREES / RADIANS / PI
+#   LOG2 / LOG10
+#
+# Existing coverage (do NOT duplicate):
+#   - log_ln_exp_basic_extra.test: LOG (1-arg = log10),
+#     LOG(b, x), LN, EXP. This slice does NOT re-pin LOG/LN/EXP
+#     but adds LOG2 / LOG10 which are siblings.
+#
+# Big-picture findings:
+#   - All functions in the trig arm route through
+#     value_to_f64_checked → std::f64 method → Value::Float64.
+#     NULL on any arg → NULL.
+#   - LOG2 / LOG10 share the LOG/LN strict-error policy:
+#     argument <= 0 → 1105 'cannot take logarithm of zero
+#     or negative number'. MySQL would NULL.
+#   - ATAN is OVERLOADED: ATAN(x) is single-arg arctan;
+#     ATAN(y, x) delegates to ATAN2(y, x). Documented in impl
+#     comment at zeta-server/src/lib.rs:46427-46431.
+#   - COT(0) = 1 / TAN(0) = 1/0 = +Infinity (NOT error).
+#     Pinned divergence: MySQL emits "out of range value".
+#   - Out-of-domain inputs to ASIN/ACOS/ACOSH/ATANH return
+#     NaN (std::f64 semantics, NOT error). Documented in impl
+#     comment "matches PG/Spark semantics".
+#
+# Adaptation notes:
+#   # zeta-adapt: Float-vs-Int comparison is type-strict. Most
+#     known-value pins use range bounds (`x > 0.99 AND x <
+#     1.01`) rather than equality to avoid the trap that
+#     ROUND(SIN(PI()/2), 10) = 1 fails (RIGHT side is Int,
+#     LEFT is Float). Same pattern as log_ln_exp slice.
+#   # zeta-adapt: COT(0) = +Inf (zeta uses std::f64 division),
+#     MySQL emits 'out of range value' error. Documented
+#     divergence.
+#   # zeta-adapt: Out-of-domain inputs to ASIN/ACOS/ACOSH/ATANH
+#     return NaN (no error). MySQL would NULL.
+#   # zeta-adapt: LOG2/LOG10 on <=0 → 1105 (PG-style strict).
+#     MySQL would NULL.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582).
+
+--echo === PI: zero-arg, returns std::f64::consts::PI ===
+
+# Range pin (avoid Float-vs-Int equality trap).
+SELECT PI() > 3.141 AND PI() < 3.142                          AS pi_range;
+# Higher-precision check.
+SELECT PI() > 3.14159265 AND PI() < 3.14159266                AS pi_high_precision;
+
+--echo === PI: rejects any arg ===
+
+--error 1105
+SELECT PI(1);
+--error 1105
+SELECT PI('foo');
+
+--echo === DEGREES / RADIANS: round-trip + known vectors ===
+
+# 180 degrees = π radians.
+SELECT RADIANS(180) > 3.141 AND RADIANS(180) < 3.142          AS rad_180_is_pi;
+SELECT DEGREES(PI())  > 179.99 AND DEGREES(PI())  < 180.01    AS deg_pi_is_180;
+# Round-trip: DEGREES(RADIANS(x)) ≈ x.
+SELECT ROUND(DEGREES(RADIANS(45)), 6) > 44.999
+   AND ROUND(DEGREES(RADIANS(45)), 6) < 45.001                AS round_trip_45;
+SELECT ROUND(DEGREES(RADIANS(360)), 6) > 359.999
+   AND ROUND(DEGREES(RADIANS(360)), 6) < 360.001              AS round_trip_360;
+
+--echo === SIN / COS / TAN: known angles ===
+
+# SIN(0) = 0, COS(0) = 1, TAN(0) = 0.
+SELECT ROUND(SIN(0), 10) > -0.001 AND ROUND(SIN(0), 10) < 0.001
+                                                              AS sin_0_is_0;
+SELECT ROUND(COS(0), 10) > 0.999 AND ROUND(COS(0), 10) < 1.001
+                                                              AS cos_0_is_1;
+SELECT ROUND(TAN(0), 10) > -0.001 AND ROUND(TAN(0), 10) < 0.001
+                                                              AS tan_0_is_0;
+# SIN(π/2) = 1, COS(π/2) = 0 (within fp precision).
+SELECT ROUND(SIN(PI()/2), 10) > 0.999
+   AND ROUND(SIN(PI()/2), 10) < 1.001                         AS sin_pi_2_is_1;
+SELECT ABS(COS(PI()/2)) < 1e-10                               AS cos_pi_2_is_0;
+# SIN(π) = 0 (within fp precision), COS(π) = -1.
+SELECT ABS(SIN(PI())) < 1e-10                                 AS sin_pi_is_0;
+SELECT ROUND(COS(PI()), 10) > -1.001
+   AND ROUND(COS(PI()), 10) < -0.999                          AS cos_pi_is_neg_1;
+
+--echo === TAN(π/2): undefined → very large number (not Inf, fp precision) ===
+
+# TAN(π/2) mathematically undefined; std::f64 returns ~1.633e16
+# (because PI()/2 isn't exactly π/2 in fp). Pin that the value
+# is "very large" but not Inf.
+SELECT TAN(PI()/2) > 1e10                                     AS tan_pi_2_very_large;
+SELECT TAN(PI()/2) < 1e308                                    AS tan_pi_2_finite;
+
+--echo === COT(0) = 1 / TAN(0) = +Infinity (zeta divergence; MySQL errors) ===
+
+# Pinned divergence: zeta returns +Inf (std::f64 1/0), MySQL
+# emits 'out of range value'. Same direction as EXP(1000) →
+# +Inf pinned in log_ln_exp slice.
+SELECT COT(0) > 1e308                                         AS cot_0_is_inf;
+
+--echo === ASIN / ACOS: domain [-1, 1] in-range ===
+
+SELECT ABS(ASIN(0)) < 1e-10                                   AS asin_0_is_0;
+SELECT ROUND(ASIN(1), 10) > 1.570
+   AND ROUND(ASIN(1), 10) < 1.572                             AS asin_1_is_pi_2;
+SELECT ABS(ACOS(1)) < 1e-10                                   AS acos_1_is_0;
+SELECT ROUND(ACOS(0), 10) > 1.570
+   AND ROUND(ACOS(0), 10) < 1.572                             AS acos_0_is_pi_2;
+SELECT ROUND(ACOS(-1), 10) > 3.141
+   AND ROUND(ACOS(-1), 10) < 3.142                            AS acos_neg_1_is_pi;
+
+--echo === ASIN / ACOS: out-of-domain → NaN (zeta divergence; MySQL NULL) ===
+
+# std::f64 returns NaN for |x| > 1; NaN != NaN by IEEE 754.
+SELECT ASIN(2)  <> ASIN(2)                                    AS asin_2_is_nan;
+SELECT ACOS(2)  <> ACOS(2)                                    AS acos_2_is_nan;
+SELECT ASIN(-2) <> ASIN(-2)                                   AS asin_neg_2_is_nan;
+
+--echo === ATAN single-arg and ATAN(y, x) = ATAN2(y, x) ===
+
+SELECT ABS(ATAN(0)) < 1e-10                                   AS atan_0_is_0;
+# ATAN(1) = π/4 ≈ 0.7854.
+SELECT ROUND(ATAN(1), 10) > 0.785
+   AND ROUND(ATAN(1), 10) < 0.786                             AS atan_1_is_pi_4;
+# Overloaded 2-arg form delegates to ATAN2.
+SELECT ATAN(1, 1)  = ATAN2(1, 1)                              AS atan_2arg_eq_atan2;
+SELECT ATAN(-1, 1) = ATAN2(-1, 1)                             AS atan_2arg_neg_eq;
+
+--echo === ATAN2: quadrant matrix ===
+
+# Q1 (+y, +x): ATAN2(1, 1) = π/4.
+SELECT ROUND(ATAN2(1, 1), 10)   > 0.785
+   AND ROUND(ATAN2(1, 1), 10)   < 0.786                       AS atan2_q1;
+# Q2 (+y, -x): ATAN2(1, -1) = 3π/4 ≈ 2.356.
+SELECT ROUND(ATAN2(1, -1), 10)  > 2.356
+   AND ROUND(ATAN2(1, -1), 10)  < 2.357                       AS atan2_q2;
+# Q3 (-y, -x): ATAN2(-1, -1) = -3π/4 ≈ -2.356.
+SELECT ROUND(ATAN2(-1, -1), 10) > -2.357
+   AND ROUND(ATAN2(-1, -1), 10) < -2.356                      AS atan2_q3;
+# Q4 (-y, +x): ATAN2(-1, 1) = -π/4 ≈ -0.785.
+SELECT ROUND(ATAN2(-1, 1), 10)  > -0.786
+   AND ROUND(ATAN2(-1, 1), 10)  < -0.785                      AS atan2_q4;
+# Axes: ATAN2(0, 1) = 0, ATAN2(1, 0) = π/2.
+SELECT ABS(ATAN2(0, 1)) < 1e-10                               AS atan2_x_axis;
+SELECT ROUND(ATAN2(1, 0), 10) > 1.570
+   AND ROUND(ATAN2(1, 0), 10) < 1.572                         AS atan2_y_axis;
+
+--echo === Hyperbolic family: known vectors ===
+
+SELECT ABS(SINH(0)) < 1e-10                                   AS sinh_0_is_0;
+SELECT ROUND(COSH(0), 10) > 0.999
+   AND ROUND(COSH(0), 10) < 1.001                             AS cosh_0_is_1;
+SELECT ABS(TANH(0)) < 1e-10                                   AS tanh_0_is_0;
+# TANH(±Inf) → ±1; TANH of large positive ≈ 1.
+SELECT TANH(20)  > 0.999 AND TANH(20)  <= 1.0                 AS tanh_large_pos_near_1;
+SELECT TANH(-20) < -0.999 AND TANH(-20) >= -1.0               AS tanh_large_neg_near_neg_1;
+
+--echo === Inverse hyperbolic: known vectors + out-of-domain NaN ===
+
+SELECT ABS(ASINH(0)) < 1e-10                                  AS asinh_0_is_0;
+SELECT ABS(ACOSH(1)) < 1e-10                                  AS acosh_1_is_0;
+SELECT ABS(ATANH(0)) < 1e-10                                  AS atanh_0_is_0;
+# ACOSH(<1) → NaN.
+SELECT ACOSH(0)  <> ACOSH(0)                                  AS acosh_below_1_is_nan;
+SELECT ACOSH(-1) <> ACOSH(-1)                                 AS acosh_neg_is_nan;
+# ATANH(|x| >= 1) → ±Inf for ±1, NaN for >1.
+SELECT ATANH(2)  <> ATANH(2)                                  AS atanh_above_1_is_nan;
+
+--echo === LOG2 / LOG10: known vectors and strict-error on <=0 ===
+
+SELECT ABS(LOG2(1))  < 1e-10                                  AS log2_1_is_0;
+SELECT ROUND(LOG2(8), 10)  > 2.999
+   AND ROUND(LOG2(8), 10)  < 3.001                            AS log2_8_is_3;
+SELECT ABS(LOG10(1)) < 1e-10                                  AS log10_1_is_0;
+SELECT ROUND(LOG10(1000), 10) > 2.999
+   AND ROUND(LOG10(1000), 10) < 3.001                         AS log10_1000_is_3;
+--error 1105
+SELECT LOG2(0);
+--error 1105
+SELECT LOG2(-1);
+--error 1105
+SELECT LOG10(0);
+--error 1105
+SELECT LOG10(-1);
+
+--echo === NULL passthrough (representative across the family) ===
+
+SELECT SIN(NULL)      IS NULL                                 AS sin_null;
+SELECT COS(NULL)      IS NULL                                 AS cos_null;
+SELECT TAN(NULL)      IS NULL                                 AS tan_null;
+SELECT ASIN(NULL)     IS NULL                                 AS asin_null;
+SELECT ACOS(NULL)     IS NULL                                 AS acos_null;
+SELECT ATAN(NULL)     IS NULL                                 AS atan_null;
+SELECT ATAN2(NULL, 1) IS NULL                                 AS atan2_y_null;
+SELECT ATAN2(1, NULL) IS NULL                                 AS atan2_x_null;
+SELECT SINH(NULL)     IS NULL                                 AS sinh_null;
+SELECT COSH(NULL)     IS NULL                                 AS cosh_null;
+SELECT TANH(NULL)     IS NULL                                 AS tanh_null;
+SELECT DEGREES(NULL)  IS NULL                                 AS degrees_null;
+SELECT RADIANS(NULL)  IS NULL                                 AS radians_null;
+SELECT LOG2(NULL)     IS NULL                                 AS log2_null;
+SELECT LOG10(NULL)    IS NULL                                 AS log10_null;
+SELECT COT(NULL)      IS NULL                                 AS cot_null;
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT SIN();
+--error 1105
+SELECT SIN(1, 2);
+--error 1105
+SELECT ATAN();
+# ATAN with 3 args: not covered by either single-arg or
+# 2-arg ATAN2 form.
+--error 1105
+SELECT ATAN(1, 2, 3);
+--error 1105
+SELECT ATAN2();
+--error 1105
+SELECT ATAN2(1);
+--error 1105
+SELECT ATAN2(1, 2, 3);
