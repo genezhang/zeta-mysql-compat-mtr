@@ -81,6 +81,32 @@ SELECT JSON_EXTRACT('{"a":1}', 'not-a-path');
 ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "not-a-path"
 SELECT JSON_EXTRACT('{"a":1}', '');
 ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path ""
+=== JSONPath unsupported features (wildcards / descendant) ===
+SELECT JSON_EXTRACT('{"a":1,"b":2}', '$.*');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$.*"
+SELECT JSON_EXTRACT('[10,20]',       '$[*]');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$[*]"
+SELECT JSON_EXTRACT('{"a":{"b":1}}', '$..b');
+ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$..b"
+=== Mixed array + multi-path ===
+SELECT JSON_EXTRACT('[10,20]', '$[0]', '$[1]') AS arr_multi_path;
+arr_multi_path
+[10,20]
+SELECT JSON_LENGTH(JSON_EXTRACT('[10,20]', '$[0]', '$[1]')) = 2 AS arr_multi_len;
+arr_multi_len
+1
+=== Quoted-key path: $."weird key" ===
+SELECT JSON_EXTRACT('{"weird key":99}', '$."weird key"') AS quoted_key;
+quoted_key
+99
+=== Deeply-nested multi-path: nested objects survive wrap ===
+SELECT JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b') AS nested_multi;
+nested_multi
+[42,{"c":42}]
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b')) = 2
+       AS nested_multi_len;
+nested_multi_len
+1
 === Invalid JSON doc → ERROR (zeta strict) ===
 SELECT JSON_EXTRACT('not json at all', '$.a');
 ERROR 1105: execution error: JSON_EXTRACT first argument is not valid JSON: JSONB error: expected 'null' at position 1

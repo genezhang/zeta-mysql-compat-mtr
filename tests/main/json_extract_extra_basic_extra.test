@@ -90,6 +90,34 @@ SELECT JSON_EXTRACT('{"a":1}', 'not-a-path');
 --error 1105
 SELECT JSON_EXTRACT('{"a":1}', '');
 
+--echo === JSONPath unsupported features (wildcards / descendant) ===
+
+# Header documents zeta's first-pass scope: no wildcards, no
+# dot-dot descendant. Pin the rejection contract.
+--error 1105
+SELECT JSON_EXTRACT('{"a":1,"b":2}', '$.*');
+--error 1105
+SELECT JSON_EXTRACT('[10,20]',       '$[*]');
+--error 1105
+SELECT JSON_EXTRACT('{"a":{"b":1}}', '$..b');
+
+--echo === Mixed array + multi-path ===
+
+# Array elements survive the multi-path wrap.
+SELECT JSON_EXTRACT('[10,20]', '$[0]', '$[1]') AS arr_multi_path;
+SELECT JSON_LENGTH(JSON_EXTRACT('[10,20]', '$[0]', '$[1]')) = 2 AS arr_multi_len;
+
+--echo === Quoted-key path: $."weird key" ===
+
+# parse_mysql_json_path implements quoted-key support.
+SELECT JSON_EXTRACT('{"weird key":99}', '$."weird key"') AS quoted_key;
+
+--echo === Deeply-nested multi-path: nested objects survive wrap ===
+
+SELECT JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b') AS nested_multi;
+SELECT JSON_LENGTH(JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b')) = 2
+       AS nested_multi_len;
+
 --echo === Invalid JSON doc → ERROR (zeta strict) ===
 
 --error 1105
