@@ -67,14 +67,16 @@ SELECT DAYOFYEAR('2024-12-31')           AS leap_year_end_366;
 # 2023 is NOT leap → Mar 1 = day 60, Dec 31 = day 365.
 SELECT DAYOFYEAR('2023-12-31')           AS non_leap_year_end_365;
 SELECT DAYOFYEAR('2023-03-01')           AS non_leap_day_after_feb;
+# Year-boundary pair: pin that DOY resets at midnight Dec 31 → Jan 1.
+SELECT DAYOFYEAR('2025-01-01')           AS year_start_1;
 
 --echo === LAST_DAY: end-of-month for various months ===
 
 # Standard month-lengths.
-SELECT LAST_DAY('2024-01-15')            AS jan;
-SELECT LAST_DAY('2024-03-01')            AS mar;
-SELECT LAST_DAY('2024-04-15')            AS apr;
-SELECT LAST_DAY('2024-12-25')            AS dec;
+SELECT LAST_DAY('2024-01-15')            AS jan_eom;
+SELECT LAST_DAY('2024-03-01')            AS mar_eom;
+SELECT LAST_DAY('2024-04-15')            AS apr_eom;
+SELECT LAST_DAY('2024-12-25')            AS dec_eom;
 # Leap-year February.
 SELECT LAST_DAY('2024-02-15')            AS feb_leap;
 # Non-leap February.
@@ -82,6 +84,9 @@ SELECT LAST_DAY('2023-02-15')            AS feb_non_leap;
 # Idempotent: applying LAST_DAY to already-last-day stays.
 SELECT LAST_DAY(LAST_DAY('2024-01-15'))
      = LAST_DAY('2024-01-15')            AS idempotent;
+# Date arithmetic invariant: LAST_DAY(d) - d returns the number
+# of days to end-of-month. 2024-01-15 → last is Jan 31 → 16 days.
+SELECT LAST_DAY('2024-01-15') - DATE '2024-01-15' AS days_to_eom;
 
 --echo === LAST_DAY: timestamp input ===
 

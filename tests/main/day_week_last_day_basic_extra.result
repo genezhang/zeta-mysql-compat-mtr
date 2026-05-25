@@ -71,18 +71,21 @@ non_leap_year_end_365
 SELECT DAYOFYEAR('2023-03-01')           AS non_leap_day_after_feb;
 non_leap_day_after_feb
 60
+SELECT DAYOFYEAR('2025-01-01')           AS year_start_1;
+year_start_1
+1
 === LAST_DAY: end-of-month for various months ===
-SELECT LAST_DAY('2024-01-15')            AS jan;
-jan
+SELECT LAST_DAY('2024-01-15')            AS jan_eom;
+jan_eom
 2024-01-31
-SELECT LAST_DAY('2024-03-01')            AS mar;
-mar
+SELECT LAST_DAY('2024-03-01')            AS mar_eom;
+mar_eom
 2024-03-31
-SELECT LAST_DAY('2024-04-15')            AS apr;
-apr
+SELECT LAST_DAY('2024-04-15')            AS apr_eom;
+apr_eom
 2024-04-30
-SELECT LAST_DAY('2024-12-25')            AS dec;
-dec
+SELECT LAST_DAY('2024-12-25')            AS dec_eom;
+dec_eom
 2024-12-31
 SELECT LAST_DAY('2024-02-15')            AS feb_leap;
 feb_leap
@@ -94,6 +97,9 @@ SELECT LAST_DAY(LAST_DAY('2024-01-15'))
      = LAST_DAY('2024-01-15')            AS idempotent;
 idempotent
 1
+SELECT LAST_DAY('2024-01-15') - DATE '2024-01-15' AS days_to_eom;
+days_to_eom
+16
 === LAST_DAY: timestamp input ===
 SELECT LAST_DAY('2024-02-15 14:30:00')   AS ts_leap_feb;
 ts_leap_feb
