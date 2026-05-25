@@ -1,0 +1,63 @@
+=== Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
+SELECT JSON_TYPE(CAST('{"a":"hi"}' AS JSONB))                 AS jsonb_cast_lands_as_object;
+jsonb_cast_lands_as_object
+OBJECT
+=== JSON_SEARCH on already-typed JSONB doc ===
+SELECT JSON_SEARCH(CAST('{"a":"hello","b":"world"}' AS JSONB),
+                   'one', 'world')                            AS typed_doc_path;
+typed_doc_path
+"$.b"
+SELECT JSON_TYPE(JSON_SEARCH(CAST('["x","y"]' AS JSONB),
+                             'one', 'x'))                     AS typed_arr_match_type;
+typed_arr_match_type
+STRING
+=== Wrong-type doc → ERROR ===
+SELECT JSON_SEARCH(42, 'one', 'x');
+ERROR 1105: execution error: JSON_SEARCH target must be JSON
+SELECT JSON_SEARCH(3.14, 'one', 'x');
+ERROR 1105: execution error: JSON_SEARCH target must be JSON
+SELECT JSON_SEARCH(TRUE, 'one', 'x');
+ERROR 1105: execution error: JSON_SEARCH target must be JSON
+=== Wrong-type mode → ERROR ===
+SELECT JSON_SEARCH('{"a":"x"}', 42, 'x');
+ERROR 1105: execution error: JSON_SEARCH one_or_all must be a string
+=== Wrong-type search_str → ERROR ===
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 42);
+ERROR 1105: execution error: JSON_SEARCH search_str must be a string
+=== Wrong-type escape_char → ERROR ===
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 'x', 42);
+ERROR 1105: execution error: JSON_SEARCH escape_char must be a string
+=== Empty escape_char rejected (distinct from multi-char) ===
+SELECT JSON_SEARCH('{"a":"x"}', 'one', 'x', '');
+ERROR 1105: execution error: JSON_SEARCH escape_char must be a single character
+=== Quoted-key path emission (non-identifier key) ===
+SELECT JSON_SEARCH('{"weird key":"hit"}', 'one', 'hit')       AS quoted_key_space;
+quoted_key_space
+"$.\"weird key\""
+SELECT JSON_SEARCH('{"k\"ey":"hit"}', 'one', 'hit')           AS quoted_key_inner_dquote;
+quoted_key_inner_dquote
+"$.\"k\\\"ey\""
+SELECT JSON_SEARCH('{"a\\b":"hit"}', 'one', 'hit')            AS quoted_key_backslash;
+quoted_key_backslash
+"$.\"a\\\\b\""
+=== Default escape char is backslash when 4th arg omitted ===
+SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100\%')             AS default_escape_backslash;
+default_escape_backslash
+"$.a"
+SELECT JSON_SEARCH('{"a":"100%"}', 'one', '100\\%') IS NULL    AS default_escape_extra_bs_no_match;
+default_escape_extra_bs_no_match
+1
+=== Empty search string semantics ===
+SELECT JSON_SEARCH('{"a":"","b":"x"}', 'one', '')             AS empty_pattern_matches_empty;
+empty_pattern_matches_empty
+"$.a"
+SELECT JSON_SEARCH('{"a":"x","b":"y"}', 'one', '') IS NULL    AS empty_pattern_no_match;
+empty_pattern_no_match
+1
+=== Multi-byte UTF-8 in search target ===
+SELECT JSON_SEARCH('{"a":"héllo"}', 'one', 'héllo')           AS utf8_exact_match;
+utf8_exact_match
+"$.a"
+SELECT JSON_SEARCH('{"a":"héllo"}', 'one', 'h%o')             AS utf8_wildcard_match;
+utf8_wildcard_match
+"$.a"
