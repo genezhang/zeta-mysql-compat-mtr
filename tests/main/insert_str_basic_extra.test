@@ -36,22 +36,35 @@ SELECT INSERT('Hello World', 7, 5, 'Earth') AS replace_word;
 
 --echo === Position past length: return str unchanged ===
 
-# Position 11 in a 9-char string → unchanged.
+# Position 11 in a 9-char string → unchanged (> strlen+1).
 SELECT INSERT('Quadratic', 11, 3, 'X')   AS pos_past_end;
 # Position 0 (< 1) → unchanged.
 SELECT INSERT('Quadratic',  0, 3, 'X')   AS pos_zero;
 # Negative position → unchanged.
 SELECT INSERT('Quadratic', -1, 3, 'X')   AS pos_negative;
-# Edge: pos = strlen+1 is the FIRST position past the end —
-# MySQL treats it as "out of range" too.
-SELECT INSERT('abc', 4, 0, 'X')          AS pos_at_strlen_plus_one;
+
+--echo === Position == strlen+1: append (in-range boundary) ===
+
+# pos == total+1 is the LAST in-range position; the impl's
+# guard is `pos > total + 1`, so strlen+1 passes and produces
+# an append. zeta matches MySQL here (both treat as in-range).
+SELECT INSERT('abc', 4, 0, 'X')          AS append_at_strlen_plus_one;
+# Empty source: pos=1, strlen=0, so strlen+1=1 is in-range and
+# inserts/appends. Exercises the empty-source path.
+SELECT INSERT('',    1, 0, 'X')          AS append_into_empty;
 
 --echo === Length zero: pure insertion at pos ===
 
 # Length=0 means insert without removing anything. But pos must
-# still be in [1, strlen]. Pos=2 with len=0 inserts before char 2.
+# still be in [1, strlen+1]. Pos=2 with len=0 inserts before char 2.
 SELECT INSERT('Quadratic', 2, 0, '__')   AS insert_only_pos2;
 SELECT INSERT('abc',       1, 0, 'X')    AS insert_only_pos1;
+
+--echo === Length == 1: pure single-char removal ===
+
+# Cheaper boundary than the existing 4-char Quadratic remove —
+# proves len=1 with empty newstr is exactly a 1-char deletion.
+SELECT INSERT('abc', 2, 1, '')           AS remove_one_char;
 
 --echo === Length too large or negative: splice to end ===
 
@@ -88,6 +101,12 @@ SELECT INSERT('café', 4, 1, 'e')         AS utf8_replace_multibyte;
 SELECT INSERT('abc', 'two', 1, 'X');
 --error 1105
 SELECT INSERT('abc', 2, 'three', 'X');
+# Float-typed pos is the more realistic MySQL-app pattern;
+# pinning that it routes to the strict `_ => Err(...)` arm.
+--error 1105
+SELECT INSERT('abc', 2.0, 1, 'X');
+--error 1105
+SELECT INSERT('abc', 2, 1.0, 'X');
 
 --echo === Determinism ===
 
