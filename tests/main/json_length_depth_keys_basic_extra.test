@@ -10,7 +10,7 @@
 #
 # This slice pins what those slices DO NOT:
 #   - JSON null vs SQL NULL asymmetry between LENGTH and DEPTH
-#     (per impl comments at lib.rs:54446-54448 and 54616).
+#     (per impl comments in JSON_DEPTH / JSON_LENGTH arms).
 #   - JSON_LENGTH on the full scalar matrix (string, bool,
 #     integer, double, JSON null) — only the 'scalar_n' case
 #     in json_basic uses an integer scalar.
@@ -21,12 +21,17 @@
 #     SQL NULL — distinct from non-object → NULL).
 #   - JSON_KEYS ordering — alphabetic via zeta-jsonb's sorted
 #     binary, not insertion-order.
+#   - JSON_KEYS object keys containing special characters
+#     (quote, backslash) — round-trip through
+#     JsonbValue::from_str_value.
 #
 # Big-picture finding:
 #   The JSON-null handling is asymmetric:
-#     JSON_LENGTH(JSON null) → SQL NULL  (lib.rs:54616 early-out)
-#     JSON_DEPTH (JSON null) → 1         (lib.rs:54446-54448
-#                                          documents scalar=1)
+#     JSON_LENGTH(JSON null) → SQL NULL  (early-out in
+#                                          JSON_LENGTH arm)
+#     JSON_DEPTH (JSON null) → 1         (folds into the
+#                                          scalar _ => 1 arm
+#                                          of jsonb_depth)
 #   This asymmetry is intentional (impl comment) but worth
 #   pinning so a "consistency fix" doesn't silently change one.
 #
@@ -111,9 +116,19 @@ SELECT JSON_DEPTH('{"a":1, "b":[1,[2]]}')    AS depth_max_over_siblings;
 
 # Distinct from non-object → SQL NULL. Empty {} is still an
 # object, so JSON_KEYS returns the empty array '[]'.
+# (The JSON_LENGTH(JSON_KEYS('{}'))=0 wrapping pin lives in
+#  json_keys_path_basic_extra.test; not re-pinned here.)
 SELECT JSON_KEYS('{}')                       AS empty_obj_keys;
-SELECT JSON_LENGTH(JSON_KEYS('{}'))          AS empty_obj_keys_len_0;
-SELECT JSON_KEYS('{}') IS NULL               AS empty_obj_keys_not_null;
+SELECT JSON_KEYS('{}') IS NULL               AS empty_obj_keys_is_null_false;
+
+--echo === JSON_KEYS object keys with special chars ===
+
+# Keys flow through JsonbValue::from_str_value when packed back
+# into the keys array. Pin the round-trip for keys containing
+# quote and backslash (the two characters JSON string encoding
+# has to escape). MySQL escapes both as \" and \\.
+SELECT JSON_KEYS('{"a\"b":1,"c":2}')         AS key_with_quote;
+SELECT JSON_KEYS('{"a\\b":1,"c":2}')         AS key_with_backslash;
 
 --echo === JSON_KEYS sort order — alphabetic (zeta-jsonb binary) ===
 

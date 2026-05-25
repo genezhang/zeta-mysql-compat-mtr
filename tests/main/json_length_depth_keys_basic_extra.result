@@ -95,12 +95,16 @@ depth_max_over_siblings
 SELECT JSON_KEYS('{}')                       AS empty_obj_keys;
 empty_obj_keys
 []
-SELECT JSON_LENGTH(JSON_KEYS('{}'))          AS empty_obj_keys_len_0;
-empty_obj_keys_len_0
+SELECT JSON_KEYS('{}') IS NULL               AS empty_obj_keys_is_null_false;
+empty_obj_keys_is_null_false
 0
-SELECT JSON_KEYS('{}') IS NULL               AS empty_obj_keys_not_null;
-empty_obj_keys_not_null
-0
+=== JSON_KEYS object keys with special chars ===
+SELECT JSON_KEYS('{"a\"b":1,"c":2}')         AS key_with_quote;
+key_with_quote
+["a\"b","c"]
+SELECT JSON_KEYS('{"a\\b":1,"c":2}')         AS key_with_backslash;
+key_with_backslash
+["a\\b","c"]
 === JSON_KEYS sort order — alphabetic (zeta-jsonb binary) ===
 SELECT JSON_KEYS('{"z":1,"a":2,"m":3}')      AS sorted_alpha;
 sorted_alpha
