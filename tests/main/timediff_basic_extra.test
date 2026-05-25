@@ -1,0 +1,150 @@
+# Independently authored TIMEDIFF exhaustive smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Existing coverage is thin: 1 case in
+# datetime_format_basic + 3 cases in funcs_1/datetime_funcs.
+# This slice walks the type-coercion matrix, NULL/arity, sub-
+# second precision, and the saturating-subtract direction edge.
+#
+# Big-picture finding:
+#   TIMEDIFF(a, b) — return `a - b` as a duration, encoded over
+#       the MySQL wire as TIME ([-]HH:MM:SS[.ffffff]). Internally
+#       a Value::Interval { months:0, days:0, microseconds: N }
+#       built via saturating_sub on each side's µs.
+#
+# Impl: zeta-server/src/lib.rs:50961+. Each side is independently
+# coerced (Time, Timestamp, or parseable String — tries
+# parse_time first, then parse_timestamp). The two sides do NOT
+# have to share a type; mixing a TIME literal with a TIMESTAMP
+# literal works.
+#
+# Adaptation notes:
+#   # zeta-adapt: Saturating subtract — overflow saturates at
+#     i64::MIN/MAX µs rather than wrapping. MySQL would error on
+#     out-of-range TIME (TIME range is ±838:59:59).
+#     Note: the saturation boundary itself is unreachable through
+#     parseable date/time literals (would need an input ~292,471
+#     years out, which parse_timestamp rejects long before). The
+#     saturating arithmetic is therefore validated by Rust unit
+#     tests; this slice pins the practically-observable side
+#     (wide-but-finite diffs emitted unbounded — see below).
+#   # zeta-adapt: Wide diffs that exceed MySQL TIME range
+#     (±838:59:59) are NOT clamped by zeta; the encoder still
+#     emits HH:MM:SS with the unbounded hour count. Documented
+#     divergence — MySQL would saturate to ±838:59:59.
+#   # zeta-adapt: NULL either arg → NULL.
+#   # zeta-adapt: Non-time/timestamp/string arg → 1105 ERROR
+#     (e.g. INT, DATE-only column). MySQL would coerce or NULL.
+#   # zeta-adapt: Arity errors → 1105 (MySQL: 1582). Codes
+#     differ, behavior (reject) matches.
+
+--echo === Basic positive duration: TIME - TIME ===
+
+SELECT TIMEDIFF('14:30:45', '12:15:30')               AS pos_time_time;
+SELECT TIMEDIFF('23:59:59', '00:00:00')               AS pos_full_day_minus_1s;
+SELECT TIMEDIFF('00:00:01', '00:00:00')               AS pos_one_second;
+
+--echo === Negative direction: a < b → leading '-' ===
+
+SELECT TIMEDIFF('12:00:00', '14:00:00')               AS neg_2h;
+SELECT TIMEDIFF('00:00:00', '00:00:01')               AS neg_one_second;
+
+--echo === Zero diff (a == b) ===
+
+SELECT TIMEDIFF('14:30:45', '14:30:45')               AS zero_time;
+SELECT TIMEDIFF('2024-03-15 14:30:45', '2024-03-15 14:30:45') AS zero_ts;
+
+--echo === TIMESTAMP - TIMESTAMP (date components cancel) ===
+
+# Same calendar day — date parts drop out, leaves just the time delta.
+SELECT TIMEDIFF('2024-03-15 14:30:45', '2024-03-15 12:15:30')
+                                                      AS ts_ts_same_day;
+# Across-day: 1 full day + 2h = 26h. Encoder folds days into hours.
+SELECT TIMEDIFF('2024-03-16 14:00:00', '2024-03-15 12:00:00')
+                                                      AS ts_ts_across_day_26h;
+
+--echo === Sub-second (microsecond) precision ===
+
+# Right-hand microseconds bigger → diff loses those µs from a
+# whole-second boundary. 45.000000 - 30.123456 = 14.876544.
+SELECT TIMEDIFF('2024-03-15 14:30:45', '2024-03-15 12:15:30.123456')
+                                                      AS ts_subsec_borrow;
+# Both sides with µs — straight µs subtraction.
+SELECT TIMEDIFF('00:00:01.500000', '00:00:00.250000') AS time_subsec_both;
+# Negative sub-second: a's µs < b's µs and a < b.
+SELECT TIMEDIFF('00:00:00.250000', '00:00:01.500000') AS neg_subsec;
+
+--echo === Mixed-type inputs (impl coerces each side independently) ===
+
+# TIME literal minus TIMESTAMP — left coerces via parse_time (succeeds),
+# right coerces via parse_timestamp. The subtraction is then µs - µs
+# where each side independently mapped to its own absolute µs origin.
+# This is a documented quirk of zeta's per-side coercion; the result
+# is well-defined but not equivalent to MySQL's semantics (MySQL
+# requires matching types or rejects). Pin the literal HH:MM:SS so a
+# silent semantic shift is caught.
+SELECT TIMEDIFF('14:30:45', '2024-03-15 14:30:45')    AS mixed_time_minus_ts;
+SELECT TIMEDIFF('2024-03-15 14:30:45', '14:30:45')    AS mixed_ts_minus_time;
+
+--echo === Typed-value inputs via CAST (exercises Value::Time / Value::Timestamp arms) ===
+
+# Without CAST, every string literal goes through the String arm
+# (parse_time → parse_timestamp). CAST forces the typed arms so a
+# refactor that breaks Value::Time / Value::Timestamp coercion is
+# caught.
+SELECT TIMEDIFF(CAST('14:30:45' AS TIME),
+                CAST('12:15:30' AS TIME))             AS typed_time_minus_time;
+# DATETIME is rejected by the executor as unsupported CAST target;
+# TIMESTAMP works and lands in Value::Timestamp the same way.
+SELECT TIMEDIFF(CAST('2024-03-15 14:30:45' AS TIMESTAMP),
+                CAST('2024-03-15 12:15:30' AS TIMESTAMP))
+                                                      AS typed_ts_minus_ts;
+# Cross-form determinism: typed values vs string literals yield
+# identical results.
+SELECT TIMEDIFF(CAST('14:30:45' AS TIME),
+                CAST('12:15:30' AS TIME))
+     = TIMEDIFF('14:30:45', '12:15:30')               AS typed_eq_string;
+
+--echo === NULL passthrough (both positions) ===
+
+SELECT TIMEDIFF(NULL, '12:00:00')                IS NULL AS null_left;
+SELECT TIMEDIFF('12:00:00', NULL)                IS NULL AS null_right;
+SELECT TIMEDIFF(NULL, NULL)                      IS NULL AS null_both;
+
+--echo === Wrong-type inputs → ERROR (zeta strict; MySQL coerces/NULLs) ===
+
+# INT cannot be reinterpreted as a time/timestamp.
+--error 1105
+SELECT TIMEDIFF(1, '00:00:00');
+--error 1105
+SELECT TIMEDIFF('00:00:00', 1);
+# Garbage string fails both parse_time and parse_timestamp.
+--error 1105
+SELECT TIMEDIFF('not a time', '00:00:00');
+--error 1105
+SELECT TIMEDIFF('00:00:00', 'not a time');
+
+--echo === Arity errors ===
+
+--error 1105
+SELECT TIMEDIFF();
+--error 1105
+SELECT TIMEDIFF('14:30:00');
+--error 1105
+SELECT TIMEDIFF('14:30:00', '12:00:00', 'extra');
+
+--echo === Wide diffs (>838:59:59) emit unbounded hours (zeta divergence) ===
+
+# 2-week span = 336h. MySQL would clip to 838:59:59 (TIME max);
+# zeta emits 336:00:00 verbatim because the Interval-as-TIME
+# encoder doesn't apply MySQL's range clamp.
+SELECT TIMEDIFF('2024-03-15 00:00:00', '2024-03-01 00:00:00')
+                                                      AS wide_336h;
+# 100-day span = 2400h, still exceeds MySQL's 838h cap; zeta
+# emits without clamp.
+SELECT TIMEDIFF('2024-06-09 00:00:00', '2024-03-01 00:00:00')
+                                                      AS wide_2400h;
+
+--echo === Determinism ===
+
+SELECT TIMEDIFF('14:30:45', '12:15:30')
+     = TIMEDIFF('14:30:45', '12:15:30')               AS deterministic;
