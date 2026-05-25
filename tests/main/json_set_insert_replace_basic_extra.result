@@ -100,6 +100,29 @@ SELECT JSON_REPLACE();
 ERROR 1105: execution error: JSON_REPLACE requires target and one or more (path, value) pairs
 SELECT JSON_REPLACE('{"a":1}', '$.a');
 ERROR 1105: execution error: JSON_REPLACE requires target and one or more (path, value) pairs
+=== Nested-key paths (multi-step keys vector) ===
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.c', 9)  AS set_nested_missing;
+set_nested_missing
+{"a":{"b":1,"c":9}}
+SELECT JSON_INSERT ('{"a":{"b":1}}', '$.a.c', 9)  AS insert_nested_missing;
+insert_nested_missing
+{"a":{"b":1,"c":9}}
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.c', 9)  AS replace_nested_missing;
+replace_nested_missing
+{"a":{"b":1}}
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.b', 9)  AS set_nested_existing;
+set_nested_existing
+{"a":{"b":9}}
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.b', 9)  AS replace_nested_existing;
+replace_nested_existing
+{"a":{"b":9}}
+=== Scalar target (non-object): path set fails silently ===
+SELECT JSON_SET('"a string"', '$.k', 1)           AS set_scalar_target;
+set_scalar_target
+"a string"
+SELECT JSON_INSERT('"a string"', '$.k', 1)        AS insert_scalar_target;
+insert_scalar_target
+"a string"
 === Idempotency: applying SET twice with the same value is stable ===
 SELECT JSON_SET(JSON_SET('{"a":1}', '$.a', 99), '$.a', 99)
      = JSON_SET('{"a":1}', '$.a', 99)            AS set_idempotent;

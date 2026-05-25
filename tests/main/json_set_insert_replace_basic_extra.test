@@ -112,6 +112,25 @@ SELECT JSON_REPLACE();
 --error 1105
 SELECT JSON_REPLACE('{"a":1}', '$.a');
 
+--echo === Nested-key paths (multi-step keys vector) ===
+
+# Path '$.a.c' on '{"a":{"b":1}}' sets a.c. Each function's
+# response follows its identity (SET inserts since a.c missing).
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.c', 9)  AS set_nested_missing;
+SELECT JSON_INSERT ('{"a":{"b":1}}', '$.a.c', 9)  AS insert_nested_missing;
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.c', 9)  AS replace_nested_missing;
+# Existing nested key.
+SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.b', 9)  AS set_nested_existing;
+SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.b', 9)  AS replace_nested_existing;
+
+--echo === Scalar target (non-object): path set fails silently ===
+
+# Target is a JSON string scalar, not an object. SET/INSERT/REPLACE
+# all attempt to set `$.k` but the path can't apply to a scalar —
+# zeta returns the scalar unchanged.
+SELECT JSON_SET('"a string"', '$.k', 1)           AS set_scalar_target;
+SELECT JSON_INSERT('"a string"', '$.k', 1)        AS insert_scalar_target;
+
 --echo === Idempotency: applying SET twice with the same value is stable ===
 
 SELECT JSON_SET(JSON_SET('{"a":1}', '$.a', 99), '$.a', 99)
