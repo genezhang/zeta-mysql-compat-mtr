@@ -1,0 +1,161 @@
+# Independently authored AT TIME ZONE extended-coverage
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - date_time_basic_extra.test:128 covers ONLY
+#     `AT TIME ZONE 'UTC'` and frames it as "silent
+#     pass-through ... no actual TZ conversion is
+#     performed." That framing is misleading — UTC happens
+#     to be offset 0 so the input passes through, but the
+#     impl at lib.rs:42350-42373 DOES shift the timestamp
+#     by the zone's offset. This slice pins the actual
+#     shift behavior with non-UTC zones AND covers the
+#     PG-extended abbreviations (AEDT/AKDT/BST/CDT/CEST/
+#     EDT/EEST/MDT/NZDT/PDT/PRC) that aren't pinned
+#     anywhere in the *.test corpus today.
+#
+# This slice pins:
+#   - AT TIME ZONE actually SHIFTS the stored UTC
+#     timestamp by the zone's offset (NOT a no-op).
+#   - 11 PG-extended abbreviations resolved to their
+#     impl-defined fixed offsets (lib.rs:57752-57789).
+#   - IANA-style names ('America/New_York', etc) work
+#     as aliases for the abbreviation.
+#   - Numeric offsets ('+05:00', '-08', '+0530') work.
+#   - Half-hour zones (IST = +05:30) work.
+#   - UTC == 0 offset (matches existing test pin).
+#   - Unknown TZ → 1105 "unknown timezone: '{tz}'".
+#   - NULL timestamp → NULL.
+#   - Wrong-type (non-timestamp) → 1105 "AT TIME ZONE
+#     requires a timestamp value".
+#
+# Big-picture finding (TWO CORRECTIONS):
+#
+#   1. **AT TIME ZONE IS NOT a no-op.** The existing test
+#      at date_time_basic_extra:123-128 frames it as
+#      pass-through, but that's misleading — the impl at
+#      lib.rs:42350-42373 adds the zone's UTC offset to
+#      the stored microsecond timestamp. For 'UTC' the
+#      offset is 0, so the input passes through unchanged.
+#      For ANY OTHER ZONE the timestamp DOES SHIFT.
+#      Example:
+#        TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'EST'
+#        = '2024-01-01 07:00:00'  (12 + (-5) = 7 UTC).
+#
+#   2. **NO DST AWARENESS.** zeta's TZ offsets are FIXED
+#      (impl comment at lib.rs:57718). 'EST' is always -5,
+#      'EDT' is always -4 — zeta does NOT know that Jan 1
+#      is EST and Jul 1 is EDT in NY. Apps that need
+#      DST-aware conversion must use a full tz database
+#      out of band.
+#
+#   STRIKING — `CST` defaults to US Central (-6), NOT
+#   China Standard Time. China's CST is spelled
+#   `CST_CHINA` or use the IANA alias `'Asia/Shanghai'` /
+#   `'PRC'` (which all map to +8 per the alternation arm
+#   at lib.rs:57777). Naming-collision footgun for
+#   internationalized apps.
+#
+# Adaptation notes:
+#   # zeta-adapt: AT TIME ZONE ACTUALLY SHIFTS the
+#     timestamp by the zone's offset. NOT a no-op.
+#   # zeta-adapt: All zones are FIXED-OFFSET — NO DST.
+#     'EST' is always -5, never -4 even in summer.
+#   # zeta-adapt: 'CST' is US Central (-6). For China
+#     Standard Time use 'CST_CHINA' or 'PRC'.
+#   # zeta-adapt: Unknown TZ → 1105 error (no silent
+#     pass-through of garbage strings).
+
+--echo === AT TIME ZONE SHIFTS (not pass-through) ===
+
+# 12:00 UTC → 'EST' (-5) → 07:00 wall clock.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'EST'    AS shifted_est;
+# 12:00 UTC → 'JST' (+9) → 21:00 wall clock.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'JST'    AS shifted_jst;
+# UTC IS 0 (matches existing pin in date_time_basic_extra).
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'UTC'    AS utc_zero_shift;
+# Equality proves the shift is real.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'EST'
+     = TIMESTAMP '2024-01-01 07:00:00'                       AS est_shift_eq_7;
+
+--echo === Extended abbreviations — US summer time (DT suffix) ===
+
+# EDT = -4 (NOT -5 like EST — fixed offset, no DST awareness).
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'EDT'    AS edt_minus_4;
+# CDT = -5.
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'CDT'    AS cdt_minus_5;
+# MDT = -6.
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'MDT'    AS mdt_minus_6;
+# PDT = -7.
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'PDT'    AS pdt_minus_7;
+# AKDT = -8.
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'AKDT'   AS akdt_minus_8;
+
+--echo === European summer-time abbreviations ===
+
+# CEST = +2.
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'CEST'   AS cest_plus_2;
+# EEST = +3.
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'EEST'   AS eest_plus_3;
+# BST (British Summer Time) = +1, also aliased with WEST.
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'BST'    AS bst_plus_1;
+
+--echo === Oceania summer-time abbreviations ===
+
+# AEDT = +11.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'AEDT'   AS aedt_plus_11;
+# NZDT = +13.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'NZDT'   AS nzdt_plus_13;
+
+--echo === PRC alias for China Standard Time (+8) ===
+
+# 'PRC' is part of the CST_CHINA alternation arm — important
+# because plain 'CST' defaults to US Central (-6), NOT China.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'PRC'    AS prc_plus_8;
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'PRC'
+     = TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'ASIA/SHANGHAI' AS prc_eq_iana_shanghai;
+# Contrast with 'CST' (US Central, -6).
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'CST'    AS cst_us_central_minus_6;
+
+--echo === IANA-style names — equivalent to abbreviations ===
+
+# 'America/New_York' = 'EST' = -5.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'America/New_York'
+     = TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'EST'    AS iana_ny_eq_est;
+# 'Europe/Berlin' = 'CET' = +1.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'Europe/Berlin' AS berlin_plus_1;
+
+--echo === Numeric offsets ===
+
+# '+05:00' literal offset.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '+05:00' AS plus_5_colon;
+# '-08' (no minutes).
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '-08'    AS minus_8;
+# '+0530' HHMM format.
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '+0530'  AS plus_5_30_hhmm;
+
+--echo === Half-hour zones — IST = +05:30 ===
+
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'IST'    AS ist_plus_5_30;
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'IST'
+     = TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '+05:30' AS ist_eq_numeric;
+
+--echo === NULL propagates ===
+
+SELECT NULL::TIMESTAMP AT TIME ZONE 'EST'                    AS null_ts;
+SELECT (NULL::TIMESTAMP AT TIME ZONE 'EST') IS NULL          AS null_pred;
+
+--echo === Unknown timezone → 1105 ===
+
+--error 1105
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'XYZ';
+--error 1105
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'Atlantis';
+
+--echo === Wrong-type (non-timestamp) → 1105 ===
+
+--error 1105
+SELECT 42 AT TIME ZONE 'EST';
+--error 1105
+SELECT 'hello' AT TIME ZONE 'EST';

@@ -1,0 +1,101 @@
+=== AT TIME ZONE SHIFTS (not pass-through) ===
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'EST'    AS shifted_est;
+shifted_est
+2024-01-01 07:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'JST'    AS shifted_jst;
+shifted_jst
+2024-01-01 21:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'UTC'    AS utc_zero_shift;
+utc_zero_shift
+2024-01-01 12:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'EST'
+     = TIMESTAMP '2024-01-01 07:00:00'                       AS est_shift_eq_7;
+est_shift_eq_7
+1
+=== Extended abbreviations — US summer time (DT suffix) ===
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'EDT'    AS edt_minus_4;
+edt_minus_4
+2024-07-01 08:00:00
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'CDT'    AS cdt_minus_5;
+cdt_minus_5
+2024-07-01 07:00:00
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'MDT'    AS mdt_minus_6;
+mdt_minus_6
+2024-07-01 06:00:00
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'PDT'    AS pdt_minus_7;
+pdt_minus_7
+2024-07-01 05:00:00
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'AKDT'   AS akdt_minus_8;
+akdt_minus_8
+2024-07-01 04:00:00
+=== European summer-time abbreviations ===
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'CEST'   AS cest_plus_2;
+cest_plus_2
+2024-07-01 14:00:00
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'EEST'   AS eest_plus_3;
+eest_plus_3
+2024-07-01 15:00:00
+SELECT TIMESTAMP '2024-07-01 12:00:00' AT TIME ZONE 'BST'    AS bst_plus_1;
+bst_plus_1
+2024-07-01 13:00:00
+=== Oceania summer-time abbreviations ===
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'AEDT'   AS aedt_plus_11;
+aedt_plus_11
+2024-01-01 23:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'NZDT'   AS nzdt_plus_13;
+nzdt_plus_13
+2024-01-02 01:00:00
+=== PRC alias for China Standard Time (+8) ===
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'PRC'    AS prc_plus_8;
+prc_plus_8
+2024-01-01 20:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'PRC'
+     = TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'ASIA/SHANGHAI' AS prc_eq_iana_shanghai;
+prc_eq_iana_shanghai
+1
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'CST'    AS cst_us_central_minus_6;
+cst_us_central_minus_6
+2024-01-01 06:00:00
+=== IANA-style names — equivalent to abbreviations ===
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'America/New_York'
+     = TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'EST'    AS iana_ny_eq_est;
+iana_ny_eq_est
+1
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'Europe/Berlin' AS berlin_plus_1;
+berlin_plus_1
+2024-01-01 13:00:00
+=== Numeric offsets ===
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '+05:00' AS plus_5_colon;
+plus_5_colon
+2024-01-01 17:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '-08'    AS minus_8;
+minus_8
+2024-01-01 04:00:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '+0530'  AS plus_5_30_hhmm;
+plus_5_30_hhmm
+2024-01-01 17:30:00
+=== Half-hour zones — IST = +05:30 ===
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'IST'    AS ist_plus_5_30;
+ist_plus_5_30
+2024-01-01 17:30:00
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'IST'
+     = TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE '+05:30' AS ist_eq_numeric;
+ist_eq_numeric
+1
+=== NULL propagates ===
+SELECT NULL::TIMESTAMP AT TIME ZONE 'EST'                    AS null_ts;
+null_ts
+NULL
+SELECT (NULL::TIMESTAMP AT TIME ZONE 'EST') IS NULL          AS null_pred;
+null_pred
+1
+=== Unknown timezone → 1105 ===
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'XYZ';
+ERROR 1105: execution error: unknown timezone: 'XYZ'
+SELECT TIMESTAMP '2024-01-01 12:00:00' AT TIME ZONE 'Atlantis';
+ERROR 1105: execution error: unknown timezone: 'Atlantis'
+=== Wrong-type (non-timestamp) → 1105 ===
+SELECT 42 AT TIME ZONE 'EST';
+ERROR 1105: execution error: AT TIME ZONE requires a timestamp value
+SELECT 'hello' AT TIME ZONE 'EST';
+ERROR 1105: execution error: AT TIME ZONE requires a timestamp value
