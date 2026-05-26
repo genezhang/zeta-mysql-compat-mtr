@@ -1,0 +1,54 @@
+DROP TABLE IF EXISTS at_t;
+CREATE TABLE at_t (id INT, v TEXT);
+=== SHAPE A — DOCUMENTED INTENTIONAL no-op (pg_dump compat) ===
+ALTER TABLE at_t OWNER TO admin_user;
+ALTER TABLE at_t OWNER TO CURRENT_USER;
+ALTER TABLE at_t ENABLE TRIGGER USER;
+ALTER TABLE at_t ENABLE TRIGGER ALL;
+=== SHAPE B — "unsupported ALTER TABLE operation: <op>" (convert.rs catch-all) ===
+ALTER TABLE at_t FORCE ROW LEVEL SECURITY;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: FORCE ROW LEVEL SECURITY
+ALTER TABLE at_t NO FORCE ROW LEVEL SECURITY;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: NO FORCE ROW LEVEL SECURITY
+ALTER TABLE at_t REPLICA IDENTITY DEFAULT;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: REPLICA IDENTITY DEFAULT
+ALTER TABLE at_t REPLICA IDENTITY FULL;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: REPLICA IDENTITY FULL
+ALTER TABLE at_t REPLICA IDENTITY NOTHING;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: REPLICA IDENTITY NOTHING
+ALTER TABLE at_t REPLICA IDENTITY USING INDEX idx_x;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: REPLICA IDENTITY USING INDEX idx_x
+ALTER TABLE at_t VALIDATE CONSTRAINT some_c;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: VALIDATE CONSTRAINT some_c
+=== SHAPE C — sqlparser ALTER TABLE grammar gap (top-level op not recognized) ===
+ALTER TABLE at_t OF some_type;
+ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: OF at Line: 1, Column: 18
+ALTER TABLE at_t NOT OF;
+ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: NOT at Line: 1, Column: 18
+ALTER TABLE at_t INHERIT parent_t;
+ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: INHERIT at Line: 1, Column: 18
+ALTER TABLE at_t NO INHERIT parent_t;
+ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: NO at Line: 1, Column: 18
+ALTER TABLE at_t CLUSTER ON some_idx;
+ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: CLUSTER at Line: 1, Column: 18
+=== SHAPE D — sqlparser SET arm expects parens (SET (k = v)) ===
+ALTER TABLE at_t SET LOGGED;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: LOGGED at Line: 1, Column: 22
+ALTER TABLE at_t SET UNLOGGED;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: UNLOGGED at Line: 1, Column: 22
+ALTER TABLE at_t SET SCHEMA public;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: SCHEMA at Line: 1, Column: 22
+ALTER TABLE at_t SET WITHOUT CLUSTER;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: WITHOUT at Line: 1, Column: 22
+=== SHAPE E — sqlparser ALTER COLUMN sub-grammar gap ===
+ALTER TABLE at_t ALTER COLUMN id SET STATISTICS 100;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET/DROP NOT NULL, SET DEFAULT, SET DATA TYPE, or ADD GENERATED after ALTER COLUMN, found: SET at Line: 1, Column: 34
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE PLAIN;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET/DROP NOT NULL, SET DEFAULT, SET DATA TYPE, or ADD GENERATED after ALTER COLUMN, found: SET at Line: 1, Column: 33
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE EXTERNAL;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET/DROP NOT NULL, SET DEFAULT, SET DATA TYPE, or ADD GENERATED after ALTER COLUMN, found: SET at Line: 1, Column: 33
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE EXTENDED;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET/DROP NOT NULL, SET DEFAULT, SET DATA TYPE, or ADD GENERATED after ALTER COLUMN, found: SET at Line: 1, Column: 33
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE MAIN;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET/DROP NOT NULL, SET DEFAULT, SET DATA TYPE, or ADD GENERATED after ALTER COLUMN, found: SET at Line: 1, Column: 33
+DROP TABLE at_t;
