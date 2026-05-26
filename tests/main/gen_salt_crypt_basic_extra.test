@@ -1,0 +1,165 @@
+# Independently authored GEN_SALT / CRYPT (pgcrypto bcrypt)
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - GEN_SALT — NONE (zero compat-mtr coverage).
+#   - CRYPT — NONE (zero compat-mtr coverage).
+#   - hashing_crypto_basic_extra.test covers ENCRYPT/DECRYPT
+#     (cipher families), MD5/SHA*, but NOT the pgcrypto
+#     bcrypt password-hashing surface (GEN_SALT / CRYPT).
+#   - aes_encrypt_decrypt_basic_extra covers AES_ENCRYPT alias.
+#
+# This slice pins:
+#   - GEN_SALT('bf') returns a 29-char bcrypt salt string of
+#     shape `$2<x>$<cost>$<22 base64 chars>`.
+#   - GEN_SALT default cost = 6 (NOT pinned explicitly because
+#     the salt embeds cost in characters 4-5 and we'd need
+#     SUBSTRING to extract — pinned via LIKE pattern below).
+#   - GEN_SALT('bf', cost) with cost in [4, 31] works; cost=10
+#     pinned, cost=31 NOT pinned (too slow to run in CI).
+#   - GEN_SALT cost < 4 or > 31 → ERROR 1105.
+#   - GEN_SALT(non-'bf') → ERROR 1105 ('only bf supported').
+#   - GEN_SALT NULL → NULL.
+#   - GEN_SALT arity (0, 3 args) → ERROR 1105.
+#   - CRYPT(password, salt) returns 60-char bcrypt hash
+#     (29-char salt prefix + 31-char hash suffix).
+#   - CRYPT round-trip verification: CRYPT(pwd, stored_hash)
+#     = stored_hash (the bcrypt password-verify idiom).
+#   - CRYPT bad salt format → ERROR 1105 ('invalid bcrypt
+#     salt format').
+#   - CRYPT NULL prop on either arg → NULL.
+#   - CRYPT arity (0, 1 args) → ERROR 1105.
+#
+# Big-picture finding:
+#   zeta implements ONLY the bcrypt ('bf') variant of pgcrypto's
+#   GEN_SALT. The full PG pgcrypto supports 'des', 'xdes',
+#   'md5', and 'bf' — only 'bf' is wired in zeta (lib.rs:55398-
+#   55402). For app porting from PG using `gen_salt('md5')`
+#   etc., the call will fail loudly with a clear error
+#   message naming the unsupported type.
+#
+#   CRYPT depends on a SALT-as-input and is deterministic
+#   given (password, salt). This makes verification work via
+#   the idiom `CRYPT(input_password, stored_hash) =
+#   stored_hash` — the salt embedded in stored_hash is re-
+#   used to hash input_password, and if input matches, the
+#   recomputed hash equals stored_hash.
+#
+#   Non-determinism note: GEN_SALT() generates a random
+#   16-byte salt each call (lib.rs:55428-55430), so direct
+#   value pins are impossible — this slice pins SHAPE
+#   (length, LIKE pattern) and SEMANTIC ROUND-TRIPS.
+#
+# Adaptation notes:
+#   # zeta-adapt: pgcrypto GEN_SALT — only 'bf' (bcrypt)
+#     supported. md5/des/xdes → 1105 with 'unsupported type'.
+#   # zeta-adapt: bcrypt cost range is [4, 31]; default 6.
+#   # zeta-adapt: CRYPT salt must be valid bcrypt format
+#     ('$2<x>$<cost>$<22 chars>...'); otherwise 1105.
+#   # zeta-adapt: For password verification, use the
+#     CRYPT(input, stored_hash) = stored_hash idiom.
+#   # zeta-adapt: Arity errors → 1105.
+
+--echo === GEN_SALT('bf') — shape and length pins (non-deterministic value) ===
+
+# Salt format: $2<x>$<cost>$<22 base64 chars> — 29 chars total.
+SELECT LENGTH(GEN_SALT('bf'))                                 AS salt_len_is_29;
+# LIKE pattern catches all four parts: $2 + 1 char + $ + cost
+# + $ + remainder. zeta uses $2b$ (modern Blowfish variant).
+SELECT GEN_SALT('bf') LIKE '$2_$%'                            AS salt_starts_with_dollar_2x;
+# Cost defaults to 6 when omitted — embedded as '06' in the
+# salt string.
+SELECT GEN_SALT('bf') LIKE '$2_$06$%'                         AS default_cost_is_06;
+
+--echo === GEN_SALT('bf', cost) — explicit cost ===
+
+# Cost 4 (minimum).
+SELECT GEN_SALT('bf', 4)  LIKE '$2_$04$%'                     AS cost_04_min;
+# Cost 10 (common production cost).
+SELECT GEN_SALT('bf', 10) LIKE '$2_$10$%'                     AS cost_10_common;
+# Cost 12 — slightly higher production cost.
+SELECT GEN_SALT('bf', 12) LIKE '$2_$12$%'                     AS cost_12;
+
+--echo === GEN_SALT — error cases ===
+
+# Unsupported type (md5/des/xdes not wired in zeta).
+--error 1105
+SELECT GEN_SALT('md5');
+--error 1105
+SELECT GEN_SALT('des');
+--error 1105
+SELECT GEN_SALT('xdes');
+# Cost out of range [4, 31].
+--error 1105
+SELECT GEN_SALT('bf', 3);
+--error 1105
+SELECT GEN_SALT('bf', 32);
+# Negative cost: the impl casts via `n as u32`, which wraps
+# -1 to u32::MAX (4294967295). The range-check fires AFTER
+# the cast, so the error message shows the wrapped value
+# (not -1). Pinned as a u32-cast-leakage finding.
+--error 1105
+SELECT GEN_SALT('bf', -1);
+# Arity errors.
+--error 1105
+SELECT GEN_SALT();
+--error 1105
+SELECT GEN_SALT('bf', 6, 1);
+
+--echo === GEN_SALT — NULL propagation ===
+
+SELECT GEN_SALT(NULL)                                         AS null_type;
+SELECT GEN_SALT(NULL) IS NULL                                 AS null_type_pred;
+SELECT GEN_SALT('bf', NULL)                                   AS null_cost;
+SELECT GEN_SALT('bf', NULL) IS NULL                           AS null_cost_pred;
+
+--echo === CRYPT — shape and length ===
+
+# Bcrypt hash is 60 chars: 29-char salt prefix + 31-char hash.
+SELECT LENGTH(CRYPT('mypassword', GEN_SALT('bf')))            AS hash_len_is_60;
+# Hash starts with the same prefix as the salt arg.
+SELECT CRYPT('mypassword', '$2b$04$abcdefghijklmnopqrstuv')
+       LIKE '$2_$04$%'                                        AS hash_inherits_salt_prefix;
+
+--echo === CRYPT — password verification round-trip (with FIXED salt) ===
+
+# Bcrypt verify idiom: CRYPT(input, stored_hash) = stored_hash
+# when input matches the password that produced stored_hash.
+# Use a FIXED salt so both sides see the same input.
+# (An earlier draft used GEN_SALT() on both sides, which
+# generated DIFFERENT random salts — recording surfaced the
+# bug by returning 0 (FALSE). Real-world apps store the
+# hash once and verify against it; we pin that idiom here.)
+SELECT CRYPT('mypassword',
+             CRYPT('mypassword', '$2b$04$abcdefghijklmnopqrstuv'))
+     = CRYPT('mypassword', '$2b$04$abcdefghijklmnopqrstuv')   AS verify_self_consistent;
+# Wrong password against the same stored hash differs.
+SELECT CRYPT('wrongpassword', '$2b$04$abcdefghijklmnopqrstuv')
+    <> CRYPT('mypassword',    '$2b$04$abcdefghijklmnopqrstuv') AS wrong_password_differs;
+# Same password + same salt → deterministic, identical output.
+SELECT CRYPT('pwd', '$2b$04$abcdefghijklmnopqrstuv')
+     = CRYPT('pwd', '$2b$04$abcdefghijklmnopqrstuv')          AS deterministic_with_fixed_salt;
+# DIFFERENT salts on the same password produce DIFFERENT
+# hashes — pinning the inverse of the determinism row above.
+# This is why password verification REQUIRES the stored salt.
+SELECT CRYPT('pwd', '$2b$04$abcdefghijklmnopqrstuv')
+    <> CRYPT('pwd', '$2b$04$zzzzzzzzzzzzzzzzzzzzzz')          AS different_salts_differ;
+
+--echo === CRYPT — error cases ===
+
+# Bad salt format (not bcrypt-shaped).
+--error 1105
+SELECT CRYPT('pwd', 'badsalt');
+# Arity errors.
+--error 1105
+SELECT CRYPT();
+--error 1105
+SELECT CRYPT('pwd');
+
+--echo === CRYPT — NULL propagation ===
+
+SELECT CRYPT(NULL, '$2b$04$abcdefghijklmnopqrstuv')           AS null_password;
+SELECT CRYPT('pwd', NULL)                                     AS null_salt;
+SELECT CRYPT(NULL, NULL)                                      AS null_both;
+SELECT CRYPT(NULL, '$2b$04$abcdefghijklmnopqrstuv') IS NULL   AS null_pwd_pred;

@@ -1,0 +1,96 @@
+=== GEN_SALT('bf') — shape and length pins (non-deterministic value) ===
+SELECT LENGTH(GEN_SALT('bf'))                                 AS salt_len_is_29;
+salt_len_is_29
+29
+SELECT GEN_SALT('bf') LIKE '$2_$%'                            AS salt_starts_with_dollar_2x;
+salt_starts_with_dollar_2x
+1
+SELECT GEN_SALT('bf') LIKE '$2_$06$%'                         AS default_cost_is_06;
+default_cost_is_06
+1
+=== GEN_SALT('bf', cost) — explicit cost ===
+SELECT GEN_SALT('bf', 4)  LIKE '$2_$04$%'                     AS cost_04_min;
+cost_04_min
+1
+SELECT GEN_SALT('bf', 10) LIKE '$2_$10$%'                     AS cost_10_common;
+cost_10_common
+1
+SELECT GEN_SALT('bf', 12) LIKE '$2_$12$%'                     AS cost_12;
+cost_12
+1
+=== GEN_SALT — error cases ===
+SELECT GEN_SALT('md5');
+ERROR 1105: execution error: gen_salt(): unsupported type 'md5', only 'bf' (bcrypt) is supported
+SELECT GEN_SALT('des');
+ERROR 1105: execution error: gen_salt(): unsupported type 'des', only 'bf' (bcrypt) is supported
+SELECT GEN_SALT('xdes');
+ERROR 1105: execution error: gen_salt(): unsupported type 'xdes', only 'bf' (bcrypt) is supported
+SELECT GEN_SALT('bf', 3);
+ERROR 1105: execution error: bcrypt cost must be between 4 and 31, got 3
+SELECT GEN_SALT('bf', 32);
+ERROR 1105: execution error: bcrypt cost must be between 4 and 31, got 32
+SELECT GEN_SALT('bf', -1);
+ERROR 1105: execution error: bcrypt cost must be between 4 and 31, got 4294967295
+SELECT GEN_SALT();
+ERROR 1105: execution error: gen_salt() requires 1 or 2 arguments
+SELECT GEN_SALT('bf', 6, 1);
+ERROR 1105: execution error: gen_salt() requires 1 or 2 arguments
+=== GEN_SALT — NULL propagation ===
+SELECT GEN_SALT(NULL)                                         AS null_type;
+null_type
+NULL
+SELECT GEN_SALT(NULL) IS NULL                                 AS null_type_pred;
+null_type_pred
+1
+SELECT GEN_SALT('bf', NULL)                                   AS null_cost;
+null_cost
+NULL
+SELECT GEN_SALT('bf', NULL) IS NULL                           AS null_cost_pred;
+null_cost_pred
+1
+=== CRYPT — shape and length ===
+SELECT LENGTH(CRYPT('mypassword', GEN_SALT('bf')))            AS hash_len_is_60;
+hash_len_is_60
+60
+SELECT CRYPT('mypassword', '$2b$04$abcdefghijklmnopqrstuv')
+       LIKE '$2_$04$%'                                        AS hash_inherits_salt_prefix;
+hash_inherits_salt_prefix
+1
+=== CRYPT — password verification round-trip (with FIXED salt) ===
+SELECT CRYPT('mypassword',
+             CRYPT('mypassword', '$2b$04$abcdefghijklmnopqrstuv'))
+     = CRYPT('mypassword', '$2b$04$abcdefghijklmnopqrstuv')   AS verify_self_consistent;
+verify_self_consistent
+1
+SELECT CRYPT('wrongpassword', '$2b$04$abcdefghijklmnopqrstuv')
+    <> CRYPT('mypassword',    '$2b$04$abcdefghijklmnopqrstuv') AS wrong_password_differs;
+wrong_password_differs
+1
+SELECT CRYPT('pwd', '$2b$04$abcdefghijklmnopqrstuv')
+     = CRYPT('pwd', '$2b$04$abcdefghijklmnopqrstuv')          AS deterministic_with_fixed_salt;
+deterministic_with_fixed_salt
+1
+SELECT CRYPT('pwd', '$2b$04$abcdefghijklmnopqrstuv')
+    <> CRYPT('pwd', '$2b$04$zzzzzzzzzzzzzzzzzzzzzz')          AS different_salts_differ;
+different_salts_differ
+1
+=== CRYPT — error cases ===
+SELECT CRYPT('pwd', 'badsalt');
+ERROR 1105: execution error: invalid bcrypt salt format
+SELECT CRYPT();
+ERROR 1105: execution error: crypt() requires 2 arguments (password, salt)
+SELECT CRYPT('pwd');
+ERROR 1105: execution error: crypt() requires 2 arguments (password, salt)
+=== CRYPT — NULL propagation ===
+SELECT CRYPT(NULL, '$2b$04$abcdefghijklmnopqrstuv')           AS null_password;
+null_password
+NULL
+SELECT CRYPT('pwd', NULL)                                     AS null_salt;
+null_salt
+NULL
+SELECT CRYPT(NULL, NULL)                                      AS null_both;
+null_both
+NULL
+SELECT CRYPT(NULL, '$2b$04$abcdefghijklmnopqrstuv') IS NULL   AS null_pwd_pred;
+null_pwd_pred
+1
