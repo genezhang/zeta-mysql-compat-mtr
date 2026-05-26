@@ -38,10 +38,10 @@
 #
 #   zeta's `->` is consistently permissive: type-
 #   mismatches return NULL silently regardless of
-#   operand combination. PG's earlier versions (≤ v13)
-#   errored on some type mismatches; later versions
-#   converged to silent NULL — zeta matches the modern
-#   PG behavior.
+#   operand combination. PG has documented the same
+#   behavior since v9.5 (2016) — returning NULL on
+#   structure mismatch rather than erroring. zeta
+#   matches PG here.
 #
 #   The cross-PR contrast with PR #381's `#>` BUG is
 #   illuminating:
