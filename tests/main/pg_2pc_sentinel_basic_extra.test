@@ -1,0 +1,86 @@
+# Independently authored PG two-phase commit (2PC)
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - PREPARE TRANSACTION / COMMIT PREPARED / ROLLBACK
+#     PREPARED: ZERO prior coverage.
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: AS, found: <X>" — pre-existing at
+#     prepare_basic_extra (MySQL PREPARE p FROM '...'
+#     form rejection). Same fingerprint applies here
+#     because sqlparser's PREPARE parser expects
+#     `PREPARE name AS stmt` and treats TRANSACTION
+#     as an identifier-position name token.
+#   - "Expected: end of statement, found: <KW>" —
+#     pre-existing (RESET TIME ZONE / RESET SESSION
+#     AUTHORIZATION at PR #399, many others).
+#
+# This slice pins:
+#
+#   PREPARE TRANSACTION 'gid' (2 forms) — "Expected:
+#   AS, found: '<gid>'" at col 21:
+#     - sqlparser parses `PREPARE TRANSACTION` as
+#       `PREPARE name=TRANSACTION` and then expects
+#       `AS stmt`, gets the gid string-literal,
+#       errors. PG 2PC PREPARE TRANSACTION cannot
+#       be expressed in zeta.
+#
+#   COMMIT PREPARED 'gid' (2 forms) — "Expected: end
+#   of statement, found: PREPARED" at col 8:
+#     - sqlparser parses COMMIT as a complete
+#       statement; the trailing PREPARED is
+#       unexpected.
+#
+#   ROLLBACK PREPARED 'gid' (2 forms) — "Expected:
+#   end of statement, found: PREPARED" at col 10:
+#     - Same shape as COMMIT PREPARED, different
+#       column (ROLLBACK is 2 chars longer than COMMIT).
+#
+# Big-picture finding:
+#
+#   PG two-phase commit (2PC, X/Open XA-style
+#   external coordinator) is entirely unreachable.
+#   All three PG 2PC statements parse-reject. Apps
+#   porting PG distributed transaction managers that
+#   use 2PC must rewrite to:
+#     - Saga pattern (compensating transactions in
+#       application logic)
+#     - Single-database transactions with retry
+#     - Whatever distributed-txn primitives zeta
+#       exposes (per project README, distributed
+#       work is feature-gated)
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — PG 2PC family (PREPARE
+#     TRANSACTION / COMMIT PREPARED / ROLLBACK
+#     PREPARED) all parse-reject at sqlparser. No
+#     direct substitute for X/Open XA-style 2PC.
+#     Use Saga compensating-txn pattern app-side.
+
+--echo === PREPARE TRANSACTION 'gid' (2 forms) → "Expected: AS, found: '<gid>'" at col 21 ===
+
+# sqlparser's PREPARE arm parses `TRANSACTION` as the
+# prepared-statement name; then expects `AS stmt`,
+# gets the gid string-literal, errors.
+--error 1064
+PREPARE TRANSACTION 'gid_1';
+--error 1064
+PREPARE TRANSACTION 'app/tx/42';
+
+--echo === COMMIT PREPARED 'gid' (2 forms) → "Expected: end of statement, found: PREPARED" at col 8 ===
+
+--error 1064
+COMMIT PREPARED 'gid_1';
+--error 1064
+COMMIT PREPARED 'app/tx/42';
+
+--echo === ROLLBACK PREPARED 'gid' (2 forms) → "Expected: end of statement, found: PREPARED" at col 10 ===
+
+# Same shape as COMMIT PREPARED, col 10 vs col 8
+# (ROLLBACK is 2 chars longer than COMMIT).
+--error 1064
+ROLLBACK PREPARED 'gid_1';
+--error 1064
+ROLLBACK PREPARED 'app/tx/42';
