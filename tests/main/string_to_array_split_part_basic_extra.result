@@ -1,0 +1,116 @@
+=== STRING_TO_ARRAY: basic 2-arg split ===
+SELECT STRING_TO_ARRAY('a,b,c', ',')                          AS basic;
+basic
+Array { element_type: Text, elements: [String("a"), String("b"), String("c")] }
+SELECT STRING_TO_ARRAY('one|two|three', '|')                  AS pipe_delim;
+pipe_delim
+Array { element_type: Text, elements: [String("one"), String("two"), String("three")] }
+SELECT STRING_TO_ARRAY('foo--bar--baz', '--')                 AS multi_char_delim;
+multi_char_delim
+Array { element_type: Text, elements: [String("foo"), String("bar"), String("baz")] }
+SELECT STRING_TO_ARRAY('alone', ',')                          AS no_delim_found;
+no_delim_found
+Array { element_type: Text, elements: [String("alone")] }
+SELECT STRING_TO_ARRAY('', ',')                               AS empty_string;
+empty_string
+Array { element_type: Text, elements: [String("")] }
+=== STRING_TO_ARRAY: 3-arg with null_string ===
+SELECT STRING_TO_ARRAY('a,N,c', ',', 'N')                     AS null_marker_N;
+null_marker_N
+Array { element_type: Text, elements: [String("a"), Null, String("c")] }
+SELECT STRING_TO_ARRAY('a,,c', ',', '')                       AS null_empty_marker;
+null_empty_marker
+Array { element_type: Text, elements: [String("a"), Null, String("c")] }
+=== STRING_TO_ARRAY: SURPRISE — NULL delim → char-by-char split ===
+SELECT STRING_TO_ARRAY('abc', NULL)                           AS null_delim_char_split;
+null_delim_char_split
+Array { element_type: Text, elements: [String("a"), String("b"), String("c")] }
+=== STRING_TO_ARRAY: NULL string → NULL ===
+SELECT STRING_TO_ARRAY(NULL, ',')                             AS null_s;
+null_s
+NULL
+SELECT STRING_TO_ARRAY(NULL, ',') IS NULL                     AS null_s_pred;
+null_s_pred
+1
+=== STRING_TO_ARRAY: 3rd-arg NULL silently falls into no-null-marker ===
+SELECT STRING_TO_ARRAY('a,N,c', ',', NULL)                    AS third_null_no_marker;
+third_null_no_marker
+Array { element_type: Text, elements: [String("a"), String("N"), String("c")] }
+=== STRING_TO_ARRAY: arity errors → 1105 ===
+SELECT STRING_TO_ARRAY();
+ERROR 1105: execution error: STRING_TO_ARRAY requires 2 or 3 arguments
+SELECT STRING_TO_ARRAY('a', ',', 'N', 'X');
+ERROR 1105: execution error: STRING_TO_ARRAY requires 2 or 3 arguments
+=== SPLIT_PART: basic 3-arg extract (1-indexed) ===
+SELECT SPLIT_PART('a,b,c,d', ',', 1)                          AS first_part;
+first_part
+a
+SELECT SPLIT_PART('a,b,c,d', ',', 2)                          AS second_part;
+second_part
+b
+SELECT SPLIT_PART('a,b,c,d', ',', 4)                          AS last_part;
+last_part
+d
+SELECT SPLIT_PART('foo--bar--baz', '--', 2)                   AS multi_char_part_2;
+multi_char_part_2
+bar
+=== SPLIT_PART: pos > parts.count → EMPTY STRING (not NULL) ===
+SELECT SPLIT_PART('a,b,c,d', ',', 5)                          AS overflow_empty;
+overflow_empty
+
+SELECT SPLIT_PART('a,b,c,d', ',', 5) = ''                     AS overflow_empty_eq_string;
+overflow_empty_eq_string
+1
+SELECT SPLIT_PART('a,b,c,d', ',', 5) IS NULL                  AS overflow_NOT_null;
+overflow_NOT_null
+0
+=== SPLIT_PART: pos < 1 → ERROR 1105 ===
+SELECT SPLIT_PART('a,b,c', ',', 0);
+ERROR 1105: execution error: SPLIT_PART position must be >= 1
+SELECT SPLIT_PART('a,b,c', ',', -1);
+ERROR 1105: execution error: SPLIT_PART position must be >= 1
+=== SPLIT_PART: NULL prop on any arg ===
+SELECT SPLIT_PART(NULL, ',', 1)                               AS null_s;
+null_s
+NULL
+SELECT SPLIT_PART('a,b,c', NULL, 1)                           AS null_delim;
+null_delim
+NULL
+SELECT SPLIT_PART('a,b,c', ',', NULL)                         AS null_pos;
+null_pos
+NULL
+SELECT SPLIT_PART(NULL, ',', 1) IS NULL                       AS null_pred;
+null_pred
+1
+=== SPLIT_PART: non-int position → ERROR 1105 ===
+SELECT SPLIT_PART('a,b,c', ',', 'not_an_int');
+ERROR 1105: execution error: SPLIT_PART position must be integer
+SELECT SPLIT_PART('a,b,c', ',', CAST(1.5 AS DOUBLE PRECISION));
+ERROR 1105: execution error: SPLIT_PART position must be integer
+=== SPLIT_PART: UTF-8 multibyte preserved through split ===
+SELECT SPLIT_PART('café-test-bréve', '-', 1)                  AS utf8_part_1;
+utf8_part_1
+café
+SELECT SPLIT_PART('café-test-bréve', '-', 3)                  AS utf8_part_3;
+utf8_part_3
+bréve
+=== Cross-link: SPLIT_PART vs SUBSTRING_INDEX (DIFFERENT semantics) ===
+SELECT SUBSTRING_INDEX('a,b,c', ',', 2)                       AS substr_index_before_2;
+substr_index_before_2
+a,b
+SELECT SPLIT_PART('a,b,c', ',', 2)                            AS split_part_at_2;
+split_part_at_2
+b
+SELECT SUBSTRING_INDEX('a,b,c', ',', 2)
+    <> SPLIT_PART('a,b,c', ',', 2)                            AS different_semantics;
+different_semantics
+1
+=== SPLIT_PART: arity errors → 1105 ===
+SELECT SPLIT_PART();
+ERROR 1105: execution error: SPLIT_PART requires 3 arguments
+SELECT SPLIT_PART('a,b');
+ERROR 1105: execution error: SPLIT_PART requires 3 arguments
+SELECT SPLIT_PART('a,b', ',');
+ERROR 1105: execution error: SPLIT_PART requires 3 arguments
+SELECT SPLIT_PART('a,b', ',', 1, 2);
+ERROR 1105: execution error: SPLIT_PART requires 3 arguments
