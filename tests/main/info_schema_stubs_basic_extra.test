@@ -1,0 +1,124 @@
+# Independently authored information_schema STUB TABLES
+# sentinel smoke for the GPL MTR-format runner. NOT copied
+# or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - info_schema_basic_extra.test covers the WELL-POPULATED
+#     info_schema views: tables, columns, schemata, statistics,
+#     views, table_constraints, key_column_usage, referential_
+#     constraints. Those have real per-user-object data.
+#   - This slice pins the STUB / EMPTY tables that
+#     info_schema_basic_extra does NOT touch.
+#
+# This slice pins:
+#   - HARDCODED single-row stubs:
+#     * information_schema.engines (1 row: InnoDB DEFAULT)
+#     * information_schema.character_sets (1 row: utf8mb4)
+#     * information_schema.collations (1 row: utf8mb4_general_ci)
+#   - EMPTY stubs (always return zero rows):
+#     * information_schema.parameters
+#     * information_schema.routines
+#     * information_schema.triggers
+#     * information_schema.user_privileges
+#     * information_schema.processlist
+#     * information_schema.global_variables
+#     * information_schema.session_variables
+#   - GAP: `SELECT count(*) FROM information_schema.X` errors
+#     1235 — the shim does NOT support function calls or
+#     expressions over info_schema. Bare `SELECT *` is the
+#     only call shape that works.
+#
+# Big-picture finding:
+#   zeta's information_schema surface has THREE tiers:
+#     1. Populated views (tables/columns/etc) — driven from
+#        the real catalog.
+#     2. Hardcoded single-row stubs (engines/character_sets/
+#        collations) — fixed values for compatibility detection.
+#     3. Empty stubs (parameters/routines/triggers/...) —
+#        zero rows always; documented but not implemented.
+#
+#   The hardcoded stubs match the same single-row strategy
+#   used by SHOW COLLATION (see show_empty_stubs_basic_extra
+#   PR #336 and charset_collation_basic_extra). Apps probing
+#   for engine/charset support get a single canonical row
+#   per table.
+#
+#   The projection-shape gap is the most surprising finding:
+#   the MySQL wire shim's info_schema interceptor (likely a
+#   query-string pattern match similar to the DATABASE()
+#   shim bug from PR #330) only handles bare-column-list
+#   `SELECT col1, col2, ... FROM information_schema.X
+#   [LIMIT n]` shapes. The shim splits the projection by
+#   "," and rejects two distinct classes of element:
+#     - "function call or expression" (errno 1235) — fires
+#       for aggregates like COUNT(*) and function calls like
+#       UPPER(col). The shim detects a `(` in the element.
+#     - "multi-token projection element" (errno 1235) — fires
+#       for arithmetic / token sequences like `col + 1`.
+#       The shim detects whitespace-separated tokens.
+#   Both message variants are pinned below to lock the two-
+#   class detection logic; a future unification of the
+#   interceptor's parser would change one or both.
+#
+# Adaptation notes:
+#   # zeta-adapt: information_schema.engines/character_sets/
+#     collations are STUBBED with one row each. Don't rely
+#     on row count or non-stub values from these.
+#   # zeta-adapt: information_schema.parameters/routines/
+#     triggers/user_privileges/processlist/global_variables/
+#     session_variables are EMPTY. Apps doing
+#     `SELECT count(*) > 0 FROM information_schema.routines`
+#     will get a different result: the count(*) errors 1235;
+#     the bare `SELECT * FROM ...` returns 0 rows.
+#   # zeta-adapt: NO aggregate / function call / expression
+#     allowed in the projection over information_schema.
+#     Use `SELECT *` then count rows client-side, or query
+#     pg_catalog tables that don't have this limitation.
+
+--echo === HARDCODED SINGLE-ROW STUBS ===
+
+# information_schema.engines — InnoDB DEFAULT with transaction
+# support flags. Matches what MySQL apps probe to confirm
+# transactional engine availability.
+SELECT * FROM information_schema.engines LIMIT 5;
+# information_schema.character_sets — utf8mb4 only.
+SELECT * FROM information_schema.character_sets LIMIT 5;
+# information_schema.collations — utf8mb4_general_ci only.
+# Same row as charset_collation_basic_extra.test:80's
+# SHOW COLLATION output (different surface, same data).
+SELECT * FROM information_schema.collations LIMIT 5;
+
+--echo === EMPTY STUBS — always zero rows ===
+
+SELECT * FROM information_schema.parameters LIMIT 5;
+SELECT * FROM information_schema.routines LIMIT 5;
+SELECT * FROM information_schema.triggers LIMIT 5;
+SELECT * FROM information_schema.user_privileges LIMIT 5;
+SELECT * FROM information_schema.processlist LIMIT 5;
+SELECT * FROM information_schema.global_variables LIMIT 5;
+SELECT * FROM information_schema.session_variables LIMIT 5;
+
+--echo === GAP: count(*) over information_schema errors 1235 ===
+
+# The MySQL wire shim's info_schema interceptor only handles
+# bare `SELECT *` shapes. count(*), other aggregates, and
+# function calls all hit a fallthrough that errors with the
+# explicit "not yet supported" msg (errno 1235).
+--error 1235
+SELECT count(*) FROM information_schema.engines;
+--error 1235
+SELECT count(*) FROM information_schema.routines;
+# Function call over an info_schema column also rejected.
+--error 1235
+SELECT UPPER(ENGINE) FROM information_schema.engines;
+# Expression / arithmetic likewise rejected.
+--error 1235
+SELECT MAXLEN + 1 FROM information_schema.character_sets;
+
+--echo === Sentinel: SELECT-LIST with COLUMN refs works (no aggregate/fn) ===
+
+# Pure column projection (no expressions) goes through the
+# interceptor successfully. Pinning so the gap above is
+# clearly bounded to "aggregate / function / expression".
+SELECT ENGINE, SUPPORT FROM information_schema.engines LIMIT 5;
+SELECT CHARACTER_SET_NAME FROM information_schema.character_sets LIMIT 5;
