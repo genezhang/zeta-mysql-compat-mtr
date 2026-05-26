@@ -1,0 +1,44 @@
+=== Setup: create an enum type with 3 labels in declaration order ===
+CREATE TYPE mood_ehb AS ENUM ('sad', 'ok', 'happy');
+=== ENUM_FIRST returns first label ===
+SELECT ENUM_FIRST(NULL::mood_ehb)                             AS first_label;
+first_label
+sad
+=== ENUM_LAST returns last label ===
+SELECT ENUM_LAST(NULL::mood_ehb)                              AS last_label;
+last_label
+happy
+=== ENUM_RANGE returns Array of all labels (declaration order) ===
+SELECT ENUM_RANGE(NULL::mood_ehb)                             AS all_labels;
+all_labels
+Array { element_type: Enum { type_name: "mood_ehb", labels: ["sad", "ok", "happy"] }, elements: [Enum { type_name: "mood_ehb", label: "sad", ordinal: 0 }, Enum { type_name: "mood_ehb", label: "ok", ordinal: 1 }, Enum { type_name: "mood_ehb", label: "happy", ordinal: 2 }] }
+=== Equality of ENUM_FIRST/LAST results against label strings ===
+SELECT CAST(ENUM_FIRST(NULL::mood_ehb) AS TEXT) = 'sad'       AS first_eq_sad;
+first_eq_sad
+1
+SELECT CAST(ENUM_LAST(NULL::mood_ehb)  AS TEXT) = 'happy'     AS last_eq_happy;
+last_eq_happy
+1
+=== Error: unknown type name → 1105 ===
+SELECT ENUM_FIRST(NULL::nonexistent_type);
+ERROR 1105: execution error: enum_first() requires an enum type, but "nonexistent_type" is not an enum
+SELECT ENUM_LAST(NULL::nonexistent_type);
+ERROR 1105: execution error: enum_last() requires an enum type, but "nonexistent_type" is not an enum
+SELECT ENUM_RANGE(NULL::nonexistent_type);
+ERROR 1105: execution error: enum_range() requires an enum type, but "nonexistent_type" is not an enum
+=== Error: known non-enum type (INT) → SAME 1105 message ===
+SELECT ENUM_FIRST(NULL::INT);
+ERROR 1105: execution error: enum_first() requires an enum type, but "INT" is not an enum
+SELECT ENUM_LAST(NULL::INT);
+ERROR 1105: execution error: enum_last() requires an enum type, but "INT" is not an enum
+=== Error: arity (0, 2 args) → 1105 ===
+SELECT ENUM_FIRST();
+ERROR 1105: execution error: enum_first() requires exactly 1 argument
+SELECT ENUM_LAST();
+ERROR 1105: execution error: enum_last() requires exactly 1 argument
+SELECT ENUM_RANGE();
+ERROR 1105: execution error: enum_range() requires exactly 1 argument
+SELECT ENUM_FIRST(NULL::mood_ehb, NULL::mood_ehb);
+ERROR 1105: execution error: enum_first() requires exactly 1 argument
+=== Cleanup ===
+DROP TYPE mood_ehb;
