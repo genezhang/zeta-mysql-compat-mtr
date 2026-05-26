@@ -1,0 +1,29 @@
+=== FLUSH variants — all parse-reject (1064) ===
+FLUSH TABLES;
+ERROR 1064: SQL parse error: sql parser error: Unsupported statement FLUSH at Line: 1, Column: 7
+FLUSH LOGS;
+ERROR 1064: SQL parse error: sql parser error: Unsupported statement FLUSH at Line: 1, Column: 7
+FLUSH STATUS;
+ERROR 1064: SQL parse error: sql parser error: Unsupported statement FLUSH at Line: 1, Column: 7
+=== RESET variants — all parse-reject (1064) ===
+RESET QUERY CACHE;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: CACHE at Line: 1, Column: 13
+RESET MASTER;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+RESET SLAVE;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+RESET REPLICA;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== HANDLER — MySQL cursor-extension, parse-reject (1064) ===
+HANDLER t OPEN;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: HANDLER at Line: 1, Column: 1
+HANDLER t READ FIRST;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: HANDLER at Line: 1, Column: 1
+HANDLER t CLOSE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: HANDLER at Line: 1, Column: 1
+=== SHUTDOWN — parse-reject (1064) ===
+SHUTDOWN;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: SHUTDOWN at Line: 1, Column: 1
+=== Contrast: FLUSH PRIVILEGES same error, different file ===
+FLUSH PRIVILEGES;
+ERROR 1064: SQL parse error: sql parser error: Unsupported statement FLUSH at Line: 1, Column: 7
