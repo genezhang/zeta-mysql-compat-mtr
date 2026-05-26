@@ -1,0 +1,118 @@
+# Independently authored JSONB `->` (arrow access) type-
+# mismatch and array-index smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - json_basic.test:102 covers `->>` single-step object
+#     access (`data->>'name'`).
+#   - jsonb_basic_extra.test:126 covers `data - 'b'`
+#     (minus, NOT arrow).
+#   - jsonb_path_operators_basic_extra (PR #381) showed
+#     `->` works on arrays (the workaround row for the
+#     `#>` array-index bug).
+#   - This slice systematically pins `->` with int
+#     operand on arrays (positive and negative), out-
+#     of-range, type-mismatch silent no-ops on arrays/
+#     objects/scalars, and the JSONB-null scalar
+#     interaction.
+#
+# This slice pins:
+#   - `[10,20,30] -> 1` = 20 (int operand on array,
+#     positive index).
+#   - `[10,20,30] -> -1` = 30 (negative index from end,
+#     contrasting with PR #381 BUG where `#>` doesn't
+#     handle this).
+#   - `[10,20,30] -> 100` = NULL (out-of-range silent).
+#   - `[10,20,30] -> 'key'` = NULL (string operand on
+#     array — type-mismatch silent).
+#   - `{"a":1} -> 'a'` = 1 (object key access; covered
+#     in spirit by ->> in json_basic but pinned here for
+#     `->` JSONB-typed return shape).
+#   - `{"a":1} -> 0` = NULL (int operand on object —
+#     type-mismatch silent).
+#   - `{"a":1} -> 'no_such'` = NULL (missing key).
+#   - `'"hello"' -> N` = NULL (scalar string indexed).
+#   - `'null' -> ANY` = NULL (JSONB null scalar absorbs).
+#
+# Big-picture finding (UNIFIED SILENT NO-OP):
+#
+#   zeta's `->` is consistently permissive: type-
+#   mismatches return NULL silently regardless of
+#   operand combination. PG has documented the same
+#   behavior since v9.5 (2016) — returning NULL on
+#   structure mismatch rather than erroring. zeta
+#   matches PG here.
+#
+#   The cross-PR contrast with PR #381's `#>` BUG is
+#   illuminating:
+#     - `->` with int operand: works correctly on arrays
+#       (returns the element).
+#     - `#>` with numeric path segment (like `'{1}'`):
+#       broken, returns NULL — the path-walker doesn't
+#       handle numeric segments.
+#
+#   So apps using `->` chains as the workaround for the
+#   `#>` array-index bug get correct behavior:
+#     `(jsonb -> 'a') -> 1` works where `jsonb #> '{a,1}'`
+#     returns NULL.
+#
+#   Note — negative-index works on `->` (returns from end,
+#   `-1` is last). On `#>` it would fail same as positive
+#   integers (per PR #381 reviewer's "negative array
+#   indices likely also broken" nice-to-have).
+#
+# Adaptation notes:
+#   # zeta-adapt: JSONB `->` is silently permissive on
+#     type mismatches (returns NULL). Use to safely
+#     probe maybe-present keys.
+#   # zeta-adapt: `->` with int operand handles negative
+#     indices (Python-style from end). Use `(jsonb -> 'a')
+#     -> 1` for array steps; `#>` with numeric segments
+#     is broken per PR #381.
+
+--echo === `->` int operand on array — positive index ===
+
+SELECT '[10,20,30]'::JSONB -> 0                               AS arr_idx_0;
+SELECT '[10,20,30]'::JSONB -> 1                               AS arr_idx_1;
+SELECT '[10,20,30]'::JSONB -> 2                               AS arr_idx_last;
+
+--echo === `->` int operand on array — negative index (Python-style) ===
+
+SELECT '[10,20,30]'::JSONB -> -1                              AS arr_neg_1;
+SELECT '[10,20,30]'::JSONB -> -3                              AS arr_neg_3;
+
+--echo === `->` int operand on array — out of range → NULL ===
+
+SELECT '[10,20,30]'::JSONB -> 100                             AS arr_oor_pos;
+SELECT '[10,20,30]'::JSONB -> -100                            AS arr_oor_neg;
+
+--echo === `->` type mismatch (silent NULL) ===
+
+# Array + string operand → NULL.
+SELECT '[10,20,30]'::JSONB -> 'key'                           AS arr_str_typemis;
+# Object + int operand → NULL.
+SELECT '{"a":1,"b":2}'::JSONB -> 0                            AS obj_int_typemis;
+# Scalar string indexed → NULL (both forms).
+SELECT '"hello"'::JSONB -> 0                                  AS scalar_str_int_null;
+SELECT '"hello"'::JSONB -> 'key'                              AS scalar_str_str_null;
+# Scalar number / bool indexed → NULL.
+SELECT '42'::JSONB -> 0                                       AS scalar_int_null;
+SELECT 'true'::JSONB -> 'key'                                 AS scalar_bool_null;
+
+--echo === `->` object key access (JSONB-typed return) ===
+
+SELECT '{"a":1,"b":2}'::JSONB -> 'a'                          AS obj_key_int_val;
+SELECT '{"a":"hello"}'::JSONB -> 'a'                          AS obj_key_str_val;
+SELECT '{"a":{"b":1}}'::JSONB -> 'a'                          AS obj_key_subtree;
+SELECT '{"a":1}'::JSONB -> 'no_such_key'                      AS obj_missing_null;
+
+--echo === `->` on JSONB 'null' scalar — always NULL ===
+
+SELECT 'null'::JSONB -> 'key'                                 AS jsonb_null_str_null;
+SELECT 'null'::JSONB -> 0                                     AS jsonb_null_int_null;
+
+--echo === Cross-link: `->` works where PR #381's `#>` BUG fails ===
+
+# Workaround for the PR #381 array-index-path bug.
+SELECT '{"a":[10,20,30]}'::JSONB #> '{a,1}'                   AS bug_hash_arrow_null_pr381;
+SELECT ('{"a":[10,20,30]}'::JSONB -> 'a') -> 1                AS workaround_chain_20;
