@@ -1,0 +1,29 @@
+=== CREATE EVENT — 1064 parse-reject ===
+CREATE EVENT e ON SCHEDULE EVERY 1 HOUR DO SELECT 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: EVENT at Line: 1, Column: 8
+=== ALTER EVENT — 1064 ===
+ALTER EVENT e DISABLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: EVENT at Line: 1, Column: 7
+ALTER EVENT e ON SCHEDULE EVERY 2 HOUR;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: EVENT at Line: 1, Column: 7
+=== DROP EVENT — 1064 with target-list error ===
+DROP EVENT e;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: EVENT at Line: 1, Column: 6
+=== STRIKING: USE <any-db> — silent + REFLECTS bogus name in DATABASE() ===
+USE someotherdb;
+USE definitely_does_not_exist_zzz;
+SELECT DATABASE();
+DATABASE()
+definitely_does_not_exist_zzz
+=== STRIKING BUG: TRUNCATE TABLE t PARTITION clause ignored ===
+CREATE TABLE truncate_partition_bug (id INT);
+INSERT INTO truncate_partition_bug VALUES (1), (2), (3);
+SELECT COUNT(*) FROM truncate_partition_bug                   AS count_before_3;
+COUNT
+3
+TRUNCATE TABLE truncate_partition_bug PARTITION (p0);
+SELECT COUNT(*) FROM truncate_partition_bug                   AS count_after_0_BUG;
+COUNT
+0
+=== Cleanup ===
+DROP TABLE truncate_partition_bug;
