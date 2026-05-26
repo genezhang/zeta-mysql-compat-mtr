@@ -1,0 +1,145 @@
+# Independently authored MySQL maintenance-command
+# sentinel smoke for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - FLUSH PRIVILEGES — covered in
+#     auth_basic_extra.test:148 (errno 1064 sentinel).
+#   - OPTIMIZE TABLE / REPAIR TABLE / CHECK TABLE —
+#     covered in vacuum_analyze_basic_extra.test:104,
+#     109, 114 (errno 1064 sentinels).
+#   - LOAD DATA INFILE — covered in
+#     copy_basic_extra.test:122 (errno 1064 sentinel).
+#   - LOAD_FILE() function — covered in
+#     load_file_stub_basic_extra.test (returns NULL).
+#   - This slice pins the REMAINING MySQL maintenance/
+#     admin statements that don't have any zeta surface
+#     at all and parse-reject at 1064.
+#
+# This slice pins:
+#   - FLUSH TABLES (different from FLUSH PRIVILEGES;
+#     intent: clear table caches).
+#   - FLUSH LOGS (intent: rotate binary logs).
+#   - RESET QUERY CACHE.
+#   - RESET MASTER / RESET SLAVE / RESET REPLICA
+#     (replication-state reset).
+#   - HANDLER t OPEN / READ / CLOSE (cursor-like MySQL
+#     extension).
+#   - SHUTDOWN.
+#   - All error 1064 with parser-level "Unsupported
+#     statement <X>".
+#
+# Big-picture finding (PARSE-REJECTED ADMIN SURFACE):
+#
+#   These MySQL extensions to standard SQL have NO zeta
+#   surface — neither in the executor nor as parser
+#   passthroughs. Apps porting MySQL replication scripts,
+#   binlog rotation, query-cache management, or
+#   cursor-based scans will hit a wall at parse time.
+#
+#   Recovery options:
+#
+#   - FLUSH TABLES → no equivalent in zeta (no shared
+#     mutable cache to flush). Drop the statement from
+#     migration scripts.
+#   - FLUSH LOGS → not applicable (zeta uses log-store
+#     segments, not MySQL binlogs; rotation is internal).
+#   - RESET QUERY CACHE → zeta has plan cache but no
+#     query-result cache; no equivalent.
+#   - RESET MASTER/SLAVE/REPLICA → zeta has logical
+#     replication via pgoutput/pg_recvlogical, not MySQL
+#     binlog-based replication; use Debezium / pg_recvlogical
+#     reset instead.
+#   - HANDLER → use a CURSOR-style DECLARE/FETCH/CLOSE
+#     in a stored procedure, or stream via libpq's
+#     server-side cursor support over pgwire.
+#   - SHUTDOWN → operational, must be done outside SQL
+#     (kill the zeta process or its supervisor).
+#
+#   STRIKING — these are PARSE-REJECTED, not silently-no-
+#   op'd. Distinct from PR #366 (LISTEN/NOTIFY silent on
+#   mysqlwire) and PR #369 (SET zeta.* absorbed) where
+#   the silent-no-op is a deliberate compatibility choice
+#   for statements that DO have a pgwire-real
+#   implementation. For these MAINTENANCE/ADMIN commands
+#   there is no real implementation on EITHER wire — a
+#   clean parse-reject is appropriate because there's no
+#   semantic anyone could reasonably want zeta to fake.
+#   The framing is "parse-reject is the right choice for
+#   ops commands that can't safely no-op" — NOT a
+#   criticism of #366/#369's silent-no-op design.
+#
+#   Recording surfaces FOUR distinct sqlparser-error
+#   shapes:
+#     (a) "Unsupported statement FLUSH at Line ..." —
+#         sqlparser-level "Unsupported statement <X>"
+#         shape (FLUSH variants only).
+#     (b) "Expected: end of statement, found: CACHE ..."
+#         — sqlparser doesn't recognize `CACHE` after
+#         `RESET QUERY` (RESET QUERY CACHE only).
+#     (c) "unsupported statement: sqlparser::ast::Statement"
+#         — parsed successfully but convert.rs:432 rejects
+#         (RESET MASTER/SLAVE/REPLICA).
+#     (d) "Expected: an SQL statement, found: <X>" —
+#         sqlparser doesn't recognize the leading
+#         keyword (HANDLER and SHUTDOWN).
+#
+# Adaptation notes:
+#   # zeta-adapt: FLUSH TABLES / FLUSH LOGS / RESET (any
+#     variant) / HANDLER / SHUTDOWN all error 1064 at
+#     parse time. No zeta surface — drop from migration
+#     scripts or replace per the recovery notes above.
+#   # zeta-adapt: Error messages come in FOUR distinct
+#     sqlparser-templates depending on the leading keyword
+#     — see the (a)/(b)/(c)/(d) classification in the
+#     big-picture finding above. Don't pattern-match
+#     errors by exact text; match by 1064 + presence of
+#     the statement keyword.
+
+--echo === FLUSH variants — all parse-reject (1064) ===
+
+# Different from FLUSH PRIVILEGES (auth_basic_extra:148).
+--error 1064
+FLUSH TABLES;
+--error 1064
+FLUSH LOGS;
+--error 1064
+FLUSH STATUS;
+
+--echo === RESET variants — all parse-reject (1064) ===
+
+--error 1064
+RESET QUERY CACHE;
+--error 1064
+RESET MASTER;
+--error 1064
+RESET SLAVE;
+--error 1064
+RESET REPLICA;
+
+--echo === HANDLER — MySQL cursor-extension, parse-reject (1064) ===
+
+# zeta has no HANDLER statement; use cursor in stored
+# procedure or pgwire server-side cursor instead.
+--error 1064
+HANDLER t OPEN;
+--error 1064
+HANDLER t READ FIRST;
+--error 1064
+HANDLER t CLOSE;
+
+--echo === SHUTDOWN — parse-reject (1064) ===
+
+# Operational, not SQL-level — must be done outside the
+# session.
+--error 1064
+SHUTDOWN;
+
+--echo === Contrast: FLUSH PRIVILEGES same error, different file ===
+
+# Pinned in auth_basic_extra.test:148; included here so
+# the pattern is comparable side-by-side. All FLUSH
+# forms share the "Unsupported statement FLUSH" parser
+# error.
+--error 1064
+FLUSH PRIVILEGES;
