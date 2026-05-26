@@ -1,0 +1,32 @@
+CREATE TABLE m_tgt (id INT PRIMARY KEY, n INT);
+INSERT INTO m_tgt VALUES (1, 10), (2, 20);
+CREATE TABLE m_src (id INT PRIMARY KEY, n INT);
+INSERT INTO m_src VALUES (1, 100), (3, 300);
+=== MERGE basic (UPDATE + INSERT branches) — catch-all 1064 ===
+MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED THEN UPDATE SET n = s.n WHEN NOT MATCHED THEN INSERT (id, n) VALUES (s.id, s.n);
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== MERGE with DELETE branch — catch-all 1064 ===
+MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED THEN DELETE;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== MERGE with `DO NOTHING` (PG 15+) — sqlparser-grammar 1064 (DIFFERENT site) ===
+MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN NOT MATCHED THEN DO NOTHING;
+ERROR 1064: SQL parse error: sql parser error: expected UPDATE, DELETE or INSERT in merge clause at Line: 1, Column: 71
+=== MERGE with WHEN MATCHED AND <cond> — catch-all 1064 ===
+MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED AND s.n > 50 THEN UPDATE SET n = s.n;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== MERGE with subquery as source — catch-all 1064 ===
+MERGE INTO m_tgt t USING (SELECT 5 AS id, 500 AS n) s ON t.id = s.id WHEN NOT MATCHED THEN INSERT (id, n) VALUES (s.id, s.n);
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== MERGE with RETURNING (PG 17+) — catch-all 1064 ===
+MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED THEN UPDATE SET n = s.n RETURNING t.id, t.n;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== Recommended rewrites work — MySQL ON DUPLICATE KEY + ON CONFLICT DO NOTHING ===
+INSERT INTO m_tgt (id, n) VALUES (1, 100) ON DUPLICATE KEY UPDATE n = VALUES(n);
+INSERT INTO m_tgt (id, n) VALUES (3, 300) ON CONFLICT DO NOTHING;
+SELECT id, n FROM m_tgt ORDER BY id;
+id	n
+1	100
+2	20
+3	300
+DROP TABLE m_tgt;
+DROP TABLE m_src;
