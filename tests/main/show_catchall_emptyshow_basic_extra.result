@@ -1,0 +1,20 @@
+=== SHOW EVENTS — silent empty (CREATE/ALTER/DROP EVENT errors 1064 per PR #373) ===
+SHOW EVENTS;
+=== SHOW MASTER STATUS / SHOW SLAVE STATUS / SHOW BINARY LOGS — silent empty ===
+SHOW MASTER STATUS;
+SHOW SLAVE STATUS;
+SHOW BINARY LOGS;
+=== SHOW FUNCTION STATUS / SHOW PROCEDURE STATUS — silent empty ===
+SHOW FUNCTION STATUS;
+SHOW PROCEDURE STATUS;
+=== SHOW TRIGGERS — silent empty even though CREATE TRIGGER works ===
+SHOW TRIGGERS;
+=== SHOW PLUGINS — silent empty (no plugin architecture) ===
+SHOW PLUGINS;
+=== STRIKING: garbage SHOW also returns empty (no 1064 error) ===
+SHOW MADE_UP_THING;
+SHOW XYZZY;
+SHOW SOMETHING_NONSENSE;
+=== SHOW KEYS / SHOW FIELDS on nonexistent table — empty (no 1146) ===
+SHOW KEYS FROM definitely_does_not_exist;
+SHOW FIELDS FROM also_does_not_exist;
