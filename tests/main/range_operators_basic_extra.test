@@ -4,13 +4,17 @@
 #
 # Existing coverage (do NOT duplicate):
 #   - range_type_basic_extra covers `@>` (contains),
-#     `<<` (strictly-left), `&&` (overlap), and pins
-#     `-|-` (adjacency) as KNOWN GAP (errno 1064).
+#     `<<` (strictly-left), `&&` (overlap), `-|-` KNOWN
+#     GAP (1064), AND `+` (union, line 143) AND `*`
+#     (intersect, line 138) AS ALREADY pinned in the
+#     same 1105 "arithmetic op requires numbers" shape.
+#     (Caught by PR #383 review.)
 #   - This slice covers the REMAINING PG range
-#     operators: `>>` (strictly-right), `<@` (contained
-#     by, range and element forms), `&<` / `&>` (extend-
-#     ranking), and the arithmetic forms `+` / `*` / `-`
-#     (union / intersect / difference).
+#     operators NOT in range_type_basic_extra: `>>`
+#     (strictly-right), `<@` (contained by, range AND
+#     element forms), `&<` / `&>` (extend-ranking),
+#     and `-` (difference — the `+`/`*` siblings are
+#     already pinned).
 #
 # This slice pins (mix of supported, parse-rejected,
 # and execution-rejected):
@@ -59,8 +63,8 @@
 #   completely different fates depending on context:
 #     - `'[1,5)'::INT4RANGE - '[1,5)'::INT4RANGE` errors
 #       1105 (range arithmetic not implemented).
-#     - `'[1,5)'::JSONB - 'a'` works (per PR #378 JSONB
-#       minus slice — key removal).
+#     - `'{"a":1,"b":2}'::JSONB - 'a'` works (per PR
+#       #378 JSONB minus slice — key removal).
 #   Apps porting PG code that uses `-` for range
 #   difference will see arithmetic-op errors, NOT a
 #   useful "operator not supported on RANGE" error.
@@ -104,15 +108,7 @@ SELECT '[1,5)'::INT4RANGE &< '[6,10)'::INT4RANGE;
 --error 1064
 SELECT '[6,10)'::INT4RANGE &> '[1,5)'::INT4RANGE;
 
---echo === `+` range-union — EXECUTION REJECTED 1105 (misroute to arithmetic) ===
-
---error 1105
-SELECT '[1,5)'::INT4RANGE + '[10,20)'::INT4RANGE;
-
---echo === `*` range-intersect — EXECUTION REJECTED 1105 ===
-
---error 1105
-SELECT '[1,10)'::INT4RANGE * '[5,15)'::INT4RANGE;
+--echo === `+` / `*` already pinned in range_type_basic_extra:138,143 — not re-pinned ===
 
 --echo === `-` range-difference — EXECUTION REJECTED 1105 ===
 

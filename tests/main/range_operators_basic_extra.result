@@ -34,12 +34,7 @@ ERROR 1064: SQL parse error: unsupported binary operator: &<
 === `&>` not-extending-left — PARSE REJECTED (1064) ===
 SELECT '[6,10)'::INT4RANGE &> '[1,5)'::INT4RANGE;
 ERROR 1064: SQL parse error: unsupported binary operator: &>
-=== `+` range-union — EXECUTION REJECTED 1105 (misroute to arithmetic) ===
-SELECT '[1,5)'::INT4RANGE + '[10,20)'::INT4RANGE;
-ERROR 1105: execution error: arithmetic op requires numbers
-=== `*` range-intersect — EXECUTION REJECTED 1105 ===
-SELECT '[1,10)'::INT4RANGE * '[5,15)'::INT4RANGE;
-ERROR 1105: execution error: arithmetic op requires numbers
+=== `+` / `*` already pinned in range_type_basic_extra:138,143 — not re-pinned ===
 === `-` range-difference — EXECUTION REJECTED 1105 ===
 SELECT '[1,10)'::INT4RANGE - '[5,15)'::INT4RANGE;
 ERROR 1105: execution error: arithmetic op requires numbers
