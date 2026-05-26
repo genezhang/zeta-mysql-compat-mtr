@@ -1,0 +1,167 @@
+# Independently authored VECTOR functions smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - L2_DISTANCE — NONE (zero compat-mtr coverage).
+#   - COSINE_DISTANCE — NONE.
+#   - INNER_PRODUCT — NONE.
+#   - VECTOR_DIMS — NONE.
+#   - VECTOR_NORM — NONE.
+#   - <->, <=>, <#> distance operators — NONE.
+#   - null_handling_basic_extra.test mentions <=> as
+#     "spaceship NULL-safe equals" gap (errno 1105 'requires
+#     vector operands'), confirming <=> is the cosine-distance
+#     operator over vectors, not the MySQL null-safe equals.
+#
+# This slice pins:
+#   - L2_DISTANCE([1,0,0], [0,1,0]) = √2 (Euclidean).
+#   - COSINE_DISTANCE([1,0], [0,1]) = 1 (orthogonal → max
+#     distance; identity vectors → 0).
+#   - INNER_PRODUCT([1,2,3], [4,5,6]) = 32 (dot product).
+#   - VECTOR_DIMS — returns Int32 vector length.
+#   - VECTOR_NORM([3,4]) = 5 (3-4-5 right-triangle L2 norm).
+#   - Distance OPERATORS: <-> (L2), <=> (cosine), <#>
+#     (negative inner product, PG convention).
+#   - Dimension-mismatch errors → 1105 'different vector
+#     dimensions N and M'.
+#   - Wrong-type (non-vector) args → 1105 'requires vector
+#     arguments' or 'requires a vector argument'.
+#   - NULL prop on any arg.
+#   - Arity errors → 1105.
+#
+# Big-picture finding:
+#   zeta implements the pgvector-compatible distance surface:
+#     L2_DISTANCE(a, b) ≡ a <-> b
+#     COSINE_DISTANCE(a, b) ≡ a <=> b
+#     INNER_PRODUCT(a, b) NEGATED ≡ a <#> b
+#   The <#> operator is the NEGATIVE inner product (per PG
+#   pgvector convention — useful for HNSW indexes where
+#   "smaller is closer"). INNER_PRODUCT itself returns the
+#   standard positive dot product.
+#
+#   STRIKING: `<=>` is OVERLOADED. For vector operands it's
+#   cosine distance; for scalar operands MySQL uses it as
+#   null-safe equals. null_handling_basic_extra.test:118
+#   pins that <=> on non-vector errors 1105 'requires vector
+#   operands' — zeta does NOT implement the MySQL spaceship.
+#   Apps doing `a <=> b` for null-safe equality should use
+#   `a IS NOT DISTINCT FROM b` instead.
+#
+#   Dimension-mismatch is an ERROR (not NULL). NULL on either
+#   side IS NULL-prop. So `L2_DISTANCE(NULL, vec3d)` returns
+#   NULL but `L2_DISTANCE(vec3d, vec2d)` errors.
+#
+# Adaptation notes:
+#   # zeta-adapt: <-> = L2_DISTANCE, <=> = COSINE_DISTANCE,
+#     <#> = NEGATIVE INNER_PRODUCT (pgvector convention).
+#   # zeta-adapt: <=> on non-vector operands errors —
+#     does NOT implement MySQL's null-safe equals.
+#   # zeta-adapt: Vector functions return Float64 (distances)
+#     or Int32 (dims).
+#   # zeta-adapt: Dimension-mismatch is an ERROR; NULL on
+#     either side is NULL-prop.
+#   # zeta-adapt: VECTOR literal syntax: '[1,2,3]'::vector.
+
+--echo === L2_DISTANCE (Euclidean) ===
+
+# Orthogonal unit vectors → √2.
+SELECT L2_DISTANCE('[1,0,0]'::vector, '[0,1,0]'::vector)      AS sqrt_2;
+# Identity → 0.
+SELECT L2_DISTANCE('[1,2,3]'::vector, '[1,2,3]'::vector)      AS identity_0;
+# 3-4-5 triangle.
+SELECT L2_DISTANCE('[0,0]'::vector,   '[3,4]'::vector)        AS three_four_five;
+
+--echo === COSINE_DISTANCE (1 - cos(θ)) ===
+
+# Orthogonal → 1 (cos = 0, distance = 1).
+SELECT COSINE_DISTANCE('[1,0]'::vector, '[0,1]'::vector)      AS orthogonal_1;
+# Same direction → 0.
+SELECT COSINE_DISTANCE('[1,0]'::vector, '[5,0]'::vector)      AS same_dir_0;
+# Opposite → 2 (cos = -1, distance = 1 - -1 = 2).
+SELECT COSINE_DISTANCE('[1,0]'::vector, '[-1,0]'::vector)     AS opposite_2;
+
+--echo === INNER_PRODUCT (dot product) ===
+
+# Standard dot product (no sign flip — the operator <#>
+# below DOES flip).
+SELECT INNER_PRODUCT('[1,2,3]'::vector, '[4,5,6]'::vector)    AS dot_32;
+SELECT INNER_PRODUCT('[1,0]'::vector, '[0,1]'::vector)        AS orthogonal_0;
+SELECT INNER_PRODUCT('[2,3]'::vector, '[2,3]'::vector)        AS self_dot_13;
+
+--echo === VECTOR_DIMS ===
+
+SELECT VECTOR_DIMS('[1,2,3]'::vector)                         AS dim_3;
+SELECT VECTOR_DIMS('[0]'::vector)                             AS dim_1;
+
+--echo === VECTOR_NORM (L2 norm) ===
+
+# 3-4-5 right triangle → 5.
+SELECT VECTOR_NORM('[3,4]'::vector)                           AS norm_5;
+# Unit vector.
+SELECT VECTOR_NORM('[1,0,0]'::vector)                         AS unit_norm_1;
+# Zero vector.
+SELECT VECTOR_NORM('[0,0,0]'::vector)                         AS zero_norm_0;
+
+--echo === Distance OPERATORS (pgvector convention) ===
+
+# <-> ≡ L2_DISTANCE.
+SELECT '[1,0,0]'::vector <-> '[0,1,0]'::vector                AS op_l2;
+SELECT ('[1,0,0]'::vector <-> '[0,1,0]'::vector)
+     = L2_DISTANCE('[1,0,0]'::vector, '[0,1,0]'::vector)      AS op_eq_fn_l2;
+# <=> ≡ COSINE_DISTANCE.
+SELECT '[1,0]'::vector <=> '[1,0]'::vector                    AS op_cosine_same;
+SELECT ('[1,0]'::vector <=> '[0,1]'::vector)
+     = COSINE_DISTANCE('[1,0]'::vector, '[0,1]'::vector)      AS op_eq_fn_cosine;
+# <#> ≡ NEGATIVE INNER_PRODUCT (pgvector convention — for
+# HNSW indexes where smaller-is-closer).
+SELECT '[1,2]'::vector <#> '[3,4]'::vector                    AS op_neg_inner_neg_11;
+SELECT ('[1,2,3]'::vector <#> '[4,5,6]'::vector)
+     = -INNER_PRODUCT('[1,2,3]'::vector, '[4,5,6]'::vector)   AS op_eq_neg_fn;
+
+--echo === Dimension-mismatch → ERROR 1105 ===
+
+--error 1105
+SELECT L2_DISTANCE('[1,2,3]'::vector, '[1,2]'::vector);
+--error 1105
+SELECT COSINE_DISTANCE('[1]'::vector, '[1,2]'::vector);
+--error 1105
+SELECT INNER_PRODUCT('[1,2,3]'::vector, '[1,2]'::vector);
+
+--echo === NULL prop on any arg → NULL (not error) ===
+
+SELECT L2_DISTANCE(NULL, '[1,2,3]'::vector)                   AS null_left;
+SELECT L2_DISTANCE('[1,2,3]'::vector, NULL)                   AS null_right;
+SELECT VECTOR_DIMS(NULL)                                      AS null_dims;
+SELECT VECTOR_NORM(NULL)                                      AS null_norm;
+SELECT L2_DISTANCE(NULL, '[1,2,3]'::vector) IS NULL           AS null_pred;
+
+--echo === Wrong-type (non-vector) → ERROR 1105 ===
+
+--error 1105
+SELECT L2_DISTANCE(1, 2);
+--error 1105
+SELECT COSINE_DISTANCE('hello', 'world');
+--error 1105
+SELECT INNER_PRODUCT('[1,2,3]'::vector, 42);
+--error 1105
+SELECT VECTOR_DIMS('not a vector');
+--error 1105
+SELECT VECTOR_NORM(42);
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT L2_DISTANCE();
+--error 1105
+SELECT L2_DISTANCE('[1,2]'::vector);
+--error 1105
+SELECT COSINE_DISTANCE('[1]'::vector, '[2]'::vector, '[3]'::vector);
+--error 1105
+SELECT INNER_PRODUCT();
+--error 1105
+SELECT VECTOR_DIMS();
+--error 1105
+SELECT VECTOR_DIMS('[1]'::vector, '[2]'::vector);
+--error 1105
+SELECT VECTOR_NORM();
