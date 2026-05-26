@@ -1,0 +1,166 @@
+=== JUSTIFY_DAYS — 30 days carry to 1 month ===
+SELECT JUSTIFY_DAYS(INTERVAL '30 days')                       AS thirty_days_one_month;
+thirty_days_one_month
+1 mon
+SELECT JUSTIFY_DAYS(INTERVAL '35 days')                       AS thirtyfive_days;
+thirtyfive_days
+1 mon 5 days
+SELECT JUSTIFY_DAYS(INTERVAL '60 days')                       AS sixty_days_two_months;
+sixty_days_two_months
+2 mons
+SELECT EXTRACT(MONTH FROM JUSTIFY_DAYS(INTERVAL '35 days'))   AS month_field_1;
+month_field_1
+1
+SELECT EXTRACT(DAY   FROM JUSTIFY_DAYS(INTERVAL '35 days'))   AS day_field_5;
+day_field_5
+5
+=== JUSTIFY_DAYS — TRUNCATED division (sign propagates) ===
+SELECT JUSTIFY_DAYS(INTERVAL '-35 days')                      AS neg_thirtyfive_days;
+neg_thirtyfive_days
+-1 mon -5 days
+SELECT JUSTIFY_DAYS(INTERVAL '-60 days')                      AS neg_sixty_days;
+neg_sixty_days
+-2 mons
+SELECT EXTRACT(MONTH FROM JUSTIFY_DAYS(INTERVAL '-35 days'))  AS neg_month_field;
+neg_month_field
+-1
+SELECT EXTRACT(DAY   FROM JUSTIFY_DAYS(INTERVAL '-35 days'))  AS neg_day_field;
+neg_day_field
+-5
+=== JUSTIFY_DAYS — no-op when |days| < 30 ===
+SELECT JUSTIFY_DAYS(INTERVAL '29 days')                       AS twentynine_wire_as_hours;
+twentynine_wire_as_hours
+696:00:00
+SELECT JUSTIFY_DAYS(INTERVAL '-29 days')                      AS neg_twentynine_wire_as_hours;
+neg_twentynine_wire_as_hours
+-696:00:00
+SELECT JUSTIFY_DAYS(INTERVAL '0 days')                        AS zero_noop;
+zero_noop
+00:00:00
+SELECT EXTRACT(DAY FROM JUSTIFY_DAYS(INTERVAL '29 days'))     AS day_field_29_unchanged;
+day_field_29_unchanged
+29
+=== JUSTIFY_DAYS — months and microseconds untouched ===
+SELECT JUSTIFY_DAYS(INTERVAL '2 months 35 days 1 hour')       AS months_and_time_preserved;
+months_and_time_preserved
+3 mons 5 days 01:00:00
+=== JUSTIFY_HOURS — 24 hours carry to 1 day ===
+SELECT JUSTIFY_HOURS(INTERVAL '25 hours')                     AS twentyfive_wire_collapsed;
+twentyfive_wire_collapsed
+25:00:00
+SELECT JUSTIFY_HOURS(INTERVAL '24 hours')                     AS twentyfour_exact_wire_collapsed;
+twentyfour_exact_wire_collapsed
+24:00:00
+SELECT JUSTIFY_HOURS(INTERVAL '49 hours')                     AS fortynine_wire_collapsed;
+fortynine_wire_collapsed
+49:00:00
+SELECT EXTRACT(DAY  FROM JUSTIFY_HOURS(INTERVAL '25 hours'))  AS jh25_day_1;
+jh25_day_1
+1
+SELECT EXTRACT(HOUR FROM JUSTIFY_HOURS(INTERVAL '25 hours'))  AS jh25_hour_1;
+jh25_hour_1
+1
+SELECT EXTRACT(DAY  FROM JUSTIFY_HOURS(INTERVAL '49 hours'))  AS jh49_day_2;
+jh49_day_2
+2
+SELECT EXTRACT(HOUR FROM JUSTIFY_HOURS(INTERVAL '49 hours'))  AS jh49_hour_1;
+jh49_hour_1
+1
+=== JUSTIFY_HOURS — TRUNCATED, sign propagates ===
+SELECT JUSTIFY_HOURS(INTERVAL '-25 hours')                    AS neg_twentyfive_wire;
+neg_twentyfive_wire
+-25:00:00
+SELECT JUSTIFY_HOURS(INTERVAL '-49 hours')                    AS neg_fortynine_wire;
+neg_fortynine_wire
+-49:00:00
+SELECT EXTRACT(DAY  FROM JUSTIFY_HOURS(INTERVAL '-25 hours')) AS jh_neg25_day_neg1;
+jh_neg25_day_neg1
+-1
+SELECT EXTRACT(HOUR FROM JUSTIFY_HOURS(INTERVAL '-25 hours')) AS jh_neg25_hour_neg1;
+jh_neg25_hour_neg1
+-1
+=== JUSTIFY_HOURS — no-op when |hours| < 24 ===
+SELECT JUSTIFY_HOURS(INTERVAL '23 hours')                     AS twentythree_noop;
+twentythree_noop
+23:00:00
+SELECT JUSTIFY_HOURS(INTERVAL '-23 hours')                    AS neg_twentythree_noop;
+neg_twentythree_noop
+-23:00:00
+SELECT JUSTIFY_HOURS(INTERVAL '0 hours')                      AS zero_hours_noop;
+zero_hours_noop
+00:00:00
+=== JUSTIFY_HOURS — months and days carry, render in PG-format ===
+SELECT JUSTIFY_HOURS(INTERVAL '1 month 5 days 25 hours')      AS months_days_pg_format;
+months_days_pg_format
+1 mon 6 days 01:00:00
+=== JUSTIFY_INTERVAL — full normalization (us → days → months) ===
+SELECT JUSTIFY_INTERVAL(INTERVAL '35 days 25 hours')          AS cascade_carry;
+cascade_carry
+1 mon 6 days 01:00:00
+=== JUSTIFY_INTERVAL — sign-balance months vs days ===
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 month -10 days')          AS borrow_days_wire_collapsed;
+borrow_days_wire_collapsed
+480:00:00
+SELECT JUSTIFY_INTERVAL(INTERVAL '-1 month 10 days')          AS borrow_neg_wire_collapsed;
+borrow_neg_wire_collapsed
+-480:00:00
+SELECT EXTRACT(MONTH FROM JUSTIFY_INTERVAL(INTERVAL '1 month -10 days'))  AS borrow_month_0;
+borrow_month_0
+0
+SELECT EXTRACT(DAY   FROM JUSTIFY_INTERVAL(INTERVAL '1 month -10 days'))  AS borrow_day_20;
+borrow_day_20
+20
+=== JUSTIFY_INTERVAL — sign-balance days vs microseconds ===
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 day -1 hour')             AS borrow_us_23h;
+borrow_us_23h
+23:00:00
+SELECT JUSTIFY_INTERVAL(INTERVAL '-1 day 1 hour')             AS borrow_us_neg_23h;
+borrow_us_neg_23h
+-23:00:00
+SELECT EXTRACT(DAY  FROM JUSTIFY_INTERVAL(INTERVAL '1 day -1 hour'))  AS borrow_us_day_0;
+borrow_us_day_0
+0
+SELECT EXTRACT(HOUR FROM JUSTIFY_INTERVAL(INTERVAL '1 day -1 hour'))  AS borrow_us_hour_23;
+borrow_us_hour_23
+23
+=== JUSTIFY_INTERVAL — already canonical is a no-op ===
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 month 5 days 3 hours')    AS canonical_noop;
+canonical_noop
+1 mon 5 days 03:00:00
+SELECT JUSTIFY_INTERVAL(INTERVAL '-1 month -5 days -3 hours') AS canonical_neg_noop;
+canonical_neg_noop
+-1 mon -5 days -03:00:00
+SELECT JUSTIFY_INTERVAL(INTERVAL '0 days')                    AS zero_noop;
+zero_noop
+00:00:00
+=== All three functions — NULL prop ===
+SELECT JUSTIFY_DAYS(NULL::INTERVAL)                           AS days_null;
+days_null
+NULL
+SELECT JUSTIFY_HOURS(NULL::INTERVAL)                          AS hours_null;
+hours_null
+NULL
+SELECT JUSTIFY_INTERVAL(NULL::INTERVAL)                       AS interval_null;
+interval_null
+NULL
+SELECT JUSTIFY_INTERVAL(NULL::INTERVAL) IS NULL               AS interval_null_pred;
+interval_null_pred
+1
+=== Wrong-type (non-INTERVAL) → ERROR 1105 ===
+SELECT JUSTIFY_DAYS(42);
+ERROR 1105: execution error: justify_days requires INTERVAL
+SELECT JUSTIFY_HOURS('hello');
+ERROR 1105: execution error: justify_hours requires INTERVAL
+SELECT JUSTIFY_INTERVAL(CAST('2026-01-01' AS DATE));
+ERROR 1105: execution error: justify_interval requires INTERVAL
+=== Arity errors → 1105 ===
+SELECT JUSTIFY_DAYS();
+ERROR 1105: execution error: justify_days requires 1 argument
+SELECT JUSTIFY_DAYS(INTERVAL '1 day', INTERVAL '2 days');
+ERROR 1105: execution error: justify_days requires 1 argument
+SELECT JUSTIFY_HOURS();
+ERROR 1105: execution error: justify_hours requires 1 argument
+SELECT JUSTIFY_INTERVAL();
+ERROR 1105: execution error: justify_interval requires 1 argument
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 day', INTERVAL '2 days');
+ERROR 1105: execution error: justify_interval requires 1 argument

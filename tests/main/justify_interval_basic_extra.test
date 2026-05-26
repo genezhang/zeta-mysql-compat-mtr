@@ -1,0 +1,229 @@
+# Independently authored JUSTIFY_DAYS / JUSTIFY_HOURS /
+# JUSTIFY_INTERVAL smoke for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - JUSTIFY_DAYS — NONE (zero compat-mtr coverage).
+#   - JUSTIFY_HOURS — NONE.
+#   - JUSTIFY_INTERVAL — NONE.
+#   - temporal_arithmetic_basic_extra and date_arith_edges
+#     cover INTERVAL arithmetic but do NOT exercise the
+#     PG normalization functions.
+#
+# This slice pins:
+#   - JUSTIFY_DAYS: 30 days → 1 month carry, TRUNCATED
+#     division (not Euclidean). `-35 days` → `-1 mon -5 days`
+#     (NOT `-2 mon +25 days`).
+#   - JUSTIFY_HOURS: 24 hours (86_400_000_000 us) → 1 day
+#     carry, also truncated. Symmetric in sign.
+#   - JUSTIFY_INTERVAL: full 4-step normalization — carry
+#     us→days, days→months, then SIGN-BALANCE months vs
+#     (days, us) and days vs us by borrowing 30 days or
+#     1 day respectively.
+#   - Internal field decomposition verified via EXTRACT
+#     (DAY/HOUR/MONTH) — the wire render is misleading on
+#     its own.
+#   - NULL prop → NULL.
+#   - Wrong-type (non-INTERVAL) → 1105 'requires INTERVAL'.
+#   - Arity (0, 2) → 1105 'requires 1 argument'.
+#
+# Big-picture finding (CRITICAL — wire-render trap):
+#   The MySQL wire-shim renders INTERVAL values using TWO
+#   DIFFERENT formats depending on whether the months field
+#   is zero:
+#
+#     - months != 0:  PG-style "N mons M days HH:MM:SS"
+#       (e.g. "1 mon 6 days 01:00:00")
+#
+#     - months == 0:  MySQL-TIME-style "HHH:MM:SS" where
+#       hours = days*24 + us/3600s
+#       (e.g. "696:00:00" for {days:29, us:0, months:0})
+#
+#   This is the source of CONFUSION reading raw JUSTIFY_*
+#   output. JUSTIFY_HOURS(INTERVAL '25 hours') correctly
+#   produces {days:1, us: 1 hour} internally — verified via
+#   EXTRACT below — but the wire shows "25:00:00" because
+#   months=0 collapses days+us into a single HH:MM:SS string.
+#   To a casual reader the JUSTIFY appears to be a no-op;
+#   it isn't.
+#
+#   PG uses TRUNCATED (toward-zero) division for the carry,
+#   not Euclidean. `JUSTIFY_DAYS(INTERVAL '-35 days')` →
+#   {months:-1, days:-5, us:0} (sign-shared), NOT
+#   {months:-2, days:+25, us:0}. Both are mathematically
+#   equivalent durations, but PG explicitly chose the
+#   sign-preserving form. Apps storing user-facing intervals
+#   should know which convention they're seeing.
+#
+#   JUSTIFY_INTERVAL goes further than the other two: after
+#   the cascade carry, it SIGN-BALANCES. If months is +ve
+#   but (days, us) is -ve — or vice versa — it borrows 30
+#   days back from months (or 1 day back from us) so all
+#   non-zero fields share one sign. This makes the result
+#   uniquely canonical: two intervals representing the same
+#   duration always JUSTIFY to the same triple. Useful for
+#   interval equality after arithmetic.
+#
+#   Per impl notes (lib.rs:52238+), the i32 arithmetic uses
+#   `wrapping_add`/`wrapping_sub` deliberately — totality
+#   is load-bearing for the planner's `IS NULL` pushdown
+#   soundness gate (PR #880). Without wrapping, extreme
+#   inputs could panic in debug builds and mask a pushdown
+#   bug. Knock-on: these functions never raise on a
+#   non-NULL INTERVAL input regardless of magnitude.
+#
+# Adaptation notes:
+#   # zeta-adapt: Wire render of INTERVAL has TWO formats —
+#     "N mons M days HH:MM:SS" when months!=0, but
+#     "HHH:MM:SS" (collapsed total hours) when months==0.
+#     Use EXTRACT(DAY/HOUR/MONTH FROM ...) to inspect the
+#     underlying field decomposition reliably.
+#   # zeta-adapt: JUSTIFY_DAYS uses TRUNCATED (not Euclidean)
+#     division — negative signs propagate to both fields.
+#   # zeta-adapt: JUSTIFY_INTERVAL produces a canonical
+#     sign-balanced form; useful for interval equality after
+#     arithmetic.
+#   # zeta-adapt: Functions are TOTAL on any non-NULL
+#     INTERVAL (wrapping arithmetic) — required by planner
+#     pushdown soundness, see PR #880.
+
+--echo === JUSTIFY_DAYS — 30 days carry to 1 month ===
+
+# Exactly 30 days → 1 month, 0 days (months!=0 → PG-format).
+SELECT JUSTIFY_DAYS(INTERVAL '30 days')                       AS thirty_days_one_month;
+# 35 days → 1 month, 5 days.
+SELECT JUSTIFY_DAYS(INTERVAL '35 days')                       AS thirtyfive_days;
+# 60 days → 2 months, 0 days.
+SELECT JUSTIFY_DAYS(INTERVAL '60 days')                       AS sixty_days_two_months;
+# Field verification.
+SELECT EXTRACT(MONTH FROM JUSTIFY_DAYS(INTERVAL '35 days'))   AS month_field_1;
+SELECT EXTRACT(DAY   FROM JUSTIFY_DAYS(INTERVAL '35 days'))   AS day_field_5;
+
+--echo === JUSTIFY_DAYS — TRUNCATED division (sign propagates) ===
+
+# STRIKING: -35 days → -1 mon -5 days (NOT -2 mon +25 days).
+# Both fields share the negative sign. PG explicitly chose
+# truncated over Euclidean division.
+SELECT JUSTIFY_DAYS(INTERVAL '-35 days')                      AS neg_thirtyfive_days;
+SELECT JUSTIFY_DAYS(INTERVAL '-60 days')                      AS neg_sixty_days;
+# Field verification proves sign-share.
+SELECT EXTRACT(MONTH FROM JUSTIFY_DAYS(INTERVAL '-35 days'))  AS neg_month_field;
+SELECT EXTRACT(DAY   FROM JUSTIFY_DAYS(INTERVAL '-35 days'))  AS neg_day_field;
+
+--echo === JUSTIFY_DAYS — no-op when |days| < 30 ===
+
+# Wire-render trap: months=0 so days field renders as TOTAL
+# HOURS over the wire (29 days * 24 = 696 hours).
+SELECT JUSTIFY_DAYS(INTERVAL '29 days')                       AS twentynine_wire_as_hours;
+SELECT JUSTIFY_DAYS(INTERVAL '-29 days')                      AS neg_twentynine_wire_as_hours;
+SELECT JUSTIFY_DAYS(INTERVAL '0 days')                        AS zero_noop;
+# Proof the underlying day count is preserved.
+SELECT EXTRACT(DAY FROM JUSTIFY_DAYS(INTERVAL '29 days'))     AS day_field_29_unchanged;
+
+--echo === JUSTIFY_DAYS — months and microseconds untouched ===
+
+# Existing months (2) carries forward; microseconds field
+# (here: 3600s = 1 hour) is preserved unchanged. months!=0
+# so wire shows PG-format.
+SELECT JUSTIFY_DAYS(INTERVAL '2 months 35 days 1 hour')       AS months_and_time_preserved;
+
+--echo === JUSTIFY_HOURS — 24 hours carry to 1 day ===
+
+# Wire-render trap: months=0 here so all three outputs look
+# like raw input (25/24/49 hours). They are NOT no-ops —
+# internal decomposition is {days:N, us:Mh}, verified below.
+SELECT JUSTIFY_HOURS(INTERVAL '25 hours')                     AS twentyfive_wire_collapsed;
+SELECT JUSTIFY_HOURS(INTERVAL '24 hours')                     AS twentyfour_exact_wire_collapsed;
+SELECT JUSTIFY_HOURS(INTERVAL '49 hours')                     AS fortynine_wire_collapsed;
+# Proof: JUSTIFY_HOURS('25 hours') really is {days:1, hour:1}.
+SELECT EXTRACT(DAY  FROM JUSTIFY_HOURS(INTERVAL '25 hours'))  AS jh25_day_1;
+SELECT EXTRACT(HOUR FROM JUSTIFY_HOURS(INTERVAL '25 hours'))  AS jh25_hour_1;
+SELECT EXTRACT(DAY  FROM JUSTIFY_HOURS(INTERVAL '49 hours'))  AS jh49_day_2;
+SELECT EXTRACT(HOUR FROM JUSTIFY_HOURS(INTERVAL '49 hours'))  AS jh49_hour_1;
+
+--echo === JUSTIFY_HOURS — TRUNCATED, sign propagates ===
+
+# Same wire-collapse trap on negatives.
+SELECT JUSTIFY_HOURS(INTERVAL '-25 hours')                    AS neg_twentyfive_wire;
+SELECT JUSTIFY_HOURS(INTERVAL '-49 hours')                    AS neg_fortynine_wire;
+# Proof: sign shared after JUSTIFY.
+SELECT EXTRACT(DAY  FROM JUSTIFY_HOURS(INTERVAL '-25 hours')) AS jh_neg25_day_neg1;
+SELECT EXTRACT(HOUR FROM JUSTIFY_HOURS(INTERVAL '-25 hours')) AS jh_neg25_hour_neg1;
+
+--echo === JUSTIFY_HOURS — no-op when |hours| < 24 ===
+
+SELECT JUSTIFY_HOURS(INTERVAL '23 hours')                     AS twentythree_noop;
+SELECT JUSTIFY_HOURS(INTERVAL '-23 hours')                    AS neg_twentythree_noop;
+SELECT JUSTIFY_HOURS(INTERVAL '0 hours')                      AS zero_hours_noop;
+
+--echo === JUSTIFY_HOURS — months and days carry, render in PG-format ===
+
+# 1 month 5 days 25 hours → 1 mon 6 days 01:00:00.
+# months!=0 so wire shows the full "N mons M days HH:MM:SS"
+# format — JUSTIFY_HOURS's effect is plainly visible here.
+SELECT JUSTIFY_HOURS(INTERVAL '1 month 5 days 25 hours')      AS months_days_pg_format;
+
+--echo === JUSTIFY_INTERVAL — full normalization (us → days → months) ===
+
+# 25 hours, 35 days → cascade: us→days (+1 day = 36 days),
+# days→months (1 mon 6 days), so final {months:1, days:6,
+# us: 1 hour}. months!=0 → PG format renders clearly.
+SELECT JUSTIFY_INTERVAL(INTERVAL '35 days 25 hours')          AS cascade_carry;
+
+--echo === JUSTIFY_INTERVAL — sign-balance months vs days ===
+
+# Months positive, days negative → borrow 30 days back from
+# months: 1 mon -10 days → 0 mon 20 days. months=0 after
+# borrow → wire collapses to TOTAL HOURS (20 days * 24 =
+# 480). The borrow really happened — see EXTRACT proof.
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 month -10 days')          AS borrow_days_wire_collapsed;
+SELECT JUSTIFY_INTERVAL(INTERVAL '-1 month 10 days')          AS borrow_neg_wire_collapsed;
+# Proof: borrow happened (months 0, days 20).
+SELECT EXTRACT(MONTH FROM JUSTIFY_INTERVAL(INTERVAL '1 month -10 days'))  AS borrow_month_0;
+SELECT EXTRACT(DAY   FROM JUSTIFY_INTERVAL(INTERVAL '1 month -10 days'))  AS borrow_day_20;
+
+--echo === JUSTIFY_INTERVAL — sign-balance days vs microseconds ===
+
+# 1 day -1 hour → 0 days +23 hours (borrow 24h from days).
+# months=0, days=0 → wire renders as pure HH:MM:SS.
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 day -1 hour')             AS borrow_us_23h;
+SELECT JUSTIFY_INTERVAL(INTERVAL '-1 day 1 hour')             AS borrow_us_neg_23h;
+# Proof.
+SELECT EXTRACT(DAY  FROM JUSTIFY_INTERVAL(INTERVAL '1 day -1 hour'))  AS borrow_us_day_0;
+SELECT EXTRACT(HOUR FROM JUSTIFY_INTERVAL(INTERVAL '1 day -1 hour'))  AS borrow_us_hour_23;
+
+--echo === JUSTIFY_INTERVAL — already canonical is a no-op ===
+
+# All fields share one sign and are within range.
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 month 5 days 3 hours')    AS canonical_noop;
+SELECT JUSTIFY_INTERVAL(INTERVAL '-1 month -5 days -3 hours') AS canonical_neg_noop;
+SELECT JUSTIFY_INTERVAL(INTERVAL '0 days')                    AS zero_noop;
+
+--echo === All three functions — NULL prop ===
+
+SELECT JUSTIFY_DAYS(NULL::INTERVAL)                           AS days_null;
+SELECT JUSTIFY_HOURS(NULL::INTERVAL)                          AS hours_null;
+SELECT JUSTIFY_INTERVAL(NULL::INTERVAL)                       AS interval_null;
+SELECT JUSTIFY_INTERVAL(NULL::INTERVAL) IS NULL               AS interval_null_pred;
+
+--echo === Wrong-type (non-INTERVAL) → ERROR 1105 ===
+
+--error 1105
+SELECT JUSTIFY_DAYS(42);
+--error 1105
+SELECT JUSTIFY_HOURS('hello');
+--error 1105
+SELECT JUSTIFY_INTERVAL(CAST('2026-01-01' AS DATE));
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT JUSTIFY_DAYS();
+--error 1105
+SELECT JUSTIFY_DAYS(INTERVAL '1 day', INTERVAL '2 days');
+--error 1105
+SELECT JUSTIFY_HOURS();
+--error 1105
+SELECT JUSTIFY_INTERVAL();
+--error 1105
+SELECT JUSTIFY_INTERVAL(INTERVAL '1 day', INTERVAL '2 days');
