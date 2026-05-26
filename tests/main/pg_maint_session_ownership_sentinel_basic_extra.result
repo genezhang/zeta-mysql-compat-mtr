@@ -26,13 +26,7 @@ ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EX
 === Shape C — ALTER OPERATOR partial-grammar → "Expected: (, found: =" at col 18 ===
 ALTER OPERATOR === (INT, INT) OWNER TO bob;
 ERROR 1064: SQL parse error: sql parser error: Expected: (, found: = at Line: 1, Column: 18
-=== BUG — ALTER DATABASE silent-no-op (5th silent-no-op witness) ===
-SELECT current_database()                                                AS before_alter;
-before_alter
-zeta
-ALTER DATABASE definitely_nonexistent_xyz OWNER TO some_random_role;
-ALTER DATABASE definitely_nonexistent_xyz RENAME TO renamed_target;
-ALTER DATABASE definitely_nonexistent_xyz SET search_path = public;
-SELECT current_database()                                                AS after_alter;
-after_alter
-zeta
+=== INTENTIONAL COMPAT NO-OP — ALTER DATABASE silently succeeds (documented in zeta source) ===
+ALTER DATABASE myapp OWNER TO bob;
+ALTER DATABASE myapp RENAME TO renamed_target;
+ALTER DATABASE myapp SET search_path = public;

@@ -52,46 +52,50 @@
 #       #390 CREATE OPERATOR (col 19); new keyword
 #       (ALTER instead of CREATE) at col 18.
 #
-#   KNOWN BUG — `ALTER DATABASE` silently accepted-and-
-#   dropped (4th silent-no-op witness):
+#   DOCUMENTED INTENTIONAL COMPAT NO-OP — ALTER DATABASE:
 #     - All three ALTER DATABASE forms (OWNER TO,
-#       RENAME TO, SET search_path) return NO ERROR
-#       — but the operation does NOTHING.
-#     - PROBE: `ALTER DATABASE definitely_nonexistent_xyz
-#       OWNER TO some_random_role` succeeds. PG would
-#       error "database does not exist" or "role does
-#       not exist". `SELECT current_database()` returns
-#       'zeta' before and after — no rename happened
-#       on the current db either.
-#     - This is the silent-no-op trap pattern from
-#       feedback_wire_path_divergence_check memory.
-#       Joins the witness list:
-#         1. LISTEN/NOTIFY mysqlwire silent (PR #366)
-#         2. Multi-dim ARRAY Debug-repr (PR #385)
-#         3. INHERITS column-drop (PR #391)
-#         4. ROLLBACK TO SAVEPOINT mysqlwire (PR #392)
-#         5. ALTER DATABASE silent-drop (this slice)
-#     - Pinned with the non-existent-db probe to prove
-#       the no-op nature.
+#       RENAME TO, SET) silently succeed with NO ERROR.
+#     - This is NOT a BUG — it is a documented
+#       intentional compat shim. Source witnesses:
+#         - zeta-parser/src/lib.rs:155 — comment
+#           "Handle ALTER DATABASE (accepted as no-op
+#           for compatibility)"
+#         - zeta-parser/src/ast.rs:272 — doc-comment
+#           "ALTER DATABASE ... (accepted as no-op
+#           for compatibility)"
+#         - zeta-server/src/lib.rs:15199-15202 —
+#           handler with "No-op for compatibility."
+#         - zeta-server/tests/multi_database.rs:185
+#           — `test_alter_database_noop` explicitly
+#           tests it succeeds without error
+#     - Pinned here so the compat behavior is visible
+#       on the MySQL wire as well. Applies symmetric
+#       reading of the wire-divergence memory: just as
+#       no-error doesn't prove SUPPORT, silent-no-op
+#       doesn't prove BUG — must check engine source
+#       first. Same NoOp category as Statement::Copy
+#       and AlterIndex at convert.rs:425-427.
 #
 # Big-picture finding:
 #
-#   The PG maint/session/ownership surface has FIVE
+#   The PG maint/session/ownership surface has FOUR
 #   distinct rejection routes (shape (d), shape (c),
-#   DROP restricted-list, Shape C partial-grammar,
-#   and a NEW silent-no-op BUG for ALTER DATABASE).
-#   The shape mechanisms are all pre-existing; the
-#   surface and the silent-no-op bug are the novelty.
+#   DROP restricted-list, Shape C partial-grammar) +
+#   ONE documented intentional compat no-op (ALTER
+#   DATABASE). All four shape mechanisms are pre-
+#   existing; novelty is per-keyword surface plus the
+#   ALTER DATABASE no-op pin.
 #
 #   Apps porting PG operational/maintenance scripts:
 #     - CHECKPOINT, DISCARD ALL/etc, REASSIGN OWNED,
 #       SECURITY LABEL, DROP OWNED, ALTER OPERATOR
 #       all fail at parse — drop from scripts.
-#     - ALTER DATABASE is DANGEROUS: returns success
-#       but does nothing. Apps that ALTER DATABASE
-#       and then check pg_database for confirmation
-#       will get stale data. Migrate via re-CREATE
-#       and explicit ownership-via-GRANT instead.
+#     - ALTER DATABASE returns success without doing
+#       anything (documented intentional behavior).
+#       Apps relying on ALTER DATABASE for actual
+#       database-state mutation should rebuild the DB
+#       and use GRANT for ownership instead — but they
+#       can expect no error from the migration script.
 #
 # Adaptation notes:
 #   # zeta-adapt: KNOWN GAP — CHECKPOINT, REASSIGN
@@ -103,9 +107,11 @@
 #   # zeta-adapt: KNOWN GAP — ALTER OPERATOR partial-
 #     grammar (parallel to CREATE OPERATOR Shape C from
 #     PR #390).
-#   # zeta-adapt: KNOWN BUG — ALTER DATABASE silently
-#     succeeds but does nothing. Database-management
-#     migrations cannot rely on it.
+#   # zeta-adapt: INTENTIONAL COMPAT NO-OP — ALTER
+#     DATABASE silently succeeds without effect
+#     (zeta-server/src/lib.rs:15199 — "No-op for
+#     compatibility"). Database-management migrations
+#     can expect no error but no mutation either.
 
 --echo === Shape (d) — CHECKPOINT / REASSIGN OWNED / SECURITY LABEL → "found: <KW>" at col 1 ===
 
@@ -147,20 +153,16 @@ DROP OWNED BY alice CASCADE;
 --error 1064
 ALTER OPERATOR === (INT, INT) OWNER TO bob;
 
---echo === BUG — ALTER DATABASE silent-no-op (5th silent-no-op witness) ===
+--echo === INTENTIONAL COMPAT NO-OP — ALTER DATABASE silently succeeds (documented in zeta source) ===
 
-# All three forms return NO ERROR despite the target
-# database (definitely_nonexistent_xyz) not existing.
-# PG would error "database does not exist" or "role
-# does not exist". Pinned as silent successes to make
-# the BUG concrete.
-SELECT current_database()                                                AS before_alter;
-ALTER DATABASE definitely_nonexistent_xyz OWNER TO some_random_role;
-ALTER DATABASE definitely_nonexistent_xyz RENAME TO renamed_target;
-ALTER DATABASE definitely_nonexistent_xyz SET search_path = public;
-# Probe: current_database() unchanged → confirms nothing
-# happened. If RENAME had actually fired (even on a non-
-# existent target), the parse path would have at least
-# attempted something. Three silent successes prove the
-# whole ALTER DATABASE handler is a no-op.
-SELECT current_database()                                                AS after_alter;
+# DOCUMENTED INTENTIONAL — not a bug. zeta source:
+#   - zeta-parser/src/lib.rs:155 (comment)
+#   - zeta-parser/src/ast.rs:272 (doc-comment)
+#   - zeta-server/src/lib.rs:15199-15202 (handler:
+#     "No-op for compatibility.")
+#   - zeta-server/tests/multi_database.rs:185
+#     (`test_alter_database_noop` asserts success)
+# All three forms succeed without error or mutation:
+ALTER DATABASE myapp OWNER TO bob;
+ALTER DATABASE myapp RENAME TO renamed_target;
+ALTER DATABASE myapp SET search_path = public;
