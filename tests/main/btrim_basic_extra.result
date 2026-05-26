@@ -1,0 +1,97 @@
+=== BTRIM 1-arg: strip surrounding whitespace ===
+SELECT BTRIM('   hello   ')                                   AS basic;
+basic
+hello
+SELECT BTRIM('   hello   ') = TRIM('   hello   ')             AS btrim_eq_trim_default;
+btrim_eq_trim_default
+1
+SELECT BTRIM('     ')                                         AS all_ws;
+all_ws
+
+SELECT LENGTH(BTRIM('     '))                                 AS all_ws_len_0;
+all_ws_len_0
+0
+SELECT BTRIM('')                                              AS empty;
+empty
+
+SELECT BTRIM('hello')                                         AS no_ws;
+no_ws
+hello
+=== BTRIM 1-arg: ALL Unicode whitespace (not just ASCII space) ===
+SELECT BTRIM(CONCAT(CHAR(9), 'hi', CHAR(9)))                  AS strip_tab;
+strip_tab
+hi
+SELECT BTRIM(CONCAT(CHAR(10), 'hi', CHAR(10)))                AS strip_newline;
+strip_newline
+hi
+SELECT BTRIM(CONCAT('  ', CHAR(9), 'hi', CHAR(10), '  '))     AS strip_mixed_ws;
+strip_mixed_ws
+hi
+SELECT BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))    AS strip_nbsp;
+strip_nbsp
+hi
+SELECT LENGTH(BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))) = 2
+                                                              AS strip_nbsp_len_2;
+strip_nbsp_len_2
+1
+=== BTRIM 2-arg: strip set of chars from both ends ===
+SELECT BTRIM('xxhelloyy', 'xy')                               AS strip_xy;
+strip_xy
+hello
+SELECT BTRIM('---hello---', '-')                              AS strip_dashes;
+strip_dashes
+hello
+SELECT BTRIM('xhello-worldy', 'xy')                           AS middle_chars_preserved;
+middle_chars_preserved
+hello-world
+SELECT BTRIM('xxyyxy', 'xy')                                  AS all_match_empty;
+all_match_empty
+
+=== BTRIM 2-arg: empty `chars` set → no-op ===
+SELECT BTRIM('   hello   ', '')                               AS empty_chars_noop;
+empty_chars_noop
+   hello   
+SELECT BTRIM('   hello   ', '') = '   hello   '               AS empty_chars_noop_eq;
+empty_chars_noop_eq
+1
+=== BTRIM 2-arg: set semantics — order/duplicates irrelevant ===
+SELECT BTRIM('xxyyxhelloyx', 'xy') = BTRIM('xxyyxhelloyx', 'yx')
+                                                              AS order_irrelevant;
+order_irrelevant
+1
+SELECT BTRIM('xxyyxhelloyx', 'xy') = BTRIM('xxyyxhelloyx', 'xxxyyy')
+                                                              AS dupes_irrelevant;
+dupes_irrelevant
+1
+=== BTRIM 2-arg: UTF-8 multibyte chars ===
+SELECT BTRIM('éééhelloééé', 'é')                              AS strip_multibyte_e;
+strip_multibyte_e
+hello
+SELECT BTRIM('é-hello-é', 'é-')                               AS strip_mixed_multibyte;
+strip_mixed_multibyte
+hello
+=== BTRIM: NULL propagation ===
+SELECT BTRIM(NULL)                                            AS null_s;
+null_s
+NULL
+SELECT BTRIM('hello', NULL)                                   AS null_chars;
+null_chars
+NULL
+SELECT BTRIM(NULL, 'x')                                       AS null_s_with_chars;
+null_s_with_chars
+NULL
+SELECT BTRIM(NULL) IS NULL                                    AS null_pred;
+null_pred
+1
+=== BTRIM: non-string arg coerce ===
+SELECT BTRIM(42)                                              AS int_no_ws_noop;
+int_no_ws_noop
+42
+SELECT BTRIM(TRUE)                                            AS bool_coerce;
+bool_coerce
+true
+=== BTRIM: arity errors ===
+SELECT BTRIM();
+ERROR 1105: execution error: BTRIM requires 1-2 arguments
+SELECT BTRIM('a', 'b', 'c');
+ERROR 1105: execution error: BTRIM requires 1-2 arguments

@@ -1,0 +1,149 @@
+# Independently authored BTRIM smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - BTRIM — NONE (zero compat-mtr coverage). PG/Spark
+#     standard full-trim function.
+#   - trim_family_basic_extra.test covers TRIM (with
+#     LEADING/TRAILING/BOTH modifiers), LTRIM, RTRIM —
+#     all of which can express BTRIM's behavior but
+#     none use the BTRIM name.
+#   - trim_replace_extras_basic_extra.test covers more TRIM
+#     edge cases (REPLACE-family bundled with TRIM).
+#
+# This slice pins:
+#   - BTRIM(s) 1-arg form: strips leading and trailing
+#     whitespace (equivalent to TRIM(s) or TRIM(BOTH FROM s)).
+#   - BTRIM(s, chars) 2-arg form: strips any char in `chars`
+#     from both ends (equivalent to TRIM(BOTH chars FROM s)).
+#   - Empty `chars` set → no-op (returns s unchanged).
+#   - Empty input string → empty output.
+#   - Input that's all-whitespace → empty string with
+#     1-arg form.
+#   - UTF-8 multibyte character handling (char-aware, NOT
+#     byte-aware).
+#   - Repeated chars in `chars` set — each char counts once
+#     (set semantics).
+#   - NULL propagation on either arg.
+#   - Arity errors (0, 3+ args).
+#   - Non-string args coerced via value_to_trim_input.
+#
+# Big-picture finding:
+#   BTRIM is a PG/Spark name for what MySQL's TRIM(BOTH ...)
+#   does. zeta supports BTRIM as an independent function
+#   arm (lib.rs:49258), not just an alias — there's no
+#   TRIM rewrite in the parser. So calling BTRIM goes
+#   through its own dispatch path, distinct from TRIM.
+#
+#   The impl uses Rust's `trim_start_matches`/`trim_end_
+#   matches` with a closure that checks `chars.contains(&c)`
+#   — char-aware, set-membership semantics. This means:
+#     - Order of chars in `chars` doesn't matter.
+#     - Duplicates in `chars` don't matter.
+#     - UTF-8 multibyte chars in `chars` work correctly.
+#
+#   The 1-arg form uses Rust's `str::trim()` which strips
+#   ALL Unicode whitespace (not just ASCII space) — includes
+#   non-breaking space, tabs, newlines, etc. Pinned via the
+#   tab/newline row below.
+#
+# Adaptation notes:
+#   # zeta-adapt: BTRIM is supported (PG/Spark name).
+#     1-arg: BTRIM(s) ≡ TRIM(BOTH FROM s) — strips whitespace.
+#     2-arg: BTRIM(s, chars) ≡ TRIM(BOTH chars FROM s) —
+#     strips set of chars.
+#   # zeta-adapt: 1-arg form strips ALL Unicode whitespace
+#     (tab, newline, NBSP), not just ASCII space.
+#   # zeta-adapt: 2-arg `chars` is a SET — order and
+#     duplicates don't matter.
+#   # zeta-adapt: NULL on either arg → NULL.
+#   # zeta-adapt: Arity errors → 1105.
+
+--echo === BTRIM 1-arg: strip surrounding whitespace ===
+
+SELECT BTRIM('   hello   ')                                   AS basic;
+# Equivalent to TRIM with no modifier.
+SELECT BTRIM('   hello   ') = TRIM('   hello   ')             AS btrim_eq_trim_default;
+# All-whitespace input → empty.
+SELECT BTRIM('     ')                                         AS all_ws;
+SELECT LENGTH(BTRIM('     '))                                 AS all_ws_len_0;
+# Empty input → empty.
+SELECT BTRIM('')                                              AS empty;
+# No-whitespace input → unchanged.
+SELECT BTRIM('hello')                                         AS no_ws;
+
+--echo === BTRIM 1-arg: ALL Unicode whitespace (not just ASCII space) ===
+
+# Tab character.
+SELECT BTRIM(CONCAT(CHAR(9), 'hi', CHAR(9)))                  AS strip_tab;
+# Newline character.
+SELECT BTRIM(CONCAT(CHAR(10), 'hi', CHAR(10)))                AS strip_newline;
+# Mixed whitespace.
+SELECT BTRIM(CONCAT('  ', CHAR(9), 'hi', CHAR(10), '  '))     AS strip_mixed_ws;
+# NBSP (U+00A0, UTF-8 bytes 0xC2 0xA0) — pins the "ALL
+# Unicode whitespace" claim explicitly. Without this row a
+# regression swapping str::trim() to an ASCII-only trim
+# would pass every other ws row in this slice. LENGTH of
+# the result is 2 ('hi'), proving the surrounding NBSPs
+# were stripped.
+SELECT BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))    AS strip_nbsp;
+SELECT LENGTH(BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))) = 2
+                                                              AS strip_nbsp_len_2;
+
+--echo === BTRIM 2-arg: strip set of chars from both ends ===
+
+SELECT BTRIM('xxhelloyy', 'xy')                               AS strip_xy;
+SELECT BTRIM('---hello---', '-')                              AS strip_dashes;
+# Char appears in middle but not at ends → unchanged middle.
+SELECT BTRIM('xhello-worldy', 'xy')                           AS middle_chars_preserved;
+# All chars match → empty.
+SELECT BTRIM('xxyyxy', 'xy')                                  AS all_match_empty;
+
+--echo === BTRIM 2-arg: empty `chars` set → no-op ===
+
+# Empty chars set means contains() returns false for every
+# char, so no chars are stripped.
+SELECT BTRIM('   hello   ', '')                               AS empty_chars_noop;
+SELECT BTRIM('   hello   ', '') = '   hello   '               AS empty_chars_noop_eq;
+
+--echo === BTRIM 2-arg: set semantics — order/duplicates irrelevant ===
+
+# 'xy' and 'yx' produce identical output.
+SELECT BTRIM('xxyyxhelloyx', 'xy') = BTRIM('xxyyxhelloyx', 'yx')
+                                                              AS order_irrelevant;
+# Duplicates in chars don't change result.
+SELECT BTRIM('xxyyxhelloyx', 'xy') = BTRIM('xxyyxhelloyx', 'xxxyyy')
+                                                              AS dupes_irrelevant;
+
+--echo === BTRIM 2-arg: UTF-8 multibyte chars ===
+
+# Strip 'é' from both ends.
+SELECT BTRIM('éééhelloééé', 'é')                              AS strip_multibyte_e;
+# Mix multibyte + ASCII in chars set.
+SELECT BTRIM('é-hello-é', 'é-')                               AS strip_mixed_multibyte;
+
+--echo === BTRIM: NULL propagation ===
+
+SELECT BTRIM(NULL)                                            AS null_s;
+SELECT BTRIM('hello', NULL)                                   AS null_chars;
+SELECT BTRIM(NULL, 'x')                                       AS null_s_with_chars;
+SELECT BTRIM(NULL) IS NULL                                    AS null_pred;
+
+--echo === BTRIM: non-string arg coerce ===
+
+# Integer / Bool coerce via value_to_trim_input (similar to
+# value_to_sql_string). BTRIM(42) trims '42' (no-op since
+# digits aren't whitespace).
+SELECT BTRIM(42)                                              AS int_no_ws_noop;
+SELECT BTRIM(TRUE)                                            AS bool_coerce;
+# Bool → "true" stringification is consistent with the same
+# pattern in HEX (PR #331) and INITCAP (PR #332). All three
+# arms route Bool through value_to_sql_string before
+# operating on the resulting string.
+
+--echo === BTRIM: arity errors ===
+
+--error 1105
+SELECT BTRIM();
+--error 1105
+SELECT BTRIM('a', 'b', 'c');
