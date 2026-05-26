@@ -1,0 +1,27 @@
+=== CREATE / DROP TABLESPACE — DOCUMENTED INTENTIONAL pg_dump compat no-op ===
+CREATE TABLESPACE ts LOCATION '/tmp/ts';
+DROP TABLESPACE ts;
+=== PK USING INDEX TABLESPACE in column def — "Expected: ',' or ')' after column definition, found: USING" ===
+CREATE TABLE pk_ts (id INT PRIMARY KEY USING INDEX TABLESPACE ts);
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: USING at Line: 1, Column: 40
+=== CREATE / DROP CONVERSION — pre-existing enumeration shapes, CONVERSION keyword witness ===
+CREATE CONVERSION c FOR 'UTF8' TO 'LATIN1' FROM ascii_to_mic;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: CONVERSION at Line: 1, Column: 8
+DROP CONVERSION c;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: CONVERSION at Line: 1, Column: 6
+=== CREATE OPERATOR CLASS / OPERATOR FAMILY — Shape (c) catch-all ===
+CREATE OPERATOR CLASS oc DEFAULT FOR TYPE int USING btree AS OPERATOR 1 <;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE OPERATOR FAMILY of USING btree;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== CREATE GROUP / ALTER GROUP ADD USER — enumeration shapes, GROUP keyword witness ===
+CREATE GROUP g;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: GROUP at Line: 1, Column: 8
+ALTER GROUP g ADD USER u;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: GROUP at Line: 1, Column: 7
+=== CREATE SCHEMA AUTHORIZATION — SILENT-DROP BUG (joins INHERITS PR #391) ===
+CREATE SCHEMA AUTHORIZATION carol;
+SELECT schema_name FROM information_schema.schemata;
+SCHEMA_NAME
+test
+zeta

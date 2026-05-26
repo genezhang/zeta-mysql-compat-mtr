@@ -1,0 +1,217 @@
+# Independently authored PG remaining-DDL sentinel
+# slice (TABLESPACE / USING INDEX TABLESPACE /
+# CONVERSION / OPERATOR CLASS|FAMILY / GROUP /
+# SCHEMA AUTHORIZATION) for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# (PG event trigger DDL deliberately SKIPPED —
+# sqlparser rejects `EVENT` at col 8 BEFORE the
+# TRIGGER token is examined, so EVENT TRIGGER is a
+# duplicate fingerprint of MySQL's `CREATE EVENT`
+# scheduler DDL already pinned at event_use_
+# partition_sentinel_basic_extra:3.)
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE/DROP TABLESPACE: ZERO prior.
+#   - USING INDEX TABLESPACE (PK clause): ZERO.
+#   - CREATE/DROP CONVERSION: ZERO.
+#   - CREATE OPERATOR CLASS / OPERATOR FAMILY: ZERO.
+#   - CREATE GROUP / ALTER GROUP: ZERO.
+#   - CREATE SCHEMA AUTHORIZATION: ZERO.
+#
+# Pre-existing rejection shape patterns (per
+# fingerprint-dedup discipline):
+#   - "Expected: an object type after CREATE, found:
+#     <KW>" — pre-existing fingerprint (pg_misc_ddl_
+#     sentinel; pg_pubsub PUBLICATION; pg_alter_
+#     system_show SYSTEM). New keyword witnesses:
+#     CONVERSION, GROUP.
+#   - "Expected: one of VIEW or TYPE or TABLE or
+#     INDEX or ROLE or POLICY or CONNECTOR or
+#     ICEBERG or SCHEMA or USER or OPERATOR, found:
+#     <KW>" — pre-existing. New witness: GROUP.
+#   - "Expected: CONNECTOR, DATABASE, EXTENSION,
+#     FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE,
+#     ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE,
+#     TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or
+#     USER after DROP, found: <KW>" — pre-existing.
+#     New witness: CONVERSION.
+#   - "unsupported statement: sqlparser::ast::Statement"
+#     — Shape (c) catch-all from PR #371. New
+#     statement witnesses: CREATE OPERATOR CLASS /
+#     CREATE OPERATOR FAMILY.
+#   - "Expected: ',' or ')' after column definition,
+#     found: <KW>" — pre-existing fingerprint
+#     (alter_table column_def parser). New keyword
+#     witness: USING (the USING INDEX TABLESPACE
+#     clause in a column definition).
+#   - DOCUMENTED INTENTIONAL pg_dump compat no-op —
+#     pinned at pg_maint_session_ownership_sentinel
+#     (PR #396 ALTER DATABASE) and pg_rls_sentinel
+#     (PR #404 ENABLE ROW LEVEL SECURITY). NEW
+#     members joining this family: CREATE TABLESPACE
+#     / DROP TABLESPACE (per zeta-parser/src/lib.rs:
+#     119-120 "no-op for Zeta, but pg_dump emits
+#     them").
+#
+# This slice pins:
+#
+#   CREATE TABLESPACE / DROP TABLESPACE — DOCUMENTED
+#   INTENTIONAL pg_dump compat no-op (zeta-parser/
+#   src/lib.rs:119-120 explicit comment). Silent
+#   success. NOT a bug — zeta config is programmatic
+#   per CLAUDE.md, no tablespace concept exists.
+#
+#   PK USING INDEX TABLESPACE clause inside
+#   CREATE TABLE — "Expected: ',' or ')' after
+#   column definition, found: USING" at col where
+#   USING begins. The USING INDEX TABLESPACE syntax
+#   is not recognized within column-definition or
+#   constraint contexts.
+#
+#   CREATE CONVERSION / DROP CONVERSION — pre-existing
+#   CREATE/DROP enumeration shapes, new CONVERSION
+#   keyword witness. zeta has no per-conversion
+#   character-set support; client charset handling
+#   is wire-protocol level.
+#
+#   CREATE OPERATOR CLASS / CREATE OPERATOR FAMILY —
+#   Shape (c) catch-all. New statement witnesses.
+#   zeta has no extensible operator framework.
+#
+#   CREATE GROUP / ALTER GROUP ADD USER — pre-existing
+#   CREATE/ALTER enumeration shapes, new GROUP
+#   keyword witness. GROUP is a PG ROLE alias for
+#   backward compat; zeta doesn't recognize it.
+#
+#   CREATE SCHEMA AUTHORIZATION <role> — SILENT-DROP
+#   BUG witness. zeta-parser/src/convert.rs:127-141
+#   converts the statement to ZetaStatement::
+#   CreateSchema with the AUTHORIZATION role's name
+#   extracted as the schema name (UnnamedAuthorization
+#   uses ident.value; NamedAuthorization throws away
+#   the second component). The role-binding is
+#   silently lost. PROBE: after `CREATE SCHEMA
+#   AUTHORIZATION carol`, `SELECT schema_name FROM
+#   information_schema.schemata WHERE
+#   schema_name='carol'` returns ZERO rows on
+#   mysqlwire — the schema is NOT even created
+#   (mysqlwire CreateSchema may further drop the
+#   statement somewhere downstream). PG semantics:
+#   creates schema OWNED BY role, AS the role's user.
+#   zeta gives neither schema nor authorization. NEW
+#   silent-drop BUG witness joining INHERITS (PR
+#   #391) — pattern is the same: parser preserves
+#   the clause as an AST field, convert.rs silently
+#   drops it, no error surfaces.
+#
+# Big-picture finding:
+#
+#   The remaining PG DDL surface (TABLESPACE,
+#   CONVERSION, OPERATOR CLASS/FAMILY, GROUP, SCHEMA
+#   AUTHORIZATION) is split across THREE behavioral
+#   buckets:
+#     1. DOCUMENTED INTENTIONAL no-op: TABLESPACE
+#        (pg_dump compat per zeta-parser/lib.rs).
+#     2. LOUD parser/Shape-(c) reject: CONVERSION,
+#        OPERATOR CLASS/FAMILY, GROUP, USING INDEX
+#        TABLESPACE.
+#     3. SILENT-DROP BUG: SCHEMA AUTHORIZATION —
+#        join INHERITS (PR #391) as second
+#        confirmed convert.rs silent-drop witness.
+#
+#   App porters of PG ops/admin DDL should:
+#     - Drop CREATE/DROP TABLESPACE from pg_dump
+#       output (safe — intentional no-op).
+#     - Rewrite CONVERSION / OPERATOR CLASS / GROUP
+#       to whatever zeta accepts (or remove if
+#       cosmetic).
+#     - NEVER use CREATE SCHEMA AUTHORIZATION —
+#       the role binding is silently lost. Use
+#       CREATE SCHEMA <name> AND separately bind
+#       ownership.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# shapes on every form. The CreateSchema silent-
+# drop happens at the parser→AST layer BEFORE
+# either wire's executor.
+#
+# Adaptation notes:
+#   # zeta-adapt: DOCUMENTED INTENTIONAL no-op —
+#     CREATE / DROP TABLESPACE silent success
+#     (zeta-parser/src/lib.rs:119-120).
+#   # zeta-adapt: KNOWN GAP — PRIMARY KEY USING
+#     INDEX TABLESPACE clause parse-reject at
+#     USING (col after column def).
+#   # zeta-adapt: KNOWN GAP — CREATE / DROP
+#     CONVERSION parse-reject at CREATE/DROP
+#     enumeration. No client-side character-set
+#     conversion configurable via DDL.
+#   # zeta-adapt: KNOWN GAP — CREATE OPERATOR
+#     CLASS / CREATE OPERATOR FAMILY hit Shape (c)
+#     catch-all. No extensible operator system.
+#   # zeta-adapt: KNOWN GAP — CREATE GROUP / ALTER
+#     GROUP ADD USER parse-reject at CREATE/ALTER
+#     enumeration. PG GROUP-as-ROLE alias not
+#     recognized.
+#   # zeta-adapt: SILENT-DROP BUG — CREATE SCHEMA
+#     AUTHORIZATION <role> silently no-ops at
+#     zeta-parser/src/convert.rs:127-141 (role
+#     binding dropped, schema may not even be
+#     created). NEW witness joining INHERITS (PR
+#     #391). Use CREATE SCHEMA <name> + explicit
+#     ownership grant instead.
+
+--echo === CREATE / DROP TABLESPACE — DOCUMENTED INTENTIONAL pg_dump compat no-op ===
+
+# zeta-parser/src/lib.rs:119-120 explicit comment:
+# "no-op for Zeta, but pg_dump emits them." Silent
+# success on both wires. NOT a bug.
+CREATE TABLESPACE ts LOCATION '/tmp/ts';
+DROP TABLESPACE ts;
+
+--echo === PK USING INDEX TABLESPACE in column def — "Expected: ',' or ')' after column definition, found: USING" ===
+
+--error 1064
+CREATE TABLE pk_ts (id INT PRIMARY KEY USING INDEX TABLESPACE ts);
+
+--echo === CREATE / DROP CONVERSION — pre-existing enumeration shapes, CONVERSION keyword witness ===
+
+--error 1064
+CREATE CONVERSION c FOR 'UTF8' TO 'LATIN1' FROM ascii_to_mic;
+--error 1064
+DROP CONVERSION c;
+
+--echo === CREATE OPERATOR CLASS / OPERATOR FAMILY — Shape (c) catch-all ===
+
+# Both forms parse cleanly into a sqlparser
+# Statement variant that zeta's executor has no
+# arm for; emits Debug repr.
+--error 1064
+CREATE OPERATOR CLASS oc DEFAULT FOR TYPE int USING btree AS OPERATOR 1 <;
+--error 1064
+CREATE OPERATOR FAMILY of USING btree;
+
+--echo === CREATE GROUP / ALTER GROUP ADD USER — enumeration shapes, GROUP keyword witness ===
+
+--error 1064
+CREATE GROUP g;
+--error 1064
+ALTER GROUP g ADD USER u;
+
+--echo === CREATE SCHEMA AUTHORIZATION — SILENT-DROP BUG (joins INHERITS PR #391) ===
+
+# Probe demonstrates the silent drop: after CREATE
+# SCHEMA AUTHORIZATION carol, the schemata listing
+# contains only `test` + `zeta` — no `carol`. The
+# role binding is silently lost at convert.rs:
+# 127-141, AND the schema is not created either.
+# (Note: mysqlwire information_schema shim rejects
+# WHERE filters / function calls (1235), so we use
+# a bare listing query and visually verify carol's
+# absence.)
+CREATE SCHEMA AUTHORIZATION carol;
+--sorted_result
+SELECT schema_name FROM information_schema.schemata;
