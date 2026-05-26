@@ -1,0 +1,150 @@
+# Independently authored CURRENT_SCHEMA + CITEXT-cast
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CURRENT_SCHEMA — NONE (zero compat-mtr coverage —
+#     checked all *.test files per PR #357 lesson).
+#   - CITEXT — NONE (cast target).
+#   - session_info_funcs_basic_extra covers
+#     CURRENT_USER / CURRENT_ROLE / CURRENT_DATABASE /
+#     CURRENT_CATALOG / DATABASE() / SCHEMA() — DISTINCT
+#     surface from CURRENT_SCHEMA which returns the
+#     schema-namespace name (in zeta: hardcoded 'public'),
+#     not the database name.
+#   - cast_basic_extra and
+#     cast_target_type_aliases_basic_extra cover other
+#     CAST targets but NOT CITEXT.
+#
+# This slice pins:
+#   - CURRENT_SCHEMA returns the literal 'public'.
+#   - CURRENT_SCHEMA has NO arity check — bare form
+#     accepted (parser keyword); explicit-call form
+#     `CURRENT_SCHEMA()` also accepted; any args silently
+#     IGNORED (returns 'public' regardless).
+#   - CAST(x AS CITEXT) on a String returns the LOWERCASED
+#     string (zeta represents CITEXT as Value::String).
+#   - CITEXT cast accepts Int / Float / Bool / etc by
+#     stringifying first (no error).
+#   - CITEXT cast on unsupported types (Date, Time, etc)
+#     errors with "cannot cast to CITEXT".
+#   - NULL CAST AS CITEXT → NULL.
+#
+# Big-picture finding:
+#   **CURRENT_SCHEMA is a TWO-FACED stub.** Three behaviors
+#   to know:
+#
+#   1. **Hardcoded value.** Returns the literal 'public'
+#      regardless of any zeta state — zeta has no per-
+#      schema namespaces today, so all objects live in the
+#      'public' namespace. PG apps that branch on
+#      `current_schema()` for multi-tenant routing will
+#      always see the same value.
+#
+#   2. **No arity check.** The impl at lib.rs:47818 is
+#      literally `"CURRENT_SCHEMA" => Ok(Value::String
+#      ("public".to_string()))` — there is NO `args` check.
+#      So `CURRENT_SCHEMA(1, 2, 3)` silently returns
+#      'public' (any args ignored). Distinct from VERSION /
+#      UUID_NIL / PI etc which DO reject args.
+#
+#   3. **Bare-vs-paren parity.** Both `CURRENT_SCHEMA`
+#      (bare keyword) and `CURRENT_SCHEMA()` (function
+#      call) resolve to the same value — unlike
+#      CURRENT_USER which rejects parentheses in some
+#      forms (per session_info_funcs_basic_extra PR #330).
+#
+#   **CITEXT is a CAST-only TYPE alias** (lib.rs:56682).
+#   zeta has no first-class CITEXT data type; CAST AS
+#   CITEXT lowercases the input and stores it as
+#   Value::String. So subsequent equality comparisons
+#   against the cast result follow String semantics —
+#   the lowercasing happens at cast time, not at compare
+#   time. Apps relying on case-insensitive *compare*
+#   semantics (PG citext behavior) should use ILIKE or
+#   manual LOWER() — zeta's CITEXT cast only normalizes
+#   on insertion.
+#
+# Adaptation notes:
+#   # zeta-adapt: CURRENT_SCHEMA always returns 'public'.
+#     Multi-schema namespace routing is NOT supported.
+#   # zeta-adapt: CURRENT_SCHEMA silently accepts any
+#     args (no arity check). Apps probing for arity
+#     errors must use VERSION / PI / UUID_NIL instead.
+#   # zeta-adapt: CITEXT is a CAST-only alias that
+#     lowercases. NOT a case-insensitive comparison type —
+#     subsequent compares are case-sensitive String
+#     compares. Use LOWER(x) = LOWER(y) or ILIKE for
+#     true case-insensitive matching.
+#   # zeta-adapt: CITEXT accepts Int32/Int64/Float64/Bool/
+#     String only. Decimal (`3.14` parses as Decimal) is
+#     NOT supported — cast through DOUBLE PRECISION first.
+
+--echo === CURRENT_SCHEMA — bare form returns 'public' ===
+
+SELECT CURRENT_SCHEMA                                         AS bare_form;
+SELECT CURRENT_SCHEMA = 'public'                              AS matches_public;
+
+--echo === CURRENT_SCHEMA() — paren form returns 'public' (same) ===
+
+SELECT CURRENT_SCHEMA()                                       AS paren_form;
+SELECT CURRENT_SCHEMA = CURRENT_SCHEMA()                      AS bare_eq_paren;
+
+--echo === STRIKING: CURRENT_SCHEMA has NO arity check ===
+
+# Any args silently IGNORED; result is still 'public'.
+# Distinct from VERSION/UUID_NIL/PI which DO reject args.
+SELECT CURRENT_SCHEMA(1)                                      AS one_arg_ignored;
+SELECT CURRENT_SCHEMA(1, 2, 'extra')                          AS three_args_ignored;
+SELECT CURRENT_SCHEMA(NULL)                                   AS null_arg_ignored;
+SELECT CURRENT_SCHEMA(NULL) = 'public'                        AS null_still_public;
+
+--echo === CAST AS CITEXT — lowercases String input ===
+
+# Mixed-case → all lower.
+SELECT CAST('HELLO' AS CITEXT)                                AS upper_to_lower;
+SELECT CAST('Hello World' AS CITEXT)                          AS mixed_to_lower;
+# Already-lower passes through unchanged.
+SELECT CAST('hello' AS CITEXT)                                AS already_lower;
+# Empty preserved.
+SELECT CAST('' AS CITEXT)                                     AS empty_passthrough;
+
+--echo === CITEXT — non-string args stringify (no error) ===
+
+SELECT CAST(42 AS CITEXT)                                     AS int_to_string;
+# Bare 3.14 parses as Decimal which CITEXT doesn't accept;
+# explicit Float64 cast first.
+SELECT CAST(CAST(3.14 AS DOUBLE PRECISION) AS CITEXT)         AS float_to_string;
+SELECT CAST(TRUE AS CITEXT)                                   AS bool_true_to_string;
+SELECT CAST(FALSE AS CITEXT)                                  AS bool_false_to_string;
+
+--echo === CITEXT — NULL CAST → NULL ===
+
+SELECT CAST(NULL AS CITEXT)                                   AS null_cast;
+SELECT CAST(NULL AS CITEXT) IS NULL                           AS null_pred;
+
+--echo === STRIKING: CITEXT does NOT make compares case-insensitive ===
+
+# zeta's CITEXT only lowercases at CAST time. Subsequent
+# equality compares are case-sensitive String compares.
+# Real PG citext would return TRUE for both rows below;
+# zeta returns TRUE for the cast-lowered side and FALSE
+# for the raw-mixed-case side.
+SELECT CAST('Hello' AS CITEXT) = 'hello'                      AS cast_lowered_eq_lower_true;
+SELECT CAST('Hello' AS CITEXT) = 'Hello'                      AS cast_lowered_ne_orig_case;
+# Two CAST-AS-CITEXT compared — both lowered, so EQ.
+SELECT CAST('Hello' AS CITEXT) = CAST('hello' AS CITEXT)      AS both_cast_eq_true;
+SELECT CAST('Hello' AS CITEXT) = CAST('HELLO' AS CITEXT)      AS both_cast_diff_case_eq_true;
+
+--echo === CITEXT — unsupported source types → 1105 ===
+
+# Date / Time / Bytea / Array don't have stringification
+# arms in the CITEXT match block at lib.rs:56682-56691.
+--error 1105
+SELECT CAST(CAST('2026-01-01' AS DATE) AS CITEXT);
+# STRIKING: Decimal is NOT in the match arms either —
+# `3.14` parses as Value::Decimal, not Float64, so the bare
+# literal trips the catch-all error path. The DOUBLE
+# PRECISION cast above is the workaround.
+--error 1105
+SELECT CAST(3.14 AS CITEXT);
