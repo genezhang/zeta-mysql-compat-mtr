@@ -67,6 +67,11 @@ SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
                               TIMESTAMP '2024-01-05',
                               1);
 ERROR 1105: execution error: generate_series with timestamps requires an interval step
+=== Timestamp form — INTERVAL 0 step → ERROR 1105 ===
+SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
+                              TIMESTAMP '2024-01-05',
+                              INTERVAL 0 DAY);
+ERROR 1105: execution error: generate_series step cannot be zero
 === SCALAR-EXPRESSION CALL GAP — outside FROM clause ===
 SELECT GENERATE_SERIES(1, 5);
 ERROR 1105: execution error: unknown function: GENERATE_SERIES
