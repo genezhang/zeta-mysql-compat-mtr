@@ -27,6 +27,13 @@ hi
 SELECT BTRIM(CONCAT('  ', CHAR(9), 'hi', CHAR(10), '  '))     AS strip_mixed_ws;
 strip_mixed_ws
 hi
+SELECT BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))    AS strip_nbsp;
+strip_nbsp
+hi
+SELECT LENGTH(BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))) = 2
+                                                              AS strip_nbsp_len_2;
+strip_nbsp_len_2
+1
 === BTRIM 2-arg: strip set of chars from both ends ===
 SELECT BTRIM('xxhelloyy', 'xy')                               AS strip_xy;
 strip_xy

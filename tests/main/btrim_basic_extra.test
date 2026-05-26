@@ -80,6 +80,15 @@ SELECT BTRIM(CONCAT(CHAR(9), 'hi', CHAR(9)))                  AS strip_tab;
 SELECT BTRIM(CONCAT(CHAR(10), 'hi', CHAR(10)))                AS strip_newline;
 # Mixed whitespace.
 SELECT BTRIM(CONCAT('  ', CHAR(9), 'hi', CHAR(10), '  '))     AS strip_mixed_ws;
+# NBSP (U+00A0, UTF-8 bytes 0xC2 0xA0) — pins the "ALL
+# Unicode whitespace" claim explicitly. Without this row a
+# regression swapping str::trim() to an ASCII-only trim
+# would pass every other ws row in this slice. LENGTH of
+# the result is 2 ('hi'), proving the surrounding NBSPs
+# were stripped.
+SELECT BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))    AS strip_nbsp;
+SELECT LENGTH(BTRIM(CONCAT(CHAR(194, 160), 'hi', CHAR(194, 160)))) = 2
+                                                              AS strip_nbsp_len_2;
 
 --echo === BTRIM 2-arg: strip set of chars from both ends ===
 
@@ -127,6 +136,10 @@ SELECT BTRIM(NULL) IS NULL                                    AS null_pred;
 # digits aren't whitespace).
 SELECT BTRIM(42)                                              AS int_no_ws_noop;
 SELECT BTRIM(TRUE)                                            AS bool_coerce;
+# Bool → "true" stringification is consistent with the same
+# pattern in HEX (PR #331) and INITCAP (PR #332). All three
+# arms route Bool through value_to_sql_string before
+# operating on the resulting string.
 
 --echo === BTRIM: arity errors ===
 
