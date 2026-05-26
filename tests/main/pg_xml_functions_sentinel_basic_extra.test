@@ -1,0 +1,160 @@
+# Independently authored PG XML surface sentinel slice
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - PG XML surface (XML data type, XMLPARSE,
+#     XMLELEMENT, XMLAGG, XPATH, XMLEXISTS, XMLCOMMENT,
+#     XMLCONCAT, XMLPI): ZERO prior coverage on the
+#     SUBSTANTIVE surface. `\bXML\b` wide-grep DOES hit
+#     `explain_format_basic_extra.test:87` for
+#     `EXPLAIN (FORMAT XML)` — but that's the EXPLAIN-
+#     option keyword, an unrelated surface. No `::XML`
+#     cast, no XML data-type DDL, no XMLPARSE /
+#     XMLELEMENT / XMLAGG / XPATH / XMLEXISTS /
+#     XMLCOMMENT / XMLCONCAT / XMLPI / XMLATTRIBUTES
+#     anywhere else.
+#
+#   The SHAPE patterns pinned by each row are well-
+#   established by prior slices — this slice is novel
+#   for the XML SURFACE specifically, not for the
+#   rejection mechanics. Per PR #386's shape (c)
+#   taxonomy reframing:
+#     - "unsupported CAST target type:" — 7 prior
+#       result files (29 occurrences) — heavy reuse
+#       across PR #387 INET/CIDR/MACADDR et al.
+#     - "unsupported data type:" — 4 prior result files.
+#     - sqlparser "Expected: ), found: <X>" — multiple
+#       priors (partition_basic_extra, agg_func_basic_
+#       extra, window_func_basic_extra, charset_
+#       collation_basic_extra). This is sqlparser's
+#       generic "function-arg expression parser ran
+#       into an adjacent token it can't continue with"
+#       pattern — NOT a PG-spec arm in sqlparser (which
+#       has none for XMLPARSE/XMLELEMENT/XMLPI/XMLEXISTS).
+#     - "unknown function: <X>" — heavy reuse across
+#       the function-arm gap closure PRs (#349-#369).
+#
+# This slice pins (FOUR shapes — all on the XML surface,
+# none of the shape patterns themselves are new):
+#
+#   Shape A — `::XML` cast (1105):
+#     - "unsupported CAST target type: XML" (uppercase).
+#
+#   Shape B — `XML` DDL column type (1064):
+#     - "unsupported data type: xml" (lowercase).
+#     - Same case-divergence as PR #387 INET/CIDR.
+#
+#   Shape C — PG-special-syntax XML functions (1064
+#   sqlparser "Expected: ), found: ..."):
+#     - `XMLPARSE(DOCUMENT 'x')` — sqlparser is parsing
+#       the function-arg list as ordinary expressions;
+#       after the bare identifier `DOCUMENT` it sees a
+#       string literal `'<a>1</a>'` adjacent (no
+#       operator between them) and bails because that
+#       sequence isn't a valid expression continuation.
+#     - `XMLPARSE(CONTENT 'x')` — same.
+#     - `XMLELEMENT(NAME foo, ...)` — bare-identifier
+#       NAME followed by bare-identifier foo (no
+#       operator); same parse failure.
+#     - `XMLPI(NAME foo)` — same.
+#     - `XMLEXISTS('/a' PASSING BY VALUE ...)` — after
+#       string literal `'/a'` sees bare-identifier
+#       PASSING (no operator); same parse failure.
+#     - These are NOT PG-spec grammar arms in sqlparser
+#       (it has none for XML functions). The mechanism
+#       is the generic expression-arg-list parser
+#       hitting adjacent non-operator tokens. Distinct
+#       site from Shape D — Shape C fails BEFORE the
+#       AST is even built; Shape D fails at function-
+#       table lookup AFTER AST construction.
+#
+#   Shape D — regular-function-call XML functions (1105
+#   "unknown function: <X>"):
+#     - `XMLAGG(x)`, `XPATH(...)`, `XMLCOMMENT(...)`,
+#       `XMLCONCAT(...)` — sqlparser PARSES these as
+#       ordinary function calls (no PG-special syntax),
+#       executor's function table doesn't have them.
+#
+# Big-picture finding:
+#
+#   PG XML is essentially unreachable from zeta: the
+#   data type doesn't exist, the cast target doesn't
+#   exist, and the XML functions split across TWO
+#   distinct rejection sites depending on whether the
+#   function uses PG-special syntax (NAME/DOCUMENT/
+#   CONTENT/PASSING — Shape C, sqlparser-level) or
+#   plain function-call form (Shape D, executor-level).
+#
+#   Apps porting PG XML code must rewrite to TEXT
+#   storage + application-side XML parsing libraries.
+#   There is no equivalent zeta surface.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — PG XML type is unsupported
+#     across ALL surfaces: ::XML cast (1105), DDL column
+#     type (1064), special-syntax functions (1064
+#     sqlparser-level), plain-function form (1105
+#     unknown function).
+#   # zeta-adapt: ERROR-SITE QUIRK — XML functions with
+#     PG-special syntax (XMLELEMENT(NAME ...), XMLPARSE
+#     (DOCUMENT ...), XMLEXISTS(... PASSING BY VALUE
+#     ...), XMLPI(NAME ...)) fail at sqlparser BEFORE
+#     reaching zeta's function table. Plain-form XML
+#     functions (XMLAGG, XPATH, XMLCOMMENT, XMLCONCAT)
+#     fail at the function-table lookup. The error
+#     message differs accordingly.
+#   # zeta-adapt: Substitute storage is TEXT + app-side
+#     XML library (e.g. libxml2 / lxml / xmltodict).
+
+--echo === Shape A — `::XML` cast (1105) ===
+
+--error 1105
+SELECT '<a>1</a>'::XML;
+--error 1105
+SELECT '<a>1</a>'::XML AS x;
+
+--echo === Shape B — `XML` DDL column type (1064) ===
+
+--error 1064
+CREATE TABLE xml_t (id INT PRIMARY KEY, x XML);
+--error 1064
+CREATE TABLE xml_d (id INT PRIMARY KEY, x XML DEFAULT '<root/>');
+
+--echo === Shape C — PG-special-syntax XML functions (1064 sqlparser) ===
+
+# DOCUMENT / CONTENT keyword inside XMLPARSE — sqlparser
+# expects closing `)` after the function name + open paren,
+# doesn't grok PG's special parse-mode keyword.
+--error 1064
+SELECT XMLPARSE(DOCUMENT '<a>1</a>');
+--error 1064
+SELECT XMLPARSE(CONTENT '<a>1</a>');
+
+# NAME keyword in XMLELEMENT — sqlparser same issue.
+--error 1064
+SELECT XMLELEMENT(NAME foo, 'value');
+--error 1064
+SELECT XMLELEMENT(NAME foo, XMLATTRIBUTES('id' AS attr), 'value');
+
+# NAME keyword in XMLPI — same.
+--error 1064
+SELECT XMLPI(NAME foo);
+
+# PASSING BY VALUE clause in XMLEXISTS — same.
+--error 1064
+SELECT XMLEXISTS('/a' PASSING BY VALUE '<a>1</a>'::XML);
+
+--echo === Shape D — plain-function-call XML functions (1105 unknown function) ===
+
+# These have NO PG-special syntax inside the parens —
+# sqlparser parses them as ordinary function calls,
+# executor's function table doesn't have them.
+--error 1105
+SELECT XMLAGG(x) FROM (SELECT '<a>1</a>' AS x) t;
+--error 1105
+SELECT XPATH('/a/text()', '<a>1</a>');
+--error 1105
+SELECT XMLCOMMENT('hi');
+--error 1105
+SELECT XMLCONCAT('<a/>', '<b/>');
