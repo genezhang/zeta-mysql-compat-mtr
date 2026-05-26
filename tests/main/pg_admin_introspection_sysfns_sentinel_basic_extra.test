@@ -1,0 +1,221 @@
+# Independently authored PG admin/introspection
+# sysfn family sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - pg_catalog.pg_table_size / pg_database_size
+#     / pg_size_pretty as function-as-VIEW shape
+#     (`FROM pg_catalog.pg_table_size`): covered at
+#     pg_catalog_views_sentinel.
+#   - The function-call shapes (`SELECT pg_table_
+#     size('t')` etc.): ZERO prior coverage.
+#   - pg_terminate_backend / pg_cancel_backend etc.
+#     (txn-mgmt admin family): covered at PR #414
+#     pg_txn_mgmt_admin_fns_sentinel.
+#   - 15 OTHER PG admin/introspection sysfns spanning
+#     size, def-introspection, privilege-check,
+#     NOTIFY-family, and config-introspection: ZERO
+#     prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "execution error: unknown function: <name>" —
+#     pre-existing fingerprint at many slices (PR
+#     #408 reflection helpers, PR #412 hypothetical-
+#     set WITHIN GROUP, PR #414 txn-mgmt admin fns).
+#   - WIRE-DIVERGENCE: 4 of these fns are REGISTERED
+#     on pgwire but NOT on mysqlwire. Out-of-band
+#     pgwire probing reveals:
+#       - pg_database_size('test') → pgwire returns
+#         an integer (e.g., 1020); mysqlwire errors
+#         "unknown function".
+#       - pg_table_size('t') → pgwire returns
+#         "pg_table_size: table not found: t" (when
+#         table absent) — proving registered on
+#         pgwire; mysqlwire errors "unknown function".
+#       - pg_size_pretty(<int>) → pgwire returns
+#         human-readable string (e.g., "1.0 kB");
+#         mysqlwire errors "unknown function".
+#       - PARTIAL: pg_size_pretty(<bigint>) errors
+#         "unknown function" on pgwire too (the
+#         registered signature only accepts int, NOT
+#         bigint — a type-overload registration gap).
+#         PG's signature is `pg_size_pretty(bigint)`;
+#         the int-only zeta variant silently degrades
+#         for PG client code that explicitly casts.
+#     Pattern matches PR #405 (pg_replication_slots
+#     CATALOG-RELATION-INTERCEPT on pgwire only). New
+#     sub-sub-pattern: FUNCTION-REGISTRATION wire-
+#     divergence (vs the catalog-relation one).
+#   - Symmetric reading per memory: silent absence
+#     on mysqlwire is NOT a security risk (no escala-
+#     tion surface for cancel/terminate / privilege-
+#     escalation). But it IS a portability footgun
+#     for apps reading pg admin tools.
+#
+# This slice pins (all probe via mysqlwire — the
+# runner wire — and produce "unknown function"):
+#
+#   GROUP 1 — Size functions:
+#     - pg_relation_size, pg_table_size,
+#       pg_total_relation_size, pg_database_size,
+#       pg_size_pretty, pg_relation_filepath.
+#     pg_database_size / pg_table_size / pg_size_
+#     pretty have wire-divergence: pgwire registers
+#     them, mysqlwire does not. Other three: both-
+#     wires unknown.
+#
+#   GROUP 2 — DEF-introspection (pg_get_*):
+#     - pg_get_indexdef, pg_get_constraintdef,
+#       pg_get_expr, pg_get_function_identity_
+#       arguments, pg_get_serial_sequence,
+#       pg_get_userbyid.
+#     All both-wires unknown (these match the gap
+#     PR #408 pinned for to_regclass/regtype/regproc
+#     /regoperator + pg_get_viewdef/functiondef/
+#     indexdef/constraintdef/format_type — extending
+#     the catalog of unimplemented reflection helpers).
+#
+#   GROUP 3 — Privilege-check fns:
+#     - pg_has_role, has_table_privilege,
+#       has_column_privilege, has_schema_privilege.
+#     All both-wires unknown.
+#     SECURITY-NEUTRAL: apps using these for runtime
+#     ACL probing get an error rather than a false
+#     positive/negative. Migrate to information_
+#     schema.role_table_grants etc. (if covered).
+#
+#   GROUP 4 — NOTIFY-family fns:
+#     - pg_notify, pg_listening_channels,
+#       pg_notification_queue_usage.
+#     All both-wires unknown. Cross-link to LISTEN/
+#     NOTIFY statement form (listen_notify_sentinel:
+#     pgwire fully implements, mysqlwire silent
+#     no-op for the STATEMENT form). The FUNCTION
+#     form (pg_notify) is NOT registered on either
+#     wire; LISTEN/NOTIFY-driven apps that route
+#     through the function form (e.g., pg_notify
+#     used in a trigger body) cannot work.
+#
+#   GROUP 5 — Config-introspection:
+#     - current_setting, set_config, pg_typeof.
+#     All both-wires unknown. current_setting and
+#     set_config are heavily used by pg_dump and ORM
+#     migration tools. pg_typeof is used for query-
+#     time type discovery (debugging, ORM mapping).
+#
+# Big-picture finding:
+#
+#   zeta's PG sysfn coverage is concentrated on:
+#     - Core arithmetic / string / date / json/jsonb
+#       / aggregate / window functions
+#     - Sequence + serial nextval/currval/setval
+#     - LISTEN/NOTIFY STATEMENT forms (pgwire)
+#     - 3 size fns on pgwire (database/table/size_
+#       pretty)
+#
+#   The PG admin/introspection sysfn family for
+#   pg_dump round-tripping and ORM/observability
+#   tooling is largely absent. Apps relying on these
+#   should:
+#     - Migrate size queries to information_schema
+#       (if implemented) or use external tools.
+#     - Skip privilege-check fns (zeta's auth model
+#       differs — see auth_basic).
+#     - Use the LISTEN/NOTIFY statement form on
+#       pgwire instead of pg_notify().
+#     - Avoid current_setting/set_config in queries;
+#       use SET/SHOW instead.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307). Cross-wire
+# matrix in slice header (see GROUP 1). The slice's
+# .result captures the mysqlwire fingerprints (all
+# "unknown function: <name>"). The 3 pgwire-only
+# wins are documented above but cannot be pinned via
+# the mysqlwire runner.
+#
+# Adaptation notes:
+#   # zeta-adapt: WIRE-DIVERGENCE — pg_database_size,
+#     pg_table_size, pg_size_pretty work on pgwire
+#     only; on mysqlwire they error "unknown function".
+#     pg_size_pretty has a TYPE-OVERLOAD GAP: only int
+#     argument works; bigint cast fails on both wires.
+#   # zeta-adapt: KNOWN GAP — pg_relation_size /
+#     pg_total_relation_size / pg_relation_filepath
+#     unknown on both wires.
+#   # zeta-adapt: KNOWN GAP — pg_get_indexdef /
+#     constraintdef / expr / function_identity_
+#     arguments / serial_sequence / userbyid all
+#     unknown on both wires (extends PR #408 reflection-
+#     helpers catalog).
+#   # zeta-adapt: KNOWN GAP — pg_has_role / has_table_
+#     privilege / has_column_privilege /
+#     has_schema_privilege unknown on both wires
+#     (security-neutral: error rather than false-ACL).
+#   # zeta-adapt: KNOWN GAP — pg_notify / pg_listening_
+#     channels / pg_notification_queue_usage unknown
+#     on both wires; use LISTEN/NOTIFY STATEMENT form
+#     on pgwire.
+#   # zeta-adapt: KNOWN GAP — current_setting /
+#     set_config / pg_typeof unknown on both wires;
+#     use SET/SHOW statements instead.
+
+--echo === GROUP 1 — Size functions (3 wire-divergent: db/table/size_pretty; 3 both-unknown) ===
+
+--error 1105
+SELECT pg_relation_size('t');
+--error 1105
+SELECT pg_table_size('t');
+--error 1105
+SELECT pg_total_relation_size('t');
+--error 1105
+SELECT pg_database_size('test');
+--error 1105
+SELECT pg_size_pretty(1024);
+--error 1105
+SELECT pg_relation_filepath('t');
+
+--echo === GROUP 2 — DEF-introspection (pg_get_*) — all both-wires unknown ===
+
+--error 1105
+SELECT pg_get_indexdef(1);
+--error 1105
+SELECT pg_get_constraintdef(1);
+--error 1105
+SELECT pg_get_expr('foo', 1);
+--error 1105
+SELECT pg_get_function_identity_arguments(1);
+--error 1105
+SELECT pg_get_serial_sequence('t', 'id');
+--error 1105
+SELECT pg_get_userbyid(10);
+
+--echo === GROUP 3 — Privilege-check fns — all both-wires unknown ===
+
+--error 1105
+SELECT pg_has_role('alice', 'admin', 'MEMBER');
+--error 1105
+SELECT has_table_privilege('t', 'SELECT');
+--error 1105
+SELECT has_column_privilege('t', 'id', 'SELECT');
+--error 1105
+SELECT has_schema_privilege('public', 'USAGE');
+
+--echo === GROUP 4 — NOTIFY-family fns — all both-wires unknown ===
+
+--error 1105
+SELECT pg_notify('c', 'p');
+--error 1105
+SELECT pg_listening_channels();
+--error 1105
+SELECT pg_notification_queue_usage();
+
+--echo === GROUP 5 — Config-introspection — all both-wires unknown ===
+
+--error 1105
+SELECT current_setting('search_path');
+--error 1105
+SELECT set_config('search_path', 'public', false);
+--error 1105
+SELECT pg_typeof(1);
