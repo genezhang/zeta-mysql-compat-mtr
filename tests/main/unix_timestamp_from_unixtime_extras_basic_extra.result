@@ -1,0 +1,123 @@
+=== UNIX_TIMESTAMP() zero-arg — same-statement determinism ===
+SELECT UNIX_TIMESTAMP() = UNIX_TIMESTAMP()                    AS same_stmt_equal;
+same_stmt_equal
+1
+SELECT UNIX_TIMESTAMP() > 0                                   AS positive_epoch;
+positive_epoch
+1
+SELECT UNIX_TIMESTAMP() > UNIX_TIMESTAMP(TIMESTAMP '2020-01-01 00:00:00')
+                                                              AS later_than_2020;
+later_than_2020
+1
+=== UNIX_TIMESTAMP arity > 1 → ERROR 1105 ===
+SELECT UNIX_TIMESTAMP(TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-01-02 00:00:00');
+ERROR 1105: execution error: UNIX_TIMESTAMP takes 0 or 1 arguments
+SELECT UNIX_TIMESTAMP(1, 2, 3);
+ERROR 1105: execution error: UNIX_TIMESTAMP takes 0 or 1 arguments
+=== UNIX_TIMESTAMP — DATE arg (days * 86400 path) ===
+SELECT UNIX_TIMESTAMP(DATE '1970-01-02')                      AS day_1_epoch;
+day_1_epoch
+86400
+SELECT UNIX_TIMESTAMP(DATE '2024-01-01')                      AS year_2024_jan1_epoch;
+year_2024_jan1_epoch
+1704067200
+SELECT UNIX_TIMESTAMP(DATE '1969-12-30')                      AS pre_epoch_negative;
+pre_epoch_negative
+-172800
+=== UNIX_TIMESTAMP — date-only string (no time portion) ===
+SELECT UNIX_TIMESTAMP('2024-01-01')                           AS date_only_string_epoch;
+date_only_string_epoch
+1704067200
+SELECT UNIX_TIMESTAMP('2024-01-01')
+     = UNIX_TIMESTAMP(DATE '2024-01-01')                      AS date_string_eq_date_literal;
+date_string_eq_date_literal
+1
+=== UNIX_TIMESTAMP — unparseable string → ERROR 1105 ===
+SELECT UNIX_TIMESTAMP('not a date');
+ERROR 1105: execution error: UNIX_TIMESTAMP: cannot parse "not a date" as a date or timestamp
+SELECT UNIX_TIMESTAMP('2024-13-99');
+ERROR 1105: execution error: UNIX_TIMESTAMP: cannot parse "2024-13-99" as a date or timestamp
+=== UNIX_TIMESTAMP — wrong-type → ERROR 1105 ===
+SELECT UNIX_TIMESTAMP(1700000000);
+ERROR 1105: execution error: UNIX_TIMESTAMP requires a date, timestamp, or parseable string
+SELECT UNIX_TIMESTAMP(CAST(1.5 AS DOUBLE PRECISION));
+ERROR 1105: execution error: UNIX_TIMESTAMP requires a date, timestamp, or parseable string
+SELECT UNIX_TIMESTAMP(TRUE);
+ERROR 1105: execution error: UNIX_TIMESTAMP requires a date, timestamp, or parseable string
+=== UNIX_TIMESTAMP — NULL propagation ===
+SELECT UNIX_TIMESTAMP(NULL)                                   AS unix_ts_null_is_null;
+unix_ts_null_is_null
+NULL
+SELECT UNIX_TIMESTAMP(CAST(NULL AS TIMESTAMP))                AS unix_ts_typed_null_is_null;
+unix_ts_typed_null_is_null
+NULL
+SELECT UNIX_TIMESTAMP(NULL) IS NULL                           AS unix_ts_null_predicate;
+unix_ts_null_predicate
+1
+=== FROM_UNIXTIME arity errors → 1105 ===
+SELECT FROM_UNIXTIME();
+ERROR 1105: execution error: FROM_UNIXTIME requires 1 argument
+SELECT FROM_UNIXTIME(1700000000, 1700000001);
+ERROR 1105: execution error: FROM_UNIXTIME requires 1 argument
+=== FROM_UNIXTIME — Int32 arm (small CAST AS INT) ===
+SELECT FROM_UNIXTIME(CAST(86400 AS INTEGER))
+     = TIMESTAMP '1970-01-02 00:00:00'                        AS int32_arm_works;
+int32_arm_works
+1
+SELECT FROM_UNIXTIME(CAST(86400 AS BIGINT))
+     = TIMESTAMP '1970-01-02 00:00:00'                        AS int64_arm_works;
+int64_arm_works
+1
+SELECT FROM_UNIXTIME(CAST(86400 AS INTEGER))
+     = FROM_UNIXTIME(CAST(86400 AS BIGINT))                   AS int32_eq_int64_same_value;
+int32_eq_int64_same_value
+1
+=== FROM_UNIXTIME — wrong-type → ERROR 1105 ===
+SELECT FROM_UNIXTIME('1700000000');
+ERROR 1105: execution error: FROM_UNIXTIME requires an integer epoch-seconds argument
+SELECT FROM_UNIXTIME(CAST(1700000000.0 AS DOUBLE PRECISION));
+ERROR 1105: execution error: FROM_UNIXTIME requires an integer epoch-seconds argument
+SELECT FROM_UNIXTIME(1.5);
+ERROR 1105: execution error: FROM_UNIXTIME requires an integer epoch-seconds argument
+SELECT FROM_UNIXTIME(TRUE);
+ERROR 1105: execution error: FROM_UNIXTIME requires an integer epoch-seconds argument
+=== FROM_UNIXTIME — NULL propagation ===
+SELECT FROM_UNIXTIME(NULL)                                    AS from_unix_null_is_null;
+from_unix_null_is_null
+NULL
+SELECT FROM_UNIXTIME(CAST(NULL AS BIGINT))                    AS from_unix_typed_null_is_null;
+from_unix_typed_null_is_null
+NULL
+SELECT FROM_UNIXTIME(NULL) IS NULL                            AS from_unix_null_predicate;
+from_unix_null_predicate
+1
+=== FROM_UNIXTIME — negative epoch (pre-1970) ===
+SELECT FROM_UNIXTIME(-86400)
+     = TIMESTAMP '1969-12-31 00:00:00'                        AS neg_epoch_pre_1970;
+neg_epoch_pre_1970
+1
+SELECT FROM_UNIXTIME(0)
+     = TIMESTAMP '1970-01-01 00:00:00'                        AS zero_epoch_is_unix_birth;
+zero_epoch_is_unix_birth
+1
+=== FROM_UNIXTIME — i64 overflow boundary (checked_mul) ===
+SELECT FROM_UNIXTIME(9223372036854) IS NOT NULL               AS just_under_overflow_ok;
+just_under_overflow_ok
+1
+SELECT FROM_UNIXTIME(9223372036855);
+ERROR 1105: execution error: FROM_UNIXTIME: epoch seconds 9223372036855 out of representable range
+SELECT FROM_UNIXTIME(-9223372036855);
+ERROR 1105: execution error: FROM_UNIXTIME: epoch seconds -9223372036855 out of representable range
+=== Round-trip: FROM_UNIXTIME(UNIX_TIMESTAMP(t)) = t ===
+SELECT FROM_UNIXTIME(UNIX_TIMESTAMP(TIMESTAMP '2024-06-15 14:30:45'))
+     = TIMESTAMP '2024-06-15 14:30:45'                        AS round_trip_ts_with_time;
+round_trip_ts_with_time
+1
+SELECT FROM_UNIXTIME(UNIX_TIMESTAMP(DATE '2024-06-15'))
+     = DATE '2024-06-15'                                      AS round_trip_date_value_coerce;
+round_trip_date_value_coerce
+1
+SELECT FROM_UNIXTIME(UNIX_TIMESTAMP(DATE '2024-06-15'))
+     = TIMESTAMP '2024-06-15 00:00:00'                        AS round_trip_date_eq_ts_midnight;
+round_trip_date_eq_ts_midnight
+1
