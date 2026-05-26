@@ -1,0 +1,160 @@
+# Independently authored PG ALTER SYSTEM + SHOW
+# wire-divergence sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - ALTER SYSTEM SET / RESET / RESET ALL: ZERO
+#     prior (grep'd ALL .test files).
+#   - pg_reload_conf: ZERO prior.
+#   - SHOW work_mem (GUC name): ZERO prior.
+#   - SHOW ALL: ZERO prior.
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: one of VIEW or TYPE or TABLE or INDEX
+#     or ROLE or POLICY or CONNECTOR or ICEBERG or
+#     SCHEMA or USER or OPERATOR, found: <KW>" — pre-
+#     existing fingerprint for the ALTER-after parser
+#     dispatch (pg_misc_ddl_sentinel:10-14 DEFAULT;
+#     event_use_partition_sentinel:6 EVENT; pg_pubsub
+#     PUBLICATION; sequence_basic_extra:50 comment).
+#     SYSTEM is a new keyword witness.
+#   - "execution error: unknown function: <FN>" —
+#     pre-existing fingerprint. pg_reload_conf is a
+#     new function-name witness.
+#   - "unsupported statement: sqlparser::ast::Statement"
+#     — Shape (c) catch-all from PR #371. SHOW ALL on
+#     pgwire lands here (parses as Statement::ShowAll,
+#     unmatched).
+#
+# This slice pins:
+#
+#   ALTER SYSTEM SET / RESET / RESET ALL — pre-
+#   existing "Expected: one of VIEW or TYPE..."
+#   enumeration shape. New SYSTEM keyword witness.
+#   All three forms reject identically because the
+#   SYSTEM token is rejected at the ALTER-dispatch
+#   point BEFORE the SET/RESET/RESET ALL is parsed.
+#
+#   pg_reload_conf() — unknown function (1105).
+#
+#   SHOW work_mem (a PG GUC name) — WIRE DIVERGENT:
+#     - mysqlwire: silent empty result. The shim
+#       prefix-intercept at zeta-mysqlwire/src/shim.rs:
+#       1904 matches `q_lower.starts_with("show ")`,
+#       runs through specific patterns (VARIABLES,
+#       STATUS, character set, collation, warnings,
+#       CREATE TABLE, INDEX, COLUMNS, TABLES,
+#       DATABASES), and falls through to the default
+#       `return Some(MySqlResult::EmptyShow)` (the
+#       last statement in the SHOW block). So any
+#       unrecognized SHOW returns 0 rows with no
+#       error.
+#     - pgwire: returns the actual GUC value (probed:
+#       "64MB" after `ALTER SYSTEM SET work_mem`
+#       wouldn't work, but the default value or any
+#       prior SET value comes back). The pgwire SHOW
+#       handler reaches zeta's GUC backing store.
+#
+#   SHOW ALL — WIRE DIVERGENT in the OPPOSITE
+#   DIRECTION from SHOW <one-GUC>:
+#     - mysqlwire: silent empty result via the same
+#       EmptyShow catch-all. ALL is not a recognized
+#       sub-pattern, so the default fires.
+#     - pgwire: Shape (c) catch-all. sqlparser parses
+#       SHOW ALL into a Statement variant that
+#       pgwire's executor doesn't dispatch, falling
+#       through to zeta-server/src/lib.rs's
+#       statement-level final-arm Debug-repr emit.
+#
+#   The pinned shape in the .result file below is
+#   mysqlwire's (EmptyShow / no rows). The pgwire
+#   behavior is documented in this header per
+#   [[feedback_wire_path_divergence_check]].
+#
+# Big-picture finding:
+#
+#   PG ALTER SYSTEM (the standard PG mechanism for
+#   writing GUC changes to postgresql.auto.conf) is
+#   entirely unreachable on zeta. Per CLAUDE.md, all
+#   zeta config is programmatic via ServerConfig (no
+#   TOML/YAML files), so ALTER SYSTEM has no
+#   meaningful semantic on the engine. The hard
+#   reject at parser level is the correct behavior.
+#
+#   The interesting finding is on the SHOW side:
+#   mysqlwire's prefix-intercept catch-all silently
+#   absorbs any SHOW <unknown-thing> as EmptyShow,
+#   while pgwire either returns real GUC state (SHOW
+#   <known-guc>) or errors at Shape (c) (SHOW ALL).
+#   This means apps porting PG GUC introspection code
+#   to the MySQL wire WILL silently get empty results
+#   instead of the expected values.
+#
+#   Joins the running list of wire-divergence
+#   patterns (PR #366, #385, #392, #396, #398, #399,
+#   #405). The SHOW pattern is structurally the SAME
+#   as the SET prefix-intercept pattern documented in
+#   PR #399: shim.rs uses `q_lower.starts_with` /
+#   `strip_prefix` for a family of statements
+#   (`show `, `set `) with a catch-all return value
+#   that swallows unmatched cases silently.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — ALTER SYSTEM SET /
+#     RESET / RESET ALL parse-reject at the ALTER
+#     dispatch enumeration. zeta config is
+#     programmatic only (per CLAUDE.md), no
+#     ALTER-SYSTEM-equivalent exists.
+#   # zeta-adapt: KNOWN GAP — pg_reload_conf() is
+#     unknown function (1105). No equivalent exists;
+#     config changes require restart.
+#   # zeta-adapt: WIRE DIVERGENCE — SHOW <GUC> on
+#     mysqlwire silently returns 0 rows (shim.rs:1904
+#     SHOW-prefix catch-all → EmptyShow). On pgwire
+#     it returns the actual GUC value. Apps probing
+#     GUC state on MySQL wire MUST use pgwire instead.
+#   # zeta-adapt: WIRE DIVERGENCE — SHOW ALL on
+#     mysqlwire returns 0 rows (same catch-all). On
+#     pgwire it errors Shape (c) ("unsupported
+#     statement: sqlparser::ast::Statement").
+
+--echo === ALTER SYSTEM SET / RESET / RESET ALL — "Expected: one of VIEW or TYPE..." SYSTEM witness ===
+
+# All three forms reject at the SYSTEM token (col 7)
+# because the ALTER-dispatch enumeration doesn't
+# include SYSTEM. The SET/RESET clause is never
+# reached.
+--error 1064
+ALTER SYSTEM SET work_mem = '64MB';
+--error 1064
+ALTER SYSTEM RESET work_mem;
+--error 1064
+ALTER SYSTEM RESET ALL;
+
+--echo === pg_reload_conf() — unknown function (1105) ===
+
+--error 1105
+SELECT pg_reload_conf();
+
+--echo === SHOW <GUC> — WIRE DIVERGENT (mysqlwire: EmptyShow catch-all → 0 rows; pgwire: actual GUC value) ===
+
+# Pinned shape is mysqlwire's: silent empty result
+# (no header row, no data rows). Cross-wire: pgwire
+# returns the actual GUC value via its SHOW handler.
+# Source: zeta-mysqlwire/src/shim.rs:1904 SHOW
+# prefix-intercept with default `return
+# Some(MySqlResult::EmptyShow)` for unrecognized
+# sub-patterns.
+SHOW work_mem;
+SHOW statement_timeout;
+SHOW search_path;
+
+--echo === SHOW ALL — WIRE DIVERGENT (mysqlwire: same EmptyShow; pgwire: Shape (c) catch-all) ===
+
+# Same mysqlwire mechanism (EmptyShow). On pgwire
+# this hits the executor's Shape (c) catch-all
+# because sqlparser parses SHOW ALL as a
+# Statement::ShowAll variant that no pgwire arm
+# dispatches.
+SHOW ALL;
