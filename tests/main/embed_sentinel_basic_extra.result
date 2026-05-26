@@ -1,0 +1,30 @@
+=== EMBED — NULL propagates BEFORE provider check ===
+SELECT EMBED(NULL)                                            AS null_returns_null;
+null_returns_null
+NULL
+SELECT EMBED(NULL) IS NULL                                    AS null_pred;
+null_pred
+1
+=== EMBED — no-provider error for non-NULL input ===
+SELECT EMBED('hello');
+ERROR 1105: execution error: embed() has no provider — call register_embed_fn() or use a zeta-embed-providers helper (use_local_embed / use_openai_embed / use_voyage_embed) before using embed() in SQL
+SELECT EMBED('');
+ERROR 1105: execution error: embed() has no provider — call register_embed_fn() or use a zeta-embed-providers helper (use_local_embed / use_openai_embed / use_voyage_embed) before using embed() in SQL
+SELECT EMBED('a longer string');
+ERROR 1105: execution error: embed() has no provider — call register_embed_fn() or use a zeta-embed-providers helper (use_local_embed / use_openai_embed / use_voyage_embed) before using embed() in SQL
+=== EMBED — non-string args ALSO trigger no-provider (after stringify) ===
+SELECT EMBED(42);
+ERROR 1105: execution error: embed() has no provider — call register_embed_fn() or use a zeta-embed-providers helper (use_local_embed / use_openai_embed / use_voyage_embed) before using embed() in SQL
+SELECT EMBED(TRUE);
+ERROR 1105: execution error: embed() has no provider — call register_embed_fn() or use a zeta-embed-providers helper (use_local_embed / use_openai_embed / use_voyage_embed) before using embed() in SQL
+=== EMBED — arity errors → 1105 ===
+SELECT EMBED();
+ERROR 1105: execution error: embed() requires exactly 1 argument
+SELECT EMBED('a', 'b');
+ERROR 1105: execution error: embed() requires exactly 1 argument
+SELECT EMBED('a', 'b', 'c');
+ERROR 1105: execution error: embed() requires exactly 1 argument
+=== EMBED — NULL-prop survives non-NULL siblings in COALESCE ===
+SELECT COALESCE(EMBED(NULL), 'fallback')                      AS coalesce_to_fallback;
+coalesce_to_fallback
+fallback
