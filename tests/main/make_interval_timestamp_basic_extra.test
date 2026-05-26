@@ -1,0 +1,203 @@
+# Independently authored MAKE_INTERVAL / MAKE_TIMESTAMP
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - MAKE_INTERVAL — NONE (zero compat-mtr coverage).
+#   - MAKE_TIMESTAMP — NONE.
+#   - date_time_basic_extra and temporal_arithmetic_basic_extra
+#     cover MAKE_DATE / MAKE_TIME / MAKETIME (already pinned).
+#   - justify_interval_basic_extra (PR #350) covers
+#     normalization of existing intervals.
+#
+# This slice pins:
+#   - MAKE_TIMESTAMP(y, m, d, h, mi, sec) — exactly 6 args.
+#     Strict calendar validation (leap-year-aware).
+#   - MAKE_INTERVAL(years?, months?, weeks?, days?, hours?,
+#     mins?, secs?) — 0 to 7 args, all default to 0.
+#   - Range errors with informative messages (month 1..=12,
+#     day 1..=days_in_month, hour 0..24, min 0..60,
+#     sec 0..60).
+#   - NULL handling DIVERGES between the two functions —
+#     see the big-picture finding below.
+#   - Wrong-type → 1105 with specific per-position message.
+#   - Arity errors → 1105.
+#   - Overflow guards on MAKE_INTERVAL (i32 months/days,
+#     i64 microseconds) → 1105.
+#
+# Big-picture finding (STRIKING NULL-SEMANTICS SPLIT):
+#   The two MAKE_ functions handle NULL completely
+#   differently:
+#
+#   - MAKE_TIMESTAMP: NULL prop. Any NULL arg → result NULL.
+#     Standard SQL/PG behavior. Implemented via an i64::MIN
+#     sentinel in the int-extractor that triggers an early
+#     return at lib.rs:52900.
+#
+#   - MAKE_INTERVAL: NULL coerce-to-0. NULL in any position
+#     is silently treated as 0 (lib.rs:52960 / 52980). So
+#     MAKE_INTERVAL(NULL, NULL, NULL, NULL, NULL, NULL, NULL)
+#     returns INTERVAL '0', NOT NULL.
+#
+#   This is a PORTABILITY FOOTGUN. Apps porting PG code
+#   that relies on MAKE_INTERVAL NULL-prop will silently
+#   get zero-intervals instead of NULL — likely masking
+#   missing-data bugs.
+#
+#   Additional finding: MAKE_INTERVAL accepts ZERO args
+#   (lib.rs:52950, only checks `args.len() > 7`). So
+#   MAKE_INTERVAL() returns INTERVAL '0' without error.
+#   This is convenient but a typo-magnet — `MAKE_INTERVAL`
+#   alone is a valid expression.
+#
+#   Calendar-validation finding: MAKE_TIMESTAMP correctly
+#   rejects 2026-02-29 (not a leap year) but accepts
+#   2024-02-29 (leap year). The error message embeds the
+#   computed max_day for that specific year+month, which
+#   is unusually informative — apps can parse it.
+#
+#   Wire-render echo: MAKE_INTERVAL outputs follow the
+#   same months=0 → HHH:MM:SS / months!=0 → PG-format
+#   rule pinned in PR #350 (justify_interval). So
+#   MAKE_INTERVAL(0, 0, 2, 3) (= {months:0, days:17,
+#   us:0}) renders as "408:00:00", NOT "17 days".
+#
+# Adaptation notes:
+#   # zeta-adapt: MAKE_INTERVAL TREATS NULL AS 0
+#     (no NULL prop). Use COALESCE or pre-checks if you
+#     need null propagation.
+#   # zeta-adapt: MAKE_INTERVAL() with zero args returns
+#     INTERVAL '0' silently.
+#   # zeta-adapt: MAKE_TIMESTAMP IS strict NULL-prop
+#     and strict calendar validation (leap years honored).
+#   # zeta-adapt: MAKE_INTERVAL output wire-renders per
+#     PR #350 rules (months=0 collapses days+us to total
+#     HHH:MM:SS).
+
+--echo === MAKE_TIMESTAMP — basic construction ===
+
+SELECT MAKE_TIMESTAMP(2024, 5, 19, 14, 30, 45)                AS basic_ts;
+# Midnight.
+SELECT MAKE_TIMESTAMP(2024, 1, 1, 0, 0, 0)                    AS midnight_ts;
+# Fractional second (last arg can be float).
+SELECT MAKE_TIMESTAMP(2024, 5, 19, 14, 30, 45.5)              AS frac_sec_ts;
+
+--echo === MAKE_TIMESTAMP — leap-year-aware day validation ===
+
+# 2024 IS a leap year — Feb 29 OK.
+SELECT MAKE_TIMESTAMP(2024, 2, 29, 0, 0, 0)                   AS leap_feb29_ok;
+# 2026 is NOT a leap year — Feb 29 invalid.
+--error 1105
+SELECT MAKE_TIMESTAMP(2026, 2, 29, 0, 0, 0);
+# Apr only has 30 days.
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 4, 31, 0, 0, 0);
+
+--echo === MAKE_TIMESTAMP — month / hour / min / sec range errors ===
+
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 13, 1, 0, 0, 0);
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 0, 1, 0, 0, 0);
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 1, 1, 24, 0, 0);
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 1, 1, 0, 60, 0);
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 1, 1, 0, 0, 60.0);
+
+--echo === MAKE_TIMESTAMP — NULL PROPAGATION (any NULL → NULL) ===
+
+SELECT MAKE_TIMESTAMP(NULL, 5, 19, 14, 30, 45)                AS null_year;
+SELECT MAKE_TIMESTAMP(2024, NULL, 19, 14, 30, 45)             AS null_month;
+SELECT MAKE_TIMESTAMP(2024, 5, NULL, 14, 30, 45)              AS null_day;
+SELECT MAKE_TIMESTAMP(2024, 5, 19, NULL, 30, 45)              AS null_hour;
+SELECT MAKE_TIMESTAMP(2024, 5, 19, 14, NULL, 45)              AS null_min;
+SELECT MAKE_TIMESTAMP(2024, 5, 19, 14, 30, NULL)              AS null_sec;
+SELECT MAKE_TIMESTAMP(NULL, NULL, NULL, NULL, NULL, NULL) IS NULL AS all_null_pred;
+
+--echo === MAKE_TIMESTAMP — arity errors → 1105 ===
+
+--error 1105
+SELECT MAKE_TIMESTAMP();
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 5, 19);
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 5, 19, 14, 30, 45, 0);
+
+--echo === MAKE_TIMESTAMP — wrong-type per-position errors ===
+
+--error 1105
+SELECT MAKE_TIMESTAMP('twenty', 5, 19, 14, 30, 45);
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 'May', 19, 14, 30, 45);
+--error 1105
+SELECT MAKE_TIMESTAMP(2024, 5, 19, 14, 30, 'forty-five');
+
+--echo === MAKE_INTERVAL — full 7-arg form ===
+
+# years=1, months=2, weeks=3, days=4, hours=5, mins=6, secs=7
+# total_months = 12+2 = 14; total_days = 3*7+4 = 25; us =
+# 5*3600s + 6*60s + 7 = 18367s. months!=0 → PG-format wire-
+# render, which RE-SPLITS the 14 months into "1 year 2 mons"
+# for display (NOT collapsed as "14 mons"). The internal
+# Interval value still stores months=14.
+SELECT MAKE_INTERVAL(1, 2, 3, 4, 5, 6, 7)                     AS full_7_arg;
+
+--echo === MAKE_INTERVAL — weeks*7 + days combined ===
+
+# (0, 0, 2, 3) = 2*7 + 3 = 17 days. months=0 → wire collapses
+# to total hours = 17*24 = "408:00:00".
+SELECT MAKE_INTERVAL(0, 0, 2, 3)                              AS weeks_and_days_collapse;
+
+--echo === MAKE_INTERVAL — years*12 + months combined ===
+
+# (2, 5) → 2*12 + 5 = 29 months → PG-format renders.
+SELECT MAKE_INTERVAL(2, 5)                                    AS years_months_pg;
+
+--echo === MAKE_INTERVAL — STRIKING: NULL is COERCED TO 0 (no NULL-prop) ===
+
+# Single NULL coerces to 0 — does NOT propagate.
+SELECT MAKE_INTERVAL(NULL)                                    AS null_year_eq_zero;
+SELECT MAKE_INTERVAL(NULL, NULL, NULL, NULL, NULL, NULL, NULL) AS all_null_zero;
+# Compare a NULL year with a 0 year — IDENTICAL.
+SELECT MAKE_INTERVAL(NULL, 5, 0, 0, 0, 0, 0)
+     = MAKE_INTERVAL(0, 5, 0, 0, 0, 0, 0)                     AS null_eq_zero;
+# Mixed NULL/non-NULL works.
+SELECT MAKE_INTERVAL(NULL, 6, NULL, 0)                        AS six_months;
+
+--echo === MAKE_INTERVAL — STRIKING: zero-arg form accepted ===
+
+# MAKE_INTERVAL() returns INTERVAL '0' without error.
+# A typo-magnet — bare `MAKE_INTERVAL` is valid.
+SELECT MAKE_INTERVAL()                                        AS zero_arg_form;
+SELECT MAKE_INTERVAL() IS NULL                                AS zero_arg_NOT_null;
+
+--echo === MAKE_INTERVAL — secs accepts fractional ===
+
+# (0, 0, 0, 0, 0, 0, 1.5) = 1.5 seconds.
+SELECT MAKE_INTERVAL(0, 0, 0, 0, 0, 0, 1.5)                   AS one_point_five_sec;
+
+--echo === MAKE_INTERVAL — arity > 7 → 1105 ===
+
+--error 1105
+SELECT MAKE_INTERVAL(0, 0, 0, 0, 0, 0, 0, 0);
+
+--echo === MAKE_INTERVAL — wrong-type → 1105 ===
+
+--error 1105
+SELECT MAKE_INTERVAL('one');
+--error 1105
+SELECT MAKE_INTERVAL(0, 'two');
+# secs is the only float-accepting arg; integer-only for others.
+--error 1105
+SELECT MAKE_INTERVAL(CAST(1.5 AS DOUBLE PRECISION));
+
+--echo === MAKE_INTERVAL — overflow guards ===
+
+# years overflow: 1e18 * 12 → i64 overflow.
+--error 1105
+SELECT MAKE_INTERVAL(CAST(1000000000000000000 AS BIGINT), 0);
+# months out-of-i32 range: years*12+months > i32::MAX.
+--error 1105
+SELECT MAKE_INTERVAL(CAST(200000000 AS BIGINT), 0);
