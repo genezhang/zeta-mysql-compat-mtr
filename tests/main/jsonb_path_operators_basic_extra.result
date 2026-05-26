@@ -1,0 +1,76 @@
+=== `#>` text-path — extract nested value ===
+SELECT '{"a":{"b":1}}'::JSONB #> '{a,b}'                      AS path_text_to_leaf;
+path_text_to_leaf
+1
+SELECT '{"a":{"b":1}}'::JSONB #> '{a}'                        AS path_text_to_subtree;
+path_text_to_subtree
+{"b":1}
+SELECT '{"a":1}'::JSONB #> '{a}'                              AS path_text_top_level;
+path_text_top_level
+1
+=== `#>` ARRAY-path — same result as text-path ===
+SELECT '{"a":{"b":1}}'::JSONB #> ARRAY['a','b']               AS path_arr_to_leaf;
+path_arr_to_leaf
+1
+SELECT '{"a":{"b":1}}'::JSONB #> ARRAY['a']                   AS path_arr_to_subtree;
+path_arr_to_subtree
+{"b":1}
+=== `#>` missing path → NULL ===
+SELECT '{"a":1}'::JSONB #> '{missing}'                        AS path_missing_null;
+path_missing_null
+NULL
+SELECT '{"a":1}'::JSONB #> '{a,b,c,d}'                        AS path_too_deep_null;
+path_too_deep_null
+NULL
+=== STRIKING BUG: array-index path returns NULL ===
+SELECT '[10,20,30]'::JSONB #> '{1}'                           AS bug_arr_idx_path_null;
+bug_arr_idx_path_null
+NULL
+SELECT '[10,20,30]'::JSONB #> '{0}'                           AS bug_arr_idx_0_null;
+bug_arr_idx_0_null
+NULL
+SELECT '{"a":[1,2,3]}'::JSONB #> '{a,0}'                      AS bug_obj_then_arr_null;
+bug_obj_then_arr_null
+NULL
+SELECT ('[10,20,30]'::JSONB -> 1)                             AS workaround_arrow_chain;
+workaround_arrow_chain
+20
+=== `#>>` text-extract variant ===
+SELECT '{"a":1}'::JSONB #>> '{a}'                             AS text_int;
+text_int
+1
+SELECT '{"a":"hello"}'::JSONB #>> '{a}'                       AS text_str_unquoted;
+text_str_unquoted
+hello
+SELECT '{"a":{"b":1}}'::JSONB #>> '{a,b}'                     AS text_nested_int;
+text_nested_int
+1
+=== SQL NULL::JSONB path → NULL (3VL, per PR #380) ===
+SELECT NULL::JSONB #> '{a}'                                   AS sql_null_path_null;
+sql_null_path_null
+NULL
+SELECT NULL::JSONB #>> '{a}'                                  AS sql_null_text_path_null;
+sql_null_text_path_null
+NULL
+=== JSONB_TYPEOF — distinguish SQL NULL from JSONB 'null' ===
+SELECT JSONB_TYPEOF(NULL::JSONB)                              AS typeof_sql_null;
+typeof_sql_null
+NULL
+SELECT JSONB_TYPEOF('null'::JSONB)                            AS typeof_jsonb_null;
+typeof_jsonb_null
+null
+SELECT JSONB_TYPEOF('1'::JSONB)                               AS typeof_number;
+typeof_number
+number
+SELECT JSONB_TYPEOF('"hello"'::JSONB)                         AS typeof_string;
+typeof_string
+string
+SELECT JSONB_TYPEOF('true'::JSONB)                            AS typeof_bool;
+typeof_bool
+boolean
+SELECT JSONB_TYPEOF('[]'::JSONB)                              AS typeof_array;
+typeof_array
+array
+SELECT JSONB_TYPEOF('{}'::JSONB)                              AS typeof_object;
+typeof_object
+object
