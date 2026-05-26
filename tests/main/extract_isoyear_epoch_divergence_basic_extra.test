@@ -18,12 +18,12 @@
 #     pins that quirk.
 #
 # This slice pins:
-#   - **ISOYEAR < YEAR divergence**: `'2024-12-30'` is
+#   - **ISOYEAR > YEAR divergence**: `'2024-12-30'` is
 #     the Monday of ISO week 1 of 2025 → ISOYEAR=2025
-#     while YEAR=2024.
-#   - **ISOYEAR > YEAR divergence**: `'2023-01-01'` is
+#     while YEAR=2024 (so ISOYEAR > YEAR).
+#   - **ISOYEAR < YEAR divergence**: `'2023-01-01'` is
 #     a Sunday in ISO week 52 of 2022 → ISOYEAR=2022
-#     while YEAR=2023.
+#     while YEAR=2023 (so ISOYEAR < YEAR).
 #   - Paired ISOYEAR vs YEAR rows so a regression to a
 #     silent ISOYEAR→YEAR fallback gets caught.
 #   - **EPOCH(INTERVAL '1 month') = 30 * 86400 = 2592000**
@@ -84,7 +84,7 @@
 #     the resulting interval is NOT the answer either —
 #     use the timestamp-diff directly.
 
---echo === ISOYEAR < YEAR — Monday of ISO week 1 in PREVIOUS calendar year ===
+--echo === ISOYEAR > YEAR — Monday of ISO week 1 in NEXT calendar year ===
 
 # 2024-12-30 is a Monday. ISO 8601 says: week 1 starts
 # on the Monday whose week contains Jan 4. Since 2024-12-30
@@ -96,7 +96,7 @@ SELECT EXTRACT(YEAR    FROM DATE '2024-12-30')                AS calendar_year_2
 SELECT EXTRACT(ISOYEAR FROM DATE '2024-12-30')
     <> EXTRACT(YEAR    FROM DATE '2024-12-30')                AS bug_witness_isoyear_diverges_pos;
 
---echo === ISOYEAR > YEAR — Sunday in ISO week 52 of PREVIOUS year ===
+--echo === ISOYEAR < YEAR — Sunday in ISO week 52 of PREVIOUS year ===
 
 # 2023-01-01 is a Sunday. It's part of the week containing
 # 2022-12-26 (Monday) through 2023-01-01 — ISO week 52 of

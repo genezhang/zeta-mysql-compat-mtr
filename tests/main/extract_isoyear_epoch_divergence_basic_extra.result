@@ -1,4 +1,4 @@
-=== ISOYEAR < YEAR — Monday of ISO week 1 in PREVIOUS calendar year ===
+=== ISOYEAR > YEAR — Monday of ISO week 1 in NEXT calendar year ===
 SELECT EXTRACT(ISOYEAR FROM DATE '2024-12-30')                AS isoyear_2025;
 isoyear_2025
 2025
@@ -9,7 +9,7 @@ SELECT EXTRACT(ISOYEAR FROM DATE '2024-12-30')
     <> EXTRACT(YEAR    FROM DATE '2024-12-30')                AS bug_witness_isoyear_diverges_pos;
 bug_witness_isoyear_diverges_pos
 1
-=== ISOYEAR > YEAR — Sunday in ISO week 52 of PREVIOUS year ===
+=== ISOYEAR < YEAR — Sunday in ISO week 52 of PREVIOUS year ===
 SELECT EXTRACT(ISOYEAR FROM DATE '2023-01-01')                AS isoyear_2022;
 isoyear_2022
 2022
