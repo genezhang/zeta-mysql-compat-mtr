@@ -1,0 +1,96 @@
+=== OVERLAY: SQL-standard PLACING/FROM/FOR syntax ===
+SELECT OVERLAY('Txxxxas' PLACING 'hom' FROM 2 FOR 4)          AS thomas;
+thomas
+Thomas
+SELECT OVERLAY('yabadoo' PLACING 'daba' FROM 5 FOR 0)         AS yabadabadoo;
+yabadabadoo
+yabadabadoo
+SELECT OVERLAY('babosa' PLACING 'ubb' FROM 2 FOR 4)           AS bubba;
+bubba
+bubba
+=== OVERLAY: positional function-call form (same impl) ===
+SELECT OVERLAY('Txxxxas', 'hom', 2, 4)                        AS thomas_positional;
+thomas_positional
+Thomas
+SELECT OVERLAY('yabadoo', 'daba', 5, 0)                       AS yabadabadoo_positional;
+yabadabadoo_positional
+yabadabadoo
+SELECT OVERLAY('babosa',  'ubb',  2, 4)                       AS bubba_positional;
+bubba_positional
+bubba
+=== OVERLAY: PLACING form ≡ positional form ===
+SELECT OVERLAY('Txxxxas' PLACING 'hom' FROM 2 FOR 4)
+     = OVERLAY('Txxxxas', 'hom', 2, 4)                        AS forms_equivalent;
+forms_equivalent
+1
+=== OVERLAY: 3-arg form (length defaults to repl.chars().count()) ===
+SELECT OVERLAY('hello' PLACING 'X' FROM 1)                    AS hello_X_at_1;
+hello_X_at_1
+Xello
+SELECT OVERLAY('helloworld' PLACING 'abc' FROM 4)             AS helabcorld;
+helabcorld
+helabcorld
+=== OVERLAY: edge cases at start position ===
+SELECT OVERLAY('hello' PLACING 'X' FROM 0 FOR 1)              AS start_0_clamps_to_1;
+start_0_clamps_to_1
+Xello
+SELECT OVERLAY('hello' PLACING 'X' FROM -5 FOR 1)             AS start_neg_clamps_to_1;
+start_neg_clamps_to_1
+Xello
+SELECT OVERLAY('hi' PLACING 'XYZ' FROM 10 FOR 5)              AS start_beyond_appends;
+start_beyond_appends
+hiXYZ
+=== OVERLAY: length variations ===
+SELECT OVERLAY('hello' PLACING 'BIG' FROM 3 FOR 0)            AS insert_at_3;
+insert_at_3
+heBIGllo
+SELECT OVERLAY('hi' PLACING 'XYZ' FROM 1 FOR 100)             AS length_overshoots;
+length_overshoots
+XYZ
+SELECT OVERLAY('hello' PLACING 'X' FROM 2 FOR -3)             AS neg_length_is_zero;
+neg_length_is_zero
+hXello
+=== OVERLAY: UTF-8 multibyte (char-indexed, NOT byte-indexed) ===
+SELECT OVERLAY('café' PLACING 'X' FROM 3 FOR 1)               AS utf8_replace_char_3;
+utf8_replace_char_3
+caXé
+SELECT OVERLAY('café' PLACING 'e' FROM 4 FOR 1)               AS utf8_replace_multibyte;
+utf8_replace_multibyte
+cafe
+=== OVERLAY: empty strings ===
+SELECT OVERLAY('' PLACING 'abc' FROM 1 FOR 0)                 AS empty_target_insert;
+empty_target_insert
+abc
+SELECT OVERLAY('hello' PLACING '' FROM 2 FOR 2)               AS empty_repl_deletes;
+empty_repl_deletes
+hlo
+=== OVERLAY: NULL propagation ===
+SELECT OVERLAY(NULL PLACING 'X' FROM 1)                       AS null_target;
+null_target
+NULL
+SELECT OVERLAY('hello' PLACING NULL FROM 1)                   AS null_repl;
+null_repl
+NULL
+SELECT OVERLAY('hello' PLACING 'X' FROM NULL)                 AS null_start;
+null_start
+NULL
+SELECT OVERLAY('hello' PLACING 'X' FROM 1 FOR NULL)           AS null_length;
+null_length
+NULL
+SELECT OVERLAY(NULL PLACING 'X' FROM 1) IS NULL               AS null_target_pred;
+null_target_pred
+1
+=== OVERLAY: wrong-type start/length → ERROR 1105 ===
+SELECT OVERLAY('hello' PLACING 'X' FROM 'not_an_int');
+ERROR 1105: execution error: OVERLAY start must be integer
+SELECT OVERLAY('hello', 'X', 'not_an_int');
+ERROR 1105: execution error: OVERLAY start must be integer
+SELECT OVERLAY('hello' PLACING 'X' FROM 1 FOR 'not_an_int');
+ERROR 1105: execution error: OVERLAY length must be integer
+=== OVERLAY: arity errors → 1105 ===
+SELECT OVERLAY('hello');
+ERROR 1105: execution error: OVERLAY requires 3-4 arguments
+SELECT OVERLAY('hello', 'X');
+ERROR 1105: execution error: OVERLAY requires 3-4 arguments
+SELECT OVERLAY('hello', 'X', 1, 2, 3);
+ERROR 1105: execution error: OVERLAY requires 3-4 arguments

@@ -1,0 +1,149 @@
+# Independently authored OVERLAY function smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - OVERLAY — NONE (zero compat-mtr coverage; PG/SQL-
+#     standard string splice that MySQL does NOT have).
+#   - INSERT (the MySQL string-splice; different name, same
+#     family) — insert_str_basic_extra covers it. OVERLAY
+#     is the SQL-standard cousin; both exist in zeta.
+#
+# This slice pins:
+#   - Two CALL FORMS: SQL-standard `OVERLAY(s PLACING repl
+#     FROM start FOR length)` and positional function-call
+#     `OVERLAY(s, repl, start, length)`.
+#   - 3-arg form (FOR length omitted) defaults length to
+#     repl.chars().count().
+#   - Edge cases at start position: start < 1 clamps to 1;
+#     start beyond target length appends.
+#   - length = 0 → pure insert (no chars removed).
+#   - length > remaining → truncates to remaining.
+#   - UTF-8 multibyte handling (char-indexed, not byte-
+#     indexed — important for safe slicing through chars
+#     like é).
+#   - NULL propagation (any NULL arg → NULL).
+#   - Wrong-type start/length (non-int) → 1105.
+#   - Arity errors (1, 2, 5 args → 1105).
+#   - Empty target / empty replacement / negative length.
+#
+# Big-picture finding:
+#   OVERLAY is PG/SQL-standard. MySQL uses INSERT(str, pos,
+#   len, newstr) for the same operation, with positional-only
+#   args (no PLACING/FROM/FOR keywords). zeta supports BOTH
+#   shapes via the same impl arm at lib.rs:49187. The PLACING/
+#   FROM/FOR keywords are parser-rewritten into positional
+#   args, so the runtime never distinguishes the two call
+#   shapes — they share an implementation.
+#
+#   Char-indexed slicing matters: OVERLAY operates on
+#   `target.chars()` (lib.rs:49228), not bytes. So OVERLAY
+#   on a UTF-8 string with multibyte chars (e.g. café)
+#   uses char positions, not byte positions. This is the
+#   safe behavior for text but differs from PG before 9.5
+#   which was byte-indexed for some types.
+#
+# Adaptation notes:
+#   # zeta-adapt: OVERLAY accepts both SQL-standard PLACING
+#     keyword syntax AND positional 3/4-arg form. Same impl;
+#     pick whichever is more readable in your code.
+#   # zeta-adapt: start < 1 clamps to position 1 (no error).
+#   # zeta-adapt: length is taken as max(0, value) — a
+#     negative length is treated as 0 (pure insert).
+#   # zeta-adapt: char-indexed (not byte-indexed) — safe
+#     for UTF-8.
+
+--echo === OVERLAY: SQL-standard PLACING/FROM/FOR syntax ===
+
+# Classic example: 'Txxxxas' → 'Thomas' (replace chars 2-5).
+SELECT OVERLAY('Txxxxas' PLACING 'hom' FROM 2 FOR 4)          AS thomas;
+# Pure insert (length=0): 'yabadoo' + 'daba' inserted at 5.
+SELECT OVERLAY('yabadoo' PLACING 'daba' FROM 5 FOR 0)         AS yabadabadoo;
+# 'babosa' → 'bubba' (replace chars 2-5 with 'ubb', length 4 trims).
+SELECT OVERLAY('babosa' PLACING 'ubb' FROM 2 FOR 4)           AS bubba;
+
+--echo === OVERLAY: positional function-call form (same impl) ===
+
+# Same results as above via 4-arg positional form.
+SELECT OVERLAY('Txxxxas', 'hom', 2, 4)                        AS thomas_positional;
+SELECT OVERLAY('yabadoo', 'daba', 5, 0)                       AS yabadabadoo_positional;
+SELECT OVERLAY('babosa',  'ubb',  2, 4)                       AS bubba_positional;
+
+--echo === OVERLAY: PLACING form ≡ positional form ===
+
+SELECT OVERLAY('Txxxxas' PLACING 'hom' FROM 2 FOR 4)
+     = OVERLAY('Txxxxas', 'hom', 2, 4)                        AS forms_equivalent;
+
+--echo === OVERLAY: 3-arg form (length defaults to repl.chars().count()) ===
+
+# 'X' is 1 char, so length defaults to 1. 'hello' chars[0]='h'
+# replaced by 'X' → 'Xello'.
+SELECT OVERLAY('hello' PLACING 'X' FROM 1)                    AS hello_X_at_1;
+# 'abc' is 3 chars, length defaults to 3. 'helloworld' chars
+# 4-6 replaced by 'abc' → 'helabcorld'.
+SELECT OVERLAY('helloworld' PLACING 'abc' FROM 4)             AS helabcorld;
+
+--echo === OVERLAY: edge cases at start position ===
+
+# start = 0 clamps to position 1 (no error).
+SELECT OVERLAY('hello' PLACING 'X' FROM 0 FOR 1)              AS start_0_clamps_to_1;
+# start = -5 also clamps to 1.
+SELECT OVERLAY('hello' PLACING 'X' FROM -5 FOR 1)             AS start_neg_clamps_to_1;
+# start beyond target length: replacement appends (prefix all,
+# nothing to remove since start_idx exceeds length).
+SELECT OVERLAY('hi' PLACING 'XYZ' FROM 10 FOR 5)              AS start_beyond_appends;
+
+--echo === OVERLAY: length variations ===
+
+# length = 0 (pure insert, no chars removed).
+SELECT OVERLAY('hello' PLACING 'BIG' FROM 3 FOR 0)            AS insert_at_3;
+# length > remaining (clamps to end-of-string).
+SELECT OVERLAY('hi' PLACING 'XYZ' FROM 1 FOR 100)             AS length_overshoots;
+# negative length → treated as 0 (max(0, n) per impl).
+SELECT OVERLAY('hello' PLACING 'X' FROM 2 FOR -3)             AS neg_length_is_zero;
+
+--echo === OVERLAY: UTF-8 multibyte (char-indexed, NOT byte-indexed) ===
+
+# 'café' is 4 chars / 5 bytes UTF-8 (é = 2 bytes). OVERLAY
+# operates on chars, so FROM 3 FOR 1 replaces 'f' (char[2]).
+SELECT OVERLAY('café' PLACING 'X' FROM 3 FOR 1)               AS utf8_replace_char_3;
+# Replace the multibyte char 'é' itself (char position 4).
+SELECT OVERLAY('café' PLACING 'e' FROM 4 FOR 1)               AS utf8_replace_multibyte;
+
+--echo === OVERLAY: empty strings ===
+
+# Empty target → just the replacement (since start clamps).
+SELECT OVERLAY('' PLACING 'abc' FROM 1 FOR 0)                 AS empty_target_insert;
+# Empty replacement with length>0 → deletes that many chars.
+SELECT OVERLAY('hello' PLACING '' FROM 2 FOR 2)               AS empty_repl_deletes;
+
+--echo === OVERLAY: NULL propagation ===
+
+SELECT OVERLAY(NULL PLACING 'X' FROM 1)                       AS null_target;
+SELECT OVERLAY('hello' PLACING NULL FROM 1)                   AS null_repl;
+SELECT OVERLAY('hello' PLACING 'X' FROM NULL)                 AS null_start;
+SELECT OVERLAY('hello' PLACING 'X' FROM 1 FOR NULL)           AS null_length;
+SELECT OVERLAY(NULL PLACING 'X' FROM 1) IS NULL               AS null_target_pred;
+
+--echo === OVERLAY: wrong-type start/length → ERROR 1105 ===
+
+# start must be integer.
+--error 1105
+SELECT OVERLAY('hello' PLACING 'X' FROM 'not_an_int');
+--error 1105
+SELECT OVERLAY('hello', 'X', 'not_an_int');
+# length must be integer.
+--error 1105
+SELECT OVERLAY('hello' PLACING 'X' FROM 1 FOR 'not_an_int');
+
+--echo === OVERLAY: arity errors → 1105 ===
+
+# 1 arg / 2 args / 5 args all reject. The positional form
+# is what's reachable for arity-error testing since the
+# PLACING form has required keywords.
+--error 1105
+SELECT OVERLAY('hello');
+--error 1105
+SELECT OVERLAY('hello', 'X');
+--error 1105
+SELECT OVERLAY('hello', 'X', 1, 2, 3);
