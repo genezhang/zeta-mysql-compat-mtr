@@ -1,0 +1,141 @@
+# Independently authored CREATE EXTENSION / DROP
+# EXTENSION smoke for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE EXTENSION — NONE (checked all *.test files
+#     per PR #357 lesson).
+#   - DROP EXTENSION — NONE.
+#   - uuid_basic_extra, uuid_generate_v1_basic_extra,
+#     gen_salt_crypt_basic_extra, current_schema_citext,
+#     pg_trgm_basic_extra cover the FUNCTIONS that the
+#     whitelisted extensions provide — but NOT the
+#     CREATE EXTENSION statement itself.
+#
+# This slice pins:
+#   - CREATE EXTENSION for each of the six whitelisted
+#     extensions silently succeeds (no rows, no error).
+#   - Unknown extension errors 1105 with the prescriptive
+#     message naming all six accepted extensions.
+#   - CREATE EXTENSION IF NOT EXISTS <unknown> swallows
+#     the error.
+#   - DROP EXTENSION is ALWAYS a silent no-op (including
+#     for never-installed extensions, including for the
+#     whitelisted ones — zeta doesn't actually track
+#     installations).
+#   - DROP EXTENSION IF EXISTS — also silent no-op.
+#
+# Big-picture finding (WHITELIST + DROP-NO-OP COMBO):
+#   zeta supports the six MOST COMMONLY USED PG extensions
+#   by having their typical functions built-in:
+#
+#     - plpgsql            (always loaded in PG)
+#     - uuid-ossp          (gen_random_uuid, uuid_generate_v*)
+#     - pgcrypto           (gen_random_uuid, crypt, gen_salt)
+#     - pg_stat_statements (digest/digest_text built-in)
+#     - citext             (citext type built-in)
+#     - pg_trgm            (similarity, word_similarity, show_trgm)
+#
+#   For these six, CREATE EXTENSION is a silent ack: the
+#   migration script thinks the extension loaded, but
+#   zeta did nothing — the functions were already
+#   resolvable. Per the impl comment at lib.rs:18854-
+#   18855: "Accepted silently so migration scripts
+#   (Rails, Django, Alembic) work."
+#
+#   STRIKING — DROP EXTENSION is ALWAYS a no-op
+#   (lib.rs:15015-15018: "We never truly load extensions,
+#   so DROP is always a no-op"). Even DROP EXTENSION
+#   plpgsql (which PG would reject) succeeds silently
+#   in zeta. Apps can't use DROP EXTENSION to detect
+#   that the extension was never really loaded.
+#
+#   STRIKING — case-insensitive matching. The whitelist
+#   uses lowercase string literals (`"plpgsql"`, etc),
+#   but matching is case-insensitive somewhere in the
+#   path (parser normalizes the identifier). Both
+#   `CREATE EXTENSION PLPGSQL` (unquoted, folded) and
+#   `CREATE EXTENSION "PLPGSQL"` (quoted, would normally
+#   preserve case) match the whitelist. This is more
+#   permissive than PG, where quoted "PLPGSQL" would
+#   NOT match the canonical lowercase `plpgsql`.
+#
+#   The unknown-extension error names all six accepted
+#   extensions — useful migration-debugging hint.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE EXTENSION for plpgsql / uuid-ossp /
+#     pgcrypto / pg_stat_statements / citext / pg_trgm
+#     silently succeeds. Anything else errors 1105 (or
+#     succeeds silently under IF NOT EXISTS).
+#   # zeta-adapt: DROP EXTENSION is ALWAYS a no-op even
+#     for the whitelisted extensions. Can't be used to
+#     detect installation state.
+#   # zeta-adapt: Extension name matching is CASE-
+#     INSENSITIVE in both quoted and unquoted forms —
+#     more permissive than PG which would reject quoted
+#     uppercase as a distinct name.
+
+--echo === CREATE EXTENSION — six whitelisted (silent accept) ===
+
+CREATE EXTENSION plpgsql;
+CREATE EXTENSION "uuid-ossp";
+CREATE EXTENSION pgcrypto;
+CREATE EXTENSION pg_stat_statements;
+CREATE EXTENSION citext;
+CREATE EXTENSION pg_trgm;
+
+--echo === CREATE EXTENSION IF NOT EXISTS — silent on whitelisted ===
+
+CREATE EXTENSION IF NOT EXISTS plpgsql;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+--echo === Unknown extension WITHOUT IF NOT EXISTS → 1105 ===
+
+# Error message names all six accepted extensions.
+--error 1105
+CREATE EXTENSION postgis;
+--error 1105
+CREATE EXTENSION "hstore";
+--error 1105
+CREATE EXTENSION ltree;
+
+--echo === CREATE EXTENSION IF NOT EXISTS — swallows unknown ===
+
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS "hstore";
+CREATE EXTENSION IF NOT EXISTS unknown_made_up_name;
+
+--echo === STRIKING: case-insensitive in both unquoted AND quoted forms ===
+
+# Unquoted upper folds to lowercase → matches.
+CREATE EXTENSION PLPGSQL;
+CREATE EXTENSION PgCrypto;
+# Quoted upper ALSO matches — more permissive than PG
+# which would treat "PLPGSQL" as a distinct quoted
+# identifier and reject as unknown.
+CREATE EXTENSION "PLPGSQL";
+CREATE EXTENSION "PgCrypto";
+CREATE EXTENSION "UUID-OSSP";
+
+--echo === DROP EXTENSION — ALWAYS no-op (whitelisted and unknown) ===
+
+# Even DROP EXTENSION plpgsql succeeds — PG would reject
+# this because plpgsql is the procedural-language base.
+DROP EXTENSION plpgsql;
+DROP EXTENSION "uuid-ossp";
+DROP EXTENSION pgcrypto;
+# DROP for never-installed extensions also no-ops.
+DROP EXTENSION made_up_name;
+
+--echo === DROP EXTENSION IF EXISTS — also silent ===
+
+DROP EXTENSION IF EXISTS plpgsql;
+DROP EXTENSION IF EXISTS never_existed;
+
+--echo === Sanity after DROPs — whitelisted functions STILL work ===
+
+# DROP EXTENSION didn't actually unload anything, so the
+# built-in functions remain callable.
+SELECT LENGTH(GEN_RANDOM_UUID()) AS uuid_still_works;
+SELECT SIMILARITY('cat', 'cat') AS trgm_still_works;
