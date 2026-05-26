@@ -1,0 +1,70 @@
+=== `->` int operand on array — positive index ===
+SELECT '[10,20,30]'::JSONB -> 0                               AS arr_idx_0;
+arr_idx_0
+10
+SELECT '[10,20,30]'::JSONB -> 1                               AS arr_idx_1;
+arr_idx_1
+20
+SELECT '[10,20,30]'::JSONB -> 2                               AS arr_idx_last;
+arr_idx_last
+30
+=== `->` int operand on array — negative index (Python-style) ===
+SELECT '[10,20,30]'::JSONB -> -1                              AS arr_neg_1;
+arr_neg_1
+30
+SELECT '[10,20,30]'::JSONB -> -3                              AS arr_neg_3;
+arr_neg_3
+10
+=== `->` int operand on array — out of range → NULL ===
+SELECT '[10,20,30]'::JSONB -> 100                             AS arr_oor_pos;
+arr_oor_pos
+NULL
+SELECT '[10,20,30]'::JSONB -> -100                            AS arr_oor_neg;
+arr_oor_neg
+NULL
+=== `->` type mismatch (silent NULL) ===
+SELECT '[10,20,30]'::JSONB -> 'key'                           AS arr_str_typemis;
+arr_str_typemis
+NULL
+SELECT '{"a":1,"b":2}'::JSONB -> 0                            AS obj_int_typemis;
+obj_int_typemis
+NULL
+SELECT '"hello"'::JSONB -> 0                                  AS scalar_str_int_null;
+scalar_str_int_null
+NULL
+SELECT '"hello"'::JSONB -> 'key'                              AS scalar_str_str_null;
+scalar_str_str_null
+NULL
+SELECT '42'::JSONB -> 0                                       AS scalar_int_null;
+scalar_int_null
+NULL
+SELECT 'true'::JSONB -> 'key'                                 AS scalar_bool_null;
+scalar_bool_null
+NULL
+=== `->` object key access (JSONB-typed return) ===
+SELECT '{"a":1,"b":2}'::JSONB -> 'a'                          AS obj_key_int_val;
+obj_key_int_val
+1
+SELECT '{"a":"hello"}'::JSONB -> 'a'                          AS obj_key_str_val;
+obj_key_str_val
+"hello"
+SELECT '{"a":{"b":1}}'::JSONB -> 'a'                          AS obj_key_subtree;
+obj_key_subtree
+{"b":1}
+SELECT '{"a":1}'::JSONB -> 'no_such_key'                      AS obj_missing_null;
+obj_missing_null
+NULL
+=== `->` on JSONB 'null' scalar — always NULL ===
+SELECT 'null'::JSONB -> 'key'                                 AS jsonb_null_str_null;
+jsonb_null_str_null
+NULL
+SELECT 'null'::JSONB -> 0                                     AS jsonb_null_int_null;
+jsonb_null_int_null
+NULL
+=== Cross-link: `->` works where PR #381's `#>` BUG fails ===
+SELECT '{"a":[10,20,30]}'::JSONB #> '{a,1}'                   AS bug_hash_arrow_null_pr381;
+bug_hash_arrow_null_pr381
+NULL
+SELECT ('{"a":[10,20,30]}'::JSONB -> 'a') -> 1                AS workaround_chain_20;
+workaround_chain_20
+20
