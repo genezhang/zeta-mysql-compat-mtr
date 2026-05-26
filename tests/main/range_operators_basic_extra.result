@@ -1,0 +1,46 @@
+=== `>>` strictly-right-of (supported) ===
+SELECT '[6,10)'::INT4RANGE >> '[1,5)'::INT4RANGE             AS strict_right_true;
+strict_right_true
+1
+SELECT '[1,5)'::INT4RANGE >> '[6,10)'::INT4RANGE             AS strict_right_false;
+strict_right_false
+0
+SELECT '[3,8)'::INT4RANGE >> '[1,5)'::INT4RANGE              AS overlap_not_strict_right;
+overlap_not_strict_right
+0
+=== `<@` range contained-by (supported) ===
+SELECT '[2,5)'::INT4RANGE <@ '[1,10)'::INT4RANGE             AS range_contained_true;
+range_contained_true
+1
+SELECT '[0,5)'::INT4RANGE <@ '[1,10)'::INT4RANGE             AS range_not_contained_false;
+range_not_contained_false
+0
+SELECT '[1,5)'::INT4RANGE <@ '[1,5)'::INT4RANGE              AS range_self_true;
+range_self_true
+1
+=== `<@` element contained in range (supported) ===
+SELECT 5 <@ '[1,10)'::INT4RANGE                              AS elem_in_range_true;
+elem_in_range_true
+1
+SELECT 10 <@ '[1,10)'::INT4RANGE                             AS elem_at_excl_upper_false;
+elem_at_excl_upper_false
+0
+SELECT 0 <@ '[1,10)'::INT4RANGE                              AS elem_below_false;
+elem_below_false
+0
+=== `&<` not-extending-right — PARSE REJECTED (1064) ===
+SELECT '[1,5)'::INT4RANGE &< '[6,10)'::INT4RANGE;
+ERROR 1064: SQL parse error: unsupported binary operator: &<
+=== `&>` not-extending-left — PARSE REJECTED (1064) ===
+SELECT '[6,10)'::INT4RANGE &> '[1,5)'::INT4RANGE;
+ERROR 1064: SQL parse error: unsupported binary operator: &>
+=== `+` / `*` already pinned in range_type_basic_extra:138,143 — not re-pinned ===
+=== `-` range-difference — EXECUTION REJECTED 1105 ===
+SELECT '[1,10)'::INT4RANGE - '[5,15)'::INT4RANGE;
+ERROR 1105: execution error: arithmetic op requires numbers
+=== STRIKING: `-` token has two fates — RANGE errors, JSONB works ===
+SELECT '[1,5)'::INT4RANGE - '[1,5)'::INT4RANGE;
+ERROR 1105: execution error: arithmetic op requires numbers
+SELECT '{"a":1,"b":2}'::JSONB - 'a'                          AS jsonb_minus_key_works;
+jsonb_minus_key_works
+{"b":2}
