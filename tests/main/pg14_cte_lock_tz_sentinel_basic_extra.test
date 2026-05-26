@@ -4,19 +4,20 @@
 # MySQL's mysql-test/.
 #
 # Existing coverage (do NOT duplicate):
-#   - WITH RECURSIVE CYCLE / SEARCH clauses (PG 14+):
-#     ZERO prior coverage. (Recursive CTE basics ARE
-#     covered in recursive_cte_basic_extra / with_cte
-#     _basic_extra, but the PG 14+ CYCLE/SEARCH clauses
-#     are zero-prior.)
+#   - WITH RECURSIVE CYCLE clause (PG 14+): ZERO prior
+#     coverage.
+#   - WITH RECURSIVE SEARCH BREADTH FIRST (PG 14+):
+#     ZERO prior coverage.
+#   - WITH RECURSIVE SEARCH DEPTH FIRST: ALREADY pinned
+#     at recursive_cte_basic_extra.test:141 with the
+#     identical fingerprint at the same line/col. NOT
+#     re-pinned here (caught by PR #398 round-1 review).
 #   - SELECT ... FOR KEY SHARE / FOR NO KEY UPDATE
 #     (PG-specific lock modes): ZERO prior coverage.
 #     (lock_basic_extra covers FOR UPDATE OF / FOR
-#     SHARE / SKIP LOCKED / NOWAIT, but NOT the
-#     KEY-prefixed variants.)
-#   - TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ cast and
-#     DDL: ZERO prior coverage. (at_time_zone_extended
-#     covers AT TIME ZONE, but not the type itself.)
+#     SHARE / SKIP LOCKED / NOWAIT.)
+#   - TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ: ZERO
+#     prior coverage at the type-surface level.
 #
 # Pre-existing rejection shape patterns:
 #   - "Expected: SELECT, VALUES, or a subquery in the
@@ -27,84 +28,95 @@
 # This slice pins:
 #
 #   "WITH RECURSIVE body expects SELECT" — adds CYCLE
-#   and SEARCH to the bucket (3 forms):
+#   and SEARCH BREADTH FIRST (2 forms; DEPTH FIRST
+#   variant already pinned per above):
 #     - `... CYCLE id SET is_cycle USING path` (PG 14+
 #       cycle detection)
-#     - `... SEARCH DEPTH FIRST BY id SET ord` (PG 14+)
 #     - `... SEARCH BREADTH FIRST BY id SET ord` (PG 14+)
-#     - All hit at line 5 col 3 — sqlparser's WITH-
-#       RECURSIVE body parser doesn't recognize CYCLE
-#       or SEARCH as clause terminators. Pre-existing
+#     - Both hit at line 5 col 3. Pre-existing
 #       fingerprint; new keywords added.
 #
 #   NEW FINGERPRINT — `Expected: one of UPDATE or
-#   SHARE, found: <KW>` (PG-specific weaker lock modes):
+#   SHARE, found: <KW>` at col 21 (PG-specific weaker
+#   lock modes):
 #     - `FOR KEY SHARE` (PG 9.3+ weaker than FOR SHARE)
 #     - `FOR NO KEY UPDATE` (PG 9.3+ weaker than FOR
 #       UPDATE)
 #     - `FOR KEY SHARE OF g` (target-specific form)
-#     - All hit "Expected: one of UPDATE or SHARE,
-#       found: KEY/NO" at col 21. sqlparser's FOR-lock-
-#       clause dispatcher accepts only UPDATE or SHARE,
-#       NOT the PG-specific KEY SHARE / NO KEY UPDATE
-#       variants. GENUINELY NEW fingerprint — by-
-#       fingerprint wide-grep returns zero priors.
+#     - sqlparser's FOR-lock-clause dispatcher accepts
+#       only UPDATE or SHARE, NOT KEY SHARE / NO KEY
+#       UPDATE. GENUINELY NEW fingerprint.
 #
-#   SUPPORTED — TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ:
-#     - `'2024-01-01 12:00:00'::TIMESTAMP WITH TIME
-#       ZONE` parses and casts.
-#     - `'2024-01-01 12:00:00'::TIMESTAMPTZ` short-form
-#       also works.
-#     - DDL column types work for both forms.
-#     - WIRE-RENDERING NOTE: MySQL wire output is the
-#       UTC-converted value without timezone suffix
-#       ("2024-01-01 12:00:00", not "2024-01-01
-#       12:00:00+00"). PG wire would render with the
-#       session-tz suffix. This is consistent with
-#       the MySQL wire's lack of a TIMESTAMP-with-TZ
-#       type — not framed as a BUG here (genuine wire
-#       semantic difference; pin only the supported
-#       cast+DDL behavior).
+#   DATA-CORRECTNESS BUG — TIMESTAMPTZ silently
+#   truncates TZ offset (NOT mere wire-rendering):
+#     - zeta-parser/src/datatype.rs:178 maps TIMESTAMPTZ
+#       → DataType::Timestamp (no separate TZ type).
+#     - zeta-common/src/value.rs:1137-1153 strip_tz_
+#       suffix TRUNCATES the offset (doesn't convert
+#       to UTC). `'2024-01-01 12:00:00+05'` becomes
+#       `2024-01-01 12:00:00`, NOT `2024-01-01
+#       07:00:00 UTC`.
+#     - PROBE: insert +00, +05, -08 — all three
+#       collapse to identical stored value, proving
+#       data corruption (PG would store three
+#       distinct UTC values: 12:00, 07:00, 20:00).
+#     - This is NOT a wire-rendering quirk (initial
+#       round-1 framing) — it's parse-time data loss
+#       BEFORE storage. The TZ offset is silently
+#       dropped, and the time is treated as if it
+#       were in UTC regardless of the offset given.
+#     - 6th silent-no-op/data-corruption witness:
+#         1. LISTEN/NOTIFY mysqlwire silent (PR #366)
+#         2. Multi-dim ARRAY Debug-repr (PR #385)
+#         3. INHERITS column-drop (PR #391)
+#         4. ROLLBACK TO SAVEPOINT mysqlwire (PR #392)
+#         5. ALTER DATABASE silent-drop (PR #396 —
+#            though that turned out to be intentional
+#            compat no-op, not a bug)
+#         6. TIMESTAMPTZ TZ-offset silent-truncation
+#            (this slice — genuine BUG, NOT intentional)
 #
 # Big-picture finding:
 #
-#   PG 14+ CTE CYCLE/SEARCH and PG-specific weaker
-#   lock modes (FOR KEY SHARE / FOR NO KEY UPDATE) are
-#   unreachable on the zeta MySQL wire. TIMESTAMPTZ
-#   IS supported as a type but renders without TZ
-#   suffix over the MySQL wire (semantic difference,
-#   not a bug).
+#   PG 14+ CTE CYCLE/SEARCH BREADTH FIRST and PG-
+#   specific weaker lock modes (FOR KEY SHARE / FOR
+#   NO KEY UPDATE) are unreachable. TIMESTAMPTZ is
+#   silently accepted as data type but truncates the
+#   TZ offset on input — data corruption for any app
+#   that stores timestamps from multiple time zones.
 #
-#   Apps porting PG 14+ code:
-#     - CYCLE/SEARCH: rewrite the recursion's
-#       termination clause manually (add a depth
-#       counter to the CTE).
+#   Apps porting PG code:
+#     - CYCLE / SEARCH BREADTH FIRST: rewrite the
+#       recursion's termination clause manually
+#       (depth counter or set-membership probe).
 #     - FOR KEY SHARE → degrade to FOR SHARE.
 #     - FOR NO KEY UPDATE → degrade to FOR UPDATE.
-#     - TIMESTAMPTZ works for storage; apps that
-#       depend on wire-side TZ rendering must convert
-#       application-side.
+#     - TIMESTAMPTZ → use TIMESTAMP and convert all
+#       app-side input to UTC BEFORE insert; never
+#       rely on zeta to do the TZ conversion.
 #
 # Adaptation notes:
-#   # zeta-adapt: KNOWN GAP — WITH RECURSIVE CYCLE /
-#     SEARCH (PG 14+) clauses error 1064 at
-#     sqlparser's WITH-body parser. Rewrite by manual
-#     depth counter in the recursion.
+#   # zeta-adapt: KNOWN GAP — WITH RECURSIVE CYCLE
+#     and SEARCH BREADTH FIRST (PG 14+) clauses error
+#     1064. (DEPTH FIRST same shape, already pinned
+#     at recursive_cte_basic_extra:141.)
 #   # zeta-adapt: KNOWN GAP — SELECT ... FOR KEY SHARE
-#     and FOR NO KEY UPDATE (PG-specific weaker lock
-#     modes) error 1064. Degrade to FOR SHARE / FOR
-#     UPDATE respectively (loses concurrency benefit
-#     of the KEY-only/NO-KEY variants).
-#   # zeta-adapt: SUPPORTED — TIMESTAMP WITH TIME
-#     ZONE / TIMESTAMPTZ cast and DDL. MySQL wire
-#     renders without TZ suffix; PG wire would
-#     include it.
+#     and FOR NO KEY UPDATE error 1064. Degrade to
+#     FOR SHARE / FOR UPDATE (loses concurrency benefit).
+#   # zeta-adapt: KNOWN BUG — TIMESTAMPTZ silently
+#     truncates TZ offset (does NOT convert to UTC).
+#     `'2024-01-01 12:00:00+05'`, `+00`, `-08` all
+#     stored as `2024-01-01 12:00:00`. Convert to UTC
+#     application-side BEFORE insert; never assume
+#     zeta-side TZ handling.
 
 CREATE TABLE g (id INT PRIMARY KEY, n INT);
 INSERT INTO g VALUES (1, 10), (2, 20);
 
---echo === WITH RECURSIVE CYCLE/SEARCH (PG 14+) — adds CYCLE/SEARCH to WITH-body bucket ===
+--echo === WITH RECURSIVE CYCLE / SEARCH BREADTH FIRST (PG 14+) — adds 2 new keywords to WITH-body bucket ===
 
+# DEPTH FIRST variant ALREADY pinned at recursive_cte_
+# basic_extra:141; not re-pinned here.
 --error 1064
 WITH RECURSIVE r(id, n) AS (
   SELECT id, n FROM g WHERE id = 1
@@ -117,17 +129,10 @@ WITH RECURSIVE r(id, n) AS (
   SELECT id, n FROM g WHERE id = 1
   UNION ALL
   SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
-) SEARCH DEPTH FIRST BY id SET ord
-SELECT id FROM r;
---error 1064
-WITH RECURSIVE r(id, n) AS (
-  SELECT id, n FROM g WHERE id = 1
-  UNION ALL
-  SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
 ) SEARCH BREADTH FIRST BY id SET ord
 SELECT id FROM r;
 
---echo === NEW FINGERPRINT — FOR KEY SHARE / FOR NO KEY UPDATE → "Expected: one of UPDATE or SHARE" ===
+--echo === NEW FINGERPRINT — FOR KEY SHARE / FOR NO KEY UPDATE ===
 
 --error 1064
 SELECT * FROM g FOR KEY SHARE;
@@ -136,17 +141,26 @@ SELECT * FROM g FOR NO KEY UPDATE;
 --error 1064
 SELECT * FROM g FOR KEY SHARE OF g;
 
---echo === SUPPORTED — TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ (wire-rendering strips TZ suffix) ===
+--echo === BUG — TIMESTAMPTZ silently TRUNCATES TZ offset (data corruption, NOT wire-render) ===
 
-SELECT '2024-01-01 12:00:00'::TIMESTAMP WITH TIME ZONE;
-SELECT '2024-01-01 12:00:00'::TIMESTAMPTZ;
-CREATE TABLE tz_t (id INT PRIMARY KEY, t TIMESTAMP WITH TIME ZONE);
-INSERT INTO tz_t VALUES (1, '2024-01-01 12:00:00+00');
-SELECT id, t FROM tz_t;
-CREATE TABLE tzz (id INT PRIMARY KEY, t TIMESTAMPTZ);
-INSERT INTO tzz VALUES (1, '2024-01-01 12:00:00+00');
-SELECT id, t FROM tzz;
+# Cast and DDL both succeed — but the stored value loses
+# the TZ information. zeta-parser/src/datatype.rs:178
+# aliases TIMESTAMPTZ → DataType::Timestamp; zeta-common/
+# src/value.rs:1137-1153 strip_tz_suffix TRUNCATES the
+# offset rather than converting to UTC.
+SELECT '2024-01-01 12:00:00'::TIMESTAMP WITH TIME ZONE                   AS cast_works;
+SELECT '2024-01-01 12:00:00'::TIMESTAMPTZ                                AS cast_short_works;
+
+# PROBE: three different TZ offsets — all collapse to
+# identical stored value. PG would store as 12:00 UTC,
+# 07:00 UTC, 20:00 UTC respectively.
+CREATE TABLE tz_p (id INT PRIMARY KEY, t TIMESTAMPTZ);
+INSERT INTO tz_p VALUES (1, '2024-01-01 12:00:00+00');
+INSERT INTO tz_p VALUES (2, '2024-01-01 12:00:00+05');
+INSERT INTO tz_p VALUES (3, '2024-01-01 12:00:00-08');
+# Three distinct PG values collapsed to identical zeta
+# storage — proves the silent-truncation BUG.
+SELECT id, t FROM tz_p ORDER BY id;
 
 DROP TABLE g;
-DROP TABLE tz_t;
-DROP TABLE tzz;
+DROP TABLE tz_p;
