@@ -30,7 +30,7 @@ bigint_eq_int8
 SELECT CAST(42 AS INT)      = CAST(42 AS INTEGER)           AS int_eq_integer;
 int_eq_integer
 1
-=== Working alias: REAL / FLOAT4, DOUBLE PRECISION / FLOAT8 / DOUBLE / FLOAT ===
+=== Working alias: REAL / FLOAT4 / FLOAT8 / DOUBLE — all collapse to Float64 at runtime ===
 SELECT CAST(1.5 AS REAL)             = CAST(1.5 AS FLOAT4)            AS real_eq_float4;
 real_eq_float4
 1
@@ -97,6 +97,12 @@ SELECT CAST('abc' AS NVARCHAR(10));
 ERROR 1105: execution error: unsupported CAST target type: NVARCHAR(10)
 SELECT CAST('abc' AS NTEXT);
 ERROR 1105: execution error: unsupported CAST target type: NTEXT
-=== Asymmetric: BYTEA recognized at plan time, rejected at runtime ===
+=== Asymmetric: BYTEA recognized at plan time (DDL), rejected at runtime (CAST) ===
+CREATE TABLE bytea_plan_check (b BYTEA);
+INSERT INTO bytea_plan_check (b) VALUES (NULL);
+SELECT COUNT(*) AS bytea_col_rows FROM bytea_plan_check;
+bytea_col_rows
+1
+DROP TABLE bytea_plan_check;
 SELECT CAST('abc' AS BYTEA);
 ERROR 1105: execution error: unsupported CAST target type: BYTEA

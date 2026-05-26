@@ -94,14 +94,20 @@ SELECT CAST(42 AS INTEGER)  = CAST(42 AS INT4)              AS integer_eq_int4;
 SELECT CAST(42 AS BIGINT)   = CAST(42 AS INT8)              AS bigint_eq_int8;
 SELECT CAST(42 AS INT)      = CAST(42 AS INTEGER)           AS int_eq_integer;
 
---echo === Working alias: REAL / FLOAT4, DOUBLE PRECISION / FLOAT8 / DOUBLE / FLOAT ===
+--echo === Working alias: REAL / FLOAT4 / FLOAT8 / DOUBLE — all collapse to Float64 at runtime ===
 
+# NOTE: at runtime `cast_value`'s float arm lumps REAL +
+# FLOAT4 + FLOAT + FLOAT8 + DOUBLE + DOUBLE PRECISION all
+# into a single Float64 output (no Float32 distinction in
+# the value-cast surface). The eq pins below succeed
+# because both sides produce the SAME Float64 value, NOT
+# because REAL and FLOAT4 distinguish themselves.
 SELECT CAST(1.5 AS REAL)             = CAST(1.5 AS FLOAT4)            AS real_eq_float4;
 SELECT CAST(1.5 AS DOUBLE PRECISION) = CAST(1.5 AS FLOAT8)            AS double_prec_eq_float8;
 SELECT CAST(1.5 AS DOUBLE)           = CAST(1.5 AS DOUBLE PRECISION)  AS double_eq_double_prec;
-# Bare FLOAT in zeta is Float64 (NOT Float32 like in MySQL/PG
-# without precision). Pin it here so a future schema-spec
-# change is caught.
+# Bare FLOAT in zeta is mapped at PLAN time to Float64 (NOT
+# Float32 like MySQL/PG default). Pin it here so a future
+# parse_cast_target_type change is caught.
 SELECT CAST(1.5 AS FLOAT)            = CAST(1.5 AS DOUBLE PRECISION)  AS bare_float_eq_double;
 
 --echo === Working alias: CHARACTER / CHARACTER VARYING ===
@@ -172,17 +178,27 @@ SELECT CAST('abc' AS NVARCHAR(10));
 --error 1105
 SELECT CAST('abc' AS NTEXT);
 
---echo === Asymmetric: BYTEA recognized at plan time, rejected at runtime ===
+--echo === Asymmetric: BYTEA recognized at plan time (DDL), rejected at runtime (CAST) ===
 
 # `parse_cast_target_type` (lib.rs:3214) maps BYTEA →
-# DataType::Bytea, BUT `cast_value` (lib.rs:56681+) has no
-# BYTEA arm — so the runtime falls into the same
-# `unsupported CAST target type: BYTEA` catch-all as the
-# fully-unrecognized aliases above. Same message, different
-# code path. Pinned here to make the plan-vs-runtime
-# asymmetry an explicit guard: if a future change wires
+# DataType::Bytea (recognized at plan time), BUT `cast_value`
+# (lib.rs:56681+) has no BYTEA arm — runtime rejects with the
+# same `unsupported CAST target type: BYTEA` catch-all.
+# To actually EXERCISE the plan-vs-runtime split (rather than
+# just duplicating cast_basic_extra.test:120-121's runtime
+# error pin), prove plan-time recognition via DDL (CREATE
+# TABLE accepts a BYTEA column) and runtime rejection via
+# CAST in the same slice.
+CREATE TABLE bytea_plan_check (b BYTEA);
+# Plan-time check: INSERT/SELECT through the BYTEA column
+# works — proves the schema-level type IS valid.
+INSERT INTO bytea_plan_check (b) VALUES (NULL);
+SELECT COUNT(*) AS bytea_col_rows FROM bytea_plan_check;
+DROP TABLE bytea_plan_check;
+# Runtime check: the value-level cast surface rejects with
+# the catch-all message, even though the type name itself
+# was just accepted in DDL above. If a future change wires
 # BYTEA into `cast_value`, this row's expected error must
-# be updated (and probably the test moved to a working-
-# alias section above).
+# be updated.
 --error 1105
 SELECT CAST('abc' AS BYTEA);
