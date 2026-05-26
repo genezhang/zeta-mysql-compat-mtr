@@ -1,0 +1,30 @@
+=== CREATE PUBLICATION (3 forms) — "Expected: an object type after CREATE, found: PUBLICATION" ===
+CREATE PUBLICATION p FOR ALL TABLES;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: PUBLICATION at Line: 1, Column: 8
+CREATE PUBLICATION p FOR TABLE t;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: PUBLICATION at Line: 1, Column: 8
+CREATE PUBLICATION p FOR TABLES IN SCHEMA public;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: PUBLICATION at Line: 1, Column: 8
+=== ALTER PUBLICATION / DROP PUBLICATION — pre-existing enumeration shapes, PUBLICATION witness ===
+ALTER PUBLICATION p ADD TABLE t;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: PUBLICATION at Line: 1, Column: 7
+DROP PUBLICATION p;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: PUBLICATION at Line: 1, Column: 6
+=== CREATE / ALTER / DROP SUBSCRIPTION — same three enumeration shapes, SUBSCRIPTION witness ===
+CREATE SUBSCRIPTION s CONNECTION 'host=remote' PUBLICATION p;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: SUBSCRIPTION at Line: 1, Column: 8
+ALTER SUBSCRIPTION s ENABLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SUBSCRIPTION at Line: 1, Column: 7
+DROP SUBSCRIPTION s;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: SUBSCRIPTION at Line: 1, Column: 6
+=== pg_create_logical_replication_slot / pg_drop_replication_slot — unknown function (BOTH wires) ===
+SELECT pg_create_logical_replication_slot('s1', 'pgoutput');
+ERROR 1105: execution error: unknown function: pg_create_logical_replication_slot
+SELECT pg_drop_replication_slot('s1');
+ERROR 1105: execution error: unknown function: pg_drop_replication_slot
+=== BARE pg_replication_slots (no pg_catalog. qualifier) — WIRE DIVERGENT ===
+SELECT * FROM pg_replication_slots;
+ERROR 1146: table not found: test.public.pg_replication_slots
+=== CREATE ROLE REPLICATION — Shape (c) catch-all, REPLICATION attribute witness ===
+CREATE ROLE r REPLICATION;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
