@@ -1,0 +1,48 @@
+=== TEMPORAL gaps ===
+SELECT CONVERT_TZ('2024-01-01 12:00:00', '+00:00', '+09:00');
+ERROR 1105: execution error: unknown function: CONVERT_TZ
+SELECT MICROSECOND(TIMESTAMP '2024-01-01 12:34:56.789012');
+ERROR 1105: execution error: unknown function: MICROSECOND
+SELECT GET_FORMAT('DATE', 'USA');
+ERROR 1105: execution error: unknown function: GET_FORMAT
+=== REPLICATION / GTID gaps ===
+SELECT MASTER_POS_WAIT('binlog', 100);
+ERROR 1105: execution error: unknown function: MASTER_POS_WAIT
+SELECT SOURCE_POS_WAIT('binlog', 100);
+ERROR 1105: execution error: unknown function: SOURCE_POS_WAIT
+SELECT MASTER_GTID_WAIT('xx');
+ERROR 1105: execution error: unknown function: MASTER_GTID_WAIT
+SELECT WAIT_FOR_EXECUTED_GTID_SET('xxx', 0);
+ERROR 1105: execution error: unknown function: WAIT_FOR_EXECUTED_GTID_SET
+SELECT WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS('xx');
+ERROR 1105: execution error: unknown function: WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS
+SELECT GTID_SUBSET('a', 'b');
+ERROR 1105: execution error: unknown function: GTID_SUBSET
+SELECT GTID_SUBTRACT('a', 'b');
+ERROR 1105: execution error: unknown function: GTID_SUBTRACT
+=== PERF_SCHEMA gaps ===
+SELECT PS_THREAD_ID(1);
+ERROR 1105: execution error: unknown function: PS_THREAD_ID
+SELECT PS_CURRENT_THREAD_ID();
+ERROR 1105: execution error: unknown function: PS_CURRENT_THREAD_ID
+SELECT FORMAT_NANOSECONDS(1000);
+ERROR 1105: execution error: unknown function: FORMAT_NANOSECONDS
+=== ADMIN / INTERNAL gaps ===
+SELECT VALIDATE_PASSWORD_STRENGTH('mypassword');
+ERROR 1105: execution error: unknown function: VALIDATE_PASSWORD_STRENGTH
+SELECT ROLES_GRAPHML();
+ERROR 1105: execution error: unknown function: ROLES_GRAPHML
+SELECT CAN_ACCESS_DATABASE('test');
+ERROR 1105: execution error: unknown function: CAN_ACCESS_DATABASE
+SELECT INTERNAL_INDEX_BLOCK_SIZE(1);
+ERROR 1105: execution error: unknown function: INTERNAL_INDEX_BLOCK_SIZE
+SELECT MERGE_PURGE(1);
+ERROR 1105: execution error: unknown function: MERGE_PURGE
+=== Case-normalization: unknown-fn name uppercased in error msg ===
+SELECT convert_tz('2024-01-01', '+00:00', '+09:00');
+ERROR 1105: execution error: unknown function: CONVERT_TZ
+SELECT Microsecond(TIMESTAMP '2024-01-01 00:00:00.5');
+ERROR 1105: execution error: unknown function: Microsecond
+=== Bare-keyword GET_FORMAT parses but the DATE keyword errors first ===
+SELECT GET_FORMAT(DATE, 'USA');
+ERROR 1054: column not found: DATE
