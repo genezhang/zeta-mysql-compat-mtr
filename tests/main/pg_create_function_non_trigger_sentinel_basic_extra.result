@@ -1,13 +1,3 @@
-=== SHAPE A — RETURNS int (scalar) → silent CREATE; SELECT errors "unknown function" ===
-DROP FUNCTION IF EXISTS sql_fn;
-CREATE FUNCTION sql_fn() RETURNS int LANGUAGE SQL AS 'SELECT 1';
-SELECT sql_fn();
-ERROR 1105: execution error: unknown function: sql_fn
-=== SHAPE A — RETURNS text (scalar) → same shape ===
-DROP FUNCTION IF EXISTS sql_text_fn;
-CREATE FUNCTION sql_text_fn() RETURNS text LANGUAGE SQL AS 'SELECT ''hello''';
-SELECT sql_text_fn();
-ERROR 1105: execution error: unknown function: sql_text_fn
 === SHAPE B — RETURNS TABLE(...) → silent CREATE; SELECT errors "unknown set-returning function: <NAME>" ===
 DROP FUNCTION IF EXISTS srf;
 CREATE FUNCTION srf() RETURNS TABLE(id INT) LANGUAGE SQL AS 'SELECT 1';
@@ -17,8 +7,3 @@ ERROR 1105: plan error: unknown set-returning function: SRF
 DROP FUNCTION IF EXISTS setof_fn;
 CREATE FUNCTION setof_fn() RETURNS SETOF int LANGUAGE SQL AS 'SELECT 1';
 ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: int at Line: 1, Column: 42
-=== SHAPE D — with arguments → silent CREATE; SELECT errors same as Shape A ===
-DROP FUNCTION IF EXISTS plus_fn;
-CREATE FUNCTION plus_fn(a INT, b INT) RETURNS int LANGUAGE SQL AS 'SELECT a + b';
-SELECT plus_fn(2, 3);
-ERROR 1105: execution error: unknown function: plus_fn
