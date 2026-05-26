@@ -21,37 +21,42 @@
 #   - SHOW APPLICATION_NAME → silent empty.
 #   - SHOW client_encoding → silent empty.
 #
-# Big-picture finding (PG-GUC SHOW IS PGWIRE-ONLY):
+# Big-picture finding (PG-GUC SHOW silent on mysql wire):
 #
-#   The pgwire handler at zeta-pgwire/src/handler.rs:
-#   1046-1169 implements PG-style SHOW for a curated
-#   set of session-config parameters:
+#   On the MYSQL WIRE PATH (this MTR runner), ALL six
+#   `SHOW <pg-guc>` forms below silently return empty.
+#   They all fall through to the mysqlwire shim's
+#   universal SHOW catch-all at shim.rs:2023 (per PR
+#   #374) → EmptyShow.
 #
-#     - SHOW search_path → returns the session search_path
-#     - SHOW STATEMENT_TIMEOUT → real timeout value
-#     - and more session-configurables (lines 1091+)
+#   On the PGWIRE PATH the behavior differs by GUC:
 #
-#   The mysqlwire shim has NONE of this. ANY `SHOW <X>`
-#   that doesn't match the shim's substring handlers
-#   falls through to the universal catch-all at
-#   shim.rs:2023 (per PR #374) — silent empty.
+#     - SHOW search_path → handler.rs:1049 returns the
+#       real session search_path (default 'public').
+#     - SHOW STATEMENT_TIMEOUT → handler.rs:1142 returns
+#       the real timeout value.
+#     - SHOW TRANSACTION_ISOLATION / SESSION_AUTHORIZATION
+#       / APPLICATION_NAME / client_encoding → NO explicit
+#       pgwire handler in the 1046-1169 range; behavior
+#       depends on the executor's fall-through (probably
+#       also empty, but NOT verified by this slice).
 #
-#   So apps using PG-style introspection over the MySQL
-#   wire will see "no rows" and may conclude the GUC
-#   doesn't exist. They should:
+#   So the strict claim this slice pins is "mysql wire
+#   returns silent empty for these 6 PG-style SHOWs".
+#   The pgwire side varies; only 2 of the 6 have
+#   confirmed real-value handlers. The slice doesn't
+#   claim "pgwire works for all 6" — only the 2
+#   explicitly handled ones do.
 #
-#     - Switch to pgwire if PG GUC introspection matters.
+#   Apps using PG-style introspection should:
+#
+#     - Verify pgwire-side support per-GUC (e.g.
+#       handler.rs:1049/1142 list).
 #     - Use `@@` MySQL-style syntax for the few sysvars
-#       that pin via shim's lookup_system_variable (PR #370).
-#     - Use information_schema for cross-wire-portable
-#       introspection.
-#
-#   STRIKING — these PG GUCs DO have real values in
-#   zeta (search_path defaults to "public", statement_
-#   timeout defaults to 0, etc.). The wire-divergence
-#   isn't "feature missing" — it's "feature unreachable
-#   from MySQL wire". Apps that need cross-wire
-#   compatibility shouldn't rely on PG-style SHOW.
+#       that pin via shim's lookup_system_variable (PR
+#       #370) — see the cross-link rows below.
+#     - Use information_schema or pg_settings (pg_catalog.
+#       rs:1042+) for cross-wire-portable introspection.
 #
 # Adaptation notes:
 #   # zeta-adapt: PG-style SHOW <guc> works ONLY over
@@ -63,31 +68,44 @@
 #     #369 (SET hlc_watermark), #370 (sysvar quirks),
 #     #373 (USE bug), this slice (SHOW pg-gucs).
 
---echo === SHOW search_path — silent empty (mysql-wire) ===
+# NOTE: Section titles updated after PR #375 review —
+# the original "pgwire returns real" framing was too
+# strong (only 2 of the 6 have explicit pgwire handlers).
+# These rows pin the MYSQL-WIRE silent-empty behavior;
+# the pgwire-side cross-link is informational only.
 
-# pgwire returns 'public' (or session search_path).
+--echo === SHOW search_path — silent empty on mysql wire ===
+
+# pgwire handler at handler.rs:1049 returns 'public'.
 SHOW search_path;
 
---echo === SHOW STATEMENT_TIMEOUT — silent empty (mysql-wire) ===
+--echo === SHOW STATEMENT_TIMEOUT — silent empty on mysql wire ===
 
-# pgwire returns the real timeout config.
+# pgwire handler at handler.rs:1142 returns real timeout.
 SHOW STATEMENT_TIMEOUT;
 
---echo === SHOW TRANSACTION_ISOLATION — silent empty (mysql-wire) ===
+--echo === SHOW TRANSACTION_ISOLATION — silent empty on mysql wire ===
 
-# pgwire returns the real isolation level.
+# pgwire has NO explicit handler in handler.rs:1046-1169
+# for this name; behavior depends on executor fall-through.
 SHOW TRANSACTION_ISOLATION;
 
---echo === SHOW SESSION_AUTHORIZATION — silent empty ===
+--echo === SHOW SESSION_AUTHORIZATION — silent empty on mysql wire ===
 
+# pgwire: no explicit handler in handler.rs:1046-1169.
 SHOW SESSION_AUTHORIZATION;
 
---echo === SHOW APPLICATION_NAME — silent empty ===
+--echo === SHOW APPLICATION_NAME — silent empty on mysql wire ===
 
+# pgwire: no explicit handler in handler.rs:1046-1169.
 SHOW APPLICATION_NAME;
 
---echo === SHOW client_encoding — silent empty ===
+--echo === SHOW client_encoding — silent empty on mysql wire ===
 
+# pgwire: no explicit handler in handler.rs:1046-1169.
+# Note: client_encoding is also a wire-protocol startup
+# param so it may be exposed via a different mechanism
+# on pgwire (not verified here).
 SHOW client_encoding;
 
 --echo === Cross-link: @@-syntax DOES work on mysql wire for these ===
