@@ -1,0 +1,26 @@
+=== IS DOCUMENT / IS NOT DOCUMENT — IS-arm new keyword witness ===
+SELECT '<a/>' IS DOCUMENT;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: DOCUMENT at Line: 1, Column: 18
+SELECT '<a/>' IS NOT DOCUMENT;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: DOCUMENT at Line: 1, Column: 22
+=== XMLTABLE — THREE distinct sub-shapes ===
+SELECT * FROM XMLTABLE('/r' PASSING '<r><x>1</x></r>' COLUMNS x INT PATH 'x');
+ERROR 1064: SQL parse error: unsupported FROM clause (only table references, subqueries, and functions supported)
+SELECT * FROM XMLTABLE('/r');
+ERROR 1064: SQL parse error: sql parser error: Expected: COLUMNS, found: ) at Line: 1, Column: 28
+SELECT * FROM XMLTABLE;
+ERROR 1146: table not found: test.public.xmltable
+=== XMLFOREST / XMLROOT / XMLSERIALIZE — "Expected: )" Shape C, new fn witnesses ===
+SELECT XMLFOREST(1 AS a, 2 AS b);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: AS at Line: 1, Column: 20
+SELECT XMLROOT('<a/>', version '1.0');
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: '1.0' at Line: 1, Column: 32
+SELECT XMLROOT('<a/>' version '1.0');
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: version at Line: 1, Column: 23
+SELECT XMLSERIALIZE(CONTENT '<a/>' AS TEXT);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: '<a/>' at Line: 1, Column: 29
+SELECT XMLSERIALIZE(DOCUMENT '<a/>' AS TEXT);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: '<a/>' at Line: 1, Column: 30
+=== XMLTYPE — unknown function 1105, joins Shape D ===
+SELECT XMLTYPE('<a/>');
+ERROR 1105: execution error: unknown function: XMLTYPE

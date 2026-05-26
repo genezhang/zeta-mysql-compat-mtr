@@ -1,0 +1,178 @@
+# Independently authored PG XML extended sentinel
+# slice for the GPL MTR-format runner. NOT copied
+# or adapted from MySQL's mysql-test/.
+#
+# Extends the pg_xml_functions_sentinel slice (PR
+# #389) which already pinned XMLPARSE / XMLELEMENT /
+# XMLPI / XMLEXISTS / XMLAGG / XPATH / XMLCOMMENT /
+# XMLCONCAT and the ::XML cast / XML DDL type shapes.
+#
+# Existing coverage (do NOT duplicate):
+#   - XMLPARSE / XMLELEMENT / XMLPI / XMLEXISTS:
+#     pinned at pg_xml_functions_sentinel_basic_extra
+#     (Shape C — parser "Expected: )"). NOT re-pinned.
+#   - XMLAGG / XPATH / XMLCOMMENT / XMLCONCAT: pinned
+#     at pg_xml_functions_sentinel (Shape D — exec
+#     unknown function 1105). NOT re-pinned.
+#   - ::XML cast: pinned at Shape A. NOT re-pinned.
+#   - XML DDL type: pinned at Shape B. NOT re-pinned.
+#   - IS DOCUMENT / IS NOT DOCUMENT: ZERO prior
+#     (grep'd ALL .test files).
+#   - XMLTABLE: ZERO prior (grep'd ALL .test files).
+#   - XMLFOREST / XMLROOT / XMLSERIALIZE / XMLTYPE:
+#     ZERO prior.
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: [NOT] NULL | TRUE | FALSE | DISTINCT
+#     | [form] NORMALIZED FROM after IS, found: <X>"
+#     — pinned at pg_sqljson_path_sentinel (PR #401)
+#     with X=JSON. Same fingerprint applies to
+#     X=DOCUMENT, just a new keyword in the same
+#     parser arm.
+#   - "Expected: ), found: <KW>" inside function
+#     argument list — pre-existing (cast_basic_extra,
+#     pg_xml_functions_sentinel Shape C, json_value
+#     PG-style modifiers). Same fingerprint applies
+#     to XMLFOREST / XMLROOT / XMLSERIALIZE modifier
+#     keywords.
+#   - "execution error: unknown function: <FN>" —
+#     pre-existing (Shape D and many others). Same
+#     fingerprint applies to XMLTYPE.
+#   - "unsupported FROM clause (only table references,
+#     subqueries, and functions supported)" — pinned
+#     at json_path_basic_extra:82 and json/json_table
+#     for JSON_TABLE. Same zeta-internal FROM-clause
+#     whitelist applies to XMLTABLE.
+#
+# This slice pins:
+#
+#   IS DOCUMENT / IS NOT DOCUMENT — new keyword
+#   witness for IS-arm parser fingerprint (joins IS
+#   JSON pinned at PR #401).
+#
+#   XMLTABLE — THREE distinct sub-shapes:
+#     1. XMLTABLE('/p' PASSING <doc> COLUMNS x INT
+#        PATH 'x') in FROM clause: zeta-internal
+#        "unsupported FROM clause" (sqlparser parses
+#        but zeta's planner whitelists FROM children).
+#        Same fingerprint as JSON_TABLE.
+#     2. XMLTABLE('/p') without COLUMNS clause:
+#        sqlparser-level "Expected: COLUMNS, found:
+#        )" — sqlparser has a partial XMLTABLE arm
+#        that REQUIRES COLUMNS.
+#     3. Bare `XMLTABLE` (no parens): zeta treats it
+#        as a table-name lookup → 1146 "table not
+#        found: public.xmltable".
+#
+#   XMLFOREST(... AS ...) — "Expected: ), found: AS"
+#   (modifier keyword in arg list). New function-name
+#   witness for Shape C.
+#
+#   XMLROOT(<doc>, version '1.0') — "Expected: ),
+#   found: '1.0'" (the version keyword IS accepted as
+#   an identifier, but the next token errors). Note:
+#   the no-comma form gives "found: version" instead,
+#   showing the comma-form gets one token further.
+#
+#   XMLSERIALIZE(CONTENT/DOCUMENT '<a/>' AS TEXT) —
+#   "Expected: ), found: '<a/>'" (CONTENT/DOCUMENT
+#   keyword in modifier position).
+#
+#   XMLTYPE('<a/>') — unknown function (1105). Joins
+#   the XMLAGG/XPATH/XMLCOMMENT/XMLCONCAT cohort.
+#
+# Big-picture finding:
+#
+#   PG's XML surface (SQL/XML, SQL:2003 +
+#   SQL:2006/2008) is essentially unreachable on
+#   zeta beyond a few function-name shapes already
+#   pinned at PR #389. The XMLTABLE entry point —
+#   the most useful PG XML feature for shredding
+#   XML into relational rows — is blocked at zeta's
+#   FROM-clause whitelist (same wall as JSON_TABLE).
+#
+#   Apps porting PG XML code must rewrite:
+#     - IS DOCUMENT → app-side XML well-formedness
+#       check before insert / extract.
+#     - XMLTABLE → app-side XML shredding to a
+#       temporary table, then JOIN.
+#     - XMLFOREST / XMLROOT / XMLSERIALIZE → string
+#       concatenation app-side or via CONCAT/||.
+#     - XML column type → store as TEXT, validate
+#       app-side.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# rejection shapes for all forms. The "unsupported
+# FROM clause" message is zeta's planner-side error,
+# not a wire layer artifact.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — IS [NOT] DOCUMENT
+#     predicate parse-rejects at IS arm (same shape
+#     as IS JSON). Use app-side XML validation.
+#   # zeta-adapt: KNOWN GAP — XMLTABLE blocked at
+#     zeta FROM-clause whitelist. Same wall as
+#     JSON_TABLE. App-side shred required.
+#   # zeta-adapt: KNOWN GAP — XMLFOREST / XMLROOT
+#     / XMLSERIALIZE parse-reject on modifier
+#     keywords (AS / version / CONTENT|DOCUMENT).
+#   # zeta-adapt: KNOWN GAP — XMLTYPE is an unknown
+#     function (1105).
+
+--echo === IS DOCUMENT / IS NOT DOCUMENT — IS-arm new keyword witness ===
+
+# Same parser-arm fingerprint as IS JSON (PR #401);
+# new keyword (DOCUMENT) in the same rejection list.
+--error 1064
+SELECT '<a/>' IS DOCUMENT;
+--error 1064
+SELECT '<a/>' IS NOT DOCUMENT;
+
+--echo === XMLTABLE — THREE distinct sub-shapes ===
+
+# Sub-shape 1: full PG syntax (PASSING + COLUMNS) —
+# sqlparser parses, zeta planner errors at FROM-
+# clause whitelist. Same fingerprint as JSON_TABLE
+# (json_path_basic_extra:82, json/json_table:21).
+--error 1064
+SELECT * FROM XMLTABLE('/r' PASSING '<r><x>1</x></r>' COLUMNS x INT PATH 'x');
+
+# Sub-shape 2: bare path only — sqlparser-level
+# "Expected: COLUMNS, found: )". sqlparser HAS a
+# partial XMLTABLE arm that REQUIRES the COLUMNS
+# clause.
+--error 1064
+SELECT * FROM XMLTABLE('/r');
+
+# Sub-shape 3: no parens at all — zeta treats as
+# table-name lookup, errors 1146 "table not found:
+# <db>.public.xmltable" (lowercase folded). Runner
+# connects to db `test` so message reads
+# `test.public.xmltable`.
+--error 1146
+SELECT * FROM XMLTABLE;
+
+--echo === XMLFOREST / XMLROOT / XMLSERIALIZE — "Expected: )" Shape C, new fn witnesses ===
+
+# XMLFOREST: AS keyword in argument list.
+--error 1064
+SELECT XMLFOREST(1 AS a, 2 AS b);
+# XMLROOT comma form: comma accepts, then version
+# keyword consumed as ident, then '1.0' literal errors.
+--error 1064
+SELECT XMLROOT('<a/>', version '1.0');
+# XMLROOT no-comma form: version keyword errors directly.
+--error 1064
+SELECT XMLROOT('<a/>' version '1.0');
+# XMLSERIALIZE CONTENT form.
+--error 1064
+SELECT XMLSERIALIZE(CONTENT '<a/>' AS TEXT);
+# XMLSERIALIZE DOCUMENT form.
+--error 1064
+SELECT XMLSERIALIZE(DOCUMENT '<a/>' AS TEXT);
+
+--echo === XMLTYPE — unknown function 1105, joins Shape D ===
+
+--error 1105
+SELECT XMLTYPE('<a/>');
