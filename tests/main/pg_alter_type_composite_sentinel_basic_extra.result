@@ -1,0 +1,34 @@
+DROP TYPE IF EXISTS color;
+DROP TYPE IF EXISTS color2;
+DROP TYPE IF EXISTS addr;
+CREATE TYPE color AS ENUM ('red', 'green', 'blue');
+=== SHAPE A — "unsupported ALTER TYPE variant" (sqlparser-recognized, convert.rs rejects) ===
+ALTER TYPE color RENAME VALUE 'red' TO 'crimson';
+ERROR 1064: SQL parse error: unsupported ALTER TYPE variant for 'color'
+ALTER TYPE color RENAME TO color2;
+ERROR 1064: SQL parse error: unsupported ALTER TYPE variant for 'color'
+=== SHAPE B — sqlparser ALTER TYPE grammar gap (only 3 ops recognized) ===
+ALTER TYPE color OWNER TO admin_user;
+ERROR 1064: SQL parse error: sql parser error: Expected: {RENAME TO | { RENAME | ADD } VALUE}, found: OWNER at Line: 1, Column: 18
+ALTER TYPE color SET SCHEMA public;
+ERROR 1064: SQL parse error: sql parser error: Expected: {RENAME TO | { RENAME | ADD } VALUE}, found: SET at Line: 1, Column: 18
+ALTER TYPE color ADD ATTRIBUTE foo TEXT;
+ERROR 1064: SQL parse error: sql parser error: Expected: {RENAME TO | { RENAME | ADD } VALUE}, found: ADD at Line: 1, Column: 18
+ALTER TYPE color DROP ATTRIBUTE foo;
+ERROR 1064: SQL parse error: sql parser error: Expected: {RENAME TO | { RENAME | ADD } VALUE}, found: DROP at Line: 1, Column: 18
+ALTER TYPE color ALTER ATTRIBUTE foo TYPE VARCHAR(50);
+ERROR 1064: SQL parse error: sql parser error: Expected: {RENAME TO | { RENAME | ADD } VALUE}, found: ALTER at Line: 1, Column: 18
+ALTER TYPE color RENAME ATTRIBUTE foo TO bar;
+ERROR 1064: SQL parse error: sql parser error: Expected: {RENAME TO | { RENAME | ADD } VALUE}, found: RENAME at Line: 1, Column: 18
+=== SHAPE C — "unsupported CREATE TYPE variant" — composite-AS form rejected ===
+CREATE TYPE addr AS (street TEXT, city TEXT);
+ERROR 1064: SQL parse error: unsupported CREATE TYPE variant for 'addr'
+=== SHAPE D (SUPPORT pin) — DROP TYPE CASCADE / RESTRICT / IF EXISTS work ===
+DROP TYPE IF EXISTS doomed_t;
+CREATE TYPE doomed_t AS ENUM ('a', 'b');
+DROP TYPE doomed_t CASCADE;
+DROP TYPE IF EXISTS doomed_t2;
+CREATE TYPE doomed_t2 AS ENUM ('x', 'y');
+DROP TYPE doomed_t2 RESTRICT;
+DROP TYPE IF EXISTS nonexistent_type CASCADE;
+DROP TYPE color;
