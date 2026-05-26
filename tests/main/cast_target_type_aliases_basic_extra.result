@@ -1,0 +1,102 @@
+=== Working alias: JSON ≡ JSONB (both DataType::Jsonb) ===
+SELECT CAST('{"a":1}' AS JSON)   = CAST('{"a":1}' AS JSONB) AS json_eq_jsonb;
+json_eq_jsonb
+1
+SELECT CAST('{"a":1,"b":2}' AS JSON) @> '{"a":1}'           AS json_alias_supports_containment;
+json_alias_supports_containment
+1
+=== Working alias: STRING (Spark/Hive name) ≡ TEXT ===
+SELECT CAST(42 AS STRING) = CAST(42 AS TEXT)                AS string_eq_text;
+string_eq_text
+1
+=== Working alias: NUMERIC ≡ DECIMAL ===
+SELECT CAST('3.14' AS NUMERIC(10,2)) = CAST('3.14' AS DECIMAL(10,2))
+                                                            AS numeric_eq_decimal;
+numeric_eq_decimal
+1
+SELECT CAST('3.14' AS NUMERIC) = CAST('3.14' AS DECIMAL)    AS bare_numeric_eq_bare_decimal;
+bare_numeric_eq_bare_decimal
+1
+=== Working alias: SMALLINT / INT2, INTEGER / INT / INT4, BIGINT / INT8 ===
+SELECT CAST(42 AS SMALLINT) = CAST(42 AS INT2)              AS smallint_eq_int2;
+smallint_eq_int2
+1
+SELECT CAST(42 AS INTEGER)  = CAST(42 AS INT4)              AS integer_eq_int4;
+integer_eq_int4
+1
+SELECT CAST(42 AS BIGINT)   = CAST(42 AS INT8)              AS bigint_eq_int8;
+bigint_eq_int8
+1
+SELECT CAST(42 AS INT)      = CAST(42 AS INTEGER)           AS int_eq_integer;
+int_eq_integer
+1
+=== Working alias: REAL / FLOAT4, DOUBLE PRECISION / FLOAT8 / DOUBLE / FLOAT ===
+SELECT CAST(1.5 AS REAL)             = CAST(1.5 AS FLOAT4)            AS real_eq_float4;
+real_eq_float4
+1
+SELECT CAST(1.5 AS DOUBLE PRECISION) = CAST(1.5 AS FLOAT8)            AS double_prec_eq_float8;
+double_prec_eq_float8
+1
+SELECT CAST(1.5 AS DOUBLE)           = CAST(1.5 AS DOUBLE PRECISION)  AS double_eq_double_prec;
+double_eq_double_prec
+1
+SELECT CAST(1.5 AS FLOAT)            = CAST(1.5 AS DOUBLE PRECISION)  AS bare_float_eq_double;
+bare_float_eq_double
+1
+=== Working alias: CHARACTER / CHARACTER VARYING ===
+SELECT CAST(42 AS CHAR(10))                 = CAST(42 AS CHARACTER(10))         AS char_eq_character;
+char_eq_character
+1
+SELECT CAST(42 AS VARCHAR(10))              = CAST(42 AS CHARACTER VARYING(10)) AS varchar_eq_character_varying;
+varchar_eq_character_varying
+1
+=== Working alias: SIGNED / SIGNED INTEGER, UNSIGNED / UNSIGNED INTEGER ===
+SELECT CAST('42' AS SIGNED)         = CAST('42' AS BIGINT)            AS signed_eq_bigint;
+signed_eq_bigint
+1
+SELECT CAST('42' AS SIGNED INTEGER) = CAST('42' AS BIGINT)            AS signed_integer_eq_bigint;
+signed_integer_eq_bigint
+1
+SELECT CAST('42' AS UNSIGNED)
+     = CAST(CAST('42' AS BIGINT) AS UNSIGNED)                         AS unsigned_eq_cast_chain;
+unsigned_eq_cast_chain
+1
+=== SENTINEL: DATETIME — not in parse_cast_target_type ===
+SELECT CAST('2024-05-19 14:30:00' AS DATETIME);
+ERROR 1105: execution error: unsupported CAST target type: DATETIME
+SELECT CAST('2024-05-19 14:30:00' AS DATETIME(6));
+ERROR 1105: execution error: unsupported CAST target type: DATETIME(6)
+=== SENTINEL: BLOB family (MySQL) — not in parse_cast_target_type ===
+SELECT CAST('abc' AS BLOB);
+ERROR 1105: execution error: unsupported CAST target type: BLOB
+SELECT CAST('abc' AS TINYBLOB);
+ERROR 1105: execution error: unsupported CAST target type: TINYBLOB
+SELECT CAST('abc' AS MEDIUMBLOB);
+ERROR 1105: execution error: unsupported CAST target type: MEDIUMBLOB
+SELECT CAST('abc' AS LONGBLOB);
+ERROR 1105: execution error: unsupported CAST target type: LONGBLOB
+=== SENTINEL: TINYTEXT / MEDIUMTEXT / LONGTEXT (MySQL) — not in parse_cast_target_type ===
+SELECT CAST('abc' AS TINYTEXT);
+ERROR 1105: execution error: unsupported CAST target type: TINYTEXT
+SELECT CAST('abc' AS MEDIUMTEXT);
+ERROR 1105: execution error: unsupported CAST target type: MEDIUMTEXT
+SELECT CAST('abc' AS LONGTEXT);
+ERROR 1105: execution error: unsupported CAST target type: LONGTEXT
+=== SENTINEL: BINARY / VARBINARY (MySQL fixed-length) — not in parse_cast_target_type ===
+SELECT CAST('abc' AS BINARY);
+ERROR 1105: execution error: unsupported CAST target type: BINARY
+SELECT CAST('abc' AS BINARY(10));
+ERROR 1105: execution error: unsupported CAST target type: BINARY(10)
+SELECT CAST('abc' AS VARBINARY(10));
+ERROR 1105: execution error: unsupported CAST target type: VARBINARY(10)
+=== SENTINEL: YEAR (MySQL 1-2-byte year) — not in parse_cast_target_type ===
+SELECT CAST(2024 AS YEAR);
+ERROR 1105: execution error: unsupported CAST target type: YEAR
+=== SENTINEL: NVARCHAR / NTEXT (SQL Server) — not in parse_cast_target_type ===
+SELECT CAST('abc' AS NVARCHAR(10));
+ERROR 1105: execution error: unsupported CAST target type: NVARCHAR(10)
+SELECT CAST('abc' AS NTEXT);
+ERROR 1105: execution error: unsupported CAST target type: NTEXT
+=== Asymmetric: BYTEA recognized at plan time, rejected at runtime ===
+SELECT CAST('abc' AS BYTEA);
+ERROR 1105: execution error: unsupported CAST target type: BYTEA
