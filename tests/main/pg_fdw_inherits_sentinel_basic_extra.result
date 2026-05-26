@@ -1,0 +1,60 @@
+=== Shape A — `CREATE FOREIGN ...` (sqlparser CREATE-dispatcher unknown) ===
+CREATE FOREIGN DATA WRAPPER pgsql_fdw HANDLER pgsql_fdw_handler;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FOREIGN at Line: 1, Column: 8
+CREATE FOREIGN DATA WRAPPER stub_fdw;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FOREIGN at Line: 1, Column: 8
+CREATE FOREIGN TABLE ext_t (id INT) SERVER foo_server;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FOREIGN at Line: 1, Column: 8
+=== Shape (c) — `CREATE SERVER ...` (catch-all dispatcher, internal type leak) ===
+CREATE SERVER foo_server FOREIGN DATA WRAPPER pgsql_fdw OPTIONS (host '127.0.0.1');
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE SERVER bar_server TYPE 'csv' FOREIGN DATA WRAPPER file_fdw;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== NEW FINGERPRINT — CREATE USER MAPPING (sqlparser CREATE USER fall-through) ===
+CREATE USER MAPPING FOR alice SERVER foo_server OPTIONS (user 'a', password 'p');
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: alice at Line: 1, Column: 25
+CREATE USER MAPPING FOR PUBLIC SERVER foo_server;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: PUBLIC at Line: 1, Column: 25
+=== Shape (d) — `IMPORT FOREIGN SCHEMA` (statement-level keyword unknown) ===
+IMPORT FOREIGN SCHEMA public FROM SERVER foo_server INTO public;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: IMPORT at Line: 1, Column: 1
+IMPORT FOREIGN SCHEMA public LIMIT TO (t1, t2) FROM SERVER foo_server INTO public;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: IMPORT at Line: 1, Column: 1
+=== BUG — INHERITS SILENT NO-OP: DDL accepted, columns NOT inherited ===
+CREATE TABLE parent_inh (id INT PRIMARY KEY, n INT);
+CREATE TABLE child_inh (extra INT) INHERITS (parent_inh);
+INSERT INTO child_inh (id, n, extra) VALUES (1, 10, 99);
+ERROR 1054: column not found: id
+INSERT INTO child_inh (extra) VALUES (99);
+SELECT * FROM child_inh;
+extra
+99
+INSERT INTO parent_inh VALUES (2, 20);
+SELECT * FROM parent_inh ORDER BY id;
+id	n
+2	20
+SELECT * FROM child_inh;
+extra
+99
+CREATE TABLE child_empty () INHERITS (parent_inh);
+ERROR 1105: internal error: at least one column required
+=== SUPPORTED — ALTER TYPE ADD VALUE positional BEFORE/AFTER form ===
+CREATE TYPE mood_pos AS ENUM ('sad', 'ok', 'happy');
+ALTER TYPE mood_pos ADD VALUE 'glad' BEFORE 'happy';
+ALTER TYPE mood_pos ADD VALUE 'meh' AFTER 'ok';
+SELECT 'glad'::mood_pos AS r1;
+r1
+glad
+SELECT 'meh'::mood_pos AS r2;
+r2
+meh
+=== Rejected — Large-object lo_* functions (unknown function) ===
+SELECT lo_create(0);
+ERROR 1105: execution error: unknown function: lo_create
+SELECT lo_open(12345, 262144);
+ERROR 1105: execution error: unknown function: lo_open
+SELECT lo_unlink(12345);
+ERROR 1105: execution error: unknown function: lo_unlink
+DROP TABLE child_inh;
+DROP TABLE parent_inh;
+DROP TYPE mood_pos;
