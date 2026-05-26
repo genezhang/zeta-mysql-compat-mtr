@@ -1,0 +1,76 @@
+=== `<@` — object containment ===
+SELECT '{"a":1}'::JSONB <@ '{"a":1,"b":2}'::JSONB             AS subset_true;
+subset_true
+1
+SELECT '{"a":1,"b":2}'::JSONB <@ '{"a":1}'::JSONB             AS superset_false;
+superset_false
+0
+SELECT '{"a":1}'::JSONB <@ '{"a":1}'::JSONB                   AS equal_true;
+equal_true
+1
+SELECT '{"a":{"b":1}}'::JSONB <@ '{"a":{"b":1,"c":2}}'::JSONB AS nested_subset_true;
+nested_subset_true
+1
+=== `<@` — array containment ===
+SELECT '[1,2]'::JSONB <@ '[1,2,3]'::JSONB                     AS arr_subset_true;
+arr_subset_true
+1
+SELECT '[1,2,3]'::JSONB <@ '[1,2]'::JSONB                     AS arr_superset_false;
+arr_superset_false
+0
+SELECT '[3,1]'::JSONB <@ '[1,2,3]'::JSONB                     AS arr_reordered_true;
+arr_reordered_true
+1
+=== `<@` — scalar self-equality ===
+SELECT '"hello"'::JSONB <@ '"hello"'::JSONB                   AS scalar_self_true;
+scalar_self_true
+1
+SELECT '1'::JSONB <@ '1'::JSONB                               AS int_self_true;
+int_self_true
+1
+SELECT '1'::JSONB <@ '2'::JSONB                               AS int_unequal_false;
+int_unequal_false
+0
+=== `<@` — scalar in array ===
+SELECT '1'::JSONB <@ '[1,2,3]'::JSONB                         AS scalar_in_arr_true;
+scalar_in_arr_true
+1
+SELECT '"a"'::JSONB <@ '["a","b","c"]'::JSONB                 AS str_in_arr_true;
+str_in_arr_true
+1
+SELECT '4'::JSONB <@ '[1,2,3]'::JSONB                         AS scalar_not_in_arr_false;
+scalar_not_in_arr_false
+0
+=== `<@` — null behavior (NOT contained in object) ===
+SELECT 'null'::JSONB <@ '{"a":1}'::JSONB                      AS null_lhs_false;
+null_lhs_false
+0
+SELECT 'null'::JSONB <@ 'null'::JSONB                         AS null_self_true;
+null_self_true
+1
+=== STRIKING: empty containers vacuously contained ===
+SELECT '{}'::JSONB <@ '{"a":1}'::JSONB                        AS empty_obj_vacuously_true;
+empty_obj_vacuously_true
+1
+SELECT '[]'::JSONB <@ '[1,2,3]'::JSONB                        AS empty_arr_vacuously_true;
+empty_arr_vacuously_true
+1
+SELECT '{}'::JSONB <@ '{}'::JSONB                             AS empty_obj_self_true;
+empty_obj_self_true
+1
+SELECT '[]'::JSONB <@ '[]'::JSONB                             AS empty_arr_self_true;
+empty_arr_self_true
+1
+=== Symmetry: a <@ b ≡ b @> a ===
+SELECT '{"a":1}'::JSONB <@ '{"a":1,"b":2}'::JSONB
+     = ('{"a":1,"b":2}'::JSONB @> '{"a":1}'::JSONB)           AS symmetry_object_subset;
+symmetry_object_subset
+1
+SELECT '[1,2]'::JSONB <@ '[1,2,3]'::JSONB
+     = ('[1,2,3]'::JSONB @> '[1,2]'::JSONB)                   AS symmetry_array_subset;
+symmetry_array_subset
+1
+SELECT '1'::JSONB <@ '[1,2,3]'::JSONB
+     = ('[1,2,3]'::JSONB @> '1'::JSONB)                       AS symmetry_scalar_in_arr;
+symmetry_scalar_in_arr
+1
