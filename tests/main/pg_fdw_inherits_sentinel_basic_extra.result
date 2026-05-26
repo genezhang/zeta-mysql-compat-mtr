@@ -20,15 +20,34 @@ IMPORT FOREIGN SCHEMA public FROM SERVER foo_server INTO public;
 ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: IMPORT at Line: 1, Column: 1
 IMPORT FOREIGN SCHEMA public LIMIT TO (t1, t2) FROM SERVER foo_server INTO public;
 ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: IMPORT at Line: 1, Column: 1
-=== SUPPORTED — CREATE TABLE ... INHERITS (parent) — with empty-column quirk ===
-CREATE TABLE parent_t (id INT PRIMARY KEY);
-CREATE TABLE child_t () INHERITS (parent_t);
+=== BUG — INHERITS SILENT NO-OP: DDL accepted, columns NOT inherited ===
+CREATE TABLE parent_inh (id INT PRIMARY KEY, n INT);
+CREATE TABLE child_inh (extra INT) INHERITS (parent_inh);
+INSERT INTO child_inh (id, n, extra) VALUES (1, 10, 99);
+ERROR 1054: column not found: id
+INSERT INTO child_inh (extra) VALUES (99);
+SELECT * FROM child_inh;
+extra
+99
+INSERT INTO parent_inh VALUES (2, 20);
+SELECT * FROM parent_inh ORDER BY id;
+id	n
+2	20
+SELECT * FROM child_inh;
+extra
+99
+CREATE TABLE child_empty () INHERITS (parent_inh);
 ERROR 1105: internal error: at least one column required
-CREATE TABLE child2_t (extra INT) INHERITS (parent_t);
-=== SUPPORTED — ALTER TYPE ... ADD VALUE (PG enum extension) ===
-CREATE TYPE mood AS ENUM ('sad', 'ok');
-ALTER TYPE mood ADD VALUE 'happy';
-ALTER TYPE mood ADD VALUE 'glad' BEFORE 'happy';
+=== SUPPORTED — ALTER TYPE ADD VALUE positional BEFORE/AFTER form ===
+CREATE TYPE mood_pos AS ENUM ('sad', 'ok', 'happy');
+ALTER TYPE mood_pos ADD VALUE 'glad' BEFORE 'happy';
+ALTER TYPE mood_pos ADD VALUE 'meh' AFTER 'ok';
+SELECT 'glad'::mood_pos AS r1;
+r1
+glad
+SELECT 'meh'::mood_pos AS r2;
+r2
+meh
 === Rejected — Large-object lo_* functions (unknown function) ===
 SELECT lo_create(0);
 ERROR 1105: execution error: unknown function: lo_create
@@ -36,6 +55,6 @@ SELECT lo_open(12345, 262144);
 ERROR 1105: execution error: unknown function: lo_open
 SELECT lo_unlink(12345);
 ERROR 1105: execution error: unknown function: lo_unlink
-DROP TABLE IF EXISTS child2_t;
-DROP TABLE IF EXISTS parent_t;
-DROP TYPE IF EXISTS mood;
+DROP TABLE child_inh;
+DROP TABLE parent_inh;
+DROP TYPE mood_pos;

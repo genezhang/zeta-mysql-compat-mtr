@@ -7,32 +7,33 @@
 #   - CREATE FOREIGN DATA WRAPPER / CREATE FOREIGN
 #     TABLE / CREATE SERVER / CREATE USER MAPPING /
 #     IMPORT FOREIGN SCHEMA / CREATE TABLE ... INHERITS
-#     / ALTER TYPE ... ADD VALUE / lo_create / lo_open
-#     / lo_unlink: ZERO prior coverage. Wide-grep of
-#     tests/main/*.test for each surface returns no
-#     hits.
+#     / `ALTER TYPE ... ADD VALUE 'x' BEFORE 'y'`
+#     positional form / lo_create / lo_open / lo_unlink:
+#     ZERO prior coverage.
+#   - `ALTER TYPE ext ADD VALUE 'c'` BASIC FORM already
+#     pinned at enum_type_basic_extra.test:96-102 — NOT
+#     re-pinned here. Only the positional `BEFORE`/
+#     `AFTER` form is new in this slice.
 #   - "at least one column required" 1105 fingerprint
 #     ALREADY pinned at partition_basic_extra.result:
-#     64 (in a different DDL context). Re-acknowledged
-#     here for the INHERITS empty-column-list quirk.
+#     64 (different DDL context).
 #
 # Pre-existing rejection shapes from prior taxonomies:
 #   - Shape A — "Expected: an object type after CREATE,
-#     found: <KW>" — see PR #390 enumeration (now 10+
-#     priors total).
+#     found: <KW>" — see PR #390 enumeration.
 #   - Shape (c) — "unsupported statement: sqlparser::
 #     ast::Statement" — see PR #371 mysql_maintenance_
 #     cmds_sentinel_basic_extra:79-83.
 #   - Shape (d) — "Expected: an SQL statement, found:
 #     <KW>" — see PR #371 mysql_maintenance_cmds_
-#     sentinel_basic_extra:84-86 (HANDLER, SHUTDOWN).
+#     sentinel_basic_extra:84-86.
 #
 # This slice pins:
 #
 #   Rejected — Shape A (PG-DDL keyword unknown):
-#     - `CREATE FOREIGN DATA WRAPPER` — "Expected: an
-#       object type after CREATE, found: FOREIGN".
-#     - `CREATE FOREIGN TABLE` — same.
+#     - `CREATE FOREIGN DATA WRAPPER` / `CREATE FOREIGN
+#       TABLE` — "Expected: an object type after
+#       CREATE, found: FOREIGN".
 #
 #   Rejected — Shape (c) catch-all dispatcher:
 #     - `CREATE SERVER ...` — sqlparser HAS a CREATE
@@ -50,38 +51,52 @@
 #   partial-grammar 1064:
 #     - "Expected: =, found: alice/PUBLIC at Line: 1,
 #       Column: 25"
-#     - sqlparser's CREATE USER arm fires on `CREATE
-#       USER ...` and starts parsing it as a normal
-#       CREATE USER statement (which would be
-#       `CREATE USER <name> WITH OPTION = ...`). The
-#       `MAPPING` token gets consumed as the user-name,
-#       then the parser expects `=` for an OPTION
-#       assignment and fails on `FOR alice`/`FOR
-#       PUBLIC`. GENUINELY NEW fingerprint — by-
-#       fingerprint wide-grep returns zero priors for
-#       "Expected: =, found:".
+#     - sqlparser's CREATE USER arm (parse_create_user
+#       at sqlparser-0.61.0/src/parser/mod.rs:5075-5101)
+#       consumes `MAPPING` as the user-name token, then
+#       expects `=` for an OPTION assignment and fails
+#       on `FOR alice`/`FOR PUBLIC`. GENUINELY NEW
+#       fingerprint — by-fingerprint wide-grep returns
+#       zero priors for "Expected: =, found:".
 #
-#   SUPPORTED — CREATE TABLE ... INHERITS:
-#     - `CREATE TABLE child (extra INT) INHERITS
-#       (parent)` works end-to-end (parses, executes,
-#       table created). This is a genuinely-supported
-#       PG-extension surface.
-#     - QUIRK: `CREATE TABLE child () INHERITS (...)`
-#       with an EMPTY column list errors 1105 "internal
-#       error: at least one column required". PG allows
-#       empty child-column lists (children just inherit
-#       all parent columns). Zeta requires at least
-#       one explicit column. Same fingerprint already
-#       pinned at partition_basic_extra:64 for the
-#       partition-DDL context.
+#   KNOWN BUG — `CREATE TABLE ... INHERITS (parent)`
+#   SILENTLY ACCEPTED but inheritance is DROPPED:
+#     - sqlparser parses INHERITS into `CreateTable.
+#       inherits` — but `zeta-parser/src/convert.rs:
+#       443-668` `convert_create_table` NEVER REFERENCES
+#       `ct.inherits`; the field is silently discarded.
+#     - The CREATE succeeds with no error, BUT the
+#       child table has NONE of the parent's columns.
+#     - PROBE: `INSERT INTO child (id, n, extra)` after
+#       `child (extra INT) INHERITS (parent (id, n))`
+#       errors 1054 "column not found: id" — proves
+#       inheritance was dropped.
+#     - Two zeta internal test files
+#       (zeta-server/tests/pg_regress_truncate.rs:8 and
+#       pg_regress_returning.rs:8) explicitly state
+#       INHERITS is "intentionally omitted".
+#     - This is the silent-no-op trap pattern from
+#       feedback_wire_path_divergence_check memory —
+#       LOOKS supported via no-error, but the feature
+#       is gone. Pinned so a fix (either implement
+#       inheritance or reject the clause) drops the
+#       pin in lockstep.
+#     - QUIRK still present: empty child column list
+#       errors 1105 "internal error: at least one
+#       column required" (same fingerprint as
+#       partition_basic_extra:64). Drops happen BEFORE
+#       the column-count check.
 #
-#   SUPPORTED — ALTER TYPE ... ADD VALUE (PG enum
-#   extension):
-#     - `ALTER TYPE mood ADD VALUE 'happy'` works.
-#     - `ALTER TYPE mood ADD VALUE 'glad' BEFORE
-#       'happy'` (positional form) also works.
+#   SUPPORTED — `ALTER TYPE ... ADD VALUE 'x' BEFORE
+#   'y'` (positional form):
+#     - Basic `ALTER TYPE ext ADD VALUE 'c'` already
+#       pinned at enum_type_basic_extra:96-102.
+#     - This slice pins the POSITIONAL `BEFORE`/`AFTER`
+#       form (genuinely new — wide-grep zero priors for
+#       `ADD VALUE.*BEFORE|AFTER`). Verified via post-
+#       ALTER cast: the inserted value works.
 #
-#   Rejected — Large-object functions (lo_* family):
+#   Rejected — Large-object lo_* functions:
 #     - `lo_create(0)`, `lo_open(oid, mode)`,
 #       `lo_unlink(oid)` → 1105 "unknown function:
 #       lo_<X>" (lowercase function name).
@@ -92,34 +107,32 @@
 #   TABLE / CREATE FOREIGN DATA WRAPPER / CREATE USER
 #   MAPPING / IMPORT FOREIGN SCHEMA) hits THREE
 #   distinct rejection sites: Shape A for FOREIGN-
-#   prefixed DDL, Shape (c) for CREATE SERVER (which
-#   sqlparser parses but zeta doesn't), Shape (d) for
-#   IMPORT (statement-level), and a NEW partial-
-#   grammar shape for CREATE USER MAPPING (where
-#   sqlparser's CREATE USER arm consumes the wrong
-#   tokens).
+#   prefixed DDL, Shape (c) for CREATE SERVER, Shape
+#   (d) for IMPORT, plus a NEW partial-grammar shape
+#   for CREATE USER MAPPING.
 #
-#   On the supported side: INHERITS and ALTER TYPE
-#   ADD VALUE are genuinely supported — apps using
-#   PG table inheritance or extending enums work,
-#   subject to the empty-column-list quirk for
-#   INHERITS.
+#   The INHERITS case is a SILENT-NO-OP BUG — the
+#   DDL succeeds with no error but inheritance is
+#   dropped. This is the wire-path-divergence trap
+#   pattern: apps relying on inheritance will see
+#   tables created successfully then fail at INSERT/
+#   SELECT time when parent columns are missing.
 #
 # Adaptation notes:
 #   # zeta-adapt: KNOWN GAP — FDW family (CREATE
 #     SERVER, CREATE FOREIGN DATA WRAPPER, CREATE
 #     FOREIGN TABLE, CREATE USER MAPPING, IMPORT
-#     FOREIGN SCHEMA) all error 1064. Drop from
-#     migration scripts — no substitute.
-#   # zeta-adapt: SUPPORTED — CREATE TABLE ... INHERITS
-#     (parent) works but child must declare at least
-#     ONE column. PG allows empty child column list;
-#     zeta does not.
-#   # zeta-adapt: SUPPORTED — ALTER TYPE ... ADD VALUE
-#     (and ... BEFORE 'literal' positional form) works.
-#   # zeta-adapt: KNOWN GAP — Large-object functions
-#     (lo_create, lo_open, lo_unlink, etc.) are
-#     unknown. Use BYTEA storage instead.
+#     FOREIGN SCHEMA) all error 1064.
+#   # zeta-adapt: KNOWN BUG — `CREATE TABLE ...
+#     INHERITS (parent)` is silently accepted but
+#     inheritance is dropped. The child table has
+#     NONE of the parent's columns. Use explicit
+#     column declarations or rewrite via VIEW.
+#   # zeta-adapt: SUPPORTED — `ALTER TYPE ext ADD
+#     VALUE 'x' BEFORE/AFTER 'y'` positional form.
+#     Basic form pinned at enum_type_basic_extra:96.
+#   # zeta-adapt: KNOWN GAP — Large-object lo_*
+#     functions unknown. Use BYTEA storage instead.
 
 --echo === Shape A — `CREATE FOREIGN ...` (sqlparser CREATE-dispatcher unknown) ===
 
@@ -154,24 +167,41 @@ IMPORT FOREIGN SCHEMA public FROM SERVER foo_server INTO public;
 --error 1064
 IMPORT FOREIGN SCHEMA public LIMIT TO (t1, t2) FROM SERVER foo_server INTO public;
 
---echo === SUPPORTED — CREATE TABLE ... INHERITS (parent) — with empty-column quirk ===
+--echo === BUG — INHERITS SILENT NO-OP: DDL accepted, columns NOT inherited ===
 
-CREATE TABLE parent_t (id INT PRIMARY KEY);
-
-# QUIRK: empty child-column list errors 1105 (same
-# fingerprint as partition_basic_extra:64).
+CREATE TABLE parent_inh (id INT PRIMARY KEY, n INT);
+# Silently accepted — looks like success.
+CREATE TABLE child_inh (extra INT) INHERITS (parent_inh);
+# PROBE: try to use parent's columns — proves inheritance
+# was dropped (would work in PG; errors here).
+--error 1054
+INSERT INTO child_inh (id, n, extra) VALUES (1, 10, 99);
+# Confirm child only has its own column.
+INSERT INTO child_inh (extra) VALUES (99);
+SELECT * FROM child_inh;
+# Parent unaffected and works normally.
+INSERT INTO parent_inh VALUES (2, 20);
+SELECT * FROM parent_inh ORDER BY id;
+# PG would show parent row in child too via inheritance;
+# zeta does not (only child's own rows).
+SELECT * FROM child_inh;
+# QUIRK still present — empty column list errors 1105
+# "at least one column required" (same fingerprint as
+# partition_basic_extra:64). Drops happen BEFORE the
+# column-count check.
 --error 1105
-CREATE TABLE child_t () INHERITS (parent_t);
+CREATE TABLE child_empty () INHERITS (parent_inh);
 
-# WORKS — at least one column declared.
-CREATE TABLE child2_t (extra INT) INHERITS (parent_t);
+--echo === SUPPORTED — ALTER TYPE ADD VALUE positional BEFORE/AFTER form ===
 
---echo === SUPPORTED — ALTER TYPE ... ADD VALUE (PG enum extension) ===
-
-CREATE TYPE mood AS ENUM ('sad', 'ok');
-ALTER TYPE mood ADD VALUE 'happy';
-# Positional form — works.
-ALTER TYPE mood ADD VALUE 'glad' BEFORE 'happy';
+CREATE TYPE mood_pos AS ENUM ('sad', 'ok', 'happy');
+# Basic form covered by enum_type_basic_extra:100 — not
+# re-pinned. Positional form is new:
+ALTER TYPE mood_pos ADD VALUE 'glad' BEFORE 'happy';
+ALTER TYPE mood_pos ADD VALUE 'meh' AFTER 'ok';
+# Verify the new values are usable (post-ALTER probe).
+SELECT 'glad'::mood_pos AS r1;
+SELECT 'meh'::mood_pos AS r2;
 
 --echo === Rejected — Large-object lo_* functions (unknown function) ===
 
@@ -182,6 +212,6 @@ SELECT lo_open(12345, 262144);
 --error 1105
 SELECT lo_unlink(12345);
 
-DROP TABLE IF EXISTS child2_t;
-DROP TABLE IF EXISTS parent_t;
-DROP TYPE IF EXISTS mood;
+DROP TABLE child_inh;
+DROP TABLE parent_inh;
+DROP TYPE mood_pos;
