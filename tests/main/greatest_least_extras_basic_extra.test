@@ -1,0 +1,214 @@
+# Independently authored GREATEST / LEAST extras smoke for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - greatest_least_math_basic_extra.test: basic numeric/
+#     string/decimal picks, NULL propagation (MYSQL_*
+#     shim), arity errors, mixed int+string, determinism,
+#     bound invariant.
+#   - control_flow_basic.test:54-58: ONE row each for
+#     GREATEST/LEAST + NULL.
+#   - function_basic.test:98: GREATEST(1,2,3) / LEAST(1,2,3).
+#
+# This slice pins what those slices DO NOT:
+#   - DATE / TIMESTAMP / TIME args — separate compare_values
+#     paths.
+#   - DATE vs TIMESTAMP-at-midnight value-coercive compare
+#     (cross-link to DATE_ADD PR #324 / NULLIF PR #325 /
+#     UNIX_TIMESTAMP PR #326 — same value-coercive equality
+#     surface).
+#   - Bool args — Bool is its own Value variant; pin behavior.
+#     SURPRISE finding: GREATEST(TRUE, FALSE) is genuinely
+#     Bool-typed (not coerced), so `= 1` returns FALSE under
+#     strict-type equality. Cross-link to PR #314 / PR #325.
+#   - JSONB args — compare_values may sort by binary encoding.
+#     Pin observable behavior.
+#   - GREATEST/LEAST in WHERE, ORDER BY, and GROUP BY
+#     clauses (different code paths through eval_row_expr;
+#     GROUP BY additionally exercises the aggregate-key-
+#     build path).
+#   - Column-arg with NULL rows (full NULL-prop test against
+#     actual table data, not literal args).
+#   - Many-args boundary (16 args — exercises the loop's
+#     accumulator without args.len limit, if any).
+#
+# Big-picture finding:
+#   Over the MySQL wire, GREATEST/LEAST are text-rewritten by
+#   the shim to MYSQL_GREATEST/MYSQL_LEAST (NULL-propagating).
+#   The native PG-arm GREATEST/LEAST at lib.rs:47125-47174
+#   (NULL-skipping) is UNREACHABLE over the MySQL wire — every
+#   row in this slice exercises the MYSQL_* arm at lib.rs:45077.
+#
+#   compare_values (lib.rs:57889) handles:
+#     - Same-typed numeric (Int/Float/Decimal)
+#     - String lex compare
+#     - Date/Timestamp value-coercive (DATE = TIMESTAMP at
+#       midnight comparable — same as NULLIF/= behavior)
+#     - Bool / JSONB are partially compared
+#
+#   When the cross-type compare returns Equal (rather than a
+#   strict ordering), GREATEST/LEAST KEEP the FIRST value
+#   they saw — because the loop only swaps on Greater (or
+#   Less). This means argument ORDER matters when args are
+#   value-coercive-equal across types. Pinned below.
+#
+# Adaptation notes:
+#   # zeta-adapt: DATE and TIMESTAMP args are value-coercive
+#     in compare_values. GREATEST/LEAST KEEP the first one
+#     when DATE = TIMESTAMP-at-midnight (no swap on Equal).
+#   # zeta-adapt: GREATEST/LEAST in WHERE/ORDER BY work the
+#     same as in projection — same eval path.
+#   # zeta-adapt: 16-arg call works; no documented args.len
+#     ceiling in the impl.
+
+--echo === Setup ===
+
+CREATE TABLE gl_temporal (
+  id INT PRIMARY KEY,
+  d  DATE,
+  ts TIMESTAMP,
+  t  TIME
+);
+INSERT INTO gl_temporal VALUES
+  (1, DATE '2024-03-15', TIMESTAMP '2024-03-15 14:30:00', TIME '14:30:00'),
+  (2, DATE '2024-06-20', TIMESTAMP '2024-06-20 09:00:00', TIME '09:00:00'),
+  (3, NULL,              NULL,                            NULL);
+
+--echo === GREATEST / LEAST on DATE args ===
+
+SELECT GREATEST(DATE '2024-01-01', DATE '2024-06-15', DATE '2024-03-10')
+                                                              AS g_date;
+SELECT LEAST(DATE '2024-01-01', DATE '2024-06-15', DATE '2024-03-10')
+                                                              AS l_date;
+
+--echo === GREATEST / LEAST on TIMESTAMP args ===
+
+SELECT GREATEST(TIMESTAMP '2024-03-15 14:30:00',
+                TIMESTAMP '2024-03-15 09:00:00',
+                TIMESTAMP '2024-03-15 23:59:59')              AS g_ts;
+SELECT LEAST(TIMESTAMP '2024-03-15 14:30:00',
+             TIMESTAMP '2024-03-15 09:00:00',
+             TIMESTAMP '2024-03-15 23:59:59')                 AS l_ts;
+
+--echo === GREATEST / LEAST on TIME args ===
+
+SELECT GREATEST(TIME '14:30:00', TIME '09:00:00', TIME '23:59:59')
+                                                              AS g_time;
+SELECT LEAST(TIME '14:30:00', TIME '09:00:00', TIME '23:59:59')
+                                                              AS l_time;
+
+--echo === STRIKING: value-coercive DATE vs TIMESTAMP-at-midnight + first-kept ===
+
+# compare_values treats DATE '2024-03-15' and
+# TIMESTAMP '2024-03-15 00:00:00' as EQUAL (cross-slice link
+# to PR #324 DATE_ADD / PR #325 NULLIF / PR #326
+# UNIX_TIMESTAMP finding). When equal, GREATEST/LEAST KEEP
+# THE FIRST argument (the loop's `take_new` only fires on
+# strict Greater/Less, not Equal). So result TYPE depends on
+# argument ORDER.
+#
+# Probing equality-predicates alone (e.g. `= DATE 'x'`) is
+# UNFALSIFIABLE because both outcomes satisfy both forms
+# under value-coercive eq. Use CAST AS TEXT to render with
+# the underlying type — DATE renders 'YYYY-MM-DD', TIMESTAMP
+# renders 'YYYY-MM-DD HH:MM:SS' — to actually pin which
+# value survived.
+SELECT CAST(GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00') AS TEXT)
+                                                              AS date_first_text;
+SELECT CAST(GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15') AS TEXT)
+                                                              AS ts_first_text;
+# Sanity: both forms still satisfy value-coercive equality
+# against either literal (just different render).
+SELECT GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
+     = GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15')
+                                                              AS order_invariant_under_eq;
+
+--echo === GREATEST / LEAST: Bool args (STRICT-TYPE result discovery) ===
+
+# Bool is its own Value variant. SURPRISE finding from recording:
+# `GREATEST(TRUE, FALSE) = 1` returns 0 (FALSE), NOT 1. This
+# means the SQL `=` operator is STRICT-TYPE between Bool and
+# Int (cross-link to PR #314 JSON_OVERLAPS, PR #325 NULLIF
+# findings — Bool ≠ Int under values_equal). So the GREATEST
+# result is genuinely Bool-typed, not coerced to Int.
+# The wire-render layer renders Bool TRUE as TINYINT 1, but
+# the SQL-level comparison happens BEFORE rendering and
+# returns FALSE.
+#
+# Pinned:
+#   (a) IS NOT NULL — call doesn't error / NULL-prop.
+#   (b) `= 1` returns FALSE — proves result is Bool, not Int.
+#   (c) Strict inequality between G and L — proves the
+#       comparator direction (Bool > Bool compare arm works).
+SELECT GREATEST(TRUE, FALSE) IS NOT NULL                      AS g_bool_returns_value;
+SELECT LEAST(TRUE, FALSE)    IS NOT NULL                      AS l_bool_returns_value;
+# Strict-type proof: Bool TRUE != Int 1, so eq returns 0.
+SELECT GREATEST(TRUE, FALSE) = 1                              AS g_bool_neq_int_1_strict;
+SELECT LEAST(TRUE, FALSE)    = 0                              AS l_bool_neq_int_0_strict;
+# Comparator-direction pin (works regardless of result type
+# because both sides are SAME-typed Bool).
+SELECT GREATEST(TRUE, FALSE) > LEAST(TRUE, FALSE)             AS g_strictly_greater_than_l;
+# Bool-vs-Bool equality DOES work (same type).
+SELECT GREATEST(TRUE, FALSE) = TRUE                           AS g_bool_eq_bool_true;
+
+--echo === GREATEST / LEAST: JSONB args ===
+
+# JSONB compare_values arm — pin observable result. Two
+# JSONB objects with different shapes; result is one of them.
+SELECT GREATEST(CAST('{"a":1}' AS JSONB), CAST('{"a":2}' AS JSONB))
+                                                              AS g_jsonb_pick;
+SELECT LEAST(CAST('{"a":1}' AS JSONB), CAST('{"a":2}' AS JSONB))
+                                                              AS l_jsonb_pick;
+# Both args identical → identity.
+SELECT GREATEST(CAST('{"a":1}' AS JSONB), CAST('{"a":1}' AS JSONB))
+     = CAST('{"a":1}' AS JSONB)                               AS g_jsonb_identity;
+
+--echo === GREATEST / LEAST in WHERE clause ===
+
+SELECT id FROM gl_temporal
+ WHERE GREATEST(id, 2) = 2 ORDER BY id;
+SELECT id FROM gl_temporal
+ WHERE LEAST(id, 2) = 1 ORDER BY id;
+
+--echo === GREATEST / LEAST in ORDER BY clause ===
+
+SELECT id FROM gl_temporal
+ WHERE id IS NOT NULL
+ ORDER BY GREATEST(id, 0), id;
+
+--echo === GREATEST / LEAST in GROUP BY clause ===
+
+# GROUP BY uses a yet-different eval path (aggregation key
+# build). Pin row counts grouped by GREATEST(id, 2): rows
+# id=1,2 both bucket to 2; row id=3 buckets to 3.
+SELECT GREATEST(id, 2) AS g_key, COUNT(*) AS c
+  FROM gl_temporal
+ GROUP BY GREATEST(id, 2)
+ ORDER BY g_key;
+SELECT LEAST(id, 2)    AS l_key, COUNT(*) AS c
+  FROM gl_temporal
+ GROUP BY LEAST(id, 2)
+ ORDER BY l_key;
+
+--echo === GREATEST / LEAST on column args with NULL rows (MYSQL_* NULL prop) ===
+
+# Row 3 has NULL d and NULL ts — MYSQL_GREATEST/LEAST should
+# propagate NULL through them.
+SELECT id,
+       GREATEST(d, DATE '2024-01-01') IS NULL AS g_is_null,
+       LEAST(d, DATE '2024-12-31')    IS NULL AS l_is_null
+  FROM gl_temporal
+ ORDER BY id;
+
+--echo === GREATEST / LEAST: 16-arg boundary (no docs args.len ceiling) ===
+
+# Pin that a 16-wide call works (random unordered ints).
+SELECT GREATEST(14, 3, 8, 11, 2, 15, 6, 1, 9, 13, 4, 16, 7, 5, 12, 10)
+                                                              AS g_16_args;
+SELECT LEAST(14, 3, 8, 11, 2, 15, 6, 1, 9, 13, 4, 16, 7, 5, 12, 10)
+                                                              AS l_16_args;
+
+--echo === Cleanup ===
+
+DROP TABLE gl_temporal;
