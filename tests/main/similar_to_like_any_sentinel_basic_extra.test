@@ -11,11 +11,16 @@
 #   - sql_pattern_basic_extra:122-123 ALREADY pins ONE
 #     SIMILAR TO row (`'foo' SIMILAR TO 'fo+'`) at the
 #     1064 "unsupported expression" shape, labeled
-#     "KNOWN GAP — SIMILAR TO" at line 55. This slice
-#     WIDENS the SIMILAR TO surface with pattern variety
-#     (dot metachar, alternation `(b|d)`, percent
-#     wildcard) — same shape, different pattern bodies,
-#     to confirm zeta rejects regardless of body shape.
+#     "KNOWN GAP — SIMILAR TO" at line 55.
+#   - comparison_predicate_basic_extra:82 ALREADY pins
+#     `SELECT 'abc' SIMILAR TO 'a%'` at the same 1064
+#     shape (labeled "KNOWN GAP" at line 23). This slice
+#     WIDENS the SIMILAR TO surface with TWO genuinely-
+#     new pattern bodies (dot metachar `a.c`, alternation
+#     `a(b|d)c`) NOT already pinned anywhere. The
+#     percent-wildcard body is intentionally OMITTED
+#     here — already pinned at comparison_predicate
+#     line 82.
 #   - LIKE ANY / LIKE ALL — NONE (PG-extension array-
 #     side LIKE forms; this is the NEW surface).
 #
@@ -78,8 +83,6 @@
 SELECT 'abc' SIMILAR TO 'a.c';
 --error 1064
 SELECT 'abc' SIMILAR TO 'a(b|d)c';
---error 1064
-SELECT 'abc' SIMILAR TO 'a%';
 
 --echo === LIKE ANY (ARRAY[...]) — 1105 execution-reject ===
 

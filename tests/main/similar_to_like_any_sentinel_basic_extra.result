@@ -3,8 +3,6 @@ SELECT 'abc' SIMILAR TO 'a.c';
 ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a.c'
 SELECT 'abc' SIMILAR TO 'a(b|d)c';
 ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a(b|d)c'
-SELECT 'abc' SIMILAR TO 'a%';
-ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a%'
 === LIKE ANY (ARRAY[...]) — 1105 execution-reject ===
 SELECT 'abc' LIKE ANY (ARRAY['a%', 'b%']);
 ERROR 1105: execution error: LIKE requires strings
