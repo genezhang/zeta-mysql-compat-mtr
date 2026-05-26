@@ -1,0 +1,27 @@
+=== TEXT-element `= ANY(ARRAY[...])` (priors are INT only) ===
+SELECT 'b' = ANY(ARRAY['a', 'b', 'c'])                       AS eq_any_text_match;
+eq_any_text_match
+1
+SELECT 'z' = ANY(ARRAY['a', 'b', 'c'])                       AS eq_any_text_no_match;
+eq_any_text_no_match
+0
+=== `> ALL(ARRAY[...])` / `<> ALL(...)` (genuinely new — priors are `=`/`= ALL` only) ===
+SELECT 10 > ALL(ARRAY[1, 2, 3])                              AS gt_all_true;
+gt_all_true
+1
+SELECT 5 > ALL(ARRAY[1, 5, 10])                              AS gt_all_false;
+gt_all_false
+0
+SELECT 99 <> ALL(ARRAY[1, 2, 3])                             AS ne_all_true;
+ne_all_true
+1
+=== `ARRAY(SELECT ...)` subquery-form — PARSE REJECTED (1064) ===
+SELECT ARRAY(SELECT i FROM generate_series(1, 3) g(i));
+ERROR 1064: SQL parse error: subquery function arguments not supported
+=== ARRAY_DIMS / ARRAY_NDIMS / ARRAY_FILL — unknown function (1105) ===
+SELECT ARRAY_DIMS(ARRAY[1, 2, 3]);
+ERROR 1105: execution error: unknown function: ARRAY_DIMS
+SELECT ARRAY_NDIMS(ARRAY[1, 2, 3]);
+ERROR 1105: execution error: unknown function: ARRAY_NDIMS
+SELECT ARRAY_FILL(0, ARRAY[3]);
+ERROR 1105: execution error: unknown function: ARRAY_FILL
