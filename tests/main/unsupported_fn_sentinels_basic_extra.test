@@ -1,0 +1,159 @@
+# Independently authored UNSUPPORTED MySQL function SENTINELS
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - sleep_stub_basic_extra: SLEEP() stub.
+#   - lock_stubs_basic_extra: GET_LOCK / RELEASE_LOCK family.
+#   - benchmark_basic_extra: BENCHMARK() stub.
+#   - load_file_stub_basic_extra: LOAD_FILE() stub.
+#   - statement_digest_basic_extra: STATEMENT_DIGEST stub.
+#   - name_const_basic_extra: NAME_CONST() pass-through stub.
+#   - mysql_extensions_basic: REPLACE / ON DUPLICATE KEY etc.
+#
+# This slice pins what those slices DO NOT:
+#   - A CATALOG of MySQL functions that zeta DOES NOT
+#     implement at all (not even as stubs). Each errors with
+#     1105 "unknown function: <NAME>".
+#   - Bucketed by family:
+#     * TEMPORAL: CONVERT_TZ, MICROSECOND, GET_FORMAT
+#     * REPLICATION / GTID: MASTER_POS_WAIT, SOURCE_POS_WAIT,
+#       MASTER_GTID_WAIT, WAIT_FOR_EXECUTED_GTID_SET,
+#       WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS, GTID_SUBSET,
+#       GTID_SUBTRACT
+#     * PERF_SCHEMA: PS_THREAD_ID, PS_CURRENT_THREAD_ID,
+#       FORMAT_NANOSECONDS
+#     * ADMIN: VALIDATE_PASSWORD_STRENGTH, ROLES_GRAPHML,
+#       CAN_ACCESS_DATABASE, INTERNAL_INDEX_BLOCK_SIZE,
+#       MERGE_PURGE
+#
+# Big-picture finding:
+#   The unknown-function error code in zeta is 1105 (MySQL's
+#   1305 is NOT used). The error message has the form:
+#     execution error: unknown function: <NAME>
+#   STRIKING: the <NAME> casing is PATH-DEPENDENT (not
+#   input-dependent). The dispatcher (eval_function in
+#   lib.rs) is called from three sites:
+#     - lib.rs:41701 (literal-folding): pre-uppercases the
+#       name (`name.to_uppercase()`) before dispatching.
+#     - lib.rs:41741 (zero-arg fallthrough): pre-uppercases
+#       via a local `upper` binding.
+#     - lib.rs:42317 (row-eval): passes RAW `name` through.
+#   The unknown-function catch-all at lib.rs:55698
+#   interpolates raw `name` into the message. So the casing
+#   surfaced depends on WHICH CALL SITE reached the
+#   dispatcher with this input, not whether the input was
+#   originally lowercase vs mixed-case. Pinned below via
+#   `convert_tz` (CONVERT_TZ in msg) and `Microsecond`
+#   (Microsecond in msg).
+#   A 1-line fix (use `upper` in the catch-all format
+#   string) would eliminate the inconsistency.
+#
+#   Porting tools doing 1105 + message-prefix matching
+#   should ALWAYS UPPERCASE the captured name before
+#   matching — that handles all paths uniformly.
+#
+#   Notable: TEMPORAL gaps surprise. MICROSECOND() is a
+#   common MySQL function for extracting the microsecond
+#   component of a TIMESTAMP — zeta has EXTRACT(MICROSECOND
+#   FROM ...) instead (covered in extract slices). Apps
+#   doing `MICROSECOND(ts)` directly will fail.
+#
+#   GET_FORMAT(DATE, 'USA') in MySQL uses bare keyword DATE
+#   as first arg; the bare keyword is parser-rejected in
+#   zeta as "column not found: DATE" (1054, not 1105). Use
+#   the string-arg form `GET_FORMAT('DATE', 'USA')` to hit
+#   the 1105 "unknown function" path. Pinned via the string
+#   form below; bare-keyword form is a separate parser
+#   sentinel (out of scope for this slice).
+#
+#   REPLICATION/GTID gaps are expected — zeta has its own
+#   log-centric CDC; MySQL binlog-position APIs don't map.
+#   Pinning them documents the surface gap for app porting.
+#
+# Adaptation notes:
+#   # zeta-adapt: For MICROSECOND(ts), use EXTRACT(MICROSECOND
+#     FROM ts).
+#   # zeta-adapt: For CONVERT_TZ, use offset arithmetic
+#     directly (zeta does not maintain timezone tables).
+#   # zeta-adapt: For GET_FORMAT, hardcode the format string
+#     (e.g. '%m/%d/%Y' for USA DATE).
+#   # zeta-adapt: REPLICATION / GTID APIs are unimplemented;
+#     zeta has its own CDC primitives (see replication
+#     docs).
+#   # zeta-adapt: PERF_SCHEMA introspection APIs are
+#     unimplemented; pgwire / mysqlwire have their own
+#     observability surfaces.
+
+--echo === TEMPORAL gaps ===
+
+--error 1105
+SELECT CONVERT_TZ('2024-01-01 12:00:00', '+00:00', '+09:00');
+--error 1105
+SELECT MICROSECOND(TIMESTAMP '2024-01-01 12:34:56.789012');
+# GET_FORMAT with string-arg form (bare-keyword form is a
+# separate parser sentinel; see header).
+--error 1105
+SELECT GET_FORMAT('DATE', 'USA');
+
+--echo === REPLICATION / GTID gaps ===
+
+--error 1105
+SELECT MASTER_POS_WAIT('binlog', 100);
+--error 1105
+SELECT SOURCE_POS_WAIT('binlog', 100);
+--error 1105
+SELECT MASTER_GTID_WAIT('xx');
+--error 1105
+SELECT WAIT_FOR_EXECUTED_GTID_SET('xxx', 0);
+--error 1105
+SELECT WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS('xx');
+--error 1105
+SELECT GTID_SUBSET('a', 'b');
+--error 1105
+SELECT GTID_SUBTRACT('a', 'b');
+
+--echo === PERF_SCHEMA gaps ===
+
+--error 1105
+SELECT PS_THREAD_ID(1);
+--error 1105
+SELECT PS_CURRENT_THREAD_ID();
+--error 1105
+SELECT FORMAT_NANOSECONDS(1000);
+
+--echo === ADMIN / INTERNAL gaps ===
+
+--error 1105
+SELECT VALIDATE_PASSWORD_STRENGTH('mypassword');
+--error 1105
+SELECT ROLES_GRAPHML();
+--error 1105
+SELECT CAN_ACCESS_DATABASE('test');
+--error 1105
+SELECT INTERNAL_INDEX_BLOCK_SIZE(1);
+--error 1105
+SELECT MERGE_PURGE(1);
+
+--echo === Case-normalization: PATH-DEPENDENT (not input-dependent) ===
+
+# The unknown-function error message's <NAME> reflects the
+# casing of the dispatcher's RAW input — which varies by
+# call site. Two of the three sites pre-uppercase, the third
+# passes raw. The catch-all at lib.rs:55698 interpolates raw
+# `name`. So porting tools must uppercase before matching;
+# the casing surfaced here is NOT a reliable input signal.
+--error 1105
+SELECT convert_tz('2024-01-01', '+00:00', '+09:00');
+--error 1105
+SELECT Microsecond(TIMESTAMP '2024-01-01 00:00:00.5');
+
+--echo === Bare-keyword GET_FORMAT parses but the DATE keyword errors first ===
+
+# When the first arg is the bare keyword DATE (MySQL's
+# documented call form), zeta's parser treats DATE as a
+# column reference, which fails with 1054 "column not found"
+# BEFORE the function dispatcher would emit 1105. Pinned as
+# a separate sentinel — the call shape diverges from MySQL.
+--error 1054
+SELECT GET_FORMAT(DATE, 'USA');
