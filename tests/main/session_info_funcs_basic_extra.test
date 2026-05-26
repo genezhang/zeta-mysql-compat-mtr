@@ -1,0 +1,205 @@
+# Independently authored session-info functions smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - database_schema_basic_extra.test: DATABASE() and SCHEMA()
+#     paren-call forms in isolation.
+#   - function_basic.test:153: VERSION().
+#   - found_rows_basic_extra.test: LAST_INSERT_ID() /
+#     FOUND_ROWS() / CONNECTION_ID().
+#
+# This slice pins what those slices DO NOT:
+#   - PARSER-RUNTIME KEYWORD ASYMMETRY (finding 1):
+#     The runtime arm at lib.rs:47284 handles USER /
+#     CURRENT_USER / SESSION_USER / CURRENT_ROLE, but the
+#     PARSER recognizes only a SUBSET of these as bare-keyword
+#     expressions, and rejects paren-call form for the
+#     keyword-parsed ones. Observable matrix cells:
+#       USER             — bare OK, USER() FAILS at parser (1064)
+#       CURRENT_USER     — bare OK, CURRENT_USER() FAILS (1064)
+#       SESSION_USER     — bare OK, SESSION_USER() FAILS (1064)
+#       CURRENT_ROLE     — bare FAILS (1054), CURRENT_ROLE() OK
+#       CURRENT_CATALOG  — bare OK
+#   - MYSQL WIRE SHIM PREFIX-MATCH BUG (finding 2):
+#     `crates/zeta-mysqlwire/src/shim.rs:2083-2098` intercepts
+#     SELECT DATABASE() / SCHEMA() at the QUERY-STRING level
+#     with prefix matching:
+#       `select database()`
+#       `select database() ...` (any trailing text)
+#       `select database() as `database()``
+#       (same triplet for schema())
+#     The `starts_with("select database() ")` clause is too
+#     aggressive: it captures ANY query that begins with
+#     `SELECT DATABASE()` followed by a space — including
+#     comparison expressions like `SELECT DATABASE() = 'zeta'`
+#     and `SELECT DATABASE() AS my_alias`. The shim returns a
+#     hardcoded `MySqlResult::CurrentDatabase` which:
+#       (a) returns the session db name (NOT the hardcoded
+#           "zeta" from lib.rs:47291);
+#       (b) emits column name `DATABASE()` regardless of the
+#           user-supplied alias;
+#       (c) DROPS the entire trailing expression (the `=` /
+#           CONCAT / etc.) — the user-asked semantics are
+#           silently replaced with bare DATABASE().
+#     Pinned via direct comparison: `SELECT DATABASE() = 'zeta'`
+#     returns "test" with column name "DATABASE()" instead of
+#     0/1 with the user's alias. STRIKING bug.
+#   - SYSTEM_USER MySQL alias missing from both parser and
+#     runtime — gap sentinel.
+#
+# Big-picture finding:
+#   Three layers (parser, mysql wire shim, runtime arm) are
+#   out of sync, and each contributes a different failure
+#   mode:
+#     - Parser gates which CALL SHAPES are reachable
+#       (paren-form rejected for SQL-standard keyword set;
+#       opposite for CURRENT_ROLE).
+#     - MySQL wire shim INTERCEPTS DATABASE()/SCHEMA() at
+#       query-string level with a prefix match that drops
+#       trailing expressions — apps using DATABASE() in
+#       comparisons or with aliases over MySQL wire see
+#       silently-wrong results.
+#     - Runtime arm returns hardcoded "zeta" for both user
+#       and DB flavors — only reachable when the wire shim
+#       doesn't intercept (e.g., DATABASE() inside CONCAT
+#       or as a non-leading expression).
+#   Single-user / single-database stubbing is acknowledged
+#   in the lib.rs TODO; the shim prefix-match aggression
+#   is the unexpected bug.
+#
+# Adaptation notes:
+#   # zeta-adapt: For USER() / CURRENT_USER() / etc., drop
+#     the parens — bare keyword form is the only one that
+#     parses. CURRENT_ROLE is the opposite: paren form only.
+#   # zeta-adapt: DATABASE() / SCHEMA() over MySQL wire are
+#     shim-intercepted and return the SESSION db name; in
+#     bare-leading position they DROP trailing expression
+#     and alias. Embed DATABASE() in CONCAT or as a non-
+#     leading subexpression to keep the user-supplied
+#     semantics intact.
+#   # zeta-adapt: User-flavor funcs all return the literal
+#     "zeta" hardcoded string (lib.rs:47284 stub).
+#   # zeta-adapt: SYSTEM_USER bare → 1054 (column not found);
+#     paren form → 1105 (unknown function — zeta uses 1105
+#     instead of MySQL's 1305 for this).
+
+--echo === User-flavor (bare-keyword shape): all return "zeta" ===
+
+SELECT USER                                                   AS user_kw;
+SELECT CURRENT_USER                                           AS current_user_kw;
+SELECT SESSION_USER                                           AS session_user_kw;
+
+--echo === User-flavor: all three equal (same runtime arm) ===
+
+SELECT USER         = CURRENT_USER                            AS user_eq_current;
+SELECT CURRENT_USER = SESSION_USER                            AS current_eq_session;
+SELECT USER         = SESSION_USER                            AS user_eq_session;
+
+--echo === User-flavor: paren-call shape REJECTED at parser ===
+
+# Parser front-end rejects the paren form for the keyword-
+# parsed names with 1064. Runtime arm would handle these
+# uniformly if reached — but it isn't.
+--error 1064
+SELECT USER();
+--error 1064
+SELECT CURRENT_USER();
+--error 1064
+SELECT SESSION_USER();
+
+--echo === Role-flavor: CURRENT_ROLE is OPPOSITE — paren only ===
+
+# CURRENT_ROLE is NOT a parser keyword (bare form errors as
+# 'column not found' 1054), but IS handled by the runtime arm
+# at lib.rs:47284. Reachable only via the function-call form.
+SELECT CURRENT_ROLE()                                         AS current_role_paren;
+SELECT CURRENT_ROLE() = USER                                  AS current_role_eq_user;
+--error 1054
+SELECT CURRENT_ROLE;
+
+--echo === DB-flavor bare forms — DATABASE()/SCHEMA() return session db ===
+
+# Both DATABASE() and SCHEMA() are intercepted by the MySQL
+# wire shim (zeta-mysqlwire/src/shim.rs:2088-2098). The shim
+# returns the session db name ("test" — the runner's default
+# connect db), NOT the hardcoded "zeta" from lib.rs:47291.
+# CURRENT_DATABASE() / CURRENT_CATALOG go through the runtime
+# arm and DO return "zeta" — used below as the NEGATIVE
+# CONTROL for the shim-intercept bug section.
+#
+# NOTE: The DATABASE() and SCHEMA() bare-call values
+# intentionally overlap with database_schema_basic_extra.test
+# — they are setup here to set up the contrast with the
+# shim-intercept bug rows that follow. Do NOT consolidate.
+SELECT DATABASE()                                             AS db_returns_session;
+SELECT SCHEMA()                                               AS schema_returns_session;
+SELECT CURRENT_DATABASE()                                     AS current_db_paren;
+SELECT CURRENT_CATALOG                                        AS current_catalog_kw;
+
+--echo === STRIKING BUG: shim prefix-match drops trailing expression + alias ===
+
+# `SELECT DATABASE() = 'zeta'` SHOULD return 0 (DATABASE() is
+# "test", not "zeta"). Instead, the shim's prefix match at
+# shim.rs:2089 captures this query, drops the `= 'zeta'`,
+# drops the alias, returns "test" with column name "DATABASE()".
+# Recording surfaces value `test` and column `DATABASE()` —
+# user-supplied semantics are SILENTLY discarded.
+SELECT DATABASE() = 'zeta'                                    AS this_alias_dropped;
+SELECT SCHEMA()   = 'zeta'                                    AS this_alias_dropped_too;
+# Same for any trailing operator expression.
+SELECT DATABASE() <> 'somethingelse'                          AS this_alias_dropped_3;
+
+--echo === Workaround: embed DATABASE() in CONCAT to bypass shim intercept ===
+
+# CONCAT(...) doesn't start with `select database() `, so the
+# shim doesn't intercept — the runtime arm runs and returns
+# "zeta". Useful for distinguishing the two paths.
+SELECT CONCAT('', DATABASE())                                 AS via_concat_returns_zeta;
+# Sanity: CONCAT-wrapped equality runs as expected (1 = TRUE
+# because runtime arm DATABASE() returns "zeta").
+SELECT CONCAT('', DATABASE()) = 'zeta'                        AS concat_eq_zeta_via_runtime;
+
+--echo === CURRENT_DATABASE() / CURRENT_CATALOG go through runtime, not shim ===
+
+# These are NOT in the shim intercept list, so they hit the
+# runtime arm at lib.rs:47291 and return literal "zeta".
+SELECT CURRENT_DATABASE() = 'zeta'                            AS current_db_is_zeta_runtime;
+SELECT CURRENT_DATABASE() = CURRENT_CATALOG                   AS current_db_eq_catalog;
+
+--echo === Cross-flavor: user arm and DB-CURRENT arm share the "zeta" stub ===
+
+# USER (user arm) and CURRENT_DATABASE() (DB-runtime arm) both
+# return literal "zeta" — sanity that the two arms share the
+# same hardcoded value.
+SELECT USER = CURRENT_DATABASE()                              AS user_eq_current_db_stub;
+
+--echo === Return type and rendered length ===
+
+# All return TEXT. CURRENT_DATABASE() = "zeta" → 4 chars.
+SELECT LENGTH(USER)                                           AS user_len;
+SELECT LENGTH(CURRENT_DATABASE())                             AS current_db_len;
+SELECT CHAR_LENGTH(CURRENT_USER)                              AS current_user_char_len;
+
+--echo === Inside-expression usage ===
+
+SELECT UPPER(USER)                                            AS upper_user;
+SELECT CONCAT('user=', USER, ', db=', CURRENT_DATABASE())     AS combined_label;
+
+--echo === Literal equality pins the exact stub value ===
+
+# Use CURRENT_DATABASE() (runtime arm, not shim-intercepted)
+# so the comparison actually runs.
+SELECT USER               = 'zeta'                            AS user_is_zeta_literal;
+SELECT CURRENT_DATABASE() = 'zeta'                            AS current_db_is_zeta_literal;
+
+--echo === GAP SENTINEL: SYSTEM_USER missing from both parser and runtime ===
+
+# MySQL's SYSTEM_USER is an alias for USER. zeta neither
+# parses it as a keyword nor matches it in the runtime arm —
+# both call shapes fail. Pin both as sentinels.
+--error 1054
+SELECT SYSTEM_USER;
+# unknown function in zeta surfaces as 1105 (not MySQL's 1305).
+--error 1105
+SELECT SYSTEM_USER();
