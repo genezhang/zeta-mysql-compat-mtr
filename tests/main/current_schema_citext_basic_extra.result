@@ -1,0 +1,78 @@
+=== CURRENT_SCHEMA — bare form returns 'public' ===
+SELECT CURRENT_SCHEMA                                         AS bare_form;
+bare_form
+public
+SELECT CURRENT_SCHEMA = 'public'                              AS matches_public;
+matches_public
+1
+=== CURRENT_SCHEMA() — paren form returns 'public' (same) ===
+SELECT CURRENT_SCHEMA()                                       AS paren_form;
+paren_form
+public
+SELECT CURRENT_SCHEMA = CURRENT_SCHEMA()                      AS bare_eq_paren;
+bare_eq_paren
+1
+=== STRIKING: CURRENT_SCHEMA has NO arity check ===
+SELECT CURRENT_SCHEMA(1)                                      AS one_arg_ignored;
+one_arg_ignored
+public
+SELECT CURRENT_SCHEMA(1, 2, 'extra')                          AS three_args_ignored;
+three_args_ignored
+public
+SELECT CURRENT_SCHEMA(NULL)                                   AS null_arg_ignored;
+null_arg_ignored
+public
+SELECT CURRENT_SCHEMA(NULL) = 'public'                        AS null_still_public;
+null_still_public
+1
+=== CAST AS CITEXT — lowercases String input ===
+SELECT CAST('HELLO' AS CITEXT)                                AS upper_to_lower;
+upper_to_lower
+hello
+SELECT CAST('Hello World' AS CITEXT)                          AS mixed_to_lower;
+mixed_to_lower
+hello world
+SELECT CAST('hello' AS CITEXT)                                AS already_lower;
+already_lower
+hello
+SELECT CAST('' AS CITEXT)                                     AS empty_passthrough;
+empty_passthrough
+
+=== CITEXT — non-string args stringify (no error) ===
+SELECT CAST(42 AS CITEXT)                                     AS int_to_string;
+int_to_string
+42
+SELECT CAST(CAST(3.14 AS DOUBLE PRECISION) AS CITEXT)         AS float_to_string;
+float_to_string
+3.14
+SELECT CAST(TRUE AS CITEXT)                                   AS bool_true_to_string;
+bool_true_to_string
+true
+SELECT CAST(FALSE AS CITEXT)                                  AS bool_false_to_string;
+bool_false_to_string
+false
+=== CITEXT — NULL CAST → NULL ===
+SELECT CAST(NULL AS CITEXT)                                   AS null_cast;
+null_cast
+NULL
+SELECT CAST(NULL AS CITEXT) IS NULL                           AS null_pred;
+null_pred
+1
+=== STRIKING: CITEXT does NOT make compares case-insensitive ===
+SELECT CAST('Hello' AS CITEXT) = 'hello'                      AS cast_lowered_eq_lower_true;
+cast_lowered_eq_lower_true
+1
+SELECT CAST('Hello' AS CITEXT) = 'Hello'                      AS cast_lowered_ne_orig_case;
+cast_lowered_ne_orig_case
+0
+SELECT CAST('Hello' AS CITEXT) = CAST('hello' AS CITEXT)      AS both_cast_eq_true;
+both_cast_eq_true
+1
+SELECT CAST('Hello' AS CITEXT) = CAST('HELLO' AS CITEXT)      AS both_cast_diff_case_eq_true;
+both_cast_diff_case_eq_true
+1
+=== CITEXT — unsupported source types → 1105 ===
+SELECT CAST(CAST('2026-01-01' AS DATE) AS CITEXT);
+ERROR 1105: execution error: cannot cast to CITEXT
+SELECT CAST(3.14 AS CITEXT);
+ERROR 1105: execution error: cannot cast to CITEXT
