@@ -1,0 +1,205 @@
+# Independently authored UNIX_TIMESTAMP / FROM_UNIXTIME
+# extras smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - temporal_arithmetic_basic_extra.test:123-126: one happy
+#     row each — FROM_UNIXTIME(1700000000), UNIX_TIMESTAMP of
+#     a TIMESTAMP literal.
+#   - datetime_format_basic.test:86-87: a single round-trip
+#     pair UNIX_TIMESTAMP('YYYY-MM-DD HH:MM:SS') /
+#     FROM_UNIXTIME(<that-epoch>).
+#   - date_time_basic_extra.test: header mentions UNIX_TIMESTAMP
+#     but the actual queries cover component extractors only.
+#
+# This slice pins what those slices DO NOT:
+#   - Zero-arg UNIX_TIMESTAMP() — same-statement determinism.
+#   - UNIX_TIMESTAMP arity error (>1 arg).
+#   - UNIX_TIMESTAMP DATE arg (separate code path from TIMESTAMP).
+#   - UNIX_TIMESTAMP unparseable-string error variant
+#     ('cannot parse <s> as a date or timestamp').
+#   - UNIX_TIMESTAMP wrong-type error (Int, Float, Bool).
+#   - UNIX_TIMESTAMP NULL → NULL.
+#   - UNIX_TIMESTAMP date-only string (YYYY-MM-DD without time).
+#   - FROM_UNIXTIME arity errors (0 args, 2 args).
+#   - FROM_UNIXTIME Int32 arm (via small CAST AS INT) vs Int64.
+#   - FROM_UNIXTIME wrong-type error (String, Float).
+#   - FROM_UNIXTIME NULL → NULL.
+#   - FROM_UNIXTIME negative epoch seconds (pre-1970).
+#   - FROM_UNIXTIME boundary near i64 overflow via checked_mul.
+#   - Round-trip: FROM_UNIXTIME(UNIX_TIMESTAMP(t)) = t for a
+#     non-midnight timestamp.
+#
+# Big-picture finding:
+#   The two functions are asymmetric in input-type strictness:
+#     - UNIX_TIMESTAMP: accepts Date, Timestamp, AND parseable
+#       String. Three input arms.
+#     - FROM_UNIXTIME: accepts ONLY Int32/Int64. String "10"
+#       is rejected, Float64 10.0 is rejected. Two input arms,
+#       both integer.
+#   The Int64 epoch-seconds * 1_000_000 multiplication uses
+#   checked_mul, so a huge epoch surfaces as a clean execution
+#   error ('out of representable range') rather than silently
+#   wrapping. Boundary: epoch ≈ ±9.22e12 (i64::MAX/1_000_000)
+#   is the breakpoint.
+#
+#   UNIX_TIMESTAMP() on the no-arg path uses statement_now_us(),
+#   so two calls in the SAME statement return the same epoch
+#   (deterministic per-statement). Separate statements are not
+#   guaranteed equal.
+#
+# Adaptation notes:
+#   # zeta-adapt: UNIX_TIMESTAMP returns BIGINT (Int64), not
+#     INT. Avoids 2038-wrap. MySQL returns INT pre-8.0.28; INT
+#     UNSIGNED in newer versions.
+#   # zeta-adapt: UNIX_TIMESTAMP(DATE 'd') multiplies days by
+#     86400. NO timezone shift — treats Date as UTC midnight.
+#   # zeta-adapt: UNIX_TIMESTAMP unparseable string →
+#     1105 'cannot parse <quoted> as a date or timestamp'.
+#   # zeta-adapt: UNIX_TIMESTAMP wrong type (Int/Float/Bool) →
+#     1105 'requires a date, timestamp, or parseable string'.
+#   # zeta-adapt: FROM_UNIXTIME rejects String and Float →
+#     1105 'requires an integer epoch-seconds argument'.
+#   # zeta-adapt: FROM_UNIXTIME on huge epoch (~i64::MAX /
+#     1_000_000) → 1105 'epoch seconds <n> out of
+#     representable range'.
+
+--echo === UNIX_TIMESTAMP() zero-arg — same-statement determinism ===
+
+# Two calls in the same SELECT are guaranteed equal
+# (statement_now_us). Cross-statement is NOT guaranteed equal
+# so we do NOT pin that.
+SELECT UNIX_TIMESTAMP() = UNIX_TIMESTAMP()                    AS same_stmt_equal;
+# Sanity: zero-arg returns a value > 0 (epoch > 1970).
+SELECT UNIX_TIMESTAMP() > 0                                   AS positive_epoch;
+# Sanity: today's epoch is later than 2020-01-01 epoch.
+SELECT UNIX_TIMESTAMP() > UNIX_TIMESTAMP(TIMESTAMP '2020-01-01 00:00:00')
+                                                              AS later_than_2020;
+
+--echo === UNIX_TIMESTAMP arity > 1 → ERROR 1105 ===
+
+--error 1105
+SELECT UNIX_TIMESTAMP(TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-01-02 00:00:00');
+--error 1105
+SELECT UNIX_TIMESTAMP(1, 2, 3);
+
+--echo === UNIX_TIMESTAMP — DATE arg (days * 86400 path) ===
+
+# DATE → epoch-seconds via days*86400. No timezone shift.
+# DATE '1970-01-02' = day 1 → 86400 seconds.
+SELECT UNIX_TIMESTAMP(DATE '1970-01-02')                      AS day_1_epoch;
+# DATE '2024-01-01' = day 19723 → 19723*86400 = 1704067200.
+SELECT UNIX_TIMESTAMP(DATE '2024-01-01')                      AS year_2024_jan1_epoch;
+# Pre-epoch date returns negative epoch.
+SELECT UNIX_TIMESTAMP(DATE '1969-12-30')                      AS pre_epoch_negative;
+
+--echo === UNIX_TIMESTAMP — date-only string (no time portion) ===
+
+# Parseable-string fallback. parse_timestamp first, then
+# parse_date on failure. Date-only string '2024-01-01' (no
+# HH:MM:SS) goes through the parse_date arm.
+SELECT UNIX_TIMESTAMP('2024-01-01')                           AS date_only_string_epoch;
+SELECT UNIX_TIMESTAMP('2024-01-01')
+     = UNIX_TIMESTAMP(DATE '2024-01-01')                      AS date_string_eq_date_literal;
+
+--echo === UNIX_TIMESTAMP — unparseable string → ERROR 1105 ===
+
+--error 1105
+SELECT UNIX_TIMESTAMP('not a date');
+--error 1105
+SELECT UNIX_TIMESTAMP('2024-13-99');
+
+--echo === UNIX_TIMESTAMP — wrong-type → ERROR 1105 ===
+
+# Int / Float / Bool all rejected — no implicit-coerce arm.
+--error 1105
+SELECT UNIX_TIMESTAMP(1700000000);
+--error 1105
+SELECT UNIX_TIMESTAMP(CAST(1.5 AS DOUBLE PRECISION));
+--error 1105
+SELECT UNIX_TIMESTAMP(TRUE);
+
+--echo === UNIX_TIMESTAMP — NULL propagation ===
+
+SELECT UNIX_TIMESTAMP(NULL)                                   AS unix_ts_null_is_null;
+SELECT UNIX_TIMESTAMP(CAST(NULL AS TIMESTAMP))                AS unix_ts_typed_null_is_null;
+SELECT UNIX_TIMESTAMP(NULL) IS NULL                           AS unix_ts_null_predicate;
+
+--echo === FROM_UNIXTIME arity errors → 1105 ===
+
+--error 1105
+SELECT FROM_UNIXTIME();
+--error 1105
+SELECT FROM_UNIXTIME(1700000000, 1700000001);
+
+--echo === FROM_UNIXTIME — Int32 arm (small CAST AS INT) ===
+
+# Int32 and Int64 are separate match arms. Small literal via
+# CAST AS INTEGER lands in the Int32 arm.
+SELECT FROM_UNIXTIME(CAST(86400 AS INTEGER))
+     = TIMESTAMP '1970-01-02 00:00:00'                        AS int32_arm_works;
+# Default-typed BIGINT literal lands in Int64 arm.
+SELECT FROM_UNIXTIME(CAST(86400 AS BIGINT))
+     = TIMESTAMP '1970-01-02 00:00:00'                        AS int64_arm_works;
+# Both arms produce the same answer for the same value.
+SELECT FROM_UNIXTIME(CAST(86400 AS INTEGER))
+     = FROM_UNIXTIME(CAST(86400 AS BIGINT))                   AS int32_eq_int64_same_value;
+
+--echo === FROM_UNIXTIME — wrong-type → ERROR 1105 ===
+
+# String "10" is NOT accepted — only Int.
+--error 1105
+SELECT FROM_UNIXTIME('1700000000');
+# Float64 10.0 (via CAST) is NOT accepted.
+--error 1105
+SELECT FROM_UNIXTIME(CAST(1700000000.0 AS DOUBLE PRECISION));
+# Decimal (the literal 1.5) is NOT accepted.
+--error 1105
+SELECT FROM_UNIXTIME(1.5);
+# Bool TRUE is NOT accepted.
+--error 1105
+SELECT FROM_UNIXTIME(TRUE);
+
+--echo === FROM_UNIXTIME — NULL propagation ===
+
+SELECT FROM_UNIXTIME(NULL)                                    AS from_unix_null_is_null;
+SELECT FROM_UNIXTIME(CAST(NULL AS BIGINT))                    AS from_unix_typed_null_is_null;
+SELECT FROM_UNIXTIME(NULL) IS NULL                            AS from_unix_null_predicate;
+
+--echo === FROM_UNIXTIME — negative epoch (pre-1970) ===
+
+# -86400 = 1969-12-31 00:00:00 UTC.
+SELECT FROM_UNIXTIME(-86400)
+     = TIMESTAMP '1969-12-31 00:00:00'                        AS neg_epoch_pre_1970;
+# Zero epoch = 1970-01-01 00:00:00 UTC.
+SELECT FROM_UNIXTIME(0)
+     = TIMESTAMP '1970-01-01 00:00:00'                        AS zero_epoch_is_unix_birth;
+
+--echo === FROM_UNIXTIME — i64 overflow boundary (checked_mul) ===
+
+# i64::MAX = 9223372036854775807. Dividing by 1_000_000 →
+# 9223372036854 is the largest epoch-seconds value that does
+# NOT overflow on multiply. 9223372036855 (one over) overflows.
+# Pin both sides: largest-OK value succeeds; one-past errors.
+SELECT FROM_UNIXTIME(9223372036854) IS NOT NULL               AS just_under_overflow_ok;
+--error 1105
+SELECT FROM_UNIXTIME(9223372036855);
+# Same on the negative side.
+--error 1105
+SELECT FROM_UNIXTIME(-9223372036855);
+
+--echo === Round-trip: FROM_UNIXTIME(UNIX_TIMESTAMP(t)) = t ===
+
+# Non-midnight timestamp (so we exercise time-of-day, not just
+# day-rounding). Round-trips lossless at second precision.
+SELECT FROM_UNIXTIME(UNIX_TIMESTAMP(TIMESTAMP '2024-06-15 14:30:45'))
+     = TIMESTAMP '2024-06-15 14:30:45'                        AS round_trip_ts_with_time;
+# DATE input → output is TIMESTAMP at midnight. Round-trip
+# yields midnight, NOT the original Date (separate types).
+# But the value-coercive equality (cross-slice link to DATE_ADD
+# PR #324 finding) treats DATE '2024-06-15' = TIMESTAMP
+# '2024-06-15 00:00:00' as equal.
+SELECT FROM_UNIXTIME(UNIX_TIMESTAMP(DATE '2024-06-15'))
+     = DATE '2024-06-15'                                      AS round_trip_date_value_coerce;
+SELECT FROM_UNIXTIME(UNIX_TIMESTAMP(DATE '2024-06-15'))
+     = TIMESTAMP '2024-06-15 00:00:00'                        AS round_trip_date_eq_ts_midnight;
