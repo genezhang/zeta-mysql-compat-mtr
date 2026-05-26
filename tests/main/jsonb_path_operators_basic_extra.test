@@ -1,0 +1,112 @@
+# Independently authored JSONB `#>` (path-as-jsonb) and
+# `#>>` (path-as-text) operator smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - jsonb_basic_extra and json_basic cover `->` and
+#     `->>` (single-step path), JSONB_TYPEOF on the
+#     JSONB-null scalar.
+#   - jsonb_sql_null_vs_jsonb_null_basic_extra (PR #380)
+#     covers other operators on the two null forms.
+#   - `#>` / `#>>` — NONE in compat-mtr today.
+#   - JSONB_TYPEOF(NULL::JSONB) — NONE.
+#
+# This slice pins:
+#   - `jsonb #> '{a,b}'` text-path form returns nested
+#     value as JSONB.
+#   - `jsonb #> ARRAY['a','b']` array-path equivalent.
+#   - Path to subtree returns the sub-object.
+#   - Path missing → NULL.
+#   - `#>>` text-extract variant — returns the value as
+#     TEXT (unquoted).
+#   - SQL NULL::JSONB → NULL (3VL).
+#   - JSONB_TYPEOF: NULL::JSONB → NULL; 'null'::JSONB →
+#     'null' (string).
+#   - **REAL BUG**: `'[10,20,30]'::JSONB #> '{1}'` returns
+#     NULL. PG would return `20` (element at index 1).
+#     Array-index paths are broken.
+#
+# Big-picture finding (REAL BUG — array-index paths):
+#
+#   PG's `#>` operator supports both object-key and
+#   array-index path segments. zeta only handles
+#   object-key segments — when a path element is
+#   numeric, the dispatch falls through to NULL instead
+#   of indexing into the array.
+#
+#   Test rows:
+#     '{"a":{"b":1}}' #> '{a,b}'    = 1       (OK)
+#     '{"a":{"b":1}}' #> '{a}'      = {"b":1} (OK, subtree)
+#     '[10,20,30]'    #> '{1}'      = NULL    (BUG — PG returns 20)
+#
+#   Apps porting PG JSON queries that mix object and
+#   array path segments will silently get NULL for the
+#   array steps. Use a workaround: `(jsonb -> 'a') -> 1`
+#   for array-step extraction.
+#
+#   Also pinned: `JSONB_TYPEOF` on the two null forms.
+#   SQL NULL → NULL (3VL); JSONB 'null' scalar →
+#   'null' (string). Useful for ingestion debugging.
+#
+# Adaptation notes:
+#   # zeta-adapt: `#>` and `#>>` work on OBJECT-key
+#     paths but NOT array-index paths. Real PG bug.
+#     Use `->` chains for array steps.
+#   # zeta-adapt: JSONB_TYPEOF(NULL::JSONB) returns
+#     NULL via 3VL; JSONB_TYPEOF('null'::JSONB) returns
+#     the string 'null'.
+
+--echo === `#>` text-path — extract nested value ===
+
+SELECT '{"a":{"b":1}}'::JSONB #> '{a,b}'                      AS path_text_to_leaf;
+SELECT '{"a":{"b":1}}'::JSONB #> '{a}'                        AS path_text_to_subtree;
+SELECT '{"a":1}'::JSONB #> '{a}'                              AS path_text_top_level;
+
+--echo === `#>` ARRAY-path — same result as text-path ===
+
+SELECT '{"a":{"b":1}}'::JSONB #> ARRAY['a','b']               AS path_arr_to_leaf;
+SELECT '{"a":{"b":1}}'::JSONB #> ARRAY['a']                   AS path_arr_to_subtree;
+
+--echo === `#>` missing path → NULL ===
+
+SELECT '{"a":1}'::JSONB #> '{missing}'                        AS path_missing_null;
+SELECT '{"a":1}'::JSONB #> '{a,b,c,d}'                        AS path_too_deep_null;
+
+--echo === STRIKING BUG: array-index path returns NULL ===
+
+# PG: `'[10,20,30]'::jsonb #> '{1}'` returns `20`. zeta
+# returns NULL — array-index path segments are not
+# dispatched. Real bug.
+SELECT '[10,20,30]'::JSONB #> '{1}'                           AS bug_arr_idx_path_null;
+SELECT '[10,20,30]'::JSONB #> '{0}'                           AS bug_arr_idx_0_null;
+# Mixed object-then-array also broken at the array step.
+SELECT '{"a":[1,2,3]}'::JSONB #> '{a,0}'                      AS bug_obj_then_arr_null;
+# Workaround via -> chain (single-step works).
+SELECT ('[10,20,30]'::JSONB -> 1)                             AS workaround_arrow_chain;
+
+--echo === `#>>` text-extract variant ===
+
+# `#>>` returns the value as TEXT (unquoted for strings,
+# stringified for other types).
+SELECT '{"a":1}'::JSONB #>> '{a}'                             AS text_int;
+SELECT '{"a":"hello"}'::JSONB #>> '{a}'                       AS text_str_unquoted;
+SELECT '{"a":{"b":1}}'::JSONB #>> '{a,b}'                     AS text_nested_int;
+
+--echo === SQL NULL::JSONB path → NULL (3VL, per PR #380) ===
+
+SELECT NULL::JSONB #> '{a}'                                   AS sql_null_path_null;
+SELECT NULL::JSONB #>> '{a}'                                  AS sql_null_text_path_null;
+
+--echo === JSONB_TYPEOF — distinguish SQL NULL from JSONB 'null' ===
+
+# SQL NULL → NULL (3VL).
+SELECT JSONB_TYPEOF(NULL::JSONB)                              AS typeof_sql_null;
+# JSONB 'null' scalar → 'null' string.
+SELECT JSONB_TYPEOF('null'::JSONB)                            AS typeof_jsonb_null;
+# Other types for comparison.
+SELECT JSONB_TYPEOF('1'::JSONB)                               AS typeof_number;
+SELECT JSONB_TYPEOF('"hello"'::JSONB)                         AS typeof_string;
+SELECT JSONB_TYPEOF('true'::JSONB)                            AS typeof_bool;
+SELECT JSONB_TYPEOF('[]'::JSONB)                              AS typeof_array;
+SELECT JSONB_TYPEOF('{}'::JSONB)                              AS typeof_object;
