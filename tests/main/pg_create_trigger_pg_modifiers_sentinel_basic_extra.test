@@ -1,0 +1,186 @@
+# Independently authored PG CREATE TRIGGER PG-
+# modifiers sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE TRIGGER basic (BEFORE/AFTER on INSERT/
+#     UPDATE/DELETE with FOR EACH ROW): covered at
+#     trigger_basic_extra and similar.
+#   - DROP TRIGGER: covered at trigger_basic_extra.
+#   - CREATE OR REPLACE TRIGGER (PG 14+ modifier):
+#     ZERO prior coverage.
+#   - CREATE CONSTRAINT TRIGGER (PG-specific
+#     deferrable trigger): ZERO prior coverage.
+#   - REFERENCING NEW TABLE / OLD TABLE (PG 10+
+#     transition tables): ZERO prior coverage.
+#   - REFERENCING NEW ROW / OLD ROW (PG row-level
+#     transition aliases): ZERO prior coverage.
+#   - INSTEAD OF TRIGGER (PG view-trigger): ZERO
+#     prior coverage.
+#   - CONSTRAINT TRIGGER ... DEFERRABLE characteristic:
+#     ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - SILENT-DROP BUG pattern at convert.rs: pre-
+#     existing at PR #391 (INHERITS), PR #407 (SCHEMA
+#     AUTHORIZATION), PR #408 (WITH ORDINALITY), PR
+#     #415 (SELECT INTO). Same mechanism: sqlparser
+#     parses the modifier into the AST, zeta's
+#     convert.rs ignores the field, the statement
+#     proceeds without the modifier's semantics.
+#   - SOURCE WITNESS: zeta-parser/src/convert.rs
+#     `convert_create_trigger` at line 5419 reads
+#     only: trigger_name, table_name, timing
+#     (BEFORE/AFTER), events (INSERT/UPDATE/DELETE/
+#     TRUNCATE), function_name, when_clause.
+#     NOT read (silently dropped):
+#       - ct.or_replace (drops OR REPLACE modifier)
+#       - ct.is_constraint (drops CONSTRAINT modifier)
+#       - ct.referenced_table_name
+#       - ct.characteristics (drops DEFERRABLE etc.)
+#       - ct.referencing (drops REFERENCING NEW/OLD
+#         TABLE / ROW)
+#       - ct.statement_orientation (drops FOR EACH
+#         STATEMENT distinction; assumed ROW)
+#   - "execution error: function does not exist" —
+#     pre-existing fingerprint when CREATE TRIGGER
+#     reaches the executor (parser-accept; executor
+#     looks up the EXECUTE FUNCTION target).
+#   - "trigger must specify BEFORE or AFTER" — pre-
+#     existing explicit reject at convert.rs:5427-
+#     5430 for INSTEAD OF triggers.
+#   - "Expected: an SQL statement, found: ROW" —
+#     pre-existing fingerprint at many slices.
+#
+# This slice pins:
+#
+#   SHAPE A — parser-accept, modifier silently dropped
+#   (proven by all reaching the "function does not
+#   exist" executor error — the same error a plain
+#   CREATE TRIGGER on a missing fn would emit). The
+#   evidence of silent-drop is SOURCE-LEVEL (the
+#   convert.rs field-ignore) not behavioral, because
+#   the trigger function does not exist so the
+#   modifier's semantic effect cannot be tested via
+#   the MTR runner. Cross-link to source line.
+#     - CREATE OR REPLACE TRIGGER cort AFTER INSERT
+#       ON t FOR EACH ROW EXECUTE FUNCTION fn();
+#       (OR REPLACE silently dropped → behaves as
+#       plain CREATE TRIGGER which would error on
+#       duplicate name if run twice. Apps relying on
+#       OR REPLACE idempotency get a duplicate-name
+#       error instead.)
+#     - CREATE CONSTRAINT TRIGGER cct AFTER INSERT
+#       ON t FOR EACH ROW EXECUTE FUNCTION fn();
+#       (CONSTRAINT silently dropped → not a
+#       constraint trigger; DEFERRABLE characteristic
+#       cannot apply.)
+#     - CREATE TRIGGER ref_n AFTER INSERT ON t
+#       REFERENCING NEW TABLE AS new_rows FOR EACH
+#       STATEMENT EXECUTE FUNCTION fn();
+#       (REFERENCING NEW TABLE silently dropped →
+#       trigger body cannot reference `new_rows` as
+#       a transition table.)
+#     - REFERENCING OLD TABLE same.
+#     - CREATE CONSTRAINT TRIGGER ... DEFERRABLE
+#       INITIALLY DEFERRED — DEFERRABLE characteristic
+#       silently dropped along with CONSTRAINT.
+#
+#   SHAPE B — parser-reject "Expected: an SQL
+#   statement, found: ROW" (sqlparser doesn't know
+#   REFERENCING NEW/OLD ROW form):
+#     - REFERENCING NEW ROW AS new_row (row-level
+#       transition alias).
+#
+#   SHAPE C — explicit reject at convert.rs:5427
+#   "trigger must specify BEFORE or AFTER":
+#     - INSTEAD OF INSERT / UPDATE / DELETE — PG
+#       view-triggers (the only triggers PG allows
+#       on views) are explicitly rejected, not silent-
+#       dropped. Convert.rs requires BEFORE or AFTER
+#       and falls into the `_ =>` arm for INSTEAD OF.
+#
+# Big-picture finding:
+#
+#   PG-specific CREATE TRIGGER modifier family
+#   has 3 distinct response classes:
+#     (a) Silently dropped (OR REPLACE, CONSTRAINT,
+#         REFERENCING NEW/OLD TABLE, DEFERRABLE) —
+#         parser accepts, convert.rs ignores. Apps
+#         get plain-trigger semantics not the modified
+#         semantics they wrote.
+#     (b) Parser-rejected (REFERENCING NEW/OLD ROW
+#         row-level transition aliases).
+#     (c) Explicitly rejected (INSTEAD OF — required
+#         for view-triggers).
+#
+#   For pg_dump round-tripping of schemas with these
+#   triggers: classes (b) and (c) error and break
+#   the dump; class (a) silently round-trips but the
+#   semantic intent is lost.
+#
+#   Most dangerous: CONSTRAINT TRIGGER silent-drop.
+#   Apps that use CONSTRAINT TRIGGER + DEFERRABLE to
+#   delay foreign-key-like checks to commit time get
+#   immediate firing instead — different ordering
+#   semantics that may invalidate the app's
+#   transaction logic.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL
+# behavior. convert.rs is parser-shared by both wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-DROP BUG — OR REPLACE,
+#     CONSTRAINT, REFERENCING NEW/OLD TABLE, and
+#     DEFERRABLE modifiers all silently dropped at
+#     convert_create_trigger (zeta-parser/src/
+#     convert.rs:5419). Apps relying on these
+#     semantics get plain CREATE TRIGGER behavior.
+#   # zeta-adapt: KNOWN GAP — REFERENCING NEW/OLD
+#     ROW row-level transition aliases parser-reject.
+#   # zeta-adapt: KNOWN GAP — INSTEAD OF triggers
+#     (required for view triggers) explicitly
+#     rejected at convert.rs:5427.
+
+DROP TABLE IF EXISTS trig_pt;
+CREATE TABLE trig_pt (id INT);
+
+--echo === SHAPE A — silently-dropped modifiers; all reach executor with same "function does not exist" ===
+
+--echo === plain CREATE TRIGGER (control — same fingerprint) ===
+--error 1105
+CREATE TRIGGER plain_t AFTER INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+
+--echo === CREATE OR REPLACE TRIGGER — OR REPLACE silently dropped ===
+--error 1105
+CREATE OR REPLACE TRIGGER cort AFTER INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+
+--echo === CREATE CONSTRAINT TRIGGER — CONSTRAINT silently dropped ===
+--error 1105
+CREATE CONSTRAINT TRIGGER cct AFTER INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+
+--echo === REFERENCING NEW TABLE AS new_rows — silently dropped ===
+--error 1105
+CREATE TRIGGER ref_n AFTER INSERT ON trig_pt REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION nonexistent_fn();
+
+--echo === REFERENCING OLD TABLE AS old_rows — silently dropped ===
+--error 1105
+CREATE TRIGGER ref_o AFTER DELETE ON trig_pt REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION nonexistent_fn();
+
+--echo === CONSTRAINT TRIGGER + DEFERRABLE INITIALLY DEFERRED — both silently dropped ===
+--error 1105
+CREATE CONSTRAINT TRIGGER cct_def AFTER INSERT ON trig_pt DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+
+--echo === SHAPE B — REFERENCING NEW ROW (row-level alias) → "Expected: an SQL statement, found: ROW" ===
+
+--error 1064
+CREATE TRIGGER ref_nr AFTER INSERT ON trig_pt REFERENCING NEW ROW AS new_row FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+
+--echo === SHAPE C — INSTEAD OF (PG view-trigger) → explicit reject "trigger must specify BEFORE or AFTER" ===
+
+--error 1064
+CREATE TRIGGER inst_t INSTEAD OF INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+
+DROP TABLE trig_pt;
