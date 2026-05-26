@@ -113,13 +113,7 @@ UTC
 SELECT @@system_time_zone;
 @@system_time_zone
 UTC
-=== Isolation / sql_mode / engine ===
-SELECT @@tx_isolation;
-@@tx_isolation
-REPEATABLE-READ
-SELECT @@transaction_isolation;
-@@transaction_isolation
-REPEATABLE-READ
+=== sql_mode / engine (isolation vars already in txn_isolation_basic_extra) ===
 SELECT @@sql_mode;
 @@sql_mode
 

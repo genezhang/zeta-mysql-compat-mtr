@@ -25,15 +25,18 @@
 #     @@collation_database all = 'utf8mb4_general_ci'.
 #   - Protocol/connection: @@protocol_version = 10,
 #     @@hostname = 'localhost'.
-#   - Limits: @@max_allowed_packet = 16777216,
-#     @@max_connections = 151, @@wait_timeout = 28800.
+#   - Limits: @@max_allowed_packet (returns 67108864
+#     from the mysql_async CLIENT — NOT shim's 16777216,
+#     see big-picture #5 below), @@max_connections = 151,
+#     @@wait_timeout = 28800.
 #   - Empty-string safe defaults for client-compat:
 #     @@socket = '', @@ssl_version = '', @@ssl_cipher = ''.
 #   - @@time_zone = 'UTC', @@system_time_zone = 'UTC'.
 #   - @@license = 'Proprietary'.
 #   - @@sql_mode = '' (empty).
-#   - @@tx_isolation / @@transaction_isolation =
-#     'REPEATABLE-READ'.
+#   - (@@tx_isolation / @@transaction_isolation already
+#     pinned in txn_isolation_basic_extra:87-88; NOT
+#     re-pinned here.)
 #   - @@lc_time_names = 'en_US' (read).
 #   - @@unknown_var → NULL silent (no error — divergence
 #     from real MySQL).
@@ -169,10 +172,11 @@ SELECT @@ssl_key;
 SELECT @@time_zone;
 SELECT @@system_time_zone;
 
---echo === Isolation / sql_mode / engine ===
+--echo === sql_mode / engine (isolation vars already in txn_isolation_basic_extra) ===
 
-SELECT @@tx_isolation;
-SELECT @@transaction_isolation;
+# @@tx_isolation and @@transaction_isolation reads are
+# already pinned in txn_isolation_basic_extra.test:87-88,
+# 116 — not re-pinned here per PR #370 review.
 SELECT @@sql_mode;
 SELECT @@default_storage_engine;
 SELECT @@storage_engine;
@@ -196,11 +200,13 @@ SELECT @@lc_time_names;
 SELECT @@nonexistent_var;
 SELECT @@made_up_variable;
 SELECT @@some_other_garbage;
-# STRIKING: `SELECT @@var IS NULL` is shim-absorbed
-# WHOLESALE — the shim matches "select @@" prefix and
-# treats everything after as one variable lookup
-# ("nonexistent_var is null as unknown_is_null"). Result
-# is the NULL from the unknown-variable fallback, not a
-# Bool. The `IS NULL` predicate is NOT actually
+# Instance of the same `@@<var> <suffix>` absorption
+# already documented in variable_basic_extra:96-100 (the
+# `@@autocommit AS r` known gap). Pinned here for the
+# predicate form too — the shim matches "select @@"
+# prefix and treats everything after as one variable
+# lookup ("nonexistent_var is null as unknown_is_null").
+# Result is the NULL from the unknown-variable fallback,
+# not a Bool. The `IS NULL` predicate is NOT actually
 # evaluated.
 SELECT @@nonexistent_var IS NULL                              AS unknown_is_null;
