@@ -1,0 +1,16 @@
+=== KILL variants — shape (c) "unsupported statement" ===
+KILL 123;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+KILL QUERY 456;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+KILL CONNECTION 789;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== BACKUP / RESTORE / PURGE — shape (d) "Expected: an SQL statement" ===
+BACKUP DATABASE test TO 'foo';
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: BACKUP at Line: 1, Column: 1
+RESTORE FROM 'foo';
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: RESTORE at Line: 1, Column: 1
+PURGE BINARY LOGS BEFORE '2026-01-01';
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: PURGE at Line: 1, Column: 1
+PURGE BINARY LOGS TO 'log';
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: PURGE at Line: 1, Column: 1

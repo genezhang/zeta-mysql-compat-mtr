@@ -1,0 +1,85 @@
+# Independently authored KILL / BACKUP / RESTORE / PURGE
+# sentinel smoke for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - KILL — NONE in compat-mtr (verified per PR #357
+#     lesson).
+#   - BACKUP DATABASE / RESTORE FROM — NONE.
+#   - PURGE BINARY LOGS — NONE.
+#   - mysql_maintenance_cmds_sentinel_basic_extra (PR
+#     #371) covers FLUSH / RESET / HANDLER / SHUTDOWN.
+#     This slice covers the remaining four ops/admin
+#     statements that have NO zeta surface and
+#     parse-reject at 1064.
+#
+# This slice pins:
+#   - KILL <id> / KILL QUERY <id> / KILL CONNECTION <id>
+#     → 1064 with the "unsupported statement: sqlparser::
+#     ast::Statement" shape (parsed by sqlparser, rejected
+#     in convert.rs:432-435).
+#   - BACKUP DATABASE / RESTORE FROM / PURGE BINARY LOGS
+#     → 1064 with the "Expected: an SQL statement, found:
+#     <X>" shape (sqlparser doesn't recognize the leading
+#     keyword).
+#
+# Big-picture finding (TWO-OF-FOUR ERROR-SHAPES):
+#   These six statements span TWO of the four sqlparser
+#   error templates documented in PR #371:
+#
+#   - **Shape (c)** "unsupported statement: sqlparser::
+#     ast::Statement": KILL variants. Parsed by sqlparser
+#     into a Statement::Kill variant; convert.rs:432-435
+#     hits the catch-all reject.
+#
+#   - **Shape (d)** "Expected: an SQL statement, found:
+#     <X>": BACKUP / RESTORE / PURGE. sqlparser-rs
+#     doesn't recognize these as top-level statement
+#     keywords at all — error fires at lexer/parser
+#     level, before any AST is built.
+#
+#   No new shapes here — this slice is purely
+#   completeness for the remaining sentinels not in PR
+#   #371.
+#
+#   Recovery paths:
+#
+#   - KILL → use OS-level signaling (kill -INT or
+#     supervisor restart). zeta has no per-connection
+#     kill from SQL today.
+#   - BACKUP DATABASE / RESTORE FROM → zeta uses
+#     LSM-segment snapshots and log-replay for backup/
+#     restore, not SQL-level commands. See the zeta
+#     STORAGE_ENGINE_ANALYSIS.md for snapshot semantics.
+#   - PURGE BINARY LOGS → zeta uses log-store
+#     segments, not MySQL binlogs; rotation is internal
+#     (no SQL handle).
+#
+# Adaptation notes:
+#   # zeta-adapt: KILL <id> / KILL QUERY / KILL CONNECTION
+#     all error 1064 (shape c). Use OS signaling for
+#     connection lifecycle.
+#   # zeta-adapt: BACKUP DATABASE / RESTORE FROM / PURGE
+#     BINARY LOGS error 1064 (shape d). Backup/restore
+#     are out-of-band ops in zeta; binlog purge is
+#     internal.
+
+--echo === KILL variants — shape (c) "unsupported statement" ===
+
+--error 1064
+KILL 123;
+--error 1064
+KILL QUERY 456;
+--error 1064
+KILL CONNECTION 789;
+
+--echo === BACKUP / RESTORE / PURGE — shape (d) "Expected: an SQL statement" ===
+
+--error 1064
+BACKUP DATABASE test TO 'foo';
+--error 1064
+RESTORE FROM 'foo';
+--error 1064
+PURGE BINARY LOGS BEFORE '2026-01-01';
+--error 1064
+PURGE BINARY LOGS TO 'log';
