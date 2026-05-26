@@ -1,0 +1,130 @@
+# Independently authored RANGE operators smoke for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - range_type_basic_extra covers `@>` (contains),
+#     `<<` (strictly-left), `&&` (overlap), and pins
+#     `-|-` (adjacency) as KNOWN GAP (errno 1064).
+#   - This slice covers the REMAINING PG range
+#     operators: `>>` (strictly-right), `<@` (contained
+#     by, range and element forms), `&<` / `&>` (extend-
+#     ranking), and the arithmetic forms `+` / `*` / `-`
+#     (union / intersect / difference).
+#
+# This slice pins (mix of supported, parse-rejected,
+# and execution-rejected):
+#
+#   Supported:
+#     - `r1 >> r2` strictly-right-of (works).
+#     - `r1 <@ r2` range contained-by (works).
+#     - `elem <@ r1` element contained in range (works).
+#
+#   Parse-rejected (errno 1064):
+#     - `r1 &< r2` not-extending-right (no binary-op
+#       dispatch — sqlparser tokenizes but binary-op
+#       arm rejects).
+#     - `r1 &> r2` not-extending-left (same).
+#
+#   Execution-rejected (errno 1105):
+#     - `r1 + r2` PG-style union (parses but executor
+#       routes to numeric `+` dispatcher → "arithmetic op
+#       requires numbers").
+#     - `r1 * r2` PG-style intersect (same misroute).
+#     - `r1 - r2` PG-style difference (same misroute).
+#
+# Big-picture finding (TWO REJECTION SHAPES):
+#
+#   The range-operator surface in zeta has THREE distinct
+#   behavior categories:
+#
+#   1. **Supported**: `@>`, `<<`, `>>`, `&&`, `<@`.
+#      Distinct types of range comparison work end-to-
+#      end.
+#
+#   2. **Parse-rejected (1064)**: `&<`, `&>`, `-|-`.
+#      sqlparser knows the tokens but zeta's binary-op
+#      dispatcher (convert.rs binary-op arm) rejects.
+#
+#   3. **Execution-rejected (1105)**: `+`, `*`, `-`.
+#      These tokens are arithmetic operators that
+#      sqlparser parses fine, and zeta's planner takes
+#      the standard arithmetic path. The executor then
+#      hits "arithmetic op requires numbers" because the
+#      operands are RANGE not number. PG would dispatch
+#      these to range-union / range-intersect /
+#      range-difference instead.
+#
+#   STRIKING — the SAME `-` operator token has TWO
+#   completely different fates depending on context:
+#     - `'[1,5)'::INT4RANGE - '[1,5)'::INT4RANGE` errors
+#       1105 (range arithmetic not implemented).
+#     - `'[1,5)'::JSONB - 'a'` works (per PR #378 JSONB
+#       minus slice — key removal).
+#   Apps porting PG code that uses `-` for range
+#   difference will see arithmetic-op errors, NOT a
+#   useful "operator not supported on RANGE" error.
+#
+# Adaptation notes:
+#   # zeta-adapt: Range operator surface has 3 buckets:
+#     supported (@>/<</>>/&&/<@), parse-reject 1064
+#     (&</&>/-|-), execution-reject 1105 misroute to
+#     arithmetic (+/*/-).
+#   # zeta-adapt: For PG-style range union, use
+#     UNNEST + explicit RANGE construction; for
+#     intersect, use multi-condition WHERE; for
+#     difference, use NOT (a @> ...) compositions.
+
+--echo === `>>` strictly-right-of (supported) ===
+
+SELECT '[6,10)'::INT4RANGE >> '[1,5)'::INT4RANGE             AS strict_right_true;
+SELECT '[1,5)'::INT4RANGE >> '[6,10)'::INT4RANGE             AS strict_right_false;
+# Overlapping ranges are NOT strictly-right.
+SELECT '[3,8)'::INT4RANGE >> '[1,5)'::INT4RANGE              AS overlap_not_strict_right;
+
+--echo === `<@` range contained-by (supported) ===
+
+SELECT '[2,5)'::INT4RANGE <@ '[1,10)'::INT4RANGE             AS range_contained_true;
+SELECT '[0,5)'::INT4RANGE <@ '[1,10)'::INT4RANGE             AS range_not_contained_false;
+SELECT '[1,5)'::INT4RANGE <@ '[1,5)'::INT4RANGE              AS range_self_true;
+
+--echo === `<@` element contained in range (supported) ===
+
+SELECT 5 <@ '[1,10)'::INT4RANGE                              AS elem_in_range_true;
+SELECT 10 <@ '[1,10)'::INT4RANGE                             AS elem_at_excl_upper_false;
+SELECT 0 <@ '[1,10)'::INT4RANGE                              AS elem_below_false;
+
+--echo === `&<` not-extending-right — PARSE REJECTED (1064) ===
+
+--error 1064
+SELECT '[1,5)'::INT4RANGE &< '[6,10)'::INT4RANGE;
+
+--echo === `&>` not-extending-left — PARSE REJECTED (1064) ===
+
+--error 1064
+SELECT '[6,10)'::INT4RANGE &> '[1,5)'::INT4RANGE;
+
+--echo === `+` range-union — EXECUTION REJECTED 1105 (misroute to arithmetic) ===
+
+--error 1105
+SELECT '[1,5)'::INT4RANGE + '[10,20)'::INT4RANGE;
+
+--echo === `*` range-intersect — EXECUTION REJECTED 1105 ===
+
+--error 1105
+SELECT '[1,10)'::INT4RANGE * '[5,15)'::INT4RANGE;
+
+--echo === `-` range-difference — EXECUTION REJECTED 1105 ===
+
+--error 1105
+SELECT '[1,10)'::INT4RANGE - '[5,15)'::INT4RANGE;
+
+--echo === STRIKING: `-` token has two fates — RANGE errors, JSONB works ===
+
+# Same `-` token, different operand types, different
+# behavior. PG dispatches range `-` to range-difference;
+# zeta routes through arithmetic and fails.
+--error 1105
+SELECT '[1,5)'::INT4RANGE - '[1,5)'::INT4RANGE;
+# JSONB minus 'key' WORKS (per PR #378).
+SELECT '{"a":1,"b":2}'::JSONB - 'a'                          AS jsonb_minus_key_works;
