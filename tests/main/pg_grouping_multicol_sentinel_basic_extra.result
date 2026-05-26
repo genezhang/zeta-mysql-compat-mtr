@@ -1,0 +1,56 @@
+DROP TABLE IF EXISTS gx;
+CREATE TABLE gx (a INT, b TEXT, v INT);
+INSERT INTO gx VALUES (1,'x',10),(2,'y',20),(1,'y',30),(2,'x',40);
+=== CUBE(a, b) — 9 rows: 4 base + 2 col-a subtotals + 2 col-b subtotals + 1 grand ===
+SELECT a, b, SUM(v) AS s FROM gx GROUP BY CUBE (a, b) ORDER BY a NULLS LAST, b NULLS LAST;
+a	b	s
+1	x	10
+1	y	30
+1	NULL	40
+2	x	40
+2	y	20
+2	NULL	60
+NULL	x	50
+NULL	y	50
+NULL	NULL	100
+=== ROLLUP(a, b) — 7 rows: 4 base + 2 col-a subtotals + 1 grand (NO col-b-only) ===
+SELECT a, b, SUM(v) AS s FROM gx GROUP BY ROLLUP (a, b) ORDER BY a NULLS LAST, b NULLS LAST;
+a	b	s
+1	x	10
+1	y	30
+1	NULL	40
+2	x	40
+2	y	20
+2	NULL	60
+NULL	NULL	100
+=== GROUPING SETS (()) — exactly 1 row, the grand-total ===
+SELECT SUM(v) AS grand_total FROM gx GROUP BY GROUPING SETS (());
+grand_total
+100
+=== GROUPING(a) + GROUPING(b) bitmap across CUBE — 4 distinct (ga, gb) combinations ===
+SELECT a, b, GROUPING(a) AS ga, GROUPING(b) AS gb, SUM(v) AS s
+FROM gx GROUP BY CUBE (a, b)
+ORDER BY ga, gb, a NULLS LAST, b NULLS LAST;
+a	b	ga	gb	s
+1	x	0	0	10
+1	y	0	0	30
+2	x	0	0	40
+2	y	0	0	20
+1	NULL	0	1	40
+2	NULL	0	1	60
+NULL	x	1	0	50
+NULL	y	1	0	50
+NULL	NULL	1	1	100
+=== GROUPING SETS ((a,b), (a), ()) — equivalent to ROLLUP(a,b) by hand, 7 rows ===
+SELECT a, b, SUM(v) AS s
+FROM gx GROUP BY GROUPING SETS ((a, b), (a), ())
+ORDER BY a NULLS LAST, b NULLS LAST;
+a	b	s
+1	x	10
+1	y	30
+1	NULL	40
+2	x	40
+2	y	20
+2	NULL	60
+NULL	NULL	100
+DROP TABLE gx;

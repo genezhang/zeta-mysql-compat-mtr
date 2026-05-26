@@ -1,0 +1,138 @@
+# Independently authored PG multi-column grouping
+# extensions sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - SINGLE-column ROLLUP/CUBE/GROUPING SETS:
+#     ALREADY pinned at group_by_edges_basic_extra:
+#     80-86 (ROLLUP(region), CUBE(region), GROUPING
+#     SETS ((region), (name))) + GROUPING(col) at
+#     line 39-40 prose. NOT re-pinned here.
+#   - MULTI-column ROLLUP(a, b) / CUBE(a, b): ZERO
+#     prior coverage. Single-column ROLLUP/CUBE
+#     behavior is degenerate (same as plain GROUP
+#     BY + a grand-total row). Multi-column is
+#     where the 2^n / n+1 semantics distinguish.
+#   - GROUPING SETS (()) for grand total only:
+#     ZERO prior.
+#   - GROUPING() multi-arg bitmap (across both
+#     CUBE-expanded columns): ZERO prior.
+#   - Nested GROUPING SETS combining named subsets
+#     and empty set: ZERO prior.
+#
+# This slice is a SUPPORT PIN (not a gap pin). All
+# probes succeed correctly. The purpose is to lock
+# the semantic guarantees in regression coverage,
+# because:
+#   (a) Multi-column CUBE / ROLLUP are easy to
+#       regress to single-column behavior if a
+#       refactor degrades the expansion logic.
+#   (b) GROUPING SETS (()) is a specific PG idiom
+#       (grand-total via grouping sets rather than
+#       via the implicit grand-total of ROLLUP/CUBE).
+#   (c) The GROUPING() function's bitmap semantic
+#       across multiple CUBE columns is subtle —
+#       the 4 expected groupings (00, 01, 10, 11)
+#       must all appear with their correct ga/gb
+#       bit pattern.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - All probes WORK; no error shapes to pin.
+#
+# This slice pins:
+#
+#   CUBE(a, b) on a 2-col 2-distinct-value-each
+#   probe table produces 9 rows:
+#     - 4 base rows ({1,x}, {1,y}, {2,x}, {2,y})
+#     - 2 subtotals for col-a-only ({1,NULL}, {2,NULL})
+#     - 2 subtotals for col-b-only ({NULL,x}, {NULL,y})
+#     - 1 grand total ({NULL,NULL})
+#
+#   ROLLUP(a, b) on the same probe produces 7 rows:
+#     - 4 base rows
+#     - 2 subtotals for col-a-only (NOT col-b-only —
+#       ROLLUP is hierarchical, leftmost is most-
+#       general)
+#     - 1 grand total
+#     CRITICAL distinguisher: ROLLUP has NO {NULL,x}
+#     or {NULL,y} subtotals because col-a is the
+#     ROLLUP root. CUBE would include them.
+#
+#   GROUPING SETS (()) produces exactly 1 row with
+#   the grand-total of all data, regardless of
+#   GROUP BY columns. PG-idiomatic way to compute
+#   a grand-total alongside a query that doesn't
+#   otherwise need GROUP BY.
+#
+#   GROUPING(a) + GROUPING(b) bitmap across CUBE
+#   produces the expected 4 groupings:
+#     - (0,0): base rows (both cols real)
+#     - (0,1): col-a-only subtotals (col-b NULL)
+#     - (1,0): col-b-only subtotals (col-a NULL)
+#     - (1,1): grand total (both NULL)
+#
+#   GROUPING SETS ((a, b), (a), ()) — mixing named
+#   subsets and empty set produces 4+2+1=7 rows
+#   (same shape as ROLLUP(a, b), confirming
+#   GROUPING SETS can express any ROLLUP/CUBE form).
+#
+# Big-picture finding:
+#
+#   PG-flavored grouping extensions are fully
+#   supported on zeta. SUPPORT pin protects against
+#   regression. Apps porting PG analytics that rely
+#   on multi-col CUBE / ROLLUP / GROUPING SETS will
+#   work as expected.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# output on every form. Both wires route through
+# the same optimizer/executor pipeline; no wire-
+# specific GROUPING handling.
+#
+# Adaptation notes:
+#   # zeta-adapt: SUPPORTED — multi-col CUBE(a, b)
+#     produces full 2^n grouping rows.
+#   # zeta-adapt: SUPPORTED — multi-col ROLLUP(a, b)
+#     produces hierarchical n+1 grouping rows.
+#   # zeta-adapt: SUPPORTED — GROUPING SETS (()) for
+#     grand-total only.
+#   # zeta-adapt: SUPPORTED — GROUPING() bitmap
+#     semantic across multiple CUBE-expanded
+#     columns.
+#   # zeta-adapt: SUPPORTED — GROUPING SETS with
+#     mixed named subsets and empty set.
+
+DROP TABLE IF EXISTS gx;
+CREATE TABLE gx (a INT, b TEXT, v INT);
+INSERT INTO gx VALUES (1,'x',10),(2,'y',20),(1,'y',30),(2,'x',40);
+
+--echo === CUBE(a, b) — 9 rows: 4 base + 2 col-a subtotals + 2 col-b subtotals + 1 grand ===
+
+SELECT a, b, SUM(v) AS s FROM gx GROUP BY CUBE (a, b) ORDER BY a NULLS LAST, b NULLS LAST;
+
+--echo === ROLLUP(a, b) — 7 rows: 4 base + 2 col-a subtotals + 1 grand (NO col-b-only) ===
+
+# CRITICAL distinguisher: NO (NULL,'x') or
+# (NULL,'y') rows here because ROLLUP is
+# hierarchical. CUBE has them; ROLLUP doesn't.
+SELECT a, b, SUM(v) AS s FROM gx GROUP BY ROLLUP (a, b) ORDER BY a NULLS LAST, b NULLS LAST;
+
+--echo === GROUPING SETS (()) — exactly 1 row, the grand-total ===
+
+SELECT SUM(v) AS grand_total FROM gx GROUP BY GROUPING SETS (());
+
+--echo === GROUPING(a) + GROUPING(b) bitmap across CUBE — 4 distinct (ga, gb) combinations ===
+
+SELECT a, b, GROUPING(a) AS ga, GROUPING(b) AS gb, SUM(v) AS s
+FROM gx GROUP BY CUBE (a, b)
+ORDER BY ga, gb, a NULLS LAST, b NULLS LAST;
+
+--echo === GROUPING SETS ((a,b), (a), ()) — equivalent to ROLLUP(a,b) by hand, 7 rows ===
+
+SELECT a, b, SUM(v) AS s
+FROM gx GROUP BY GROUPING SETS ((a, b), (a), ())
+ORDER BY a NULLS LAST, b NULLS LAST;
+
+DROP TABLE gx;
