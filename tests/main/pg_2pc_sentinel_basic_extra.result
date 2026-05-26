@@ -1,0 +1,15 @@
+=== PREPARE TRANSACTION 'gid' (2 forms) → "Expected: AS, found: '<gid>'" at col 21 ===
+PREPARE TRANSACTION 'gid_1';
+ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: 'gid_1' at Line: 1, Column: 21
+PREPARE TRANSACTION 'app/tx/42';
+ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: 'app/tx/42' at Line: 1, Column: 21
+=== COMMIT PREPARED 'gid' (2 forms) → "Expected: end of statement, found: PREPARED" at col 8 ===
+COMMIT PREPARED 'gid_1';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PREPARED at Line: 1, Column: 8
+COMMIT PREPARED 'app/tx/42';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PREPARED at Line: 1, Column: 8
+=== ROLLBACK PREPARED 'gid' (2 forms) → "Expected: end of statement, found: PREPARED" at col 10 ===
+ROLLBACK PREPARED 'gid_1';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PREPARED at Line: 1, Column: 10
+ROLLBACK PREPARED 'app/tx/42';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PREPARED at Line: 1, Column: 10
