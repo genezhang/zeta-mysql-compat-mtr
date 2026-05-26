@@ -1,0 +1,153 @@
+# Independently authored WEEK / WEEKOFYEAR extras smoke for
+# the GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - temporal_arithmetic_basic_extra.test:101: ONE row
+#     `WEEK(DATE '2024-05-19')`.
+#   - datetime_format_basic.test:80: ONE row `WEEK('2026-05-19')`.
+#   - date_time_basic_extra.test:137: ONE row
+#     `WEEKOFYEAR('2024-05-19')`.
+#   - yearweek_basic_extra.test: covers YEARWEEK with the
+#     2-arg mode form and year-shift edge cases (4-day rule,
+#     53-week years). DO NOT duplicate ISO-year-shift
+#     pinning — that file owns it. This slice keeps to bare
+#     WEEK/WEEKOFYEAR per-week-number values and arity.
+#   - day_week_last_day_basic_extra.test: covers DAYOFWEEK /
+#     DAYOFYEAR / WEEKDAY / LAST_DAY.
+#
+# This slice pins what those slices DO NOT:
+#   - WEEK and WEEKOFYEAR equivalence (same impl: ISO-week).
+#   - 2-arg WEEK(d, mode) MySQL form → ERROR 1105 (zeta is
+#     1-arg only). MAJOR DIVERGENCE — MySQL defaults to
+#     mode 0 (Sunday-first), zeta returns ISO weeks.
+#   - Arity errors (0 args, 2 args).
+#   - Wrong-type (Int, Float, Bool) → 1105.
+#   - Unparseable-string → 1105.
+#   - NULL propagation (NULL + typed NULL).
+#   - TIMESTAMP arg (separate code path from Date).
+#   - WEEK at ISO 4-day-rule boundary: 2024-12-30 (Monday) →
+#     week 1 of 2025; 2024-01-01 (Monday) → week 1; 2023-01-01
+#     (Sunday) → week 52 of 2022.
+#   - WEEK return type is Int (mysql wire renders as bigint).
+#
+# Big-picture finding:
+#   zeta's WEEK and WEEKOFYEAR are aliases: SAME impl arm at
+#   lib.rs:51753 (`"WEEK" | "WEEKOFYEAR" => iso_week_number`).
+#   Both ALWAYS return ISO 8601 week number (Monday-first,
+#   week-containing-thursday). This is a DIVERGENCE from
+#   MySQL:
+#     - MySQL's WEEK(d) defaults to mode 0 (Sunday-first).
+#       Different value for some dates.
+#     - MySQL's WEEK(d, mode) takes 0..7. Zeta REJECTS the
+#       2-arg form (only 1-arg arity supported).
+#     - MySQL's WEEKOFYEAR(d) = WEEK(d, 3) (ISO). Coincidentally
+#       matches zeta's behavior.
+#   So porting MySQL apps that use WEEK(d) bare may silently
+#   return different values, and apps using WEEK(d, mode)
+#   will fail with arity error.
+#
+# Adaptation notes:
+#   # zeta-adapt: WEEK and WEEKOFYEAR both return ISO 8601
+#     week number — same value. zeta's WEEK(d) = MySQL's
+#     WEEK(d, 3), NOT MySQL's WEEK(d, 0).
+#   # zeta-adapt: 2-arg WEEK(d, mode) → 1105 'WEEK requires
+#     1 argument'.
+#   # zeta-adapt: Wrong-type → 1105 'requires a date,
+#     timestamp, or parseable string'.
+#   # zeta-adapt: Unparseable string → 1105 'cannot parse <s>
+#     as a date or timestamp'.
+
+--echo === WEEK and WEEKOFYEAR equivalence (same ISO impl) ===
+
+# Both functions share the impl arm — values are identical
+# for ANY input.
+SELECT WEEK(DATE '2024-05-19')        = WEEKOFYEAR(DATE '2024-05-19')        AS may_eq;
+SELECT WEEK(DATE '2024-01-01')        = WEEKOFYEAR(DATE '2024-01-01')        AS jan_eq;
+SELECT WEEK(DATE '2024-12-31')        = WEEKOFYEAR(DATE '2024-12-31')        AS dec_eq;
+SELECT WEEK(TIMESTAMP '2024-05-19 14:30:00')
+     = WEEKOFYEAR(TIMESTAMP '2024-05-19 14:30:00')                           AS ts_eq;
+
+--echo === WEEK ISO 4-day rule — year boundary edges ===
+
+# 2024-01-01 (Monday) → ISO week 1 of 2024.
+SELECT WEEK(DATE '2024-01-01')                                AS mon_jan1_2024_w1;
+# 2023-01-01 (Sunday) → ISO week 52 of 2022 (4-day rule: the
+# week containing Jan 4 / first Thursday).
+SELECT WEEK(DATE '2023-01-01')                                AS sun_jan1_2023_w52;
+# 2024-12-30 (Monday) → ISO week 1 of 2025 (forward shift).
+SELECT WEEK(DATE '2024-12-30')                                AS mon_dec30_2024_forward_w1;
+# 2026-01-01 (Thursday) → ISO week 1 of 2026.
+SELECT WEEK(DATE '2026-01-01')                                AS thu_jan1_2026_w1;
+# 2021-12-31 (Friday) — last day in week 52 of 2021.
+SELECT WEEK(DATE '2021-12-31')                                AS fri_dec31_2021_w52;
+# Sentinel: WEEK and WEEKOFYEAR agree at all the above edges.
+SELECT WEEK(DATE '2023-01-01') = WEEKOFYEAR(DATE '2023-01-01') AS edges_agree_sun;
+SELECT WEEK(DATE '2024-12-30') = WEEKOFYEAR(DATE '2024-12-30') AS edges_agree_forward;
+
+--echo === WEEK — TIMESTAMP arg (time-of-day independent) ===
+
+# Time-of-day must not change the week number.
+SELECT WEEK(TIMESTAMP '2024-05-19 00:00:00')                  AS midnight;
+SELECT WEEK(TIMESTAMP '2024-05-19 23:59:59')                  AS one_sec_before_midnight;
+SELECT WEEK(TIMESTAMP '2024-05-19 00:00:00')
+     = WEEK(TIMESTAMP '2024-05-19 23:59:59')                  AS time_of_day_irrelevant;
+
+--echo === WEEK — String fallback arms ===
+
+# parse_date first, then parse_timestamp.
+SELECT WEEK('2024-05-19')                                     AS str_date_only;
+SELECT WEEK('2024-05-19 14:30:00')                            AS str_with_time;
+SELECT WEEK('2024-05-19') = WEEK(DATE '2024-05-19')           AS str_eq_date;
+
+--echo === WEEK — MAJOR DIVERGENCE: 2-arg MySQL form rejected ===
+
+# MySQL allows WEEK(d, mode) where mode ∈ 0..7. Zeta is 1-arg
+# only and returns ISO weeks unconditionally — equivalent to
+# MySQL's WEEK(d, 3). Porting MySQL code using WEEK(d, 0)
+# (the MySQL default) will fail at the parser/runtime layer.
+--error 1105
+SELECT WEEK(DATE '2024-05-19', 0);
+--error 1105
+SELECT WEEK(DATE '2024-05-19', 3);
+--error 1105
+SELECT WEEK(DATE '2024-05-19', 7);
+# Same for WEEKOFYEAR — MySQL also forbids 2-arg here, but
+# pin it for the zeta surface.
+--error 1105
+SELECT WEEKOFYEAR(DATE '2024-05-19', 0);
+
+--echo === WEEK / WEEKOFYEAR arity 0 → ERROR 1105 ===
+
+--error 1105
+SELECT WEEK();
+--error 1105
+SELECT WEEKOFYEAR();
+
+--echo === WEEK / WEEKOFYEAR — wrong-type → ERROR 1105 ===
+
+# Int / Float / Bool — no implicit-coerce arm (parseable
+# string is the only String→Date escape).
+--error 1105
+SELECT WEEK(20240519);
+--error 1105
+SELECT WEEK(CAST(1.5 AS DOUBLE PRECISION));
+--error 1105
+SELECT WEEK(TRUE);
+--error 1105
+SELECT WEEKOFYEAR(20240519);
+
+--echo === WEEK — unparseable string → ERROR 1105 ===
+
+--error 1105
+SELECT WEEK('not a date');
+--error 1105
+SELECT WEEKOFYEAR('2024-13-99');
+
+--echo === WEEK / WEEKOFYEAR — NULL propagation ===
+
+SELECT WEEK(NULL)                                             AS week_null_is_null;
+SELECT WEEKOFYEAR(NULL)                                       AS weekofyear_null_is_null;
+SELECT WEEK(CAST(NULL AS DATE))                               AS week_typed_null_is_null;
+SELECT WEEKOFYEAR(CAST(NULL AS TIMESTAMP))                    AS weekofyear_typed_null_is_null;
+SELECT WEEK(NULL) IS NULL                                     AS week_null_predicate;

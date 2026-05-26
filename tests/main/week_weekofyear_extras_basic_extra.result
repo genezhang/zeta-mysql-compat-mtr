@@ -1,0 +1,101 @@
+=== WEEK and WEEKOFYEAR equivalence (same ISO impl) ===
+SELECT WEEK(DATE '2024-05-19')        = WEEKOFYEAR(DATE '2024-05-19')        AS may_eq;
+may_eq
+1
+SELECT WEEK(DATE '2024-01-01')        = WEEKOFYEAR(DATE '2024-01-01')        AS jan_eq;
+jan_eq
+1
+SELECT WEEK(DATE '2024-12-31')        = WEEKOFYEAR(DATE '2024-12-31')        AS dec_eq;
+dec_eq
+1
+SELECT WEEK(TIMESTAMP '2024-05-19 14:30:00')
+     = WEEKOFYEAR(TIMESTAMP '2024-05-19 14:30:00')                           AS ts_eq;
+ts_eq
+1
+=== WEEK ISO 4-day rule — year boundary edges ===
+SELECT WEEK(DATE '2024-01-01')                                AS mon_jan1_2024_w1;
+mon_jan1_2024_w1
+1
+SELECT WEEK(DATE '2023-01-01')                                AS sun_jan1_2023_w52;
+sun_jan1_2023_w52
+52
+SELECT WEEK(DATE '2024-12-30')                                AS mon_dec30_2024_forward_w1;
+mon_dec30_2024_forward_w1
+1
+SELECT WEEK(DATE '2026-01-01')                                AS thu_jan1_2026_w1;
+thu_jan1_2026_w1
+1
+SELECT WEEK(DATE '2021-12-31')                                AS fri_dec31_2021_w52;
+fri_dec31_2021_w52
+52
+SELECT WEEK(DATE '2023-01-01') = WEEKOFYEAR(DATE '2023-01-01') AS edges_agree_sun;
+edges_agree_sun
+1
+SELECT WEEK(DATE '2024-12-30') = WEEKOFYEAR(DATE '2024-12-30') AS edges_agree_forward;
+edges_agree_forward
+1
+=== WEEK — TIMESTAMP arg (time-of-day independent) ===
+SELECT WEEK(TIMESTAMP '2024-05-19 00:00:00')                  AS midnight;
+midnight
+20
+SELECT WEEK(TIMESTAMP '2024-05-19 23:59:59')                  AS one_sec_before_midnight;
+one_sec_before_midnight
+20
+SELECT WEEK(TIMESTAMP '2024-05-19 00:00:00')
+     = WEEK(TIMESTAMP '2024-05-19 23:59:59')                  AS time_of_day_irrelevant;
+time_of_day_irrelevant
+1
+=== WEEK — String fallback arms ===
+SELECT WEEK('2024-05-19')                                     AS str_date_only;
+str_date_only
+20
+SELECT WEEK('2024-05-19 14:30:00')                            AS str_with_time;
+str_with_time
+20
+SELECT WEEK('2024-05-19') = WEEK(DATE '2024-05-19')           AS str_eq_date;
+str_eq_date
+1
+=== WEEK — MAJOR DIVERGENCE: 2-arg MySQL form rejected ===
+SELECT WEEK(DATE '2024-05-19', 0);
+ERROR 1105: execution error: WEEK requires 1 argument
+SELECT WEEK(DATE '2024-05-19', 3);
+ERROR 1105: execution error: WEEK requires 1 argument
+SELECT WEEK(DATE '2024-05-19', 7);
+ERROR 1105: execution error: WEEK requires 1 argument
+SELECT WEEKOFYEAR(DATE '2024-05-19', 0);
+ERROR 1105: execution error: WEEKOFYEAR requires 1 argument
+=== WEEK / WEEKOFYEAR arity 0 → ERROR 1105 ===
+SELECT WEEK();
+ERROR 1105: execution error: WEEK requires 1 argument
+SELECT WEEKOFYEAR();
+ERROR 1105: execution error: WEEKOFYEAR requires 1 argument
+=== WEEK / WEEKOFYEAR — wrong-type → ERROR 1105 ===
+SELECT WEEK(20240519);
+ERROR 1105: execution error: WEEK requires a date, timestamp, or parseable string
+SELECT WEEK(CAST(1.5 AS DOUBLE PRECISION));
+ERROR 1105: execution error: WEEK requires a date, timestamp, or parseable string
+SELECT WEEK(TRUE);
+ERROR 1105: execution error: WEEK requires a date, timestamp, or parseable string
+SELECT WEEKOFYEAR(20240519);
+ERROR 1105: execution error: WEEKOFYEAR requires a date, timestamp, or parseable string
+=== WEEK — unparseable string → ERROR 1105 ===
+SELECT WEEK('not a date');
+ERROR 1105: execution error: WEEK: cannot parse "not a date" as a date or timestamp
+SELECT WEEKOFYEAR('2024-13-99');
+ERROR 1105: execution error: WEEKOFYEAR: cannot parse "2024-13-99" as a date or timestamp
+=== WEEK / WEEKOFYEAR — NULL propagation ===
+SELECT WEEK(NULL)                                             AS week_null_is_null;
+week_null_is_null
+NULL
+SELECT WEEKOFYEAR(NULL)                                       AS weekofyear_null_is_null;
+weekofyear_null_is_null
+NULL
+SELECT WEEK(CAST(NULL AS DATE))                               AS week_typed_null_is_null;
+week_typed_null_is_null
+NULL
+SELECT WEEKOFYEAR(CAST(NULL AS TIMESTAMP))                    AS weekofyear_typed_null_is_null;
+weekofyear_typed_null_is_null
+NULL
+SELECT WEEK(NULL) IS NULL                                     AS week_null_predicate;
+week_null_predicate
+1
