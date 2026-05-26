@@ -1,0 +1,118 @@
+=== L2_DISTANCE (Euclidean) ===
+SELECT L2_DISTANCE('[1,0,0]'::vector, '[0,1,0]'::vector)      AS sqrt_2;
+sqrt_2
+1.4142135623730951
+SELECT L2_DISTANCE('[1,2,3]'::vector, '[1,2,3]'::vector)      AS identity_0;
+identity_0
+0
+SELECT L2_DISTANCE('[0,0]'::vector,   '[3,4]'::vector)        AS three_four_five;
+three_four_five
+5
+=== COSINE_DISTANCE (1 - cos(θ)) ===
+SELECT COSINE_DISTANCE('[1,0]'::vector, '[0,1]'::vector)      AS orthogonal_1;
+orthogonal_1
+1
+SELECT COSINE_DISTANCE('[1,0]'::vector, '[5,0]'::vector)      AS same_dir_0;
+same_dir_0
+0
+SELECT COSINE_DISTANCE('[1,0]'::vector, '[-1,0]'::vector)     AS opposite_2;
+opposite_2
+2
+=== INNER_PRODUCT (dot product) ===
+SELECT INNER_PRODUCT('[1,2,3]'::vector, '[4,5,6]'::vector)    AS dot_32;
+dot_32
+32
+SELECT INNER_PRODUCT('[1,0]'::vector, '[0,1]'::vector)        AS orthogonal_0;
+orthogonal_0
+0
+SELECT INNER_PRODUCT('[2,3]'::vector, '[2,3]'::vector)        AS self_dot_13;
+self_dot_13
+13
+=== VECTOR_DIMS ===
+SELECT VECTOR_DIMS('[1,2,3]'::vector)                         AS dim_3;
+dim_3
+3
+SELECT VECTOR_DIMS('[0]'::vector)                             AS dim_1;
+dim_1
+1
+=== VECTOR_NORM (L2 norm) ===
+SELECT VECTOR_NORM('[3,4]'::vector)                           AS norm_5;
+norm_5
+5
+SELECT VECTOR_NORM('[1,0,0]'::vector)                         AS unit_norm_1;
+unit_norm_1
+1
+SELECT VECTOR_NORM('[0,0,0]'::vector)                         AS zero_norm_0;
+zero_norm_0
+0
+=== Distance OPERATORS (pgvector convention) ===
+SELECT '[1,0,0]'::vector <-> '[0,1,0]'::vector                AS op_l2;
+op_l2
+1.4142135623730951
+SELECT ('[1,0,0]'::vector <-> '[0,1,0]'::vector)
+     = L2_DISTANCE('[1,0,0]'::vector, '[0,1,0]'::vector)      AS op_eq_fn_l2;
+op_eq_fn_l2
+1
+SELECT '[1,0]'::vector <=> '[1,0]'::vector                    AS op_cosine_same;
+op_cosine_same
+0
+SELECT ('[1,0]'::vector <=> '[0,1]'::vector)
+     = COSINE_DISTANCE('[1,0]'::vector, '[0,1]'::vector)      AS op_eq_fn_cosine;
+op_eq_fn_cosine
+1
+SELECT '[1,2]'::vector <#> '[3,4]'::vector                    AS op_neg_inner_neg_11;
+op_neg_inner_neg_11
+-11
+SELECT ('[1,2,3]'::vector <#> '[4,5,6]'::vector)
+     = -INNER_PRODUCT('[1,2,3]'::vector, '[4,5,6]'::vector)   AS op_eq_neg_fn;
+op_eq_neg_fn
+1
+=== Dimension-mismatch → ERROR 1105 ===
+SELECT L2_DISTANCE('[1,2,3]'::vector, '[1,2]'::vector);
+ERROR 1105: execution error: different vector dimensions 3 and 2
+SELECT COSINE_DISTANCE('[1]'::vector, '[1,2]'::vector);
+ERROR 1105: execution error: different vector dimensions 1 and 2
+SELECT INNER_PRODUCT('[1,2,3]'::vector, '[1,2]'::vector);
+ERROR 1105: execution error: different vector dimensions 3 and 2
+=== NULL prop on any arg → NULL (not error) ===
+SELECT L2_DISTANCE(NULL, '[1,2,3]'::vector)                   AS null_left;
+null_left
+NULL
+SELECT L2_DISTANCE('[1,2,3]'::vector, NULL)                   AS null_right;
+null_right
+NULL
+SELECT VECTOR_DIMS(NULL)                                      AS null_dims;
+null_dims
+NULL
+SELECT VECTOR_NORM(NULL)                                      AS null_norm;
+null_norm
+NULL
+SELECT L2_DISTANCE(NULL, '[1,2,3]'::vector) IS NULL           AS null_pred;
+null_pred
+1
+=== Wrong-type (non-vector) → ERROR 1105 ===
+SELECT L2_DISTANCE(1, 2);
+ERROR 1105: execution error: l2_distance() requires vector arguments
+SELECT COSINE_DISTANCE('hello', 'world');
+ERROR 1105: execution error: cosine_distance() requires vector arguments
+SELECT INNER_PRODUCT('[1,2,3]'::vector, 42);
+ERROR 1105: execution error: inner_product() requires vector arguments
+SELECT VECTOR_DIMS('not a vector');
+ERROR 1105: execution error: vector_dims() requires a vector argument
+SELECT VECTOR_NORM(42);
+ERROR 1105: execution error: vector_norm() requires a vector argument
+=== Arity errors → 1105 ===
+SELECT L2_DISTANCE();
+ERROR 1105: execution error: l2_distance() requires 2 arguments
+SELECT L2_DISTANCE('[1,2]'::vector);
+ERROR 1105: execution error: l2_distance() requires 2 arguments
+SELECT COSINE_DISTANCE('[1]'::vector, '[2]'::vector, '[3]'::vector);
+ERROR 1105: execution error: cosine_distance() requires 2 arguments
+SELECT INNER_PRODUCT();
+ERROR 1105: execution error: inner_product() requires 2 arguments
+SELECT VECTOR_DIMS();
+ERROR 1105: execution error: vector_dims() requires 1 argument
+SELECT VECTOR_DIMS('[1]'::vector, '[2]'::vector);
+ERROR 1105: execution error: vector_dims() requires 1 argument
+SELECT VECTOR_NORM();
+ERROR 1105: execution error: vector_norm() requires 1 argument
