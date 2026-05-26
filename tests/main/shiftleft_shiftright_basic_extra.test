@@ -1,0 +1,205 @@
+# Independently authored SHIFTLEFT / SHIFTRIGHT /
+# SHIFTRIGHTUNSIGNED smoke for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - SHIFTLEFT — NONE (zero compat-mtr coverage).
+#   - SHIFTRIGHT — NONE.
+#   - SHIFTRIGHTUNSIGNED — NONE.
+#   - bitwise_basic_extra and bit_op_extra_basic_extra cover
+#     MySQL `<<` and `>>` operators. Those operators are
+#     i64-arithmetic in zeta (NOT MySQL's classic u64 widen
+#     — confirmed by recording below). The Spark SHIFT*
+#     functions are width-preserving and offer separate
+#     arithmetic-vs-logical right-shift.
+#
+# This slice pins:
+#   - Width preservation: INT input → INT output (32-bit
+#     mask), BIGINT input → BIGINT output (64-bit mask).
+#     Critical detail: zeta parses BARE integer literals as
+#     BIGINT, so all "32-bit-mask" tests must use
+#     `CAST(... AS INTEGER)` explicitly.
+#   - Shift count masked to width: `count & 31` for INT,
+#     `count & 63` for BIGINT (matches Java/Spark, which is
+#     what `wrapping_sh*` does in Rust).
+#   - SHIFTLEFT(CAST(1 AS INTEGER), 32)  = 1 (no shift).
+#   - SHIFTLEFT(CAST(1 AS INTEGER), 33)  = 2 (shift by 1).
+#   - Negative shift count: `as u32` reinterpret then mask
+#     (low bits of u32(-1)=0xFFFFFFFF after width-mask).
+#   - SHIFTRIGHT is ARITHMETIC (sign-extend): -1 stays -1
+#     under right shift.
+#   - SHIFTRIGHTUNSIGNED is LOGICAL (zero-fill): -1 INT
+#     right-shifted by 1 = INT32::MAX.
+#   - NULL prop on either arg → NULL.
+#   - Non-integer first arg → 1105 'requires an integer
+#     first argument'.
+#   - Non-integer shift count → 1105 'shift count must be
+#     an integer'.
+#   - Arity (0, 1, 3) → 1105 'requires 2 arguments'.
+#
+# Big-picture finding (TWO traps for the unwary):
+#
+#   1. **Bare integer literals are BIGINT in zeta.**
+#      `SHIFTLEFT(1, 31)` returns 2147483648 (positive!),
+#      NOT INT32::MIN. To exercise the 32-bit-mask paths
+#      you MUST write `CAST(1 AS INTEGER)`. This is a real
+#      portability footgun when migrating Spark code that
+#      assumed `cast(...).asInstanceOf[Int]` would survive
+#      the round-trip through SQL.
+#
+#   2. **zeta's `<<` / `>>` operators are NOT the classic
+#      MySQL widen-to-u64.** MySQL's `>>` widens both
+#      operands to UNSIGNED 64-bit so `-1 >> 1` yields
+#      9223372036854775807. zeta's `>>` is i64-ARITHMETIC,
+#      so `-1 >> 1` yields -1. This means SHIFTRIGHT and
+#      `>>` produce IDENTICAL results on i64 inputs — the
+#      named function only differs from the operator on
+#      explicitly-narrowed (INT) inputs. SHIFTRIGHTUNSIGNED
+#      has no operator equivalent in zeta.
+#
+#   The implementation deliberately uses Rust's
+#   `wrapping_shl`/`wrapping_shr` which already do the
+#   `count & (BITS-1)` mask — so `SHIFTLEFT(int, 32)`
+#   returns the input (not 0), matching Java's
+#   `int << 32`. This is the classic C-vs-Java shift
+#   behavior; pin it explicitly so the test catches any
+#   regression to bare `<<`/`>>` semantics.
+#
+# Adaptation notes:
+#   # zeta-adapt: Bare INTEGER LITERALS parse as BIGINT.
+#     To exercise INT-width SHIFT* you MUST cast:
+#     `SHIFTLEFT(CAST(1 AS INTEGER), 31)`.
+#   # zeta-adapt: SHIFTLEFT/SHIFTRIGHT/SHIFTRIGHTUNSIGNED
+#     are SPARK named functions — width-preserving and
+#     mask-by-width.
+#   # zeta-adapt: SHIFTLEFT(int, 32) = int (mask & 31).
+#   # zeta-adapt: SHIFTRIGHT = arithmetic (sign-extend);
+#     SHIFTRIGHTUNSIGNED = logical (zero-fill).
+#   # zeta-adapt: zeta's `<<`/`>>` operators are
+#     i64-arithmetic (NOT MySQL's u64-widen). On BIGINT
+#     inputs, `>>` and SHIFTRIGHT match exactly.
+#   # zeta-adapt: Negative shift count is treated as
+#     `u32` reinterpret then masked — non-zero, defined.
+
+--echo === SHIFTLEFT — basic shifts (bare literal = BIGINT) ===
+
+SELECT SHIFTLEFT(1, 4)                                        AS one_lsh_4_eq_16;
+SELECT SHIFTLEFT(3, 2)                                        AS three_lsh_2_eq_12;
+SELECT SHIFTLEFT(0, 100)                                      AS zero_lsh_anything_zero;
+
+--echo === SHIFTLEFT — INT-WIDTH mask-by-31 (explicit CAST AS INTEGER) ===
+
+# SHIFTLEFT(1::INT, 31) sets the sign bit → INT32::MIN.
+SELECT SHIFTLEFT(CAST(1 AS INTEGER), 31)                      AS int_one_lsh_31_min;
+# 32 & 31 = 0 → no shift, returns input (1).
+SELECT SHIFTLEFT(CAST(1 AS INTEGER), 32)                      AS int_one_lsh_32_eq_1;
+# 33 & 31 = 1 → shift by 1.
+SELECT SHIFTLEFT(CAST(1 AS INTEGER), 33)                      AS int_one_lsh_33_eq_2;
+# 63 & 31 = 31 → same as 31.
+SELECT SHIFTLEFT(CAST(1 AS INTEGER), 63)
+     = SHIFTLEFT(CAST(1 AS INTEGER), 31)                      AS int_lsh_63_eq_31;
+
+--echo === SHIFTLEFT — TRAP: bare-literal version uses BIGINT mask ===
+
+# These would be wildly wrong if you assumed INT semantics.
+# Returns 2147483648 (positive), not INT32::MIN (-2^31).
+SELECT SHIFTLEFT(1, 31)                                       AS bigint_default_one_lsh_31;
+# Returns 2^32 = 4294967296, not 1.
+SELECT SHIFTLEFT(1, 32)                                       AS bigint_default_one_lsh_32;
+# Returns 2^33 = 8589934592, not 2.
+SELECT SHIFTLEFT(1, 33)                                       AS bigint_default_one_lsh_33;
+
+--echo === SHIFTLEFT — BIGINT mask-by-63 (explicit) ===
+
+# 1::BIGINT << 31 = 2^31 = 2147483648 (fits in i64).
+SELECT SHIFTLEFT(CAST(1 AS BIGINT), 31)                       AS bigint_one_lsh_31;
+# 64 & 63 = 0 → no shift.
+SELECT SHIFTLEFT(CAST(1 AS BIGINT), 64)                       AS bigint_one_lsh_64_eq_1;
+# 1::BIGINT << 63 = -9223372036854775808 (i64::MIN).
+SELECT SHIFTLEFT(CAST(1 AS BIGINT), 63)                       AS bigint_one_lsh_63_min;
+
+--echo === SHIFTRIGHT — ARITHMETIC (sign-extending) ===
+
+SELECT SHIFTRIGHT(16, 2)                                      AS sixteen_rsh_2_eq_4;
+SELECT SHIFTRIGHT(256, 4)                                     AS twofiftysix_rsh_4_eq_16;
+# Negative INT right-shifted ARITHMETICALLY stays negative.
+# -1 sign-extended forever = -1.
+SELECT SHIFTRIGHT(CAST(-1 AS INTEGER), 1)                     AS neg_one_arith_rsh_neg_one;
+SELECT SHIFTRIGHT(CAST(-1 AS INTEGER), 31)                    AS neg_one_arith_rsh_full_neg_one;
+# Negative non-extreme: -8 >> 1 = -4 (arithmetic).
+SELECT SHIFTRIGHT(CAST(-8 AS INTEGER), 1)                     AS neg_eight_arith_rsh_neg_four;
+
+--echo === SHIFTRIGHTUNSIGNED — LOGICAL (zero-fill) ===
+
+SELECT SHIFTRIGHTUNSIGNED(16, 2)                              AS sixteen_logic_rsh_4;
+# -1::INT logical-shifted by 1 = 0x7FFFFFFF = INT32::MAX.
+SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS INTEGER), 1)             AS neg_one_logic_rsh_int_max;
+# Full-shift: -1 >>> 31 = 1 (only sign bit becomes 1).
+SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS INTEGER), 31)            AS neg_one_logic_rsh_31_eq_1;
+# BIGINT logical: -1::BIGINT >>> 1 = INT64::MAX.
+SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS BIGINT), 1)              AS bigint_neg_one_logic_rsh;
+
+--echo === Negative shift count — `as u32` reinterpret + mask ===
+
+# SHIFTLEFT(1::INT, -1): n=-1 → (-1 as u32)=0xFFFFFFFF, then
+# wrapping_shl on i32 masks by 31 → 31. Result = 1 << 31 =
+# INT32::MIN.
+SELECT SHIFTLEFT(CAST(1 AS INTEGER), -1)                      AS int_lsh_neg_one_min;
+# Same trick on BIGINT: 0xFFFFFFFF & 63 = 63. Result = i64::MIN.
+SELECT SHIFTLEFT(CAST(1 AS BIGINT), -1)                       AS bigint_lsh_neg_one_min;
+# SHIFTRIGHT(1::INT, -1) = arithmetic-rsh by 31 → 0
+# (positive 1 sign-extends to 0).
+SELECT SHIFTRIGHT(CAST(1 AS INTEGER), -1)                     AS int_rsh_neg_one_eq_0;
+# SHIFTRIGHTUNSIGNED(-1::INT, -1): n=-1 → 31. Logical rsh
+# by 31 of 0xFFFFFFFF → 1.
+SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS INTEGER), -1)            AS int_unsigned_rsh_neg_one_eq_1;
+
+--echo === Contrast: zeta `>>` is i64-ARITHMETIC, not MySQL u64-widen ===
+
+# MySQL classic: `-1 >> 1` = 9223372036854775807 (widens
+# -1 to u64=0xFFFFFFFFFFFFFFFF then logical-shifts).
+# zeta: `-1 >> 1` = -1 (BIGINT arithmetic shift preserves
+# sign). So `>>` and SHIFTRIGHT match exactly on BIGINT.
+SELECT -1 >> 1                                                AS zeta_op_arith_not_u64;
+SELECT SHIFTRIGHT(CAST(-1 AS BIGINT), 1)                      AS shiftright_bigint_neg_one;
+# The ONE place they diverge: SHIFTRIGHTUNSIGNED has no
+# operator equivalent — only the named function offers
+# logical (zero-fill) shift.
+SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS BIGINT), 1)              AS shiftrightunsigned_bigint_int64_max;
+
+--echo === NULL propagation ===
+
+SELECT SHIFTLEFT(NULL, 4)                                     AS null_base;
+SELECT SHIFTLEFT(1, NULL)                                     AS null_count;
+SELECT SHIFTRIGHT(NULL, NULL)                                 AS null_both;
+SELECT SHIFTRIGHTUNSIGNED(NULL, 1)                            AS null_base_rsu;
+SELECT SHIFTLEFT(NULL, 4) IS NULL                             AS null_pred;
+
+--echo === Wrong-type first arg → ERROR 1105 ===
+
+--error 1105
+SELECT SHIFTLEFT('hello', 1);
+--error 1105
+SELECT SHIFTRIGHT(CAST(1.5 AS DOUBLE PRECISION), 1);
+--error 1105
+SELECT SHIFTRIGHTUNSIGNED(CAST('2026-01-01' AS DATE), 1);
+
+--echo === Wrong-type shift count → ERROR 1105 ===
+
+--error 1105
+SELECT SHIFTLEFT(1, 'one');
+--error 1105
+SELECT SHIFTRIGHT(1, CAST(1.5 AS DOUBLE PRECISION));
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT SHIFTLEFT();
+--error 1105
+SELECT SHIFTLEFT(1);
+--error 1105
+SELECT SHIFTLEFT(1, 2, 3);
+--error 1105
+SELECT SHIFTRIGHT();
+--error 1105
+SELECT SHIFTRIGHTUNSIGNED();
