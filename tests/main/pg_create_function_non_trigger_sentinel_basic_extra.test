@@ -1,0 +1,143 @@
+# Independently authored PG CREATE FUNCTION non-
+# trigger silent-accept sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE/DROP FUNCTION (RETURNS trigger): SUPPORTED
+#     per zeta CLAUDE.md ("CREATE/DROP FUNCTION
+#     (RETURNS trigger)"). Trigger-fn creation
+#     pinned at trigger_basic_extra and similar.
+#   - CREATE FUNCTION RETURNS int / text / TABLE /
+#     SETOF (non-trigger forms): ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "execution error: unknown function: <name>" —
+#     pre-existing fingerprint at many slices (e.g.,
+#     PR #408 reflection helpers, PR #412
+#     hypothetical-set WITHIN GROUP, PR #414 txn-mgmt
+#     admin fns, PR #419 admin/introspection sysfns).
+#     Reused here for scalar-return non-trigger fns.
+#   - "plan error: unknown set-returning function:
+#     <NAME>" — NEW fingerprint at this slice for
+#     SRF dispatch. Note: function name is upper-
+#     cased in the error message (case-folded
+#     differently from scalar fn dispatch).
+#   - "Expected: end of statement, found: int" —
+#     sqlparser doesn't recognize RETURNS SETOF;
+#     errors at the `int` after SETOF.
+#
+# This slice pins:
+#
+#   SHAPE A — scalar RETURNS forms (int / text):
+#     CREATE FUNCTION accepts silently; SELECT
+#     errors "unknown function: <name>". Silent-
+#     accept means CREATE returns success (no SQL
+#     error) but no callable function is registered.
+#     Apps porting PG SQL-language scalar functions
+#     get silent-success on schema apply, then
+#     runtime "unknown function" errors when callers
+#     try to use the fn.
+#
+#   SHAPE B — RETURNS TABLE(...) (set-returning):
+#     CREATE FUNCTION accepts silently; SELECT * FROM
+#     errors "plan error: unknown set-returning
+#     function: <NAME>". Note: the fn name is
+#     UPPER-CASED in the SRF dispatch error (case-
+#     folded differently from scalar dispatch). NEW
+#     fingerprint for the SRF code path.
+#
+#   SHAPE C — RETURNS SETOF <type>:
+#     Parser-reject at sqlparser grammar — SETOF
+#     keyword is not in the RETURNS sub-grammar.
+#     "Expected: end of statement, found: <type>".
+#
+#   SHAPE D (cross-check) — with arguments:
+#     CREATE FUNCTION with parameter list accepts
+#     silently; SELECT errors same as Shape A.
+#
+# Big-picture finding:
+#
+#   zeta's CREATE FUNCTION is documented as
+#   "RETURNS trigger" only (zeta CLAUDE.md). Apps
+#   using other RETURNS forms see:
+#     (a) Silent-accept at CREATE (looks like
+#         success).
+#     (b) Runtime "unknown function" or "unknown set-
+#         returning function" when callers reference
+#         the fn.
+#
+#   This is a SILENT-ACCEPT BUG (joins silent-drop
+#   family at the STATEMENT level instead of FIELD
+#   level): the entire CREATE FUNCTION statement is
+#   silently no-op'd for unsupported RETURNS forms,
+#   without an error to alert the schema-apply
+#   tool. pg_dump output that includes scalar SQL
+#   functions will appear to apply cleanly but the
+#   functions are absent from the runtime catalog.
+#
+#   Apps porting non-trigger PG functions must
+#   rewrite to:
+#     - Inline the function body at each call site.
+#     - Use VIEW / MATERIALIZED VIEW for fixed result
+#       sets.
+#     - Use a row-level trigger that mutates a stored
+#       column instead of computing on-demand.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL
+# behavior. CREATE FUNCTION runs through convert.rs
+# (parser-shared) and the result is registered in
+# the executor function-catalog (executor-shared).
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-ACCEPT BUG — CREATE FUNCTION
+#     RETURNS int / text / etc. (non-trigger scalar
+#     forms) silently succeeds at parser but no
+#     callable function is registered. SELECT errors
+#     "unknown function" at call time.
+#   # zeta-adapt: SILENT-ACCEPT BUG — CREATE FUNCTION
+#     RETURNS TABLE(...) silently succeeds at
+#     parser; SELECT * FROM errors with a different
+#     fingerprint "unknown set-returning function:
+#     <NAME>" (upper-cased) at planner.
+#   # zeta-adapt: KNOWN GAP — CREATE FUNCTION RETURNS
+#     SETOF <type> parser-reject; SETOF keyword not
+#     in sqlparser's RETURNS sub-grammar.
+#   # zeta-adapt: SUPPORTED — CREATE FUNCTION RETURNS
+#     trigger (the documented form; see CLAUDE.md
+#     and trigger_basic_extra coverage).
+
+--echo === SHAPE A — RETURNS int (scalar) → silent CREATE; SELECT errors "unknown function" ===
+
+DROP FUNCTION IF EXISTS sql_fn;
+CREATE FUNCTION sql_fn() RETURNS int LANGUAGE SQL AS 'SELECT 1';
+--error 1105
+SELECT sql_fn();
+
+--echo === SHAPE A — RETURNS text (scalar) → same shape ===
+
+DROP FUNCTION IF EXISTS sql_text_fn;
+CREATE FUNCTION sql_text_fn() RETURNS text LANGUAGE SQL AS 'SELECT ''hello''';
+--error 1105
+SELECT sql_text_fn();
+
+--echo === SHAPE B — RETURNS TABLE(...) → silent CREATE; SELECT errors "unknown set-returning function: <NAME>" ===
+
+DROP FUNCTION IF EXISTS srf;
+CREATE FUNCTION srf() RETURNS TABLE(id INT) LANGUAGE SQL AS 'SELECT 1';
+--error 1105
+SELECT * FROM srf();
+
+--echo === SHAPE C — RETURNS SETOF int → sqlparser parse-reject "Expected: end of statement, found: int" ===
+
+DROP FUNCTION IF EXISTS setof_fn;
+--error 1064
+CREATE FUNCTION setof_fn() RETURNS SETOF int LANGUAGE SQL AS 'SELECT 1';
+
+--echo === SHAPE D — with arguments → silent CREATE; SELECT errors same as Shape A ===
+
+DROP FUNCTION IF EXISTS plus_fn;
+CREATE FUNCTION plus_fn(a INT, b INT) RETURNS int LANGUAGE SQL AS 'SELECT a + b';
+--error 1105
+SELECT plus_fn(2, 3);
