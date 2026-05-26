@@ -1,0 +1,28 @@
+DROP TABLE IF EXISTS trig_pt;
+CREATE TABLE trig_pt (id INT);
+=== SHAPE A — silently-dropped modifiers; all reach executor with same "function does not exist" ===
+=== plain CREATE TRIGGER (control — same fingerprint) ===
+CREATE TRIGGER plain_t AFTER INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+ERROR 1105: execution error: function "nonexistent_fn" does not exist
+=== CREATE OR REPLACE TRIGGER — OR REPLACE silently dropped ===
+CREATE OR REPLACE TRIGGER cort AFTER INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+ERROR 1105: execution error: function "nonexistent_fn" does not exist
+=== CREATE CONSTRAINT TRIGGER — CONSTRAINT silently dropped ===
+CREATE CONSTRAINT TRIGGER cct AFTER INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+ERROR 1105: execution error: function "nonexistent_fn" does not exist
+=== REFERENCING NEW TABLE AS new_rows — silently dropped ===
+CREATE TRIGGER ref_n AFTER INSERT ON trig_pt REFERENCING NEW TABLE AS new_rows FOR EACH STATEMENT EXECUTE FUNCTION nonexistent_fn();
+ERROR 1105: execution error: function "nonexistent_fn" does not exist
+=== REFERENCING OLD TABLE AS old_rows — silently dropped ===
+CREATE TRIGGER ref_o AFTER DELETE ON trig_pt REFERENCING OLD TABLE AS old_rows FOR EACH STATEMENT EXECUTE FUNCTION nonexistent_fn();
+ERROR 1105: execution error: function "nonexistent_fn" does not exist
+=== CONSTRAINT TRIGGER + DEFERRABLE INITIALLY DEFERRED — both silently dropped ===
+CREATE CONSTRAINT TRIGGER cct_def AFTER INSERT ON trig_pt DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+ERROR 1105: execution error: function "nonexistent_fn" does not exist
+=== SHAPE B — REFERENCING NEW ROW (row-level alias) → "Expected: an SQL statement, found: ROW" ===
+CREATE TRIGGER ref_nr AFTER INSERT ON trig_pt REFERENCING NEW ROW AS new_row FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: ROW at Line: 1, Column: 63
+=== SHAPE C — INSTEAD OF (PG view-trigger) → explicit reject "trigger must specify BEFORE or AFTER" ===
+CREATE TRIGGER inst_t INSTEAD OF INSERT ON trig_pt FOR EACH ROW EXECUTE FUNCTION nonexistent_fn();
+ERROR 1064: SQL parse error: trigger must specify BEFORE or AFTER
+DROP TABLE trig_pt;
