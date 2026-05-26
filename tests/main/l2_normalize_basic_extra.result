@@ -1,0 +1,55 @@
+=== L2_NORMALIZE: classical unit-vector decomposition ===
+SELECT L2_NORMALIZE('[3,4]'::vector)                          AS unit_3_4;
+unit_3_4
+Vector([0.6, 0.8])
+=== Round-trip: VECTOR_NORM after L2_NORMALIZE ≈ 1 ===
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) > 0.9999    AS norm_above_threshold;
+norm_above_threshold
+1
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) < 1.0001    AS norm_below_threshold;
+norm_below_threshold
+1
+SELECT VECTOR_NORM(L2_NORMALIZE('[5,12]'::vector)) > 0.9999   AS norm_5_12_above;
+norm_5_12_above
+1
+=== Idempotent on unit vectors ===
+SELECT L2_NORMALIZE('[1,0,0]'::vector)                        AS already_unit;
+already_unit
+Vector([1.0, 0.0, 0.0])
+SELECT VECTOR_NORM(L2_NORMALIZE('[1,0,0]'::vector)) > 0.9999  AS unit_norm_preserved;
+unit_norm_preserved
+1
+=== ZERO vector — no divide-by-zero, returns zero ===
+SELECT L2_NORMALIZE('[0,0,0]'::vector)                        AS zero_in_zero_out;
+zero_in_zero_out
+Vector([0.0, 0.0, 0.0])
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))           AS zero_norm_still_0;
+zero_norm_still_0
+0
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS float64_ne_int_strict;
+float64_ne_int_strict
+0
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0.0     AS float64_eq_decimal_coerce;
+float64_eq_decimal_coerce
+1
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))
+     = CAST(0 AS DOUBLE PRECISION)                            AS float64_eq_float64_same_type;
+float64_eq_float64_same_type
+1
+=== NULL propagation ===
+SELECT L2_NORMALIZE(NULL::vector)                             AS null_propagates;
+null_propagates
+NULL
+SELECT L2_NORMALIZE(NULL::vector) IS NULL                     AS null_pred;
+null_pred
+1
+=== Wrong-type → ERROR 1105 ===
+SELECT L2_NORMALIZE('not_a_vector');
+ERROR 1105: execution error: l2_normalize() requires a vector argument
+SELECT L2_NORMALIZE(42);
+ERROR 1105: execution error: l2_normalize() requires a vector argument
+=== Arity errors → 1105 ===
+SELECT L2_NORMALIZE();
+ERROR 1105: execution error: l2_normalize() requires 1 argument
+SELECT L2_NORMALIZE('[1,2]'::vector, '[3,4]'::vector);
+ERROR 1105: execution error: l2_normalize() requires 1 argument
