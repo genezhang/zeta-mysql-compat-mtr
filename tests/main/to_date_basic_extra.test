@@ -1,0 +1,193 @@
+# Independently authored TO_DATE smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - TO_DATE — NONE (zero compat-mtr coverage). Spark
+#     to_date(str) / to_date(str, fmt). Different surface
+#     from MySQL STR_TO_DATE (which uses %-specifiers).
+#   - str_to_date_specifiers_basic_extra covers MySQL
+#     %Y/%m/%d-style format specifiers — distinct from
+#     Spark/Java yyyy/MM/dd tokens.
+#   - date_time_basic_extra and datetime_format_basic cover
+#     DATE_FORMAT and STR_TO_DATE — also distinct.
+#
+# This slice pins:
+#   - 1-arg form parses with default heuristics (ISO date,
+#     ISO timestamp truncated, PG-style special words).
+#   - 2-arg form takes a SPARK/JAVA-style format pattern
+#     (yyyy/yy/MM/M/dd/d/HH/hh/mm/ss — NOT MySQL %-specs).
+#   - DATE input passes through.
+#   - TIMESTAMP input is TRUNCATED to date (time dropped).
+#   - PG-style special words: 'today', 'yesterday',
+#     'tomorrow', 'epoch', 'now', 'infinity', '-infinity'.
+#   - 2-digit year (yy) interpreted as 2000-relative
+#     (Spark convention).
+#   - DD/YY (uppercase doubled, except yyyy/YYYY) is NOT
+#     a token — falls through to literal byte match.
+#   - NULL prop on either arg.
+#   - Wrong-type → 1105.
+#   - Unparseable string → 1105 with context message.
+#   - Arity (0, 3) → 1105 'requires 1 or 2 arguments'.
+#
+# Big-picture finding (FORMAT-DIALECT MISMATCH):
+#   TO_DATE and STR_TO_DATE use DIFFERENT format-string
+#   dialects despite both being SQL date-parsers:
+#
+#   - STR_TO_DATE (MySQL): %Y, %m, %d, %H, %i, %S, %M, %b,
+#     %p, etc.
+#   - TO_DATE (Spark/Java): yyyy, MM, dd, HH, mm, ss, etc.
+#
+#   Apps porting between MySQL and Spark/PG must translate
+#   format strings — same calls, same conceptual fields,
+#   incompatible patterns. The slice pins this with a
+#   row that contrasts the two on the same date.
+#
+#   STRIKING TOKEN-vs-LITERAL trap: the parser at
+#   lib.rs:58503-58543 recognizes ONLY these tokens:
+#   `yyyy`/`YYYY` (4-digit year), `yy`/`YY` (2-digit year,
+#   2000-relative), `MM` (2-digit month fixed), `M`
+#   (1-2 digit month flexible), `dd` (2-digit day), `d`
+#   (1-2 digit day), `HH`/`hh` (hour ignored), `mm`
+#   (minute ignored), `ss` (second ignored). EVERYTHING
+#   ELSE is a literal — including the uppercase 'DD'
+#   which doesn't tokenize. So:
+#
+#     TO_DATE('2026-05-25', 'YYYY-MM-DD')   → ERROR
+#         (DD isn't a token; bytes must literally match)
+#     TO_DATE('2026-05-25', 'yyyy-MM-dd')   → OK
+#
+#   The header comment at lib.rs:58460 explicitly notes
+#   this is INTENTIONAL: "Day-of-year (D) is intentionally
+#   NOT supported — it is rejected as an unknown literal
+#   rather than silently misinterpreted as day-of-month."
+#   This protects against silent semantic shift but breaks
+#   anyone porting from PG's TO_DATE which DOES accept DD.
+#
+#   Special-words tolerance: 'today EST' parses
+#   (lib.rs:58426-58440) — trailing all-alpha "timezone-
+#   shaped" word is stripped before matching the date
+#   keyword. So 'today EST' = today, 'today garbage123'
+#   ≠ today (digits not allowed).
+#
+# Adaptation notes:
+#   # zeta-adapt: TO_DATE uses SPARK/JAVA format (yyyy/MM/
+#     dd/HH/mm/ss), NOT MySQL %-specifiers like STR_TO_DATE.
+#     Apps porting from MySQL must translate format strings.
+#   # zeta-adapt: 'DD' / 'YY' / etc lowercase-only tokens
+#     mean only `yyyy/YYYY/yy/YY/MM/M/dd/d/HH/hh/mm/ss`
+#     are recognized. 'DD' falls through to literal.
+#   # zeta-adapt: TIMESTAMP input is TRUNCATED to date.
+#   # zeta-adapt: PG-style special words supported:
+#     'today', 'yesterday', 'tomorrow', 'epoch', 'now',
+#     'infinity', '-infinity'.
+#   # zeta-adapt: 'today EST' (trailing alpha) tolerated;
+#     'today garbage123' (mixed) rejected.
+
+--echo === TO_DATE — 1-arg form (default heuristics) ===
+
+SELECT TO_DATE('2026-05-25')                                  AS iso_date;
+# ISO timestamp → truncated to date.
+SELECT TO_DATE('2026-05-25 14:30:00')                         AS iso_ts_truncated;
+# Different valid ISO format.
+SELECT TO_DATE('2026-01-01')                                  AS new_year;
+
+--echo === TO_DATE — DATE input passes through ===
+
+SELECT TO_DATE(CAST('2026-05-25' AS DATE))                    AS date_passthrough;
+
+--echo === TO_DATE — TIMESTAMP input truncates to date ===
+
+SELECT TO_DATE(CAST('2026-05-25 14:30:00' AS TIMESTAMP))      AS ts_input_truncated;
+
+--echo === TO_DATE — PG-style special words ===
+
+# Epoch (Unix day 0).
+SELECT TO_DATE('epoch')                                       AS epoch_1970;
+# 'today' — runtime-dependent, just confirm not NULL and
+# is a valid DATE.
+SELECT TO_DATE('today') IS NOT NULL                           AS today_resolves;
+# Yesterday < today.
+SELECT TO_DATE('yesterday') < TO_DATE('today')                AS yesterday_lt_today;
+SELECT TO_DATE('tomorrow')  > TO_DATE('today')                AS tomorrow_gt_today;
+# 'now' alias for today (DATE truncates time).
+SELECT TO_DATE('now') = TO_DATE('today')                      AS now_eq_today;
+# Trailing all-alpha timezone-shaped tolerated.
+SELECT TO_DATE('today EST') = TO_DATE('today')                AS today_est_eq_today;
+
+--echo === TO_DATE — 2-arg form with Spark format ===
+
+# yyyy / MM / dd separated by slashes.
+SELECT TO_DATE('25/05/2026', 'dd/MM/yyyy')                    AS dmy_slash;
+SELECT TO_DATE('2026/05/25', 'yyyy/MM/dd')                    AS ymd_slash;
+# Hyphens.
+SELECT TO_DATE('2026-05-25', 'yyyy-MM-dd')                    AS ymd_dash;
+# Separator-free yyyyMMdd.
+SELECT TO_DATE('20260525', 'yyyyMMdd')                        AS ymd_no_sep;
+# 2-digit year = 2000-relative.
+SELECT TO_DATE('26-05-25', 'yy-MM-dd')                        AS yy_2000_rel;
+# Flexible M and d (1-2 digits).
+SELECT TO_DATE('2026-5-3', 'yyyy-M-d')                        AS m_d_flexible;
+
+--echo === TO_DATE — uppercase tokens YYYY accepted (alias for yyyy) ===
+
+SELECT TO_DATE('2026-05-25', 'YYYY-MM-dd')                    AS upper_yyyy_alias;
+
+--echo === TO_DATE — HH/mm/ss tokens consumed but IGNORED (DATE only) ===
+
+# Time fields in format are matched but contribute nothing
+# to the DATE result.
+SELECT TO_DATE('2026-05-25 14:30:45', 'yyyy-MM-dd HH:mm:ss')  AS time_consumed_ignored;
+
+--echo === STRIKING: 'DD' in fmt is NOT a token (falls through to literal) ===
+
+# 'DD' as literal bytes in fmt requires 'DD' verbatim in
+# input — '25' doesn't match → error. This protects against
+# silent day-of-year misinterpretation but breaks PG-style
+# 'YYYY-MM-DD' format strings.
+--error 1105
+SELECT TO_DATE('2026-05-25', 'YYYY-MM-DD');
+
+--echo === Contrast: STR_TO_DATE (MySQL %-spec) vs TO_DATE (Spark) ===
+
+# Same target date, completely different format dialects.
+SELECT STR_TO_DATE('2026-05-25', '%Y-%m-%d')                  AS mysql_dialect;
+SELECT TO_DATE('2026-05-25', 'yyyy-MM-dd')                    AS spark_dialect;
+SELECT STR_TO_DATE('2026-05-25', '%Y-%m-%d')
+     = TO_DATE('2026-05-25', 'yyyy-MM-dd')                    AS same_date_diff_dialect;
+
+--echo === TO_DATE — NULL prop on either arg ===
+
+SELECT TO_DATE(NULL)                                          AS null_str_1arg;
+SELECT TO_DATE(NULL, 'yyyy-MM-dd')                            AS null_str_2arg;
+SELECT TO_DATE('2026-05-25', NULL)                            AS null_fmt_2arg;
+SELECT TO_DATE(NULL) IS NULL                                  AS null_pred;
+
+--echo === TO_DATE — wrong type → ERROR 1105 ===
+
+--error 1105
+SELECT TO_DATE(42);
+--error 1105
+SELECT TO_DATE(CAST(1.5 AS DOUBLE PRECISION));
+# Wrong fmt type.
+--error 1105
+SELECT TO_DATE('2026-05-25', 99);
+
+--echo === TO_DATE — unparseable input → ERROR 1105 ===
+
+# Default-heuristic form: garbage input.
+--error 1105
+SELECT TO_DATE('not a date');
+# 2-arg: input doesn't match format.
+--error 1105
+SELECT TO_DATE('2026-05-25', 'dd/MM/yyyy');
+# 2-arg: invalid digit width (yy expects 2 digits, '1' is one).
+--error 1105
+SELECT TO_DATE('1-05-25', 'yy-MM-dd');
+
+--echo === TO_DATE — arity → 1105 ===
+
+--error 1105
+SELECT TO_DATE();
+--error 1105
+SELECT TO_DATE('a', 'b', 'c');

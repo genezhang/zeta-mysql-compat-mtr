@@ -1,0 +1,110 @@
+=== TO_DATE — 1-arg form (default heuristics) ===
+SELECT TO_DATE('2026-05-25')                                  AS iso_date;
+iso_date
+2026-05-25
+SELECT TO_DATE('2026-05-25 14:30:00')                         AS iso_ts_truncated;
+iso_ts_truncated
+2026-05-25
+SELECT TO_DATE('2026-01-01')                                  AS new_year;
+new_year
+2026-01-01
+=== TO_DATE — DATE input passes through ===
+SELECT TO_DATE(CAST('2026-05-25' AS DATE))                    AS date_passthrough;
+date_passthrough
+2026-05-25
+=== TO_DATE — TIMESTAMP input truncates to date ===
+SELECT TO_DATE(CAST('2026-05-25 14:30:00' AS TIMESTAMP))      AS ts_input_truncated;
+ts_input_truncated
+2026-05-25
+=== TO_DATE — PG-style special words ===
+SELECT TO_DATE('epoch')                                       AS epoch_1970;
+epoch_1970
+1970-01-01
+SELECT TO_DATE('today') IS NOT NULL                           AS today_resolves;
+today_resolves
+1
+SELECT TO_DATE('yesterday') < TO_DATE('today')                AS yesterday_lt_today;
+yesterday_lt_today
+1
+SELECT TO_DATE('tomorrow')  > TO_DATE('today')                AS tomorrow_gt_today;
+tomorrow_gt_today
+1
+SELECT TO_DATE('now') = TO_DATE('today')                      AS now_eq_today;
+now_eq_today
+1
+SELECT TO_DATE('today EST') = TO_DATE('today')                AS today_est_eq_today;
+today_est_eq_today
+1
+=== TO_DATE — 2-arg form with Spark format ===
+SELECT TO_DATE('25/05/2026', 'dd/MM/yyyy')                    AS dmy_slash;
+dmy_slash
+2026-05-25
+SELECT TO_DATE('2026/05/25', 'yyyy/MM/dd')                    AS ymd_slash;
+ymd_slash
+2026-05-25
+SELECT TO_DATE('2026-05-25', 'yyyy-MM-dd')                    AS ymd_dash;
+ymd_dash
+2026-05-25
+SELECT TO_DATE('20260525', 'yyyyMMdd')                        AS ymd_no_sep;
+ymd_no_sep
+2026-05-25
+SELECT TO_DATE('26-05-25', 'yy-MM-dd')                        AS yy_2000_rel;
+yy_2000_rel
+2026-05-25
+SELECT TO_DATE('2026-5-3', 'yyyy-M-d')                        AS m_d_flexible;
+m_d_flexible
+2026-05-03
+=== TO_DATE — uppercase tokens YYYY accepted (alias for yyyy) ===
+SELECT TO_DATE('2026-05-25', 'YYYY-MM-dd')                    AS upper_yyyy_alias;
+upper_yyyy_alias
+2026-05-25
+=== TO_DATE — HH/mm/ss tokens consumed but IGNORED (DATE only) ===
+SELECT TO_DATE('2026-05-25 14:30:45', 'yyyy-MM-dd HH:mm:ss')  AS time_consumed_ignored;
+time_consumed_ignored
+2026-05-25
+=== STRIKING: 'DD' in fmt is NOT a token (falls through to literal) ===
+SELECT TO_DATE('2026-05-25', 'YYYY-MM-DD');
+ERROR 1105: execution error: TO_DATE: cannot parse '2026-05-25' with format 'YYYY-MM-DD': input does not match format literal byte 0x44 at position 8
+=== Contrast: STR_TO_DATE (MySQL %-spec) vs TO_DATE (Spark) ===
+SELECT STR_TO_DATE('2026-05-25', '%Y-%m-%d')                  AS mysql_dialect;
+mysql_dialect
+2026-05-25 00:00:00
+SELECT TO_DATE('2026-05-25', 'yyyy-MM-dd')                    AS spark_dialect;
+spark_dialect
+2026-05-25
+SELECT STR_TO_DATE('2026-05-25', '%Y-%m-%d')
+     = TO_DATE('2026-05-25', 'yyyy-MM-dd')                    AS same_date_diff_dialect;
+same_date_diff_dialect
+1
+=== TO_DATE — NULL prop on either arg ===
+SELECT TO_DATE(NULL)                                          AS null_str_1arg;
+null_str_1arg
+NULL
+SELECT TO_DATE(NULL, 'yyyy-MM-dd')                            AS null_str_2arg;
+null_str_2arg
+NULL
+SELECT TO_DATE('2026-05-25', NULL)                            AS null_fmt_2arg;
+null_fmt_2arg
+NULL
+SELECT TO_DATE(NULL) IS NULL                                  AS null_pred;
+null_pred
+1
+=== TO_DATE — wrong type → ERROR 1105 ===
+SELECT TO_DATE(42);
+ERROR 1105: execution error: TO_DATE requires a string, date, or timestamp argument
+SELECT TO_DATE(CAST(1.5 AS DOUBLE PRECISION));
+ERROR 1105: execution error: TO_DATE requires a string, date, or timestamp argument
+SELECT TO_DATE('2026-05-25', 99);
+ERROR 1105: execution error: TO_DATE format must be a string
+=== TO_DATE — unparseable input → ERROR 1105 ===
+SELECT TO_DATE('not a date');
+ERROR 1105: execution error: TO_DATE: cannot parse 'not a date' as a date
+SELECT TO_DATE('2026-05-25', 'dd/MM/yyyy');
+ERROR 1105: execution error: TO_DATE: cannot parse '2026-05-25' with format 'dd/MM/yyyy': input does not match format literal byte 0x2f at position 2
+SELECT TO_DATE('1-05-25', 'yy-MM-dd');
+ERROR 1105: execution error: TO_DATE: cannot parse '1-05-25' with format 'yy-MM-dd': expected year digit(s) at position 0
+=== TO_DATE — arity → 1105 ===
+SELECT TO_DATE();
+ERROR 1105: execution error: TO_DATE requires 1 or 2 arguments
+SELECT TO_DATE('a', 'b', 'c');
+ERROR 1105: execution error: TO_DATE requires 1 or 2 arguments
