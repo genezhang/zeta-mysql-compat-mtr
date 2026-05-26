@@ -1,0 +1,15 @@
+=== (DATE, DATE) OVERLAPS (DATE, DATE) — overlapping range → "unsupported binary operator: OVERLAPS" ===
+SELECT (DATE '2024-01-01', DATE '2024-03-01') OVERLAPS (DATE '2024-02-15', DATE '2024-04-01') AS yes_overlap;
+ERROR 1064: SQL parse error: unsupported binary operator: OVERLAPS
+=== (DATE, DATE) OVERLAPS (DATE, DATE) — disjoint range → same fingerprint ===
+SELECT (DATE '2024-01-01', DATE '2024-02-01') OVERLAPS (DATE '2024-03-01', DATE '2024-04-01') AS no_overlap;
+ERROR 1064: SQL parse error: unsupported binary operator: OVERLAPS
+=== (TIMESTAMP, TIMESTAMP) OVERLAPS — sub-day precision → same fingerprint ===
+SELECT (TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-01-01 12:00:00') OVERLAPS (TIMESTAMP '2024-01-01 06:00:00', TIMESTAMP '2024-01-01 18:00:00') AS ts_yes;
+ERROR 1064: SQL parse error: unsupported binary operator: OVERLAPS
+=== (DATE, INTERVAL) OVERLAPS — PG-extension length form → same fingerprint ===
+SELECT (DATE '2024-01-01', INTERVAL '30 days') OVERLAPS (DATE '2024-01-15', INTERVAL '30 days') AS interval_form;
+ERROR 1064: SQL parse error: unsupported binary operator: OVERLAPS
+=== OVERLAPS(a, b, c) — function-style (NOT valid SQL) → "unknown function: OVERLAPS" ===
+SELECT OVERLAPS(DATE '2024-01-01', DATE '2024-03-01', DATE '2024-02-15');
+ERROR 1105: execution error: unknown function: OVERLAPS
