@@ -1,0 +1,117 @@
+=== SHOW_TRGM — basic trigrams (padded, lowercased, unique, sorted) ===
+SELECT SHOW_TRGM('cat')                                       AS cat_trgms;
+cat_trgms
+Array { element_type: Text, elements: [String("  c"), String(" ca"), String("at "), String("cat")] }
+SELECT SHOW_TRGM('CAT') = SHOW_TRGM('cat')                    AS upper_eq_lower;
+upper_eq_lower
+1
+SELECT SHOW_TRGM('a')                                         AS single_char_trgms;
+single_char_trgms
+Array { element_type: Text, elements: [String("  a"), String(" a ")] }
+SELECT SHOW_TRGM('')                                          AS empty_trgms;
+empty_trgms
+Array { element_type: Text, elements: [String("   ")] }
+=== SHOW_TRGM — duplicates collapse to UNIQUE set ===
+SELECT SHOW_TRGM('aaa')                                       AS aaa_trgms;
+aaa_trgms
+Array { element_type: Text, elements: [String("  a"), String(" aa"), String("aa "), String("aaa")] }
+SELECT SHOW_TRGM('aaaa')                                      AS aaaa_trgms;
+aaaa_trgms
+Array { element_type: Text, elements: [String("  a"), String(" aa"), String("aa "), String("aaa")] }
+=== SIMILARITY — Jaccard over trigram sets ===
+SELECT SIMILARITY('cat', 'cat')                               AS identity_1;
+identity_1
+1
+SELECT SIMILARITY('', '')                                     AS empty_pair_1;
+empty_pair_1
+1
+SELECT SIMILARITY('cat', 'dog')                               AS disjoint_0;
+disjoint_0
+0
+SELECT SIMILARITY('foobar', 'foobaz')                         AS foobar_foobaz_5_9;
+foobar_foobaz_5_9
+0.5555555555555556
+=== Headline finding pinned: 1-char inputs share NO trigrams ===
+SELECT SIMILARITY('a', 'b')                                   AS one_char_disjoint_0;
+one_char_disjoint_0
+0
+SELECT SIMILARITY('x', 'y')                                   AS one_char_disjoint_xy;
+one_char_disjoint_xy
+0
+=== SIMILARITY — symmetric (Jaccard is set-symmetric) ===
+SELECT SIMILARITY('apple', 'apply') = SIMILARITY('apply', 'apple') AS symmetric;
+symmetric
+1
+=== SIMILARITY — case-insensitive (folded in trigram extract) ===
+SELECT SIMILARITY('CAT', 'cat')                               AS upper_lower_1;
+upper_lower_1
+1
+SELECT SIMILARITY('Hello', 'HELLO')                           AS hello_case_1;
+hello_case_1
+1
+=== WORD_SIMILARITY — sliding window of N-word substrings ===
+SELECT WORD_SIMILARITY('cat', 'the cat sat')                  AS word_best_1;
+word_best_1
+1
+SELECT WORD_SIMILARITY('cat sat', 'the cat sat')              AS two_word_best_1;
+two_word_best_1
+1
+SELECT WORD_SIMILARITY('zebra', 'the cat sat') < 0.5          AS no_match_low;
+no_match_low
+1
+=== WORD_SIMILARITY — empty inputs ===
+SELECT WORD_SIMILARITY('', 'the cat sat')                     AS empty_query_0;
+empty_query_0
+0
+SELECT WORD_SIMILARITY('cat', '')                             AS empty_text_0;
+empty_text_0
+0
+=== All three — NULL propagation ===
+SELECT SHOW_TRGM(NULL)                                        AS show_null;
+show_null
+NULL
+SELECT SIMILARITY(NULL, 'cat')                                AS sim_left_null;
+sim_left_null
+NULL
+SELECT SIMILARITY('cat', NULL)                                AS sim_right_null;
+sim_right_null
+NULL
+SELECT WORD_SIMILARITY(NULL, 'text')                          AS ws_left_null;
+ws_left_null
+NULL
+SELECT WORD_SIMILARITY('q', NULL)                             AS ws_right_null;
+ws_right_null
+NULL
+SELECT SHOW_TRGM(NULL) IS NULL                                AS show_null_pred;
+show_null_pred
+1
+=== STRIKING: non-string args are STRINGIFIED (no error) ===
+SELECT SIMILARITY(1, 1)                                       AS int_int_1;
+int_int_1
+1
+SELECT SIMILARITY(1, 2)                                       AS int_int_disjoint;
+int_int_disjoint
+0
+SELECT SHOW_TRGM(42)                                          AS int_show_42;
+int_show_42
+Array { element_type: Text, elements: [String("  4"), String(" 42"), String("42 ")] }
+SELECT SIMILARITY('1', 1)                                     AS str_int_eq_1;
+str_int_eq_1
+1
+=== Arity errors → 1105 ===
+SELECT SHOW_TRGM();
+ERROR 1105: execution error: show_trgm requires 1 argument
+SELECT SHOW_TRGM('a', 'b');
+ERROR 1105: execution error: show_trgm requires 1 argument
+SELECT SIMILARITY();
+ERROR 1105: execution error: similarity requires 2 arguments
+SELECT SIMILARITY('a');
+ERROR 1105: execution error: similarity requires 2 arguments
+SELECT SIMILARITY('a', 'b', 'c');
+ERROR 1105: execution error: similarity requires 2 arguments
+SELECT WORD_SIMILARITY();
+ERROR 1105: execution error: word_similarity requires 2 arguments
+SELECT WORD_SIMILARITY('q');
+ERROR 1105: execution error: word_similarity requires 2 arguments
+SELECT WORD_SIMILARITY('q', 't', 'extra');
+ERROR 1105: execution error: word_similarity requires 2 arguments

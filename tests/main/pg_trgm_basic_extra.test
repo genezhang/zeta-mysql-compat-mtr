@@ -1,0 +1,183 @@
+# Independently authored pg_trgm SIMILARITY /
+# WORD_SIMILARITY / SHOW_TRGM smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - SIMILARITY — NONE (zero compat-mtr coverage).
+#   - WORD_SIMILARITY — NONE.
+#   - SHOW_TRGM — NONE.
+#   - regexp_family_basic_extra and
+#     like_regexp_edges_basic_extra cover fuzzy-ish string
+#     matching but NOT trigram similarity.
+#
+# This slice pins:
+#   - SHOW_TRGM(text) extracts pg_trgm-compatible trigrams:
+#     pad with 2 leading + 1 trailing space, lowercase, then
+#     emit all UNIQUE 3-character windows in sorted order.
+#   - SIMILARITY(a, b) = JACCARD over trigram sets:
+#     |A ∩ B| / |A ∪ B|.
+#   - WORD_SIMILARITY(query, text) = best similarity of
+#     `query` against any N-word substring of `text` where
+#     N = word count of query.
+#   - Empty string is NOT a special case — padded to "   "
+#     produces ONE trigram "   ".
+#   - Identical strings → 1.0; disjoint → 0.0 (after both
+#     remove all shared padding).
+#   - NULL prop → NULL.
+#   - Wrong-type args are STRINGIFIED (no error) via
+#     value_to_sql_string — non-string inputs work.
+#   - Arity (0, 1 for SIMILARITY; 0, 3 for SHOW_TRGM/etc) →
+#     1105.
+#
+# Big-picture finding:
+#   The padding rule is load-bearing for short-string
+#   similarity. A 1-char string 'a' pads to '  a ' (4 chars)
+#   and produces 2 trigrams: '  a' and ' a '. Two distinct
+#   1-char strings 'a' and 'b' share NO trigrams: the
+#   3-char window NEVER lands on pure-padding '   ' because
+#   the trailing space is exactly one (not two). So
+#   SIMILARITY('a','b') = 0 — short-string false-positives
+#   are NOT inflated by shared padding.
+#
+#   SHOW_TRGM returns Value::Array<String> which renders
+#   over the MySQL wire as Rust Debug format (`["...","..."]`
+#   style) — same shim leak pattern as PR #343 / PR #346.
+#
+#   WORD_SIMILARITY sliding window is "by word", not by
+#   character. WORD_SIMILARITY('cat', 'the cat sat') slides
+#   1-word windows: {'the', 'cat', 'sat'} and picks the
+#   BEST Jaccard. Empty query → 0.0 directly (impl
+#   shortcut at lib.rs:57348). Empty text → 0.0 (impl
+#   shortcut at lib.rs:57353).
+#
+#   Non-string arg path: lib.rs:55209/55227/55245 fall
+#   through `_ => value_to_sql_string(...)` so SIMILARITY(1,2)
+#   computes trigrams of '1' and '2' rather than erroring.
+#   Surprising but documented.
+#
+# Adaptation notes:
+#   # zeta-adapt: pg_trgm trigrams are pad-then-lowercase
+#     ('  ' + s + ' ') 3-char windows, unique.
+#   # zeta-adapt: SIMILARITY = JACCARD over trigram sets.
+#   # zeta-adapt: WORD_SIMILARITY slides BY WORD (word count
+#     of query) — not by character.
+#   # zeta-adapt: Non-string arg is STRINGIFIED, not an error.
+#   # zeta-adapt: SHOW_TRGM wire-renders as Rust Debug Array
+#     (server-side shim leak — see PR #343).
+
+--echo === SHOW_TRGM — basic trigrams (padded, lowercased, unique, sorted) ===
+
+# 'cat' padded → '  cat ' (length 6). Windows of 3:
+# '  c', ' ca', 'cat', 'at '. Sorted alphabetically (with
+# spaces < letters).
+SELECT SHOW_TRGM('cat')                                       AS cat_trgms;
+# Uppercase folded to lower.
+SELECT SHOW_TRGM('CAT') = SHOW_TRGM('cat')                    AS upper_eq_lower;
+# Single char: '  a ' (4 chars) → 2 trigrams: '  a', ' a '.
+SELECT SHOW_TRGM('a')                                         AS single_char_trgms;
+# Empty string: padded = '   ' (3 chars, all spaces). ONE
+# trigram '   '.
+SELECT SHOW_TRGM('')                                          AS empty_trgms;
+
+--echo === SHOW_TRGM — duplicates collapse to UNIQUE set ===
+
+# 'aaa' padded → '  aaa '. Windows: '  a', ' aa', 'aaa',
+# 'aa '. All distinct (4 trigrams).
+SELECT SHOW_TRGM('aaa')                                       AS aaa_trgms;
+# 'aaaa' padded → '  aaaa '. Windows: '  a', ' aa', 'aaa',
+# 'aaa' (duplicate), 'aa '. Dedup → 4 trigrams.
+SELECT SHOW_TRGM('aaaa')                                      AS aaaa_trgms;
+
+--echo === SIMILARITY — Jaccard over trigram sets ===
+
+# Identical strings → exactly 1.0.
+SELECT SIMILARITY('cat', 'cat')                               AS identity_1;
+# Empty vs empty → both produce trigram '   ', so identical
+# → 1.0.
+SELECT SIMILARITY('', '')                                     AS empty_pair_1;
+# Disjoint short strings: 'cat' trgms = {'  c',' ca','cat',
+# 'at '} and 'dog' trgms = {'  d',' do','dog','og '} —
+# NO overlap → 0.0.
+SELECT SIMILARITY('cat', 'dog')                               AS disjoint_0;
+# Similar strings share many trigrams. 'foobar' vs 'foobaz'
+# share '  f',' fo','foo','oob','oba' (5) and differ in
+# 'bar','ar '/'baz','az '. Total union = 9, intersection = 5
+# → 5/9 ≈ 0.555.
+SELECT SIMILARITY('foobar', 'foobaz')                         AS foobar_foobaz_5_9;
+
+--echo === Headline finding pinned: 1-char inputs share NO trigrams ===
+
+# 'a' → trigrams {'  a', ' a '}; 'b' → trigrams {'  b',
+# ' b '}. Trailing pad is exactly ONE space, so no window
+# lands on pure '   '. Jaccard = 0/4 = 0.
+SELECT SIMILARITY('a', 'b')                                   AS one_char_disjoint_0;
+# Symmetric — and same all-disjoint case.
+SELECT SIMILARITY('x', 'y')                                   AS one_char_disjoint_xy;
+
+--echo === SIMILARITY — symmetric (Jaccard is set-symmetric) ===
+
+SELECT SIMILARITY('apple', 'apply') = SIMILARITY('apply', 'apple') AS symmetric;
+
+--echo === SIMILARITY — case-insensitive (folded in trigram extract) ===
+
+SELECT SIMILARITY('CAT', 'cat')                               AS upper_lower_1;
+SELECT SIMILARITY('Hello', 'HELLO')                           AS hello_case_1;
+
+--echo === WORD_SIMILARITY — sliding window of N-word substrings ===
+
+# Query 'cat' (1 word) slides 1-word windows over text:
+# {'the','cat','sat'}. Best match is 'cat' itself → 1.0.
+SELECT WORD_SIMILARITY('cat', 'the cat sat')                  AS word_best_1;
+# Query 'cat sat' (2 words) slides 2-word windows:
+# {'the cat', 'cat sat'}. Best is 'cat sat' itself → 1.0.
+SELECT WORD_SIMILARITY('cat sat', 'the cat sat')              AS two_word_best_1;
+# Query word not present → < 1.0 but may still be > 0 if
+# partial trigram overlap.
+SELECT WORD_SIMILARITY('zebra', 'the cat sat') < 0.5          AS no_match_low;
+
+--echo === WORD_SIMILARITY — empty inputs ===
+
+# Empty query → 0.0 (impl shortcut at lib.rs:57348).
+SELECT WORD_SIMILARITY('', 'the cat sat')                     AS empty_query_0;
+# Empty text → 0.0 (impl shortcut at lib.rs:57353).
+SELECT WORD_SIMILARITY('cat', '')                             AS empty_text_0;
+
+--echo === All three — NULL propagation ===
+
+SELECT SHOW_TRGM(NULL)                                        AS show_null;
+SELECT SIMILARITY(NULL, 'cat')                                AS sim_left_null;
+SELECT SIMILARITY('cat', NULL)                                AS sim_right_null;
+SELECT WORD_SIMILARITY(NULL, 'text')                          AS ws_left_null;
+SELECT WORD_SIMILARITY('q', NULL)                             AS ws_right_null;
+SELECT SHOW_TRGM(NULL) IS NULL                                AS show_null_pred;
+
+--echo === STRIKING: non-string args are STRINGIFIED (no error) ===
+
+# value_to_sql_string fallback at lib.rs:55209/55227/55245
+# means SIMILARITY(1, 2) doesn't error — it computes
+# trigrams of '1' and '2'.
+SELECT SIMILARITY(1, 1)                                       AS int_int_1;
+SELECT SIMILARITY(1, 2)                                       AS int_int_disjoint;
+SELECT SHOW_TRGM(42)                                          AS int_show_42;
+# Cross-type: SIMILARITY('1', 1) — both stringify to '1' so
+# identity → 1.0.
+SELECT SIMILARITY('1', 1)                                     AS str_int_eq_1;
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT SHOW_TRGM();
+--error 1105
+SELECT SHOW_TRGM('a', 'b');
+--error 1105
+SELECT SIMILARITY();
+--error 1105
+SELECT SIMILARITY('a');
+--error 1105
+SELECT SIMILARITY('a', 'b', 'c');
+--error 1105
+SELECT WORD_SIMILARITY();
+--error 1105
+SELECT WORD_SIMILARITY('q');
+--error 1105
+SELECT WORD_SIMILARITY('q', 't', 'extra');
