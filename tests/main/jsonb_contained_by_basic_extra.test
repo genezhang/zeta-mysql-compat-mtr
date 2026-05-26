@@ -32,16 +32,16 @@
 #   LHS is "contained in" RHS iff every key/element of
 #   LHS is matched in RHS (recursive for nested objects).
 #
-#   STRIKING — scalar-in-array works (`'1' <@ '[1,2,3]'`
+#   Note — scalar-in-array works (`'1' <@ '[1,2,3]'`
 #   = TRUE) but scalar-vs-scalar requires equality
-#   (`'1' <@ '2'` = FALSE). This is PG-compatible.
+#   (`'1' <@ '2'` = FALSE). PG-compatible.
 #
-#   STRIKING — empty containers are vacuously contained.
-#   `{} <@ <anything-that's-an-object>` = TRUE; same
-#   for `[] <@ <any-array>`. Apps using `<@` for
-#   capability checks (e.g. "do I have at least these
-#   keys?") with an empty filter will get unexpected
-#   TRUE matches.
+#   Note — empty containers are vacuously contained
+#   (standard set-theory ∅ ⊆ X). `{} <@ <any-object>`
+#   = TRUE; `[] <@ <any-array>` = TRUE. PG-compatible.
+#   Apps using `<@` for capability checks with an
+#   empty filter still get unexpected TRUE matches on
+#   PG too — worth flagging for callers regardless.
 #
 #   Symmetry with `@>` is exact: `a <@ b` returns the
 #   same Bool as `b @> a`. Pinned with paired rows
@@ -88,11 +88,12 @@ SELECT 'null'::JSONB <@ '{"a":1}'::JSONB                      AS null_lhs_false;
 # `null <@ null` is TRUE — self-equality.
 SELECT 'null'::JSONB <@ 'null'::JSONB                         AS null_self_true;
 
---echo === STRIKING: empty containers vacuously contained ===
+--echo === Empty containers vacuously contained (PG-compat: ∅ ⊆ X) ===
 
 # `{} <@ {"a":1}` = TRUE (empty object is contained in
-# any object). Apps using `<@` with empty-filter pattern
-# will get unexpected TRUE.
+# any object). Same on PG — apps using `<@` with empty-
+# filter pattern still need to handle the vacuous-TRUE
+# case explicitly.
 SELECT '{}'::JSONB <@ '{"a":1}'::JSONB                        AS empty_obj_vacuously_true;
 SELECT '[]'::JSONB <@ '[1,2,3]'::JSONB                        AS empty_arr_vacuously_true;
 # Empty <@ Empty also TRUE.
