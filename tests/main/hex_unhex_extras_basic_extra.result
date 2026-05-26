@@ -1,0 +1,171 @@
+=== HEX / TO_HEX alias equivalence ===
+SELECT HEX(255)    = TO_HEX(255)                              AS int_alias;
+int_alias
+1
+SELECT HEX('abc')  = TO_HEX('abc')                            AS str_alias;
+str_alias
+1
+SELECT HEX(NULL)   IS NULL                                    AS null_alias_left;
+null_alias_left
+1
+SELECT TO_HEX(NULL) IS NULL                                   AS null_alias_right;
+null_alias_right
+1
+=== UNHEX / FROM_HEX alias equivalence ===
+SELECT UNHEX('616263') = FROM_HEX('616263')                   AS bytes_alias;
+bytes_alias
+1
+SELECT UNHEX('41')     = FROM_HEX('41')                       AS single_alias;
+single_alias
+1
+=== Uppercase invariant — HEX always uppercase ===
+SELECT HEX('z')                                               AS hex_z;
+hex_z
+7A
+SELECT HEX(3735928559)                                        AS hex_deadbeef_decimal;
+hex_deadbeef_decimal
+DEADBEEF
+SELECT LOWER(HEX('z'))                                        AS hex_z_lower;
+hex_z_lower
+7a
+=== Round-trips ===
+SELECT UNHEX(HEX('hello'))    = 'hello'                       AS rt_ascii;
+rt_ascii
+1
+SELECT UNHEX(HEX('café'))     = 'café'                        AS rt_utf8_multibyte;
+rt_utf8_multibyte
+1
+SELECT UNHEX(HEX(''))         = ''                            AS rt_empty;
+rt_empty
+1
+SELECT HEX(UNHEX('48656C6C6F')) = '48656C6C6F'                AS rt_hex_to_hex;
+rt_hex_to_hex
+1
+=== HEX of negative Int (i32 sign-extends to 64 bits) ===
+SELECT HEX(-1)                                                AS neg_one;
+neg_one
+FFFFFFFFFFFFFFFF
+SELECT LENGTH(HEX(-1))                                        AS neg_one_hex_len_is_16;
+neg_one_hex_len_is_16
+16
+SELECT HEX(-2)                                                AS neg_two;
+neg_two
+FFFFFFFFFFFFFFFE
+SELECT HEX(255)                                               AS pos_255;
+pos_255
+FF
+=== HEX of Int64 boundaries (BIGINT) ===
+SELECT HEX(CAST(9223372036854775807 AS BIGINT))               AS i64_max;
+i64_max
+7FFFFFFFFFFFFFFF
+SELECT LENGTH(HEX(CAST(9223372036854775807 AS BIGINT)))       AS i64_max_len;
+i64_max_len
+16
+SELECT HEX(0)                                                 AS zero;
+zero
+0
+=== HEX of non-numeric types — catch-all via value_to_sql_string ===
+SELECT HEX(TRUE)                                              AS hex_bool_true;
+hex_bool_true
+74727565
+SELECT HEX(DATE '2024-03-15')                                 AS hex_date;
+hex_date
+323032342D30332D3135
+SELECT HEX(TIMESTAMP '2024-03-15 14:30:00')                   AS hex_timestamp;
+hex_timestamp
+323032342D30332D31352031343A33303A30302E303030303030
+SELECT HEX(CAST(1.5 AS DOUBLE PRECISION))                     AS hex_float64;
+hex_float64
+312E35
+=== HEX of Bytes (BYTEA via CAST chain) ===
+SELECT HEX(UNHEX('FF'))                                       AS hex_of_bytes_FF;
+hex_of_bytes_FF
+FF
+SELECT HEX(UNHEX('DEADBEEF'))                                 AS hex_of_bytes_deadbeef;
+hex_of_bytes_deadbeef
+DEADBEEF
+=== UNHEX String-vs-Bytes — round-trip preserves bytes regardless of shape ===
+SELECT HEX(UNHEX('48656C6C6F'))                               AS unhex_string_path_rt;
+unhex_string_path_rt
+48656C6C6F
+SELECT HEX(UNHEX('FF'))                                       AS unhex_bytes_path_rt;
+unhex_bytes_path_rt
+FF
+SELECT UNHEX('48656C6C6F') = 'Hello'                          AS unhex_string_eq_literal;
+unhex_string_eq_literal
+1
+=== UNHEX odd-length → NULL ===
+SELECT UNHEX('A')                                             AS odd_one_char_null;
+odd_one_char_null
+NULL
+SELECT UNHEX('ABC')                                           AS odd_three_char_null;
+odd_three_char_null
+NULL
+SELECT UNHEX('A') IS NULL                                     AS odd_predicate_null;
+odd_predicate_null
+1
+=== UNHEX invalid hex char → NULL ===
+SELECT UNHEX('GH')                                            AS bad_g_h_null;
+bad_g_h_null
+NULL
+SELECT UNHEX('41G2')                                          AS mixed_valid_bad_null;
+mixed_valid_bad_null
+NULL
+SELECT UNHEX('41G2') IS NULL                                  AS bad_predicate_null;
+bad_predicate_null
+1
+SELECT UNHEX('41 42')                                         AS space_in_middle_null;
+space_in_middle_null
+NULL
+=== Empty string handling ===
+SELECT HEX('')                                                AS hex_empty;
+hex_empty
+
+SELECT UNHEX('')                                              AS unhex_empty;
+unhex_empty
+
+SELECT HEX('')   = ''                                         AS hex_empty_eq;
+hex_empty_eq
+1
+SELECT UNHEX('') = ''                                         AS unhex_empty_eq;
+unhex_empty_eq
+1
+=== NULL propagation (NULL + typed NULL) ===
+SELECT HEX(NULL)                                              AS hex_null;
+hex_null
+NULL
+SELECT UNHEX(NULL)                                            AS unhex_null;
+unhex_null
+NULL
+SELECT HEX(CAST(NULL AS INTEGER))                             AS hex_typed_null;
+hex_typed_null
+NULL
+SELECT UNHEX(CAST(NULL AS TEXT))                              AS unhex_typed_null;
+unhex_typed_null
+NULL
+SELECT HEX(NULL)   IS NULL                                    AS hex_null_pred;
+hex_null_pred
+1
+SELECT UNHEX(NULL) IS NULL                                    AS unhex_null_pred;
+unhex_null_pred
+1
+=== Arity errors → 1105 ===
+SELECT HEX();
+ERROR 1105: execution error: HEX requires 1 argument
+SELECT HEX(1, 2);
+ERROR 1105: execution error: HEX requires 1 argument
+SELECT UNHEX();
+ERROR 1105: execution error: UNHEX requires 1 argument
+SELECT UNHEX('41', '42');
+ERROR 1105: execution error: UNHEX requires 1 argument
+SELECT TO_HEX();
+ERROR 1105: execution error: TO_HEX requires 1 argument
+SELECT FROM_HEX();
+ERROR 1105: execution error: FROM_HEX requires 1 argument
+=== CONV equivalence: CONV(n, 10, 16) = HEX(n) for positive int ===
+SELECT CONV(255, 10, 16) = HEX(255)                           AS conv_eq_hex_255;
+conv_eq_hex_255
+1
+SELECT CONV(0,   10, 16) = HEX(0)                             AS conv_eq_hex_0;
+conv_eq_hex_0
+1
