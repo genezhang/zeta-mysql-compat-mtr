@@ -1,0 +1,22 @@
+=== MySQL wire path — LISTEN parses and produces no rows ===
+LISTEN cache_invalidate;
+LISTEN job_queue;
+LISTEN "with spaces";
+=== MySQL wire path — UNLISTEN parses (named and wildcard) ===
+UNLISTEN cache_invalidate;
+UNLISTEN job_queue;
+UNLISTEN *;
+=== MySQL wire path — NOTIFY (bare) parses and produces no rows ===
+NOTIFY cache_invalidate;
+=== MySQL wire path — NOTIFY with payload string ===
+NOTIFY cache_invalidate, 'cache_key_42';
+NOTIFY cache_invalidate, 'payload with spaces';
+NOTIFY cache_invalidate, '';
+=== MySQL wire path — sequence LISTEN→NOTIFY→UNLISTEN all silent ===
+LISTEN test_seq;
+NOTIFY test_seq, 'hello';
+UNLISTEN test_seq;
+=== Sanity — subsequent SELECT shows no rows leaked from above ===
+SELECT 1 AS sanity;
+sanity
+1
