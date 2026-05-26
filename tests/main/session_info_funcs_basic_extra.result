@@ -1,0 +1,106 @@
+=== User-flavor (bare-keyword shape): all return "zeta" ===
+SELECT USER                                                   AS user_kw;
+user_kw
+zeta
+SELECT CURRENT_USER                                           AS current_user_kw;
+current_user_kw
+zeta
+SELECT SESSION_USER                                           AS session_user_kw;
+session_user_kw
+zeta
+=== User-flavor: all three equal (same runtime arm) ===
+SELECT USER         = CURRENT_USER                            AS user_eq_current;
+user_eq_current
+1
+SELECT CURRENT_USER = SESSION_USER                            AS current_eq_session;
+current_eq_session
+1
+SELECT USER         = SESSION_USER                            AS user_eq_session;
+user_eq_session
+1
+=== User-flavor: paren-call shape REJECTED at parser ===
+SELECT USER();
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ( at Line: 1, Column: 12
+SELECT CURRENT_USER();
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ( at Line: 1, Column: 20
+SELECT SESSION_USER();
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ( at Line: 1, Column: 20
+=== Role-flavor: CURRENT_ROLE is OPPOSITE — paren only ===
+SELECT CURRENT_ROLE()                                         AS current_role_paren;
+current_role_paren
+zeta
+SELECT CURRENT_ROLE() = USER                                  AS current_role_eq_user;
+current_role_eq_user
+1
+SELECT CURRENT_ROLE;
+ERROR 1054: column not found: CURRENT_ROLE
+=== DB-flavor bare forms — DATABASE()/SCHEMA() return session db ===
+SELECT DATABASE()                                             AS db_returns_session;
+DATABASE()
+test
+SELECT SCHEMA()                                               AS schema_returns_session;
+DATABASE()
+test
+SELECT CURRENT_DATABASE()                                     AS current_db_paren;
+current_db_paren
+zeta
+SELECT CURRENT_CATALOG                                        AS current_catalog_kw;
+current_catalog_kw
+zeta
+=== STRIKING BUG: shim prefix-match drops trailing expression + alias ===
+SELECT DATABASE() = 'zeta'                                    AS this_alias_dropped;
+DATABASE()
+test
+SELECT SCHEMA()   = 'zeta'                                    AS this_alias_dropped_too;
+DATABASE()
+test
+SELECT DATABASE() <> 'somethingelse'                          AS this_alias_dropped_3;
+DATABASE()
+test
+=== Workaround: embed DATABASE() in CONCAT to bypass shim intercept ===
+SELECT CONCAT('', DATABASE())                                 AS via_concat_returns_zeta;
+via_concat_returns_zeta
+zeta
+SELECT CONCAT('', DATABASE()) = 'zeta'                        AS concat_eq_zeta_via_runtime;
+concat_eq_zeta_via_runtime
+1
+=== CURRENT_DATABASE() / CURRENT_CATALOG go through runtime, not shim ===
+SELECT CURRENT_DATABASE() = 'zeta'                            AS current_db_is_zeta_runtime;
+current_db_is_zeta_runtime
+1
+SELECT CURRENT_DATABASE() = CURRENT_CATALOG                   AS current_db_eq_catalog;
+current_db_eq_catalog
+1
+=== Cross-flavor: user arm and DB-CURRENT arm share the "zeta" stub ===
+SELECT USER = CURRENT_DATABASE()                              AS user_eq_current_db_stub;
+user_eq_current_db_stub
+1
+=== Return type and rendered length ===
+SELECT LENGTH(USER)                                           AS user_len;
+user_len
+4
+SELECT LENGTH(CURRENT_DATABASE())                             AS current_db_len;
+current_db_len
+4
+SELECT CHAR_LENGTH(CURRENT_USER)                              AS current_user_char_len;
+current_user_char_len
+4
+=== Inside-expression usage ===
+SELECT UPPER(USER)                                            AS upper_user;
+upper_user
+ZETA
+SELECT CONCAT('user=', USER, ', db=', CURRENT_DATABASE())     AS combined_label;
+combined_label
+user=zeta, db=zeta
+=== Literal equality pins the exact stub value ===
+SELECT USER               = 'zeta'                            AS user_is_zeta_literal;
+user_is_zeta_literal
+1
+SELECT CURRENT_DATABASE() = 'zeta'                            AS current_db_is_zeta_literal;
+current_db_is_zeta_literal
+1
+=== GAP SENTINEL: SYSTEM_USER missing from both parser and runtime ===
+SELECT SYSTEM_USER;
+ERROR 1054: column not found: SYSTEM_USER
+SELECT SYSTEM_USER();
+ERROR 1105: execution error: unknown function: SYSTEM_USER
