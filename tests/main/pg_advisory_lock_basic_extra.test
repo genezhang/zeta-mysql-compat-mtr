@@ -1,0 +1,158 @@
+# Independently authored PG_ADVISORY_LOCK /
+# PG_TRY_ADVISORY_LOCK / PG_ADVISORY_UNLOCK /
+# PG_ADVISORY_UNLOCK_ALL smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - PG_ADVISORY_LOCK family — NONE (zero compat-mtr
+#     coverage).
+#   - lock_basic_extra and lock_stubs_basic_extra cover
+#     row-level / MySQL named-mutex locks but NOT the PG
+#     advisory-lock family.
+#
+# This slice pins:
+#   - PG_ADVISORY_LOCK(key) returns NULL (void).
+#   - PG_TRY_ADVISORY_LOCK(key) returns BOOLEAN — but per
+#     the impl comment at lib.rs:99-104, ALWAYS returns
+#     TRUE.
+#   - PG_ADVISORY_UNLOCK(key) returns BOOLEAN — TRUE if
+#     refcount > 0 (and decrements), FALSE if not held.
+#   - PG_ADVISORY_UNLOCK_ALL() returns NULL (void); takes
+#     no args.
+#   - Refcount semantics: lock+lock+unlock+unlock all
+#     return TRUE, third unlock returns FALSE.
+#   - INT and BIGINT keys both accepted.
+#   - NULL key → 1105 'must be an integer' (NO NULL prop).
+#   - Wrong-type → 1105 'must be an integer'.
+#   - Arity errors → 1105.
+#
+# Big-picture finding (TWO MAJOR PG SEMANTIC GAPS):
+#
+#   1. **PG_ADVISORY_LOCK IS NON-BLOCKING** despite the
+#      PG name. The impl comment at lib.rs:89-92 is
+#      explicit: "Currently non-blocking — always succeeds
+#      immediately. PostgreSQL's pg_advisory_lock is
+#      blocking-exclusive; implementing true blocking
+#      requires async coordination and is deferred." So
+#      this function is a refcount-only stub. It does NOT
+#      provide exclusion across sessions.
+#
+#   2. **PG_TRY_ADVISORY_LOCK ALWAYS RETURNS TRUE.**
+#      Per the impl at lib.rs:101-104, try_acquire just
+#      calls acquire() and returns true. There is no false
+#      path. Apps using `IF NOT pg_try_advisory_lock(...)`
+#      branches will NEVER take the false branch. This is
+#      a MUCH bigger semantic gap than the blocking one
+#      because it silently breaks correctness for any
+#      app trying to detect lock contention.
+#
+#   Both stubs are session-scoped via ADVISORY_SESSION_ID
+#   thread-local (lib.rs:133). Refcounts (acquire +1,
+#   release -1) work correctly WITHIN a session — a real
+#   feature, not a stub. So intra-session correctness IS
+#   exercised below; cross-session exclusion isn't pinned
+#   because the MTR runner uses one connection per test.
+#
+#   STRIKING: NULL key is an ERROR, not NULL-prop. Most
+#   PG functions NULL-prop their args, but the match arms
+#   at lib.rs:47024-47030 (etc) have only Int64 and Int32
+#   variants; NULL falls into the `_` "must be an integer"
+#   error. Apps doing `pg_advisory_lock(maybe_null_col)`
+#   need explicit COALESCE or IS NULL guards.
+#
+# Adaptation notes:
+#   # zeta-adapt: PG_ADVISORY_LOCK is NON-BLOCKING (stub).
+#     Does NOT provide cross-session exclusion. Refcount
+#     within session works correctly.
+#   # zeta-adapt: PG_TRY_ADVISORY_LOCK ALWAYS returns TRUE.
+#     Apps relying on it to detect contention will silently
+#     break.
+#   # zeta-adapt: NULL key → ERROR, not NULL-prop. Add
+#     COALESCE if input may be NULL.
+#   # zeta-adapt: PG_ADVISORY_UNLOCK returns TRUE for any
+#     positive refcount; FALSE when not held.
+
+--echo === PG_ADVISORY_LOCK — returns NULL (void) ===
+
+SELECT PG_ADVISORY_LOCK(1)                                    AS lock_1_void;
+# Confirm the result IS NULL.
+SELECT PG_ADVISORY_LOCK(2) IS NULL                            AS lock_2_void_pred;
+
+--echo === STRIKING: PG_TRY_ADVISORY_LOCK always returns TRUE ===
+
+# Fresh key — TRUE.
+SELECT PG_TRY_ADVISORY_LOCK(100)                              AS try_fresh_true;
+# Same key again, already held — STILL TRUE (real PG would
+# return TRUE here too since same session is re-entrant,
+# but a DIFFERENT session would get FALSE in PG. zeta
+# returns TRUE for ANY caller.)
+SELECT PG_TRY_ADVISORY_LOCK(100)                              AS try_held_still_true;
+# Brand-new key after holding 100 — TRUE.
+SELECT PG_TRY_ADVISORY_LOCK(200)                              AS try_new_key_true;
+
+--echo === PG_ADVISORY_UNLOCK — refcount-driven boolean ===
+
+# Release 100 once — was held twice (1 from LOCK above? no,
+# only the TRY_ADVISORY_LOCK rows incremented 100; we have
+# 2 TRY rows for key 100). Counts: key 100 = 2, key 200 = 1.
+SELECT PG_ADVISORY_UNLOCK(100)                                AS unlock_100_true_1;
+# Second release of 100 (refcount goes 1 → 0).
+SELECT PG_ADVISORY_UNLOCK(100)                                AS unlock_100_true_2;
+# Third release — no longer held → FALSE.
+SELECT PG_ADVISORY_UNLOCK(100)                                AS unlock_100_false;
+# Never-held key → FALSE.
+SELECT PG_ADVISORY_UNLOCK(99999)                              AS unlock_unheld_false;
+
+--echo === PG_ADVISORY_UNLOCK_ALL — releases everything ===
+
+# Still holding 1, 2, 200 from above. UNLOCK_ALL clears.
+SELECT PG_ADVISORY_UNLOCK_ALL()                               AS unlock_all_void;
+# Confirm void.
+SELECT PG_ADVISORY_UNLOCK_ALL() IS NULL                       AS unlock_all_void_pred;
+# After UNLOCK_ALL, any prior key returns FALSE on unlock.
+SELECT PG_ADVISORY_UNLOCK(1)                                  AS post_all_unlock_1_false;
+SELECT PG_ADVISORY_UNLOCK(200)                                AS post_all_unlock_200_false;
+
+--echo === INT and BIGINT keys both accepted ===
+
+SELECT PG_TRY_ADVISORY_LOCK(CAST(42 AS INTEGER))              AS int_key_true;
+SELECT PG_TRY_ADVISORY_LOCK(CAST(42 AS BIGINT))               AS bigint_key_true;
+# Cleanup.
+SELECT PG_ADVISORY_UNLOCK_ALL()                               AS cleanup_void;
+
+--echo === Negative keys accepted (i64 range) ===
+
+SELECT PG_TRY_ADVISORY_LOCK(-1)                               AS neg_key_true;
+SELECT PG_ADVISORY_UNLOCK(-1)                                 AS neg_key_unlock_true;
+
+--echo === STRIKING: NULL key is ERROR, not NULL-prop ===
+
+--error 1105
+SELECT PG_ADVISORY_LOCK(NULL);
+--error 1105
+SELECT PG_TRY_ADVISORY_LOCK(NULL);
+--error 1105
+SELECT PG_ADVISORY_UNLOCK(NULL);
+
+--echo === Wrong-type key → ERROR 1105 ===
+
+--error 1105
+SELECT PG_ADVISORY_LOCK('one');
+--error 1105
+SELECT PG_TRY_ADVISORY_LOCK(CAST(1.5 AS DOUBLE PRECISION));
+--error 1105
+SELECT PG_ADVISORY_UNLOCK(CAST('2026-01-01' AS DATE));
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT PG_ADVISORY_LOCK();
+--error 1105
+SELECT PG_ADVISORY_LOCK(1, 2);
+--error 1105
+SELECT PG_TRY_ADVISORY_LOCK();
+--error 1105
+SELECT PG_ADVISORY_UNLOCK();
+# UNLOCK_ALL takes NO args (different error wording).
+--error 1105
+SELECT PG_ADVISORY_UNLOCK_ALL(1);
