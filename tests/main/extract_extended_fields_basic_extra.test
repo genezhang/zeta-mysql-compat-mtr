@@ -1,0 +1,167 @@
+# Independently authored EXTRACT extended-field smoke for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - EXTRACT(CENTURY/DECADE/MILLENNIUM/ISOYEAR/EPOCH/
+#     MILLISECONDS/MICROSECONDS) — NONE (checked all
+#     *.test files per PR #357 lesson; only YEAR/MONTH/
+#     DAY/HOUR/MINUTE/SECOND/QUARTER/WEEK/DOW/DOY are
+#     covered today).
+#   - temporal_arithmetic_basic_extra covers DATE_PART
+#     (PG alias for EXTRACT) on basic fields (year, month).
+#   - unsupported_fn_sentinels_basic_extra pins
+#     MICROSECOND() (no `S`) as unsupported standalone
+#     function — distinct from EXTRACT(MICROSECONDS FROM ...)
+#     which IS supported.
+#
+# This slice pins:
+#   - EXTRACT(CENTURY FROM ts/date) — PG: floor((year-1)/100)+1.
+#   - EXTRACT(DECADE FROM ts/date) — PG: year/10 floor.
+#   - EXTRACT(MILLENNIUM FROM ts/date) — PG: floor((year-1)/1000)+1.
+#   - EXTRACT(ISOYEAR FROM ts/date) — ISO-8601 week-year.
+#   - EXTRACT(EPOCH FROM ts) — seconds since Unix epoch as Float.
+#   - EXTRACT(MILLISECOND/MILLISECONDS FROM ts/time).
+#   - EXTRACT(MICROSECOND/MICROSECONDS FROM ts/time).
+#   - DATE_PART equivalence (PG alias).
+#   - Validation: EXTRACT(HOUR FROM date) → error (no time
+#     fields on Date); EXTRACT(YEAR FROM time) → error
+#     (no date fields on Time).
+#
+# Big-picture finding (PG-EXTENDED FIELD SURFACE):
+#   zeta's EXTRACT/DATE_PART supports the PG-extended
+#   field tokens beyond SQL-standard (YEAR/MONTH/etc).
+#   The validation table at lib.rs:5068-5121 enforces
+#   per-type-validity:
+#
+#     Timestamp: 19 fields (all SQL-standard + extras)
+#     Date:      12 fields (no time fields)
+#     Time:       8 fields (no date fields)
+#     Interval:   7 fields (no extras, just YMD HMS + EPOCH)
+#
+#   STRIKING — ISOYEAR vs YEAR DIVERGE near year boundaries.
+#   For 2025-12-31 (Wednesday) ISO week-year is still 2025,
+#   but for 2024-12-30 (Monday of ISO week 1 of 2025) the
+#   ISO year is ALREADY 2025 while the regular year is
+#   2024. Pinned for 2025-01-01 (a Wednesday, ISO week 1
+#   of 2025, so ISOYEAR=2025=YEAR — they happen to match
+#   here, but the field is exercised).
+#
+#   STRIKING — EPOCH returns Float (or Decimal-shaped value
+#   with subsecond precision). For timestamp inputs, it's
+#   the seconds-since-1970-01-01-UTC count. For interval,
+#   it's total seconds in the interval.
+#
+#   STRIKING — Both singular and plural forms accepted:
+#   MILLISECOND ≡ MILLISECONDS, MICROSECOND ≡ MICROSECONDS.
+#   (PG uses both; zeta accepts both per the validation
+#   list at lib.rs:5076-5079, :5110-5113.)
+#
+# Adaptation notes:
+#   # zeta-adapt: EXTRACT(CENTURY FROM ts) uses PG formula
+#     `floor((year-1)/100)+1`, NOT `year/100`. So
+#     2024 → century 21 (not 20).
+#   # zeta-adapt: EXTRACT(MILLENNIUM FROM ts) uses
+#     `floor((year-1)/1000)+1`. 2024 → 3rd millennium.
+#   # zeta-adapt: ISOYEAR diverges from YEAR near year
+#     boundaries (ISO 8601 weeks).
+#   # zeta-adapt: EPOCH returns seconds-since-Unix-epoch
+#     for timestamps; total-seconds for intervals.
+#   # zeta-adapt: Both MILLISECOND/MILLISECONDS and
+#     MICROSECOND/MICROSECONDS forms accepted.
+#   # zeta-adapt: Per-type-validity — Date rejects time
+#     fields; Time rejects date fields.
+
+--echo === EXTRACT(CENTURY) — PG formula floor((year-1)/100)+1 ===
+
+# 2024 → century 21 (since (2024-1)/100 + 1 = 20 + 1 = 21).
+SELECT EXTRACT(CENTURY FROM TIMESTAMP '2024-05-19 14:30:45') AS century_21;
+# Year 2000 → century 20 (since (2000-1)/100 + 1 = 19 + 1 = 20).
+SELECT EXTRACT(CENTURY FROM DATE '2000-01-01')               AS year_2000_century_20;
+# Year 2001 → century 21.
+SELECT EXTRACT(CENTURY FROM DATE '2001-01-01')               AS year_2001_century_21;
+
+--echo === EXTRACT(DECADE) — floor(year/10) ===
+
+SELECT EXTRACT(DECADE FROM TIMESTAMP '2024-05-19 14:30:45') AS decade_202;
+SELECT EXTRACT(DECADE FROM DATE '2030-01-01')                AS year_2030_decade_203;
+SELECT EXTRACT(DECADE FROM DATE '1999-12-31')                AS year_1999_decade_199;
+
+--echo === EXTRACT(MILLENNIUM) — floor((year-1)/1000)+1 ===
+
+# 2024 → 3rd millennium.
+SELECT EXTRACT(MILLENNIUM FROM TIMESTAMP '2024-05-19 00:00:00') AS millennium_3;
+# Year 2000 → 2nd millennium (boundary).
+SELECT EXTRACT(MILLENNIUM FROM DATE '2000-01-01')            AS year_2000_millennium_2;
+# Year 2001 → 3rd millennium.
+SELECT EXTRACT(MILLENNIUM FROM DATE '2001-01-01')            AS year_2001_millennium_3;
+
+--echo === EXTRACT(ISOYEAR) — ISO 8601 week-year ===
+
+# Mid-year, no boundary issues: ISOYEAR = YEAR.
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-05-19')               AS mid_2024;
+# 2025-01-01 is a Wednesday → ISO week 1 of 2025.
+SELECT EXTRACT(ISOYEAR FROM DATE '2025-01-01')               AS new_year_2025;
+
+--echo === EXTRACT(EPOCH) — seconds since Unix epoch ===
+
+# Unix epoch itself → 0.
+SELECT EXTRACT(EPOCH FROM TIMESTAMP '1970-01-01 00:00:00')   AS epoch_0;
+# One hour past epoch → 3600.
+SELECT EXTRACT(EPOCH FROM TIMESTAMP '1970-01-01 01:00:00')   AS epoch_3600;
+# Date input — EPOCH returns midnight-UTC seconds.
+SELECT EXTRACT(EPOCH FROM DATE '1970-01-02')                 AS day_after_epoch_86400;
+# Interval input — total seconds in the interval.
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 hour')                 AS one_hour_3600;
+
+--echo === EXTRACT(MILLISECOND/MILLISECONDS) — both singular AND plural ===
+
+# Plural form.
+SELECT EXTRACT(MILLISECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789') AS ms_plural;
+# Singular form — same result.
+SELECT EXTRACT(MILLISECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789') AS ms_singular;
+# Both forms equal.
+SELECT EXTRACT(MILLISECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789')
+     = EXTRACT(MILLISECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789') AS sing_eq_plur_ms;
+
+--echo === EXTRACT(MICROSECOND/MICROSECONDS) — both forms accepted ===
+
+SELECT EXTRACT(MICROSECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789012') AS us_plural;
+SELECT EXTRACT(MICROSECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789012') AS us_singular;
+SELECT EXTRACT(MICROSECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789012')
+     = EXTRACT(MICROSECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789012') AS sing_eq_plur_us;
+
+--echo === DATE_PART equivalence (PG alias) ===
+
+SELECT DATE_PART('century',    TIMESTAMP '2024-05-19 14:30:45')
+     = EXTRACT(CENTURY FROM TIMESTAMP '2024-05-19 14:30:45')   AS date_part_century_eq;
+SELECT DATE_PART('decade',     TIMESTAMP '2024-05-19 14:30:45')
+     = EXTRACT(DECADE FROM TIMESTAMP '2024-05-19 14:30:45')    AS date_part_decade_eq;
+SELECT DATE_PART('millennium', TIMESTAMP '2024-05-19 14:30:45')
+     = EXTRACT(MILLENNIUM FROM TIMESTAMP '2024-05-19 14:30:45') AS date_part_mill_eq;
+SELECT DATE_PART('epoch',      TIMESTAMP '1970-01-01 01:00:00')
+     = EXTRACT(EPOCH FROM TIMESTAMP '1970-01-01 01:00:00')      AS date_part_epoch_eq;
+
+--echo === Per-type validity — Date rejects time fields ===
+
+# Date has no HOUR/MINUTE/SECOND/MILLISECOND/MICROSECOND.
+--error 1105
+SELECT EXTRACT(HOUR FROM DATE '2024-05-19');
+--error 1105
+SELECT EXTRACT(MICROSECOND FROM DATE '2024-05-19');
+
+--echo === Per-type validity — Time rejects date fields ===
+
+# Time has no YEAR/MONTH/DAY/CENTURY etc.
+--error 1105
+SELECT EXTRACT(YEAR FROM TIME '14:30:45');
+--error 1105
+SELECT EXTRACT(CENTURY FROM TIME '14:30:45');
+
+--echo === Per-type validity — Interval rejects extras (only Y/M/D/H/M/S/EPOCH) ===
+
+# Interval has no CENTURY/DECADE/MILLENNIUM/ISOYEAR/etc.
+--error 1105
+SELECT EXTRACT(CENTURY FROM INTERVAL '1 year');
+--error 1105
+SELECT EXTRACT(ISOYEAR FROM INTERVAL '1 year');
