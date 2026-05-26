@@ -1,0 +1,131 @@
+# Independently authored SQL NULL::JSONB vs JSONB
+# `'null'` scalar comparison smoke for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - jsonb_contained_by_basic_extra (PR #379) pins
+#     `'null'::JSONB <@ '{"a":1}' = FALSE` and
+#     `'null' <@ 'null' = TRUE` for the JSONB-null
+#     scalar case but doesn't compare with SQL NULL.
+#   - jsonb_basic_extra and jsonb_minus_operators_basic_extra
+#     don't compare the two null forms either.
+#   - This slice systematically pins the distinction
+#     across containment / equality / concat / key-exists
+#     / minus / null-test operators.
+#
+# This slice pins:
+#   - SQL NULL::JSONB on either side of any operator →
+#     SQL NULL result (3VL propagation — PG-compat).
+#   - JSONB 'null' scalar on either side of an operator →
+#     real evaluation (treated as a JSONB value).
+#   - The two are DISTINCT: SQL NULL is a column-level
+#     unknown; JSONB 'null' is a scalar value WITHIN the
+#     JSONB type.
+#   - `NULL::JSONB IS NULL` = TRUE; `'null'::JSONB IS
+#     NULL` = FALSE.
+#   - Equality: `NULL = NULL` = NULL (3VL), `'null' =
+#     'null'` = TRUE (scalar self), `NULL = 'null'` = NULL.
+#
+# Big-picture finding (TWO-LEVEL NULL TYPE-SYSTEM):
+#
+#   This is one of the most confusing parts of using
+#   JSONB. There are TWO completely distinct concepts:
+#
+#     - **SQL NULL** at the column / value level:
+#       represents "unknown / not present". Propagates
+#       per 3VL — any operator with NULL operand returns
+#       NULL.
+#
+#     - **JSONB 'null' scalar**: a real JSON value, like
+#       "true" or "false" or "123". Stored as a JSONB
+#       value. Operators treat it as a normal value.
+#
+#   In PG and zeta both:
+#     - `NULL::JSONB <@ '{}'`     = NULL    (3VL)
+#     - `'null'::JSONB <@ '{}'`   = FALSE   (real eval)
+#     - `NULL::JSONB IS NULL`     = TRUE
+#     - `'null'::JSONB IS NULL`   = FALSE
+#     - `NULL = 'null'`           = NULL    (3VL)
+#     - `'null' = 'null'`         = TRUE    (self)
+#
+#   Apps reading JSON from external sources (HTTP APIs
+#   that return `null` for missing fields) must
+#   distinguish these. JSON deserializers often map
+#   `null` literals to SQL NULL, which then propagates
+#   3VL — fundamentally different from preserving the
+#   JSONB null scalar.
+#
+# Adaptation notes:
+#   # zeta-adapt: SQL `NULL::JSONB` and JSONB `'null'`
+#     scalar are DISTINCT. SQL NULL propagates 3VL;
+#     JSONB null is a real value with eval semantics.
+#   # zeta-adapt: `NULL::JSONB IS NULL = TRUE`;
+#     `'null'::JSONB IS NULL = FALSE`. Useful for
+#     disambiguating during ingestion.
+#   # zeta-adapt: PG-compat — both engines have the
+#     same distinction; this slice exists to make it
+#     inescapable in zeta's compat-mtr corpus.
+
+--echo === IS NULL — TRUE for SQL NULL, FALSE for JSONB null ===
+
+SELECT NULL::JSONB IS NULL                                    AS sql_null_is_null_true;
+SELECT 'null'::JSONB IS NULL                                  AS jsonb_null_is_null_false;
+
+--echo === <@ contained-by — NULL propagates, 'null' evaluates ===
+
+# SQL NULL on either side → NULL (3VL).
+SELECT NULL::JSONB <@ '{"a":1}'::JSONB                        AS sql_null_lhs_null;
+SELECT '{"a":1}'::JSONB <@ NULL::JSONB                        AS sql_null_rhs_null;
+SELECT NULL::JSONB <@ NULL::JSONB                             AS both_sql_null_null;
+# JSONB null scalar → real eval (PR #379 cross-link).
+SELECT 'null'::JSONB <@ '{"a":1}'::JSONB                      AS jsonb_null_lhs_false;
+SELECT 'null'::JSONB <@ 'null'::JSONB                         AS jsonb_null_self_true;
+# Mixed: SQL NULL + JSONB null → still NULL (SQL NULL wins).
+SELECT NULL::JSONB <@ 'null'::JSONB                           AS mixed_sql_null_lhs_null;
+SELECT 'null'::JSONB <@ NULL::JSONB                           AS mixed_jsonb_null_lhs_null;
+
+--echo === @> contains — symmetric pattern (3VL on SQL NULL) ===
+
+SELECT NULL::JSONB @> '{"a":1}'::JSONB                        AS at_sql_null_lhs_null;
+SELECT '{"a":1}'::JSONB @> NULL::JSONB                        AS at_sql_null_rhs_null;
+SELECT 'null'::JSONB @> 'null'::JSONB                         AS at_jsonb_null_self_true;
+
+--echo === = equality — 3VL for SQL NULL, real eval for JSONB null ===
+
+SELECT NULL::JSONB = NULL::JSONB                              AS eq_sql_null_eq_sql_null_null;
+SELECT 'null'::JSONB = 'null'::JSONB                          AS eq_jsonb_null_self_true;
+SELECT NULL::JSONB = 'null'::JSONB                            AS eq_mixed_null;
+SELECT 'null'::JSONB = '1'::JSONB                             AS eq_jsonb_null_ne_int_false;
+
+--echo === || concat — SQL NULL propagates ===
+
+SELECT NULL::JSONB || '{"a":1}'::JSONB                        AS concat_sql_null_lhs_null;
+SELECT '{"a":1}'::JSONB || NULL::JSONB                        AS concat_sql_null_rhs_null;
+# JSONB null + object: concat returns array with both.
+SELECT 'null'::JSONB || '{"a":1}'::JSONB                      AS concat_jsonb_null_object;
+
+--echo === ? key-exists — SQL NULL propagates ===
+
+SELECT NULL::JSONB ? 'a'                                      AS q_sql_null_null;
+SELECT 'null'::JSONB ? 'a'                                    AS q_jsonb_null_false;
+SELECT '{"a":1}'::JSONB ? NULL                                AS q_null_key_null;
+
+--echo === - minus — SQL NULL propagates ===
+
+SELECT NULL::JSONB - 'key'                                    AS minus_sql_null_null;
+SELECT 'null'::JSONB - 'key'                                  AS minus_jsonb_null_unchanged;
+SELECT '{"a":1}'::JSONB - NULL                                AS minus_null_key_null;
+
+--echo === IS NOT DISTINCT FROM — null-safe equality bridges ===
+
+# SQL-NULL-safe equality. The canonical rule: IS NOT
+# DISTINCT FROM treats two SQL NULLs as equal (collapse
+# rule) and otherwise behaves like `=` (which would NULL-
+# prop). When exactly ONE side is SQL NULL, the values
+# ARE distinct → FALSE. So `NULL::JSONB IS NOT DISTINCT
+# FROM 'null'::JSONB` = FALSE (one side is SQL NULL, the
+# other isn't). Both sides being SQL NULL → TRUE; both
+# sides being JSONB 'null' → TRUE (real `=` eval).
+SELECT NULL::JSONB IS NOT DISTINCT FROM NULL::JSONB           AS isnd_sql_null_pair_true;
+SELECT 'null'::JSONB IS NOT DISTINCT FROM 'null'::JSONB       AS isnd_jsonb_null_pair_true;
+SELECT NULL::JSONB IS NOT DISTINCT FROM 'null'::JSONB         AS isnd_mixed_false;
