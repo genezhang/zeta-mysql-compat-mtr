@@ -1,0 +1,204 @@
+# Independently authored CAST target-type ALIASES sentinel
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - cast_basic_extra.test: INT/INTEGER/BIGINT aliases for
+#     int, TEXT/VARCHAR/CHAR for string, BYTEA gap pin,
+#     CONVERT(x, SIGNED/UNSIGNED) → 1064. Pins the canonical-
+#     name aliases only.
+#   - type_cast_edges_basic_extra.test: narrow numeric
+#     overflow, BIGINT silent-saturation bug, BOOL/Int,
+#     DECIMAL truncation. No alias coverage.
+#   - integer_cast_basic_extra.test, varchar_char_basic_extra.
+#     test, etc. — type-specific value-roundtrip slices.
+#
+# This slice pins what those slices DO NOT — the FULL
+# MYSQL-NAME alias matrix:
+#   - JSON alias for JSONB (same DataType::Jsonb under the hood).
+#   - SIGNED / UNSIGNED already covered as ints; pin DATETIME,
+#     BLOB family, TINYTEXT family, BINARY/VARBINARY, YEAR.
+#   - NUMERIC ≡ DECIMAL (same DataType::Numeric).
+#   - CHARACTER / CHARACTER VARYING accepted as CHAR / VARCHAR
+#     aliases.
+#   - INT2 / INT4 / INT8 accepted as SMALLINT / INTEGER / BIGINT.
+#   - FLOAT4 / FLOAT8 accepted as REAL / DOUBLE PRECISION.
+#   - STRING (Spark/Hive name) accepted as TEXT alias.
+#
+# Big-picture finding:
+#   zeta has TWO cast-target lookups that need to agree:
+#     - `parse_cast_target_type` (lib.rs:3152) — used at plan
+#       time for type metadata (closed-set match).
+#     - `cast_value` (lib.rs:56653) — the runtime impl. Its
+#       match arm catch-all emits `unsupported CAST target
+#       type: <target>` for anything it doesn't know.
+#   These two CAN disagree. BYTEA is the known asymmetric
+#   case: `parse_cast_target_type` maps it to DataType::Bytea
+#   (recognized at plan time), but `cast_value` has NO
+#   `BYTEA` arm — so the runtime rejects it with the same
+#   `unsupported CAST target type: BYTEA` message that pure-
+#   unrecognized names get. End result: same error surface,
+#   different code path. Cast_basic_extra.test:118 already
+#   pins the BYTEA case; this slice catalogs the broader set.
+#
+#   MySQL-specific aliases that ARE fully wired (parse + runtime):
+#     SIGNED, SIGNED INTEGER, UNSIGNED, UNSIGNED INTEGER,
+#     JSON (→ Jsonb), STRING (→ Text).
+#   MySQL-specific aliases that are NOT wired anywhere
+#   (this slice's sentinel list):
+#     DATETIME, BLOB, TINYBLOB, MEDIUMBLOB, LONGBLOB,
+#     TINYTEXT, MEDIUMTEXT, LONGTEXT, BINARY, VARBINARY, YEAR.
+#   The parens-form (e.g. DATETIME(6), BINARY(10)) carries
+#   through verbatim in the error message — pin both bare
+#   and parens forms below.
+#   Cross-slice link: timediff_basic_extra (PR #310) found
+#   `CAST(... AS DATETIME)` rejected, swapped to TIMESTAMP.
+#   This slice pins THAT exact rejection.
+#
+# Adaptation notes:
+#   # zeta-adapt: For MySQL DATETIME → use TIMESTAMP.
+#   # zeta-adapt: For MySQL BLOB family → use BYTEA target
+#     name (note BYTEA has its OWN issue — runtime cast not
+#     implemented for String→Bytea even though target type
+#     IS recognized; covered in cast_basic_extra.test:118-121).
+#   # zeta-adapt: For MySQL TINYTEXT/MEDIUMTEXT/LONGTEXT →
+#     use TEXT.
+#   # zeta-adapt: For MySQL BINARY(n)/VARBINARY(n) → BYTEA.
+#   # zeta-adapt: For MySQL YEAR → SMALLINT or extract YEAR
+#     via EXTRACT.
+
+--echo === Working alias: JSON ≡ JSONB (both DataType::Jsonb) ===
+
+# Both names map to the SAME underlying type — round-trip
+# is identical.
+SELECT CAST('{"a":1}' AS JSON)   = CAST('{"a":1}' AS JSONB) AS json_eq_jsonb;
+# Type-checking via @> operator works the same way regardless
+# of alias.
+SELECT CAST('{"a":1,"b":2}' AS JSON) @> '{"a":1}'           AS json_alias_supports_containment;
+
+--echo === Working alias: STRING (Spark/Hive name) ≡ TEXT ===
+
+SELECT CAST(42 AS STRING) = CAST(42 AS TEXT)                AS string_eq_text;
+
+--echo === Working alias: NUMERIC ≡ DECIMAL ===
+
+SELECT CAST('3.14' AS NUMERIC(10,2)) = CAST('3.14' AS DECIMAL(10,2))
+                                                            AS numeric_eq_decimal;
+# Bare NUMERIC (no precision) also works.
+SELECT CAST('3.14' AS NUMERIC) = CAST('3.14' AS DECIMAL)    AS bare_numeric_eq_bare_decimal;
+
+--echo === Working alias: SMALLINT / INT2, INTEGER / INT / INT4, BIGINT / INT8 ===
+
+SELECT CAST(42 AS SMALLINT) = CAST(42 AS INT2)              AS smallint_eq_int2;
+SELECT CAST(42 AS INTEGER)  = CAST(42 AS INT4)              AS integer_eq_int4;
+SELECT CAST(42 AS BIGINT)   = CAST(42 AS INT8)              AS bigint_eq_int8;
+SELECT CAST(42 AS INT)      = CAST(42 AS INTEGER)           AS int_eq_integer;
+
+--echo === Working alias: REAL / FLOAT4 / FLOAT8 / DOUBLE — all collapse to Float64 at runtime ===
+
+# NOTE: at runtime `cast_value`'s float arm lumps REAL +
+# FLOAT4 + FLOAT + FLOAT8 + DOUBLE + DOUBLE PRECISION all
+# into a single Float64 output (no Float32 distinction in
+# the value-cast surface). The eq pins below succeed
+# because both sides produce the SAME Float64 value, NOT
+# because REAL and FLOAT4 distinguish themselves.
+SELECT CAST(1.5 AS REAL)             = CAST(1.5 AS FLOAT4)            AS real_eq_float4;
+SELECT CAST(1.5 AS DOUBLE PRECISION) = CAST(1.5 AS FLOAT8)            AS double_prec_eq_float8;
+SELECT CAST(1.5 AS DOUBLE)           = CAST(1.5 AS DOUBLE PRECISION)  AS double_eq_double_prec;
+# Bare FLOAT in zeta is mapped at PLAN time to Float64 (NOT
+# Float32 like MySQL/PG default). Pin it here so a future
+# parse_cast_target_type change is caught.
+SELECT CAST(1.5 AS FLOAT)            = CAST(1.5 AS DOUBLE PRECISION)  AS bare_float_eq_double;
+
+--echo === Working alias: CHARACTER / CHARACTER VARYING ===
+
+# CHAR ≡ CHARACTER, VARCHAR ≡ CHARACTER VARYING.
+SELECT CAST(42 AS CHAR(10))                 = CAST(42 AS CHARACTER(10))         AS char_eq_character;
+SELECT CAST(42 AS VARCHAR(10))              = CAST(42 AS CHARACTER VARYING(10)) AS varchar_eq_character_varying;
+
+--echo === Working alias: SIGNED / SIGNED INTEGER, UNSIGNED / UNSIGNED INTEGER ===
+
+# MySQL-specific names — wired explicitly in the parser.
+SELECT CAST('42' AS SIGNED)         = CAST('42' AS BIGINT)            AS signed_eq_bigint;
+SELECT CAST('42' AS SIGNED INTEGER) = CAST('42' AS BIGINT)            AS signed_integer_eq_bigint;
+SELECT CAST('42' AS UNSIGNED)
+     = CAST(CAST('42' AS BIGINT) AS UNSIGNED)                         AS unsigned_eq_cast_chain;
+
+--echo === SENTINEL: DATETIME — not in parse_cast_target_type ===
+
+# Header of timediff_basic_extra (PR #310) noted this; pinned
+# here explicitly. MySQL DATETIME has no zeta CAST mapping —
+# use TIMESTAMP.
+--error 1105
+SELECT CAST('2024-05-19 14:30:00' AS DATETIME);
+# DATETIME with fractional precision form also rejected.
+--error 1105
+SELECT CAST('2024-05-19 14:30:00' AS DATETIME(6));
+
+--echo === SENTINEL: BLOB family (MySQL) — not in parse_cast_target_type ===
+
+--error 1105
+SELECT CAST('abc' AS BLOB);
+--error 1105
+SELECT CAST('abc' AS TINYBLOB);
+--error 1105
+SELECT CAST('abc' AS MEDIUMBLOB);
+--error 1105
+SELECT CAST('abc' AS LONGBLOB);
+
+--echo === SENTINEL: TINYTEXT / MEDIUMTEXT / LONGTEXT (MySQL) — not in parse_cast_target_type ===
+
+--error 1105
+SELECT CAST('abc' AS TINYTEXT);
+--error 1105
+SELECT CAST('abc' AS MEDIUMTEXT);
+--error 1105
+SELECT CAST('abc' AS LONGTEXT);
+
+--echo === SENTINEL: BINARY / VARBINARY (MySQL fixed-length) — not in parse_cast_target_type ===
+
+--error 1105
+SELECT CAST('abc' AS BINARY);
+--error 1105
+SELECT CAST('abc' AS BINARY(10));
+--error 1105
+SELECT CAST('abc' AS VARBINARY(10));
+
+--echo === SENTINEL: YEAR (MySQL 1-2-byte year) — not in parse_cast_target_type ===
+
+--error 1105
+SELECT CAST(2024 AS YEAR);
+
+--echo === SENTINEL: NVARCHAR / NTEXT (SQL Server) — not in parse_cast_target_type ===
+
+# Non-MySQL but other-DB aliases; reasonable to expect a
+# port could hit them.
+--error 1105
+SELECT CAST('abc' AS NVARCHAR(10));
+--error 1105
+SELECT CAST('abc' AS NTEXT);
+
+--echo === Asymmetric: BYTEA recognized at plan time (DDL), rejected at runtime (CAST) ===
+
+# `parse_cast_target_type` (lib.rs:3214) maps BYTEA →
+# DataType::Bytea (recognized at plan time), BUT `cast_value`
+# (lib.rs:56681+) has no BYTEA arm — runtime rejects with the
+# same `unsupported CAST target type: BYTEA` catch-all.
+# To actually EXERCISE the plan-vs-runtime split (rather than
+# just duplicating cast_basic_extra.test:120-121's runtime
+# error pin), prove plan-time recognition via DDL (CREATE
+# TABLE accepts a BYTEA column) and runtime rejection via
+# CAST in the same slice.
+CREATE TABLE bytea_plan_check (b BYTEA);
+# Plan-time check: INSERT/SELECT through the BYTEA column
+# works — proves the schema-level type IS valid.
+INSERT INTO bytea_plan_check (b) VALUES (NULL);
+SELECT COUNT(*) AS bytea_col_rows FROM bytea_plan_check;
+DROP TABLE bytea_plan_check;
+# Runtime check: the value-level cast surface rejects with
+# the catch-all message, even though the type name itself
+# was just accepted in DDL above. If a future change wires
+# BYTEA into `cast_value`, this row's expected error must
+# be updated.
+--error 1105
+SELECT CAST('abc' AS BYTEA);
