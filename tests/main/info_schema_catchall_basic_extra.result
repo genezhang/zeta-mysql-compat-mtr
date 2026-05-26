@@ -1,5 +1,4 @@
 === Unknown info_schema views — SELECT * silent empty ===
-SELECT * FROM information_schema.partitions LIMIT 1;
 SELECT * FROM information_schema.events LIMIT 1;
 SELECT * FROM information_schema.plugins LIMIT 1;
 SELECT * FROM information_schema.profiling LIMIT 1;

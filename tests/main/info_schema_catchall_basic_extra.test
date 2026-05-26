@@ -10,17 +10,26 @@
 #     character_sets, collations, routines, parameters,
 #     engines, triggers, processlist, user_privileges,
 #     session_variables, global_variables.
+#   - partition_basic_extra.test:110 already pins
+#     `information_schema.partitions` returning empty
+#     rows (per PR #377 review). This slice covers the
+#     OTHER catch-all views — partitions is included
+#     here only for the explicit-column XYZZY-style
+#     finding (a different angle than the existing pin).
 #   - show_catchall_emptyshow_basic_extra (PR #374) covers
 #     the parallel SHOW catch-all at shim.rs:2023.
 #   - pg_catalog_views_sentinel_basic_extra (PR #376)
 #     covers pg_catalog catch-all (1146 errors).
 #
 # This slice covers the information_schema catch-all at
-# zeta-mysqlwire/src/shim.rs:1667-1675 — UNKNOWN
+# zeta-mysqlwire/src/shim.rs:1664-1671 — UNKNOWN
 # information_schema views fall through to
 # `MySqlResult::InformationSchemaEmpty` with a generic
 # 4-column header (TABLE_CATALOG, TABLE_SCHEMA,
 # TABLE_NAME, CONSTRAINT_NAME) and ZERO rows.
+# Serializer at shim.rs:3487-3492 emits the hardcoded
+# 4-col header + 0 rows regardless of the SELECT's
+# projection list — no column validation fires.
 #
 # This slice pins (all silent empty):
 #   - information_schema.partitions (MySQL partition
@@ -91,7 +100,9 @@
 
 --echo === Unknown info_schema views — SELECT * silent empty ===
 
-SELECT * FROM information_schema.partitions LIMIT 1;
+# information_schema.partitions SELECT * is already
+# pinned in partition_basic_extra.test:110 — not
+# repeated here. Explicit-column variant below.
 SELECT * FROM information_schema.events LIMIT 1;
 SELECT * FROM information_schema.plugins LIMIT 1;
 SELECT * FROM information_schema.profiling LIMIT 1;
