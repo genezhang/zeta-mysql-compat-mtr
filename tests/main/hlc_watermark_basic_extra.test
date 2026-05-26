@@ -42,13 +42,14 @@
 #     in session_vars as a string and DOES NOTHING.
 #     No validation, no TSO advance, no cap check.
 #
-#   This is the THIRD wire-path divergence finding in
-#   the slice corpus (after PR #366 LISTEN/NOTIFY and
-#   PR #367 DROP DOMAIN dependents). PR #366's wire-
-#   path divergence was a no-op-on-MySQL-wire; this is
-#   the same shape but more concerning because the
-#   GUC name suggests cross-node correctness behavior
-#   that apps may rely on.
+#   This is the SECOND wire-path divergence finding in
+#   the slice corpus (after PR #366 LISTEN/NOTIFY).
+#   PR #367 (CREATE/DROP DOMAIN) is engine-wide PG
+#   divergence — same shape on both wires — not wire-
+#   specific. PR #366's wire-divergence was a no-op-on-
+#   MySQL-wire shape; this is the same shape but more
+#   concerning because the GUC name suggests cross-node
+#   correctness behavior that apps may rely on.
 #
 #   STRIKING — even values WAY OVER i64::MAX silently
 #   succeed because the shim never parses the value as
