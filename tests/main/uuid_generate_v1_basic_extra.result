@@ -1,0 +1,64 @@
+=== UUID_GENERATE_V1 — basic shape ===
+SELECT UUID_GENERATE_V1() IS NOT NULL                         AS not_null;
+not_null
+1
+SELECT LENGTH(UUID_GENERATE_V1())                             AS len_36;
+len_36
+36
+=== Version byte — UUID_GENERATE_V1 sets '1' at pos 15 ===
+SELECT SUBSTRING(UUID_GENERATE_V1(), 15, 1)                   AS version_char_1;
+version_char_1
+1
+SELECT SUBSTRING(UUID_GENERATE_V1(), 15, 1) = '1'             AS is_version_1;
+is_version_1
+1
+=== Contrast with V4 — different version byte ===
+SELECT SUBSTRING(UUID_GENERATE_V4(), 15, 1)                   AS v4_version_char_4;
+v4_version_char_4
+4
+SELECT SUBSTRING(UUID_GENERATE_V4(), 15, 1) = '4'             AS v4_is_version_4;
+v4_is_version_4
+1
+SELECT SUBSTRING(UUID_GENERATE_V1(), 15, 1)
+    <> SUBSTRING(UUID_GENERATE_V4(), 15, 1)                   AS v1_v4_diff_versions;
+v1_v4_diff_versions
+1
+=== Variant byte — RFC 4122 (one of 8,9,a,b) at pos 20 ===
+SELECT SUBSTRING(UUID_GENERATE_V1(), 20, 1)
+    IN ('8', '9', 'a', 'b')                                   AS variant_rfc_4122;
+variant_rfc_4122
+1
+=== Two calls produce DIFFERENT UUIDs ===
+SELECT UUID_GENERATE_V1() <> UUID_GENERATE_V1()               AS different_per_call;
+different_per_call
+1
+=== V1 is distinct from V4, GEN_RANDOM_UUID, UUID_NIL ===
+SELECT UUID_GENERATE_V1() <> UUID_GENERATE_V4()               AS v1_ne_v4;
+v1_ne_v4
+1
+SELECT UUID_GENERATE_V1() <> GEN_RANDOM_UUID()                AS v1_ne_gen_random;
+v1_ne_gen_random
+1
+SELECT UUID_GENERATE_V1() <> UUID_NIL()                       AS v1_ne_nil;
+v1_ne_nil
+1
+=== V1 wire-render is same UUID hex-dash format ===
+SELECT SUBSTRING(UUID_GENERATE_V1(),  9, 1)                   AS dash_pos_9;
+dash_pos_9
+-
+SELECT SUBSTRING(UUID_GENERATE_V1(), 14, 1)                   AS dash_pos_14;
+dash_pos_14
+-
+SELECT SUBSTRING(UUID_GENERATE_V1(), 19, 1)                   AS dash_pos_19;
+dash_pos_19
+-
+SELECT SUBSTRING(UUID_GENERATE_V1(), 24, 1)                   AS dash_pos_24;
+dash_pos_24
+-
+=== Arity errors → 1105 ===
+SELECT UUID_GENERATE_V1(1);
+ERROR 1105: execution error: uuid_generate_v1() takes no arguments
+SELECT UUID_GENERATE_V1('arg');
+ERROR 1105: execution error: uuid_generate_v1() takes no arguments
+SELECT UUID_GENERATE_V1(NULL);
+ERROR 1105: execution error: uuid_generate_v1() takes no arguments
