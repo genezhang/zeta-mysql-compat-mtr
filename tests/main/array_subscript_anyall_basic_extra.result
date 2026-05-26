@@ -15,10 +15,6 @@ gt_all_false
 SELECT 99 <> ALL(ARRAY[1, 2, 3])                             AS ne_all_true;
 ne_all_true
 1
-=== MYSQL-WIRE-ONLY BUG: multi-dim ARRAY[[...]] leaks Rust Debug repr ===
-SELECT ARRAY[[1, 2], [3, 4]]                                 AS multidim_mysql_wire_bug;
-multidim_mysql_wire_bug
-Array { element_type: Array(Int64), elements: [Array { element_type: Int64, elements: [Int64(1), Int64(2)] }, Array { element_type: Int64, elements: [Int64(3), Int64(4)] }] }
 === `ARRAY(SELECT ...)` subquery-form — PARSE REJECTED (1064) ===
 SELECT ARRAY(SELECT i FROM generate_series(1, 3) g(i));
 ERROR 1064: SQL parse error: subquery function arguments not supported

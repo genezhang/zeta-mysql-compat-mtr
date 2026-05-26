@@ -26,12 +26,18 @@
 #
 # Genuinely-new gap surfaces pinned here:
 #
-#   Supported (genuinely new — priors only have `=`):
+#   Supported (genuinely new):
 #     - `'b' = ANY(ARRAY['a','b','c'])` — TEXT-element
-#       comparison-form ANY (priors are all INT).
-#     - `10 > ALL(ARRAY[1,2,3])` — `>` comparison-op ALL.
-#     - `5 > ALL(ARRAY[1,5,10])` — false case.
-#     - `99 <> ALL(ARRAY[1,2,3])` — `<>` comparison-op ALL.
+#       comparison-form ANY (priors at array_type_basic_
+#       extra:78-90 are all INT).
+#     - `10 > ALL(ARRAY[1,2,3])`, `5 > ALL(ARRAY[1,5,10])`,
+#       `99 <> ALL(ARRAY[1,2,3])` — `>` / `<>` comparison-
+#       op ALL with ARRAY[] argument. Subquery-form
+#       `<op> ALL(SELECT ...)` IS pinned elsewhere (e.g.
+#       subquery_basic_extra) — this slice pins the
+#       ARRAY-form which is DISTINCT (parser routes
+#       through array-comparison expansion, not subquery
+#       evaluation).
 #
 #   Parse-rejected (1064):
 #     - `ARRAY(SELECT ...)` subquery form — "subquery
@@ -47,25 +53,22 @@
 #       supported ARRAY_UPPER / ARRAY_LOWER pair pinned
 #       at array_type_basic_extra:140-143.
 #
-#   MYSQL-WIRE-ONLY BUG (NOT engine-wide):
-#     - `ARRAY[[1,2],[3,4]]` multi-dim constructor PARSES,
-#       EXECUTES, and `zeta-common/src/value.rs:210-233`
-#       has a correct `Display` impl that produces PG
-#       format `{{1,2},{3,4}}` recursively. zeta-pgwire
-#       (encode.rs:54-57) calls `format!("{}", value)`
-#       and renders correctly.
-#     - The MYSQL wire path falls through `zeta-mysqlwire/
-#       src/shim.rs:327` catch-all
-#       `_ => MysqlValue::Text(format!("{:?}", value))`
-#       which uses Debug, not Display. `Value::Array` has
-#       no explicit arm (the adjacent `Value::Enum` arm
-#       at :326 was added specifically to escape this
-#       same trap — see the comment at :320-325).
-#     - Fix: one-line `Value::Array { .. } => Some(
-#       MysqlValue::Text(format!("{}", value)))` arm.
-#     - Pinned here so a fix drops the pin in lockstep.
-#       PG-wire (psql) users do NOT see this bug — only
-#       MySQL-wire (mysql_async) users.
+#   MYSQL-WIRE-ONLY BUG row REMOVED — caught by PR #385
+#   round-2 review. The `Array { element_type: ... }` Debug-
+#   repr leak is dimensionality-agnostic (shim.rs:327 catch-
+#   all has no special-case for nested Array), and the 1D
+#   form is ALREADY heavily pinned across:
+#     - string_to_array_split_part_basic_extra.result:4,7,
+#       10,13,16,20,23,27,38
+#     - type_cast_edges_basic_extra.result:50
+#     - enum_helpers_basic_extra.result:14,59
+#     - datatype_basic_extra.test:35 (prose)
+#   The one-line `Value::Array { .. }` arm in
+#   `zeta-mysqlwire/src/shim.rs:327` (just below the
+#   `Value::Enum` arm at :326 that escapes the same trap)
+#   would close all those pins simultaneously — adding a
+#   multi-dim variant here gives no incremental fix-
+#   tracking value.
 #
 # Adaptation notes:
 #   # zeta-adapt: `<op> ANY(ARRAY[...])` / `<op> ALL(...)`
@@ -81,11 +84,10 @@
 #   # zeta-adapt: KNOWN GAP — ARRAY_DIMS / ARRAY_NDIMS /
 #     ARRAY_FILL are unknown functions (1105). ARRAY_UPPER
 #     / ARRAY_LOWER are supported.
-#   # zeta-adapt: KNOWN BUG (mysqlwire-only) — multi-dim
-#     ARRAY[[...],[...]] renders zeta-internal Rust Debug
-#     repr on the MySQL wire. PG wire renders correctly.
-#     Avoid multi-dim arrays on MySQL wire until shim.rs
-#     gets an explicit Value::Array arm.
+#   # zeta-adapt: Array Debug-repr leak (mysqlwire-only) is
+#     ALREADY PINNED in 1D form across multiple slices —
+#     not re-pinned here. One-line fix in zeta-mysqlwire/
+#     src/shim.rs:327 closes all pins.
 
 --echo === TEXT-element `= ANY(ARRAY[...])` (priors are INT only) ===
 
@@ -97,17 +99,6 @@ SELECT 'z' = ANY(ARRAY['a', 'b', 'c'])                       AS eq_any_text_no_m
 SELECT 10 > ALL(ARRAY[1, 2, 3])                              AS gt_all_true;
 SELECT 5 > ALL(ARRAY[1, 5, 10])                              AS gt_all_false;
 SELECT 99 <> ALL(ARRAY[1, 2, 3])                             AS ne_all_true;
-
---echo === MYSQL-WIRE-ONLY BUG: multi-dim ARRAY[[...]] leaks Rust Debug repr ===
-
-# Engine-side `Value::Array` Display impl (zeta-common/
-# src/value.rs:210-233) renders PG format `{{1,2},{3,4}}`.
-# PG wire (zeta-pgwire/src/encode.rs:54-57) calls Display
-# and renders correctly. MySQL wire (zeta-mysqlwire/src/
-# shim.rs:327 catch-all) falls through to Debug. One-line
-# fix: add `Value::Array { .. } => Some(MysqlValue::Text(
-# format!("{}", value)))` arm.
-SELECT ARRAY[[1, 2], [3, 4]]                                 AS multidim_mysql_wire_bug;
 
 --echo === `ARRAY(SELECT ...)` subquery-form — PARSE REJECTED (1064) ===
 
