@@ -1,0 +1,102 @@
+# Independently authored SIMILAR TO / LIKE ANY / LIKE
+# ALL sentinel smoke for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - like_regexp_edges_basic_extra and
+#     collation_compare_basic_extra cover LIKE, ILIKE
+#     (PG extension), and regexp-family edges.
+#   - regexp_family_basic_extra covers REGEXP and
+#     ~ / ~* / !~ / !~*.
+#   - SIMILAR TO — NONE (PG-style SQL-standard pattern
+#     matching).
+#   - LIKE ANY / LIKE ALL — NONE (PG-extension array-
+#     side LIKE forms).
+#
+# This slice pins (THREE distinct rejection shapes):
+#
+#   Parse-rejected (1064):
+#     - `'x' SIMILAR TO '<pattern>'` — sqlparser
+#       tokenizes but zeta's expression dispatcher has
+#       no SIMILAR TO arm.
+#
+#   Execution-rejected (1105) — TWO sub-shapes:
+#     - `'x' LIKE ANY (ARRAY[...])` → "LIKE requires
+#       strings". The executor's LIKE arm expects scalar
+#       string operands, sees an Array, errors.
+#     - `'x' LIKE ALL (ARRAY[...])` → "unknown function:
+#       ALL". DIFFERENT shape — the parser treats `ALL`
+#       in this position as a function call name and
+#       routes through the function-dispatch path.
+#     - Same split for NOT LIKE ANY (→ "LIKE requires
+#       strings") and NOT LIKE ALL (→ "unknown function:
+#       ALL").
+#
+#   The ANY vs ALL split is recording-surfaced — initial
+#   draft assumed both would give the same "LIKE requires
+#   strings" error. ALL takes a different route entirely.
+#
+# Big-picture finding (parallel to PR #383 range slice):
+#
+#   This is the SAME pattern as PR #383 range operators:
+#   features parse as standard SQL expressions but
+#   fail at the executor because the impl doesn't have
+#   a dedicated handler for the input type. The error
+#   message ("LIKE requires strings") doesn't mention
+#   ANY/ALL — it's the generic LIKE-arm type-check
+#   failing.
+#
+#   Apps porting PG queries that use `LIKE ANY (ARRAY
+#   ['pattern1', 'pattern2'])` for multi-pattern
+#   matching must rewrite using OR:
+#     `x LIKE 'pattern1' OR x LIKE 'pattern2'`
+#
+#   SIMILAR TO is a SQL-standard regex-like pattern
+#   matcher (with character classes, alternation, etc.).
+#   Apps using it must rewrite to:
+#     - Plain LIKE for simple cases
+#     - REGEXP / ~ for full regex
+#     - Multiple LIKE-ORed clauses for alternation
+#
+# Adaptation notes:
+#   # zeta-adapt: SIMILAR TO is unsupported (1064
+#     parse-reject). Use LIKE / REGEXP / ~ instead.
+#   # zeta-adapt: LIKE ANY (ARRAY[...]) and LIKE ALL
+#     (ARRAY[...]) parse but error 1105 at execution
+#     ("LIKE requires strings"). Rewrite as
+#     `x LIKE p1 OR x LIKE p2` for ANY, `AND` for ALL.
+
+--echo === SIMILAR TO — 1064 parse-reject ===
+
+--error 1064
+SELECT 'abc' SIMILAR TO 'a.c';
+--error 1064
+SELECT 'abc' SIMILAR TO 'a(b|d)c';
+--error 1064
+SELECT 'abc' SIMILAR TO 'a%';
+
+--echo === LIKE ANY (ARRAY[...]) — 1105 execution-reject ===
+
+--error 1105
+SELECT 'abc' LIKE ANY (ARRAY['a%', 'b%']);
+--error 1105
+SELECT 'abc' LIKE ANY (ARRAY['x%']);
+
+--echo === LIKE ALL (ARRAY[...]) — 1105 ===
+
+--error 1105
+SELECT 'abc' LIKE ALL (ARRAY['a%', '%c']);
+
+--echo === NOT LIKE ANY / NOT LIKE ALL — 1105 ===
+
+--error 1105
+SELECT 'abc' NOT LIKE ANY (ARRAY['x%']);
+--error 1105
+SELECT 'abc' NOT LIKE ALL (ARRAY['z%']);
+
+--echo === Recommended rewrites work as expected ===
+
+# `LIKE ANY (ARRAY['a%','b%'])` rewrite using OR.
+SELECT 'abc' LIKE 'a%' OR 'abc' LIKE 'b%'                     AS or_rewrite_for_like_any;
+# `LIKE ALL (ARRAY['a%','%c'])` rewrite using AND.
+SELECT 'abc' LIKE 'a%' AND 'abc' LIKE '%c'                    AS and_rewrite_for_like_all;

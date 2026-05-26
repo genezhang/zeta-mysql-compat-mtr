@@ -1,0 +1,27 @@
+=== SIMILAR TO — 1064 parse-reject ===
+SELECT 'abc' SIMILAR TO 'a.c';
+ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a.c'
+SELECT 'abc' SIMILAR TO 'a(b|d)c';
+ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a(b|d)c'
+SELECT 'abc' SIMILAR TO 'a%';
+ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a%'
+=== LIKE ANY (ARRAY[...]) — 1105 execution-reject ===
+SELECT 'abc' LIKE ANY (ARRAY['a%', 'b%']);
+ERROR 1105: execution error: LIKE requires strings
+SELECT 'abc' LIKE ANY (ARRAY['x%']);
+ERROR 1105: execution error: LIKE requires strings
+=== LIKE ALL (ARRAY[...]) — 1105 ===
+SELECT 'abc' LIKE ALL (ARRAY['a%', '%c']);
+ERROR 1105: execution error: unknown function: ALL
+=== NOT LIKE ANY / NOT LIKE ALL — 1105 ===
+SELECT 'abc' NOT LIKE ANY (ARRAY['x%']);
+ERROR 1105: execution error: LIKE requires strings
+SELECT 'abc' NOT LIKE ALL (ARRAY['z%']);
+ERROR 1105: execution error: unknown function: ALL
+=== Recommended rewrites work as expected ===
+SELECT 'abc' LIKE 'a%' OR 'abc' LIKE 'b%'                     AS or_rewrite_for_like_any;
+or_rewrite_for_like_any
+1
+SELECT 'abc' LIKE 'a%' AND 'abc' LIKE '%c'                    AS and_rewrite_for_like_all;
+and_rewrite_for_like_all
+1
