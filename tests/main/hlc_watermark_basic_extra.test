@@ -1,0 +1,131 @@
+# Independently authored SET [LOCAL] zeta.hlc_watermark
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - SET zeta.hlc_watermark — NONE (checked all *.test
+#     files per PR #357 lesson).
+#   - zero_arg_constants_basic_extra (PR #357) covers
+#     the sibling vendor function ZETA_LAST_COMMIT_HLC()
+#     (reads the per-connection commit HLC); this slice
+#     covers the WRITE side of the HLC subsystem on
+#     the MySQL wire path.
+#
+# This slice pins (MYSQL WIRE PATH ONLY):
+#   - SET zeta.hlc_watermark = N silently succeeds for
+#     ANY value (including u64::MAX overflows, negative,
+#     whatever — see below).
+#   - SET LOCAL zeta.hlc_watermark = N also silent.
+#   - The validation logic at lib.rs:19458 (cap at
+#     i64::MAX with a verbose error message) is NEVER
+#     REACHED on MySQL wire — the shim absorbs the SET
+#     before the executor sees it.
+#
+# Big-picture finding (THIRD WIRE-PATH DIVERGENCE,
+# SAME PATTERN AS PR #366 LISTEN/NOTIFY):
+#
+#   The MySQL wire shim at zeta-mysqlwire/src/shim.rs:
+#   2044-2081 INTERCEPTS ALL `SET` statements as
+#   generic MySQL session-variable stores. It splits
+#   on `=`, normalizes the name, stores the value in
+#   `session_vars`, and returns `MySqlResult::Ok`
+#   without ever routing to the executor. So:
+#
+#   - PGWIRE clients: SET zeta.hlc_watermark = N goes
+#     through apply_hlc_watermark at lib.rs:19452-
+#     19474, validates the cap, calls tso_advance_to.
+#     Over-cap errors with the verbose diagnostic.
+#     ROLLBACK doesn't undo (TSO is fetch-max).
+#
+#   - MYSQL WIRE clients (incl. THIS MTR runner): SET
+#     never reaches the executor. The value is stored
+#     in session_vars as a string and DOES NOTHING.
+#     No validation, no TSO advance, no cap check.
+#
+#   This is the THIRD wire-path divergence finding in
+#   the slice corpus (after PR #366 LISTEN/NOTIFY and
+#   PR #367 DROP DOMAIN dependents). PR #366's wire-
+#   path divergence was a no-op-on-MySQL-wire; this is
+#   the same shape but more concerning because the
+#   GUC name suggests cross-node correctness behavior
+#   that apps may rely on.
+#
+#   STRIKING — even values WAY OVER i64::MAX silently
+#   succeed because the shim never parses the value as
+#   a number — it's stored as the raw string. Apps
+#   sending obviously-bogus watermarks won't detect
+#   the typo until they switch to pgwire and see the
+#   verbose overflow error.
+#
+#   STRIKING — `-1` succeeds too. The shim's generic
+#   string-pair store doesn't filter on sign or shape.
+#
+#   The MTR runner is single-connection and can't
+#   observe cross-node visibility, so the slice pins
+#   ONLY the parse/no-op path. Real cross-node
+#   watermark testing needs an integration harness
+#   with two zeta nodes and a pgwire client.
+#
+# Adaptation notes:
+#   # zeta-adapt: SET [LOCAL] zeta.hlc_watermark = N on
+#     MYSQL WIRE is a SILENT NO-OP. The TSO is NOT
+#     advanced. Apps relying on this for cross-node
+#     read-after-write MUST use pgwire.
+#   # zeta-adapt: The shim absorbs ALL SET statements
+#     at shim.rs:2044-2081 and stores them in
+#     session_vars — generic catch-all, not a per-var
+#     handler.
+#   # zeta-adapt: No validation on MySQL wire — over-cap
+#     values, negative values, garbage strings all
+#     "succeed". The real check at lib.rs:19458 only
+#     fires on pgwire.
+
+--echo === SET zeta.hlc_watermark — basic forms silently succeed ===
+
+SET zeta.hlc_watermark = 0;
+SET zeta.hlc_watermark = 1000;
+SET zeta.hlc_watermark = 1700000000000000;
+
+--echo === SET LOCAL — same silent-no-op ===
+
+SET LOCAL zeta.hlc_watermark = 2000;
+BEGIN;
+SET LOCAL zeta.hlc_watermark = 3000;
+COMMIT;
+
+--echo === STRIKING: even way-over-i64::MAX silently succeeds ===
+
+# pgwire would error with "exceeds the maximum allowed
+# value (9223372036854775807)" diagnostic. mysqlwire
+# absorbs the string into session_vars without parsing.
+SET zeta.hlc_watermark = 9223372036854775807;
+SET zeta.hlc_watermark = 9223372036854775808;
+SET zeta.hlc_watermark = 18446744073709551615;
+SET zeta.hlc_watermark = 18446744073709551616;
+
+--echo === STRIKING: negative values silently succeed too ===
+
+# parser would reject `value: u64 = -1.parse()`; mysqlwire
+# never reaches that path.
+SET zeta.hlc_watermark = -1;
+SET zeta.hlc_watermark = -9999;
+
+--echo === STRIKING: garbage values silently succeed ===
+
+# mysqlwire just stores the right-hand side as a string.
+SET zeta.hlc_watermark = 'not-a-number';
+SET zeta.hlc_watermark = '';
+
+--echo === Transaction context — ROLLBACK doesn't matter (shim absorbs) ===
+
+BEGIN;
+SET LOCAL zeta.hlc_watermark = 9999;
+ROLLBACK;
+SET zeta.hlc_watermark = 11111;
+
+--echo === Cross-link: ZETA_LAST_COMMIT_HLC() read-side still works ===
+
+# The READ-side function (PR #357) is NOT shim-intercepted —
+# it runs through the executor. Confirms the rest of the
+# HLC subsystem is reachable from MySQL wire.
+SELECT ZETA_LAST_COMMIT_HLC() >= 0                            AS read_side_works;
