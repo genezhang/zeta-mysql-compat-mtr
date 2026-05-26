@@ -1,0 +1,103 @@
+=== Setup: y = x linear dataset ===
+CREATE TABLE stats_pp (
+  id INT,
+  v  DOUBLE PRECISION
+);
+INSERT INTO stats_pp VALUES
+  (1, 1.0), (2, 2.0), (3, 3.0), (4, 4.0), (5, 5.0);
+=== PERCENTILE_CONT / PERCENTILE_DISC — WITHIN GROUP ordered-set form ===
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v) AS median_cont FROM stats_pp;
+median_cont
+3
+SELECT PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY v) AS median_disc FROM stats_pp;
+median_disc
+3
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)
+     = PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY v)
+                                                              AS cont_eq_disc_on_int_set FROM stats_pp;
+cont_eq_disc_on_int_set
+1
+SELECT PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY v) AS q1_cont FROM stats_pp;
+q1_cont
+2
+SELECT PERCENTILE_DISC(0.25) WITHIN GROUP (ORDER BY v) AS q1_disc FROM stats_pp;
+q1_disc
+2
+=== STRIKING quirks: PERCENTILE_CONT(p, v) form + aggregate-collapse bug ===
+SELECT PERCENTILE_CONT(0.5, v)                                AS arg_form_returns_pct FROM stats_pp;
+arg_form_returns_pct
+0.5
+SELECT PERCENTILE_CONT(0.5, v) = 0.5                          AS arg_form_eq_arg FROM stats_pp;
+arg_form_eq_arg
+1
+SELECT PERCENTILE_CONT(0.5, v),
+       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)         FROM stats_pp;
+PERCENTILE_CONT	PERCENTILE_CONT
+0.5	0.5
+SELECT PERCENTILE_CONT(0.5, v)
+     = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)         AS bug_present_both_collapse FROM stats_pp;
+bug_present_both_collapse
+1
+=== REGR_* family — y = x linear regression (slope=1, intercept=0, R²=1) ===
+SELECT REGR_COUNT(v, id)                                      AS rc FROM stats_pp;
+rc
+5
+SELECT REGR_AVGY(v, id)                                       AS avgy FROM stats_pp;
+avgy
+3
+SELECT REGR_AVGX(v, id)                                       AS avgx FROM stats_pp;
+avgx
+3
+SELECT REGR_SLOPE(v, id)                                      AS slope_is_1 FROM stats_pp;
+slope_is_1
+1
+SELECT REGR_INTERCEPT(v, id)                                  AS intercept_is_0 FROM stats_pp;
+intercept_is_0
+0
+SELECT REGR_R2(v, id)                                         AS r2_is_1 FROM stats_pp;
+r2_is_1
+1
+SELECT REGR_SXX(v, id)                                        AS sxx FROM stats_pp;
+sxx
+10
+SELECT REGR_SYY(v, id)                                        AS syy FROM stats_pp;
+syy
+10
+SELECT REGR_SXY(v, id)                                        AS sxy FROM stats_pp;
+sxy
+10
+=== COVAR_POP / COVAR_SAMP / CORR — y = x ===
+SELECT COVAR_POP(v, id)                                       AS covp_is_2 FROM stats_pp;
+covp_is_2
+2
+SELECT COVAR_SAMP(v, id)                                      AS covs_is_2_5 FROM stats_pp;
+covs_is_2_5
+2.5
+SELECT CORR(v, id)                                            AS corr_is_1 FROM stats_pp;
+corr_is_1
+1
+=== Type: PERCENTILE_CONT/DISC over int-domain returns DOUBLE PRECISION ===
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v) = 3.0   AS median_eq_3_float FROM stats_pp;
+median_eq_3_float
+1
+=== Two-row dataset for percentile interpolation ===
+CREATE TABLE stats_pair (x DOUBLE PRECISION);
+INSERT INTO stats_pair VALUES (10.0), (20.0);
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY x) AS cont_interp FROM stats_pair;
+cont_interp
+15
+SELECT PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x) AS disc_pick   FROM stats_pair;
+disc_pick
+10
+DROP TABLE stats_pair;
+=== NULL-row exclusion — rows with NULL in any arg are skipped ===
+INSERT INTO stats_pp VALUES (6, NULL);
+SELECT REGR_COUNT(v, id)                                      AS rc_still_5 FROM stats_pp;
+rc_still_5
+5
+INSERT INTO stats_pp VALUES (NULL, 99.0);
+SELECT REGR_COUNT(v, id)                                      AS rc_still_5_after_null_x FROM stats_pp;
+rc_still_5_after_null_x
+5
+=== Cleanup ===
+DROP TABLE stats_pp;

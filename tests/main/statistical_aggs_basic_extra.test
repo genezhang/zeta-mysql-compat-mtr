@@ -1,0 +1,167 @@
+# Independently authored STATISTICAL AGGREGATES smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - agg_func_basic_extra.test:74+ pins COUNT/SUM/AVG/STDDEV/
+#     STDDEV_POP/STDDEV_SAMP/VAR_SAMP/VAR_POP/VARIANCE.
+#   - No existing slice covers PERCENTILE_CONT/PERCENTILE_DISC,
+#     REGR_* family, COVAR_POP/SAMP, CORR.
+#
+# This slice pins what those slices DO NOT:
+#   - PERCENTILE_CONT / PERCENTILE_DISC ordered-set aggs via
+#     PG `WITHIN GROUP (ORDER BY ...)` syntax. The MySQL
+#     "hypothetical-set" form `PERCENTILE_CONT(p, v)` is NOT
+#     what it appears to be — pinned below.
+#   - REGR_COUNT / REGR_AVGY / REGR_AVGX / REGR_SXX / REGR_SYY
+#     / REGR_SXY / REGR_SLOPE / REGR_INTERCEPT / REGR_R2 over
+#     a simple linear dataset (y = x, where slope=1,
+#     intercept=0, R²=1).
+#   - COVAR_POP / COVAR_SAMP / CORR over the same dataset.
+#   - NULL-row exclusion (rows with either argument NULL are
+#     skipped from the aggregation, matching SQL standard).
+#
+# Big-picture finding:
+#   zeta implements the full PG/SQL-standard statistical
+#   aggregate family — 11+ functions. This is BROADER than
+#   stock MySQL, which doesn't include REGR_* in core, though
+#   MySQL 8.0+ added some via SQL/2003 conformance. Apps
+#   porting from PG can use these directly; apps from MySQL
+#   gain access to functions that often require client-side
+#   computation in MySQL.
+#
+#   STRIKING quirks (two findings):
+#     1. `PERCENTILE_CONT(p, v)` (the hypothetical-set form)
+#        does NOT compute the percentile of `v`. The arg-
+#        style call returns the literal percentile value `p`,
+#        ignoring `v`. Only the WITHIN GROUP form actually
+#        computes the percentile of an ordered set.
+#     2. (BUG) When BOTH the arg-form AND the WITHIN GROUP
+#        form appear in the SAME SELECT, the WITHIN GROUP
+#        result COLLAPSES to the arg-form result (both
+#        columns return the percentile arg, NOT the median).
+#        Root cause: planner.rs:913-926 — `agg_calls.
+#        dedup_by` key tuple includes (name, arg, arg2,
+#        distinct, filter, order_by, distinct_extra_args)
+#        but OMITS `within_group`. Two calls hash identical
+#        and the WITHIN GROUP entry is dropped, then the
+#        projection reads the wrong accumulator. Pinned as
+#        `bug_present_both_collapse`.
+#
+# Adaptation notes:
+#   # zeta-adapt: Use WITHIN GROUP (ORDER BY col) form for
+#     percentile computation: `PERCENTILE_CONT(0.5) WITHIN
+#     GROUP (ORDER BY v)`. The bare-arg form
+#     `PERCENTILE_CONT(0.5, v)` parses but does NOT do what
+#     you'd expect — it just returns the percentile arg.
+#   # zeta-adapt: REGR_* / COVAR_* / CORR follow SQL/PG arg
+#     order: y first, x second. REGR_SLOPE(y, x) returns
+#     dy/dx.
+
+--echo === Setup: y = x linear dataset ===
+
+CREATE TABLE stats_pp (
+  id INT,
+  v  DOUBLE PRECISION
+);
+INSERT INTO stats_pp VALUES
+  (1, 1.0), (2, 2.0), (3, 3.0), (4, 4.0), (5, 5.0);
+
+--echo === PERCENTILE_CONT / PERCENTILE_DISC — WITHIN GROUP ordered-set form ===
+
+# Median of {1, 2, 3, 4, 5} = 3.
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v) AS median_cont FROM stats_pp;
+SELECT PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY v) AS median_disc FROM stats_pp;
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)
+     = PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY v)
+                                                              AS cont_eq_disc_on_int_set FROM stats_pp;
+# 25th percentile of {1,2,3,4,5}: CONT interpolates → 2.0,
+# DISC picks an actual value → 2.0.
+SELECT PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY v) AS q1_cont FROM stats_pp;
+SELECT PERCENTILE_DISC(0.25) WITHIN GROUP (ORDER BY v) AS q1_disc FROM stats_pp;
+
+--echo === STRIKING quirks: PERCENTILE_CONT(p, v) form + aggregate-collapse bug ===
+
+# QUIRK 1: The 2-arg form `PERCENTILE_CONT(p, v)` parses but
+# DOES NOT compute the percentile of `v`. The actual mechanism
+# (per planner.rs:3262): PERCENTILE_CONT is not in the
+# `uses_arg2_as_second_positional` set, so the second arg `v`
+# is SILENTLY DROPPED at planner intake. The accumulator then
+# pushes the literal `0.5` once per row and "computes the
+# percentile" of {0.5, 0.5, …, 0.5} = 0.5. Observable result:
+# the arg-form returns the percentile arg verbatim.
+SELECT PERCENTILE_CONT(0.5, v)                                AS arg_form_returns_pct FROM stats_pp;
+SELECT PERCENTILE_CONT(0.5, v) = 0.5                          AS arg_form_eq_arg FROM stats_pp;
+#
+# QUIRK 2 (BUG): When BOTH the 2-arg form AND the WITHIN
+# GROUP form appear in the SAME SELECT projection, the
+# WITHIN GROUP call's result COLLAPSES to the 2-arg result.
+# Both columns return 0.5 even though the WITHIN GROUP form
+# alone returns 3 (the median). Root cause: planner.rs:913-926
+# has `agg_calls.dedup_by` with a key tuple of (name, arg,
+# arg2, distinct, filter, order_by, distinct_extra_args) that
+# OMITS `within_group`. The two calls hash identical and the
+# WITHIN GROUP entry is dropped — the projection then reads
+# the wrong accumulator. Single-line fix.
+SELECT PERCENTILE_CONT(0.5, v),
+       PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)         FROM stats_pp;
+# Equality predicate sees both sides as 0.5 → TRUE. With the
+# bug fixed, this row would record 0 (FALSE) since 0.5 != 3.
+# Inverted from `<>` to `=` so the alias is intuitive: the
+# "bug present" state evaluates to 1.
+SELECT PERCENTILE_CONT(0.5, v)
+     = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)         AS bug_present_both_collapse FROM stats_pp;
+
+--echo === REGR_* family — y = x linear regression (slope=1, intercept=0, R²=1) ===
+
+SELECT REGR_COUNT(v, id)                                      AS rc FROM stats_pp;
+SELECT REGR_AVGY(v, id)                                       AS avgy FROM stats_pp;
+SELECT REGR_AVGX(v, id)                                       AS avgx FROM stats_pp;
+SELECT REGR_SLOPE(v, id)                                      AS slope_is_1 FROM stats_pp;
+SELECT REGR_INTERCEPT(v, id)                                  AS intercept_is_0 FROM stats_pp;
+SELECT REGR_R2(v, id)                                         AS r2_is_1 FROM stats_pp;
+SELECT REGR_SXX(v, id)                                        AS sxx FROM stats_pp;
+SELECT REGR_SYY(v, id)                                        AS syy FROM stats_pp;
+SELECT REGR_SXY(v, id)                                        AS sxy FROM stats_pp;
+
+--echo === COVAR_POP / COVAR_SAMP / CORR — y = x ===
+
+# COVAR_POP({1..5},{1..5}) = sum((xi-3)(yi-3))/n = 10/5 = 2.
+SELECT COVAR_POP(v, id)                                       AS covp_is_2 FROM stats_pp;
+# COVAR_SAMP = sum/(n-1) = 10/4 = 2.5.
+SELECT COVAR_SAMP(v, id)                                      AS covs_is_2_5 FROM stats_pp;
+# CORR = 1 for perfect linear y=x.
+SELECT CORR(v, id)                                            AS corr_is_1 FROM stats_pp;
+
+--echo === Type: PERCENTILE_CONT/DISC over int-domain returns DOUBLE PRECISION ===
+
+# Sanity: the result is Float64-typed. Pin via comparison
+# with a float literal (1.0) using `=`. Strict-type checks
+# from PRs #314/#325/#329 don't apply here because both
+# sides are Float-domain.
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v) = 3.0   AS median_eq_3_float FROM stats_pp;
+
+--echo === Two-row dataset for percentile interpolation ===
+
+# {10, 20} — PERCENTILE_CONT(0.5) interpolates → 15.
+# PERCENTILE_DISC(0.5) picks one (typically lower → 10
+# per PG semantics).
+CREATE TABLE stats_pair (x DOUBLE PRECISION);
+INSERT INTO stats_pair VALUES (10.0), (20.0);
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY x) AS cont_interp FROM stats_pair;
+SELECT PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x) AS disc_pick   FROM stats_pair;
+DROP TABLE stats_pair;
+
+--echo === NULL-row exclusion — rows with NULL in any arg are skipped ===
+
+# Add a NULL row, then re-run REGR_COUNT (should still be 5,
+# not 6, because the new row has NULL in v).
+INSERT INTO stats_pp VALUES (6, NULL);
+SELECT REGR_COUNT(v, id)                                      AS rc_still_5 FROM stats_pp;
+# Now add a row with NULL in id (the X). Should also be excluded.
+INSERT INTO stats_pp VALUES (NULL, 99.0);
+SELECT REGR_COUNT(v, id)                                      AS rc_still_5_after_null_x FROM stats_pp;
+
+--echo === Cleanup ===
+
+DROP TABLE stats_pp;
