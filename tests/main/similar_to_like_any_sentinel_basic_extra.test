@@ -8,10 +8,16 @@
 #     (PG extension), and regexp-family edges.
 #   - regexp_family_basic_extra covers REGEXP and
 #     ~ / ~* / !~ / !~*.
-#   - SIMILAR TO — NONE (PG-style SQL-standard pattern
-#     matching).
+#   - sql_pattern_basic_extra:122-123 ALREADY pins ONE
+#     SIMILAR TO row (`'foo' SIMILAR TO 'fo+'`) at the
+#     1064 "unsupported expression" shape, labeled
+#     "KNOWN GAP — SIMILAR TO" at line 55. This slice
+#     WIDENS the SIMILAR TO surface with pattern variety
+#     (dot metachar, alternation `(b|d)`, percent
+#     wildcard) — same shape, different pattern bodies,
+#     to confirm zeta rejects regardless of body shape.
 #   - LIKE ANY / LIKE ALL — NONE (PG-extension array-
-#     side LIKE forms).
+#     side LIKE forms; this is the NEW surface).
 #
 # This slice pins (THREE distinct rejection shapes):
 #
@@ -66,7 +72,7 @@
 #     ("LIKE requires strings"). Rewrite as
 #     `x LIKE p1 OR x LIKE p2` for ANY, `AND` for ALL.
 
---echo === SIMILAR TO — 1064 parse-reject ===
+--echo === SIMILAR TO — 1064 parse-reject (widens sql_pattern_basic_extra:122-123 — pattern variety) ===
 
 --error 1064
 SELECT 'abc' SIMILAR TO 'a.c';

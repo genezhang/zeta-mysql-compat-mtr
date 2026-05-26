@@ -1,4 +1,4 @@
-=== SIMILAR TO — 1064 parse-reject ===
+=== SIMILAR TO — 1064 parse-reject (widens sql_pattern_basic_extra:122-123 — pattern variety) ===
 SELECT 'abc' SIMILAR TO 'a.c';
 ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a.c'
 SELECT 'abc' SIMILAR TO 'a(b|d)c';
