@@ -1,0 +1,126 @@
+# Independently authored UUID_GENERATE_V1 smoke for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - UUID_GENERATE_V1 — NONE (zero compat-mtr coverage —
+#     checked all *.test files per PR #357 lesson).
+#   - uuid_basic_extra covers UUID_GENERATE_V4 (random
+#     UUIDs), GEN_RANDOM_UUID, the UUID type. V1 is a
+#     SEPARATE uuid-ossp function that produces TIME-
+#     BASED UUIDs (impl arm at lib.rs:55592).
+#   - uuid_short_basic_extra covers MySQL UUID_SHORT()
+#     (BIGINT, distinct surface).
+#
+# This slice pins:
+#   - UUID_GENERATE_V1() returns a 36-char UUID-formatted
+#     string over the wire.
+#   - Version-byte (position 14, 0-indexed) is '1' (NOT
+#     '4' like V4 — this is the v1/v4 differentiator).
+#   - Variant-byte (position 19) is 8/9/a/b (RFC 4122).
+#   - Two consecutive calls produce DIFFERENT values (V1
+#     mixes timestamp + random 6-byte node ID).
+#   - V1 is DISTINCT from V4 (different version byte).
+#   - V1 is DISTINCT from UUID_NIL.
+#   - Wire-renders identically to V4 / NIL (same Uuid →
+#     String shim path).
+#   - Arity errors → 1105 "uuid_generate_v1() takes no
+#     arguments".
+#
+# Big-picture finding:
+#   **V1 = TIME-BASED, V4 = RANDOM, NIL = SENTINEL.** zeta
+#   provides all three of the uuid-ossp variants the
+#   ecosystem expects. The semantic difference matters:
+#
+#   - V1 carries a TIMESTAMP and a NODE ID — sortable by
+#     creation time but leaks creation time to anyone who
+#     reads the UUID.
+#   - V4 is purely RANDOM (122 bits of entropy) — no time
+#     leakage but no time-ordering.
+#   - NIL is the all-zeros sentinel.
+#
+#   STRIKING — random-node-id mode. Per impl at
+#   lib.rs:55599-55602, zeta generates a fresh random
+#   6-byte node ID per call (with the multicast bit set
+#   per RFC 4122). This is the "random node" variant of
+#   v1 — NOT the MAC-address variant. Calls within the
+#   same microsecond would still differ because of node-
+#   ID randomization. This means V1 is NOT a stable
+#   per-machine identifier (apps relying on MAC-stable v1
+#   for clustering must encode the node ID externally).
+#
+#   The version differentiator is the 13th 0-indexed
+#   character (the first char of the third hyphen-
+#   separated group): '1' for V1, '4' for V4. Pinning
+#   via SUBSTRING gives a deterministic version check
+#   even though the UUID itself is non-deterministic.
+#
+# Adaptation notes:
+#   # zeta-adapt: UUID_GENERATE_V1() is time-based with a
+#     RANDOM 6-byte node ID per call (NOT MAC-stable).
+#     Apps needing stable node IDs must encode them out
+#     of band.
+#   # zeta-adapt: V1 leaks creation time; if you need
+#     time-private UUIDs, use UUID_GENERATE_V4() /
+#     GEN_RANDOM_UUID() instead.
+#   # zeta-adapt: Version byte at 1-based position 15 is
+#     the v1/v4 differentiator: '1' or '4' respectively.
+
+--echo === UUID_GENERATE_V1 — basic shape ===
+
+SELECT UUID_GENERATE_V1() IS NOT NULL                         AS not_null;
+SELECT LENGTH(UUID_GENERATE_V1())                             AS len_36;
+
+--echo === Version byte — UUID_GENERATE_V1 sets '1' at pos 15 ===
+
+# 1-based char 15 is the first character of the third
+# hyphen-separated group (after "xxxxxxxx-xxxx-V").
+SELECT SUBSTRING(UUID_GENERATE_V1(), 15, 1)                   AS version_char_1;
+# Confirm it's the version '1' literally.
+SELECT SUBSTRING(UUID_GENERATE_V1(), 15, 1) = '1'             AS is_version_1;
+
+--echo === Contrast with V4 — different version byte ===
+
+# UUID_GENERATE_V4 puts '4' at the same position.
+SELECT SUBSTRING(UUID_GENERATE_V4(), 15, 1)                   AS v4_version_char_4;
+SELECT SUBSTRING(UUID_GENERATE_V4(), 15, 1) = '4'             AS v4_is_version_4;
+# V1 and V4 differ at the version-byte position.
+SELECT SUBSTRING(UUID_GENERATE_V1(), 15, 1)
+    <> SUBSTRING(UUID_GENERATE_V4(), 15, 1)                   AS v1_v4_diff_versions;
+
+--echo === Variant byte — RFC 4122 (one of 8,9,a,b) at pos 20 ===
+
+# The variant nibble's high two bits are 10 in RFC 4122,
+# so the hex char is 8/9/a/b.
+SELECT SUBSTRING(UUID_GENERATE_V1(), 20, 1)
+    IN ('8', '9', 'a', 'b')                                   AS variant_rfc_4122;
+
+--echo === Two calls produce DIFFERENT UUIDs ===
+
+# Even back-to-back, the random node ID + timestamp
+# combination ensures non-equal results.
+SELECT UUID_GENERATE_V1() <> UUID_GENERATE_V1()               AS different_per_call;
+
+--echo === V1 is distinct from V4, GEN_RANDOM_UUID, UUID_NIL ===
+
+SELECT UUID_GENERATE_V1() <> UUID_GENERATE_V4()               AS v1_ne_v4;
+SELECT UUID_GENERATE_V1() <> GEN_RANDOM_UUID()                AS v1_ne_gen_random;
+SELECT UUID_GENERATE_V1() <> UUID_NIL()                       AS v1_ne_nil;
+
+--echo === V1 wire-render is same UUID hex-dash format ===
+
+# 8-4-4-4-12 with 4 hyphens at positions 9, 14, 19, 24
+# (1-based). Verify the dashes via SUBSTRING.
+SELECT SUBSTRING(UUID_GENERATE_V1(),  9, 1)                   AS dash_pos_9;
+SELECT SUBSTRING(UUID_GENERATE_V1(), 14, 1)                   AS dash_pos_14;
+SELECT SUBSTRING(UUID_GENERATE_V1(), 19, 1)                   AS dash_pos_19;
+SELECT SUBSTRING(UUID_GENERATE_V1(), 24, 1)                   AS dash_pos_24;
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT UUID_GENERATE_V1(1);
+--error 1105
+SELECT UUID_GENERATE_V1('arg');
+--error 1105
+SELECT UUID_GENERATE_V1(NULL);
