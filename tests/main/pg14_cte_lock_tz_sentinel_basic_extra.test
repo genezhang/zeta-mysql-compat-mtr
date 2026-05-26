@@ -1,0 +1,152 @@
+# Independently authored PG 14+ CTE CYCLE/SEARCH +
+# FOR KEY SHARE + TIMESTAMPTZ sentinel slice for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - WITH RECURSIVE CYCLE / SEARCH clauses (PG 14+):
+#     ZERO prior coverage. (Recursive CTE basics ARE
+#     covered in recursive_cte_basic_extra / with_cte
+#     _basic_extra, but the PG 14+ CYCLE/SEARCH clauses
+#     are zero-prior.)
+#   - SELECT ... FOR KEY SHARE / FOR NO KEY UPDATE
+#     (PG-specific lock modes): ZERO prior coverage.
+#     (lock_basic_extra covers FOR UPDATE OF / FOR
+#     SHARE / SKIP LOCKED / NOWAIT, but NOT the
+#     KEY-prefixed variants.)
+#   - TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ cast and
+#     DDL: ZERO prior coverage. (at_time_zone_extended
+#     covers AT TIME ZONE, but not the type itself.)
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: SELECT, VALUES, or a subquery in the
+#     query body, found: <KW>" — pre-existing at
+#     cte_edges_basic_extra, recursive_cte_basic_extra,
+#     set_ops_edges_basic_extra.
+#
+# This slice pins:
+#
+#   "WITH RECURSIVE body expects SELECT" — adds CYCLE
+#   and SEARCH to the bucket (3 forms):
+#     - `... CYCLE id SET is_cycle USING path` (PG 14+
+#       cycle detection)
+#     - `... SEARCH DEPTH FIRST BY id SET ord` (PG 14+)
+#     - `... SEARCH BREADTH FIRST BY id SET ord` (PG 14+)
+#     - All hit at line 5 col 3 — sqlparser's WITH-
+#       RECURSIVE body parser doesn't recognize CYCLE
+#       or SEARCH as clause terminators. Pre-existing
+#       fingerprint; new keywords added.
+#
+#   NEW FINGERPRINT — `Expected: one of UPDATE or
+#   SHARE, found: <KW>` (PG-specific weaker lock modes):
+#     - `FOR KEY SHARE` (PG 9.3+ weaker than FOR SHARE)
+#     - `FOR NO KEY UPDATE` (PG 9.3+ weaker than FOR
+#       UPDATE)
+#     - `FOR KEY SHARE OF g` (target-specific form)
+#     - All hit "Expected: one of UPDATE or SHARE,
+#       found: KEY/NO" at col 21. sqlparser's FOR-lock-
+#       clause dispatcher accepts only UPDATE or SHARE,
+#       NOT the PG-specific KEY SHARE / NO KEY UPDATE
+#       variants. GENUINELY NEW fingerprint — by-
+#       fingerprint wide-grep returns zero priors.
+#
+#   SUPPORTED — TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ:
+#     - `'2024-01-01 12:00:00'::TIMESTAMP WITH TIME
+#       ZONE` parses and casts.
+#     - `'2024-01-01 12:00:00'::TIMESTAMPTZ` short-form
+#       also works.
+#     - DDL column types work for both forms.
+#     - WIRE-RENDERING NOTE: MySQL wire output is the
+#       UTC-converted value without timezone suffix
+#       ("2024-01-01 12:00:00", not "2024-01-01
+#       12:00:00+00"). PG wire would render with the
+#       session-tz suffix. This is consistent with
+#       the MySQL wire's lack of a TIMESTAMP-with-TZ
+#       type — not framed as a BUG here (genuine wire
+#       semantic difference; pin only the supported
+#       cast+DDL behavior).
+#
+# Big-picture finding:
+#
+#   PG 14+ CTE CYCLE/SEARCH and PG-specific weaker
+#   lock modes (FOR KEY SHARE / FOR NO KEY UPDATE) are
+#   unreachable on the zeta MySQL wire. TIMESTAMPTZ
+#   IS supported as a type but renders without TZ
+#   suffix over the MySQL wire (semantic difference,
+#   not a bug).
+#
+#   Apps porting PG 14+ code:
+#     - CYCLE/SEARCH: rewrite the recursion's
+#       termination clause manually (add a depth
+#       counter to the CTE).
+#     - FOR KEY SHARE → degrade to FOR SHARE.
+#     - FOR NO KEY UPDATE → degrade to FOR UPDATE.
+#     - TIMESTAMPTZ works for storage; apps that
+#       depend on wire-side TZ rendering must convert
+#       application-side.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — WITH RECURSIVE CYCLE /
+#     SEARCH (PG 14+) clauses error 1064 at
+#     sqlparser's WITH-body parser. Rewrite by manual
+#     depth counter in the recursion.
+#   # zeta-adapt: KNOWN GAP — SELECT ... FOR KEY SHARE
+#     and FOR NO KEY UPDATE (PG-specific weaker lock
+#     modes) error 1064. Degrade to FOR SHARE / FOR
+#     UPDATE respectively (loses concurrency benefit
+#     of the KEY-only/NO-KEY variants).
+#   # zeta-adapt: SUPPORTED — TIMESTAMP WITH TIME
+#     ZONE / TIMESTAMPTZ cast and DDL. MySQL wire
+#     renders without TZ suffix; PG wire would
+#     include it.
+
+CREATE TABLE g (id INT PRIMARY KEY, n INT);
+INSERT INTO g VALUES (1, 10), (2, 20);
+
+--echo === WITH RECURSIVE CYCLE/SEARCH (PG 14+) — adds CYCLE/SEARCH to WITH-body bucket ===
+
+--error 1064
+WITH RECURSIVE r(id, n) AS (
+  SELECT id, n FROM g WHERE id = 1
+  UNION ALL
+  SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
+) CYCLE id SET is_cycle USING path
+SELECT id FROM r;
+--error 1064
+WITH RECURSIVE r(id, n) AS (
+  SELECT id, n FROM g WHERE id = 1
+  UNION ALL
+  SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
+) SEARCH DEPTH FIRST BY id SET ord
+SELECT id FROM r;
+--error 1064
+WITH RECURSIVE r(id, n) AS (
+  SELECT id, n FROM g WHERE id = 1
+  UNION ALL
+  SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
+) SEARCH BREADTH FIRST BY id SET ord
+SELECT id FROM r;
+
+--echo === NEW FINGERPRINT — FOR KEY SHARE / FOR NO KEY UPDATE → "Expected: one of UPDATE or SHARE" ===
+
+--error 1064
+SELECT * FROM g FOR KEY SHARE;
+--error 1064
+SELECT * FROM g FOR NO KEY UPDATE;
+--error 1064
+SELECT * FROM g FOR KEY SHARE OF g;
+
+--echo === SUPPORTED — TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ (wire-rendering strips TZ suffix) ===
+
+SELECT '2024-01-01 12:00:00'::TIMESTAMP WITH TIME ZONE;
+SELECT '2024-01-01 12:00:00'::TIMESTAMPTZ;
+CREATE TABLE tz_t (id INT PRIMARY KEY, t TIMESTAMP WITH TIME ZONE);
+INSERT INTO tz_t VALUES (1, '2024-01-01 12:00:00+00');
+SELECT id, t FROM tz_t;
+CREATE TABLE tzz (id INT PRIMARY KEY, t TIMESTAMPTZ);
+INSERT INTO tzz VALUES (1, '2024-01-01 12:00:00+00');
+SELECT id, t FROM tzz;
+
+DROP TABLE g;
+DROP TABLE tz_t;
+DROP TABLE tzz;

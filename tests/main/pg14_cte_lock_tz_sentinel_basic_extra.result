@@ -1,0 +1,51 @@
+CREATE TABLE g (id INT PRIMARY KEY, n INT);
+INSERT INTO g VALUES (1, 10), (2, 20);
+=== WITH RECURSIVE CYCLE/SEARCH (PG 14+) — adds CYCLE/SEARCH to WITH-body bucket ===
+WITH RECURSIVE r(id, n) AS (
+  SELECT id, n FROM g WHERE id = 1
+  UNION ALL
+  SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
+) CYCLE id SET is_cycle USING path
+SELECT id FROM r;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: CYCLE at Line: 5, Column: 3
+WITH RECURSIVE r(id, n) AS (
+  SELECT id, n FROM g WHERE id = 1
+  UNION ALL
+  SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
+) SEARCH DEPTH FIRST BY id SET ord
+SELECT id FROM r;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: SEARCH at Line: 5, Column: 3
+WITH RECURSIVE r(id, n) AS (
+  SELECT id, n FROM g WHERE id = 1
+  UNION ALL
+  SELECT g.id, g.n FROM g JOIN r ON g.id = r.id + 1
+) SEARCH BREADTH FIRST BY id SET ord
+SELECT id FROM r;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: SEARCH at Line: 5, Column: 3
+=== NEW FINGERPRINT — FOR KEY SHARE / FOR NO KEY UPDATE → "Expected: one of UPDATE or SHARE" ===
+SELECT * FROM g FOR KEY SHARE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of UPDATE or SHARE, found: KEY at Line: 1, Column: 21
+SELECT * FROM g FOR NO KEY UPDATE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of UPDATE or SHARE, found: NO at Line: 1, Column: 21
+SELECT * FROM g FOR KEY SHARE OF g;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of UPDATE or SHARE, found: KEY at Line: 1, Column: 21
+=== SUPPORTED — TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ (wire-rendering strips TZ suffix) ===
+SELECT '2024-01-01 12:00:00'::TIMESTAMP WITH TIME ZONE;
+'2024-01-01 12:00:00'::TIMESTAMP WITH TIME ZONE
+2024-01-01 12:00:00
+SELECT '2024-01-01 12:00:00'::TIMESTAMPTZ;
+'2024-01-01 12:00:00'::TIMESTAMPTZ
+2024-01-01 12:00:00
+CREATE TABLE tz_t (id INT PRIMARY KEY, t TIMESTAMP WITH TIME ZONE);
+INSERT INTO tz_t VALUES (1, '2024-01-01 12:00:00+00');
+SELECT id, t FROM tz_t;
+id	t
+1	2024-01-01 12:00:00
+CREATE TABLE tzz (id INT PRIMARY KEY, t TIMESTAMPTZ);
+INSERT INTO tzz VALUES (1, '2024-01-01 12:00:00+00');
+SELECT id, t FROM tzz;
+id	t
+1	2024-01-01 12:00:00
+DROP TABLE g;
+DROP TABLE tz_t;
+DROP TABLE tzz;
