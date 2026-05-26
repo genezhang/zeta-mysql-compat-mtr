@@ -32,6 +32,10 @@ NULL
 SELECT STRING_TO_ARRAY(NULL, ',') IS NULL                     AS null_s_pred;
 null_s_pred
 1
+=== STRING_TO_ARRAY: 3rd-arg NULL silently falls into no-null-marker ===
+SELECT STRING_TO_ARRAY('a,N,c', ',', NULL)                    AS third_null_no_marker;
+third_null_no_marker
+Array { element_type: Text, elements: [String("a"), String("N"), String("c")] }
 === STRING_TO_ARRAY: arity errors → 1105 ===
 SELECT STRING_TO_ARRAY();
 ERROR 1105: execution error: STRING_TO_ARRAY requires 2 or 3 arguments
