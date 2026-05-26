@@ -1,0 +1,185 @@
+# Independently authored PG CREATE TABLE LIKE +
+# EXCLUDE constraint sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE TABLE basic: covered at create_table_*.
+#   - CREATE TABLE AS SELECT: covered at
+#     temp_table_basic_extra (with a known CTAS
+#     FROM-resolution bug pinned there).
+#   - PRIMARY/UNIQUE/FOREIGN/CHECK constraints:
+#     covered at constraint_*.
+#   - CREATE TABLE LIKE <src> [INCLUDING/EXCLUDING
+#     <opts>]: ZERO prior coverage.
+#   - EXCLUDE (...) USING <method> constraint:
+#     ZERO prior coverage.
+#   - ALTER TABLE ADD CONSTRAINT EXCLUDE: ZERO prior.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "unsupported data type: <type>" — pre-existing
+#     fingerprint at many slices (type_cast_edges
+#     etc.). Reused here for the bare LIKE shape:
+#     sqlparser's CREATE TABLE column-list grammar
+#     interprets `(LIKE src)` as a column with name
+#     `LIKE` and type `src` (the LIKE-clause sub-
+#     grammar is NOT recognized at the column-list
+#     level), then convert.rs rejects the unknown
+#     type. NEW use of this fingerprint for a
+#     SCHEMA-CLONE statement form.
+#   - "Expected: ',' or ')' after column definition,
+#     found: <KW>" — pre-existing for INCLUDING /
+#     EXCLUDING (extension qualifiers after LIKE)
+#     and for `gist` / `btree` (the USING <method>
+#     after EXCLUDE).
+#   - "Expected: a data type name, found: (" — when
+#     EXCLUDE is used WITHOUT a USING clause: the
+#     parser treats EXCLUDE as a column-name token
+#     and `(...)` as a (non-existent) parenthesized
+#     type.
+#   - "Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK,
+#     found: EXCLUDE" — sqlparser's ADD CONSTRAINT
+#     sub-grammar lists only 4 constraint kinds.
+#     EXCLUDE not among them.
+#
+# This slice pins:
+#
+#   SHAPE A — CREATE TABLE LIKE bare (NEW use of
+#   "unsupported data type" fingerprint):
+#     - `CREATE TABLE x (LIKE src)`
+#     - `CREATE TABLE x (a INT, LIKE src)`
+#     - `CREATE TABLE x (LIKE src, b TEXT)`
+#     All three: "unsupported data type: src" because
+#     sqlparser parses LIKE in column-position as a
+#     column NAME (since the LIKE-source clause is not
+#     a CREATE TABLE column-list-level construct in
+#     sqlparser's grammar).
+#
+#   SHAPE B — CREATE TABLE LIKE with INCLUDING /
+#   EXCLUDING qualifier (column-definition boundary
+#   reject):
+#     - INCLUDING ALL
+#     - INCLUDING DEFAULTS / CONSTRAINTS / INDEXES /
+#       COMMENTS / IDENTITY / GENERATED / STATISTICS
+#       / STORAGE
+#     - EXCLUDING DEFAULTS
+#     All: "Expected: ',' or ')' after column
+#     definition, found: INCLUDING/EXCLUDING" at col
+#     37 (the post-source-name boundary).
+#
+#   SHAPE C — EXCLUDE constraint with USING method:
+#     - `EXCLUDE USING gist (...)` — "found: gist"
+#     - `EXCLUDE USING btree (...)` — "found: btree"
+#     - `EXCLUDE USING gist (...) WHERE (...)` — same
+#       fingerprint (WHERE clause never reached).
+#     All: "Expected: ',' or ')' after column
+#     definition, found: <method>" at the USING-
+#     method column (depends on table-name length).
+#
+#   SHAPE D — EXCLUDE constraint WITHOUT USING:
+#     - `EXCLUDE (id WITH =, ...)` — "Expected: a
+#       data type name, found: ("
+#       Different fingerprint because no USING means
+#       no method-name to error on; instead the
+#       parser fails at the parenthesized exclusion-
+#       spec.
+#
+#   SHAPE E — ALTER TABLE ADD CONSTRAINT EXCLUDE:
+#     - "Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK,
+#       found: EXCLUDE" at the EXCLUDE column. ADD
+#       CONSTRAINT sub-grammar lists only 4 kinds.
+#
+# Big-picture finding:
+#
+#   PG schema-cloning via `CREATE TABLE x (LIKE src)`
+#   and PG exclusion constraints (the temporal-range
+#   no-overlap idiom: `EXCLUDE USING gist (resource
+#   WITH =, booking_range WITH &&)`) are entirely
+#   unreachable on zeta. Both are common PG idioms:
+#
+#   - LIKE: pg_dump uses `CREATE TABLE foo (LIKE bar
+#     INCLUDING ALL)` for partition clones and table
+#     copies. Apps must rewrite to explicit column
+#     definitions or use CREATE TABLE AS SELECT
+#     (which has its own FROM-resolution bug).
+#
+#   - EXCLUDE: the canonical PG way to enforce
+#     "no two bookings on the same resource overlap
+#     in time". Apps must rewrite to a check trigger
+#     or application-level locking.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL
+# parse-arm fingerprints. The grammar is sqlparser-
+# level, shared by both wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CREATE TABLE (LIKE src)
+#     errors "unsupported data type: <src>" because
+#     LIKE is parsed as a column name and src as the
+#     (unknown) type. Use explicit column definitions
+#     or CREATE TABLE AS SELECT (caveat: CTAS has
+#     its own FROM-resolution bug).
+#   # zeta-adapt: KNOWN GAP — CREATE TABLE (LIKE src
+#     INCLUDING ...) parse-rejects with a different
+#     fingerprint (column-definition boundary). All
+#     INCLUDING/EXCLUDING sub-options unsupported.
+#   # zeta-adapt: KNOWN GAP — EXCLUDE constraint with
+#     or without USING <method> both unsupported. No
+#     way to enforce no-overlap predicates at the
+#     constraint level.
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE ADD
+#     CONSTRAINT EXCLUDE also unsupported (sub-
+#     grammar lists only PRIMARY/UNIQUE/FOREIGN/
+#     CHECK).
+
+DROP TABLE IF EXISTS like_src;
+DROP TABLE IF EXISTS excl_at_t;
+CREATE TABLE like_src (id INT PRIMARY KEY, v TEXT);
+CREATE TABLE excl_at_t (id INT, period INT);
+
+--echo === SHAPE A — CREATE TABLE LIKE bare → "unsupported data type: like_src" ===
+
+--error 1064
+CREATE TABLE like_d1 (LIKE like_src);
+--error 1064
+CREATE TABLE like_d2 (a INT, LIKE like_src);
+--error 1064
+CREATE TABLE like_d3 (LIKE like_src, b TEXT);
+
+--echo === SHAPE B — CREATE TABLE LIKE INCLUDING/EXCLUDING → "found: INCLUDING/EXCLUDING" at col 37 ===
+
+--error 1064
+CREATE TABLE like_d4 (LIKE like_src INCLUDING ALL);
+--error 1064
+CREATE TABLE like_d5 (LIKE like_src INCLUDING DEFAULTS);
+--error 1064
+CREATE TABLE like_d6 (LIKE like_src INCLUDING CONSTRAINTS);
+--error 1064
+CREATE TABLE like_d7 (LIKE like_src EXCLUDING DEFAULTS);
+--error 1064
+CREATE TABLE like_d8 (LIKE like_src INCLUDING INDEXES);
+--error 1064
+CREATE TABLE like_d9 (LIKE like_src INCLUDING COMMENTS);
+
+--echo === SHAPE C — EXCLUDE constraint with USING method → "found: <method>" at USING-method col ===
+
+--error 1064
+CREATE TABLE excl_g (id INT, period INT, EXCLUDE USING gist (id WITH =, period WITH &&));
+--error 1064
+CREATE TABLE excl_b (id INT, period INT, EXCLUDE USING btree (id WITH =));
+--error 1064
+CREATE TABLE excl_w (id INT, period INT, EXCLUDE USING gist (id WITH =) WHERE (id > 0));
+
+--echo === SHAPE D — EXCLUDE constraint WITHOUT USING → "Expected: a data type name, found: (" at parenthesis-col ===
+
+--error 1064
+CREATE TABLE excl_n (id INT, period INT, EXCLUDE (id WITH =, period WITH &&));
+
+--echo === SHAPE E — ALTER TABLE ADD CONSTRAINT EXCLUDE → "found: EXCLUDE" at EXCLUDE-col ===
+
+--error 1064
+ALTER TABLE excl_at_t ADD CONSTRAINT excl_c EXCLUDE USING gist (id WITH =);
+
+DROP TABLE like_src;
+DROP TABLE excl_at_t;

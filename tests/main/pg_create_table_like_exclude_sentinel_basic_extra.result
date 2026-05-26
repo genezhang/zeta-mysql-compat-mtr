@@ -1,0 +1,39 @@
+DROP TABLE IF EXISTS like_src;
+DROP TABLE IF EXISTS excl_at_t;
+CREATE TABLE like_src (id INT PRIMARY KEY, v TEXT);
+CREATE TABLE excl_at_t (id INT, period INT);
+=== SHAPE A — CREATE TABLE LIKE bare → "unsupported data type: like_src" ===
+CREATE TABLE like_d1 (LIKE like_src);
+ERROR 1064: SQL parse error: unsupported data type: like_src
+CREATE TABLE like_d2 (a INT, LIKE like_src);
+ERROR 1064: SQL parse error: unsupported data type: like_src
+CREATE TABLE like_d3 (LIKE like_src, b TEXT);
+ERROR 1064: SQL parse error: unsupported data type: like_src
+=== SHAPE B — CREATE TABLE LIKE INCLUDING/EXCLUDING → "found: INCLUDING/EXCLUDING" at col 37 ===
+CREATE TABLE like_d4 (LIKE like_src INCLUDING ALL);
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: INCLUDING at Line: 1, Column: 37
+CREATE TABLE like_d5 (LIKE like_src INCLUDING DEFAULTS);
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: INCLUDING at Line: 1, Column: 37
+CREATE TABLE like_d6 (LIKE like_src INCLUDING CONSTRAINTS);
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: INCLUDING at Line: 1, Column: 37
+CREATE TABLE like_d7 (LIKE like_src EXCLUDING DEFAULTS);
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: EXCLUDING at Line: 1, Column: 37
+CREATE TABLE like_d8 (LIKE like_src INCLUDING INDEXES);
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: INCLUDING at Line: 1, Column: 37
+CREATE TABLE like_d9 (LIKE like_src INCLUDING COMMENTS);
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: INCLUDING at Line: 1, Column: 37
+=== SHAPE C — EXCLUDE constraint with USING method → "found: <method>" at USING-method col ===
+CREATE TABLE excl_g (id INT, period INT, EXCLUDE USING gist (id WITH =, period WITH &&));
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: gist at Line: 1, Column: 56
+CREATE TABLE excl_b (id INT, period INT, EXCLUDE USING btree (id WITH =));
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: btree at Line: 1, Column: 56
+CREATE TABLE excl_w (id INT, period INT, EXCLUDE USING gist (id WITH =) WHERE (id > 0));
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: gist at Line: 1, Column: 56
+=== SHAPE D — EXCLUDE constraint WITHOUT USING → "Expected: a data type name, found: (" at parenthesis-col ===
+CREATE TABLE excl_n (id INT, period INT, EXCLUDE (id WITH =, period WITH &&));
+ERROR 1064: SQL parse error: sql parser error: Expected: a data type name, found: ( at Line: 1, Column: 50
+=== SHAPE E — ALTER TABLE ADD CONSTRAINT EXCLUDE → "found: EXCLUDE" at EXCLUDE-col ===
+ALTER TABLE excl_at_t ADD CONSTRAINT excl_c EXCLUDE USING gist (id WITH =);
+ERROR 1064: SQL parse error: sql parser error: Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK, found: EXCLUDE at Line: 1, Column: 45
+DROP TABLE like_src;
+DROP TABLE excl_at_t;
