@@ -1,0 +1,92 @@
+=== IS NULL — TRUE for SQL NULL, FALSE for JSONB null ===
+SELECT NULL::JSONB IS NULL                                    AS sql_null_is_null_true;
+sql_null_is_null_true
+1
+SELECT 'null'::JSONB IS NULL                                  AS jsonb_null_is_null_false;
+jsonb_null_is_null_false
+0
+=== <@ contained-by — NULL propagates, 'null' evaluates ===
+SELECT NULL::JSONB <@ '{"a":1}'::JSONB                        AS sql_null_lhs_null;
+sql_null_lhs_null
+NULL
+SELECT '{"a":1}'::JSONB <@ NULL::JSONB                        AS sql_null_rhs_null;
+sql_null_rhs_null
+NULL
+SELECT NULL::JSONB <@ NULL::JSONB                             AS both_sql_null_null;
+both_sql_null_null
+NULL
+SELECT 'null'::JSONB <@ '{"a":1}'::JSONB                      AS jsonb_null_lhs_false;
+jsonb_null_lhs_false
+0
+SELECT 'null'::JSONB <@ 'null'::JSONB                         AS jsonb_null_self_true;
+jsonb_null_self_true
+1
+SELECT NULL::JSONB <@ 'null'::JSONB                           AS mixed_sql_null_lhs_null;
+mixed_sql_null_lhs_null
+NULL
+SELECT 'null'::JSONB <@ NULL::JSONB                           AS mixed_jsonb_null_lhs_null;
+mixed_jsonb_null_lhs_null
+NULL
+=== @> contains — symmetric pattern (3VL on SQL NULL) ===
+SELECT NULL::JSONB @> '{"a":1}'::JSONB                        AS at_sql_null_lhs_null;
+at_sql_null_lhs_null
+NULL
+SELECT '{"a":1}'::JSONB @> NULL::JSONB                        AS at_sql_null_rhs_null;
+at_sql_null_rhs_null
+NULL
+SELECT 'null'::JSONB @> 'null'::JSONB                         AS at_jsonb_null_self_true;
+at_jsonb_null_self_true
+1
+=== = equality — 3VL for SQL NULL, real eval for JSONB null ===
+SELECT NULL::JSONB = NULL::JSONB                              AS eq_sql_null_eq_sql_null_null;
+eq_sql_null_eq_sql_null_null
+NULL
+SELECT 'null'::JSONB = 'null'::JSONB                          AS eq_jsonb_null_self_true;
+eq_jsonb_null_self_true
+1
+SELECT NULL::JSONB = 'null'::JSONB                            AS eq_mixed_null;
+eq_mixed_null
+NULL
+SELECT 'null'::JSONB = '1'::JSONB                             AS eq_jsonb_null_ne_int_false;
+eq_jsonb_null_ne_int_false
+0
+=== || concat — SQL NULL propagates ===
+SELECT NULL::JSONB || '{"a":1}'::JSONB                        AS concat_sql_null_lhs_null;
+concat_sql_null_lhs_null
+NULL
+SELECT '{"a":1}'::JSONB || NULL::JSONB                        AS concat_sql_null_rhs_null;
+concat_sql_null_rhs_null
+NULL
+SELECT 'null'::JSONB || '{"a":1}'::JSONB                      AS concat_jsonb_null_object;
+concat_jsonb_null_object
+[null,{"a":1}]
+=== ? key-exists — SQL NULL propagates ===
+SELECT NULL::JSONB ? 'a'                                      AS q_sql_null_null;
+q_sql_null_null
+NULL
+SELECT 'null'::JSONB ? 'a'                                    AS q_jsonb_null_false;
+q_jsonb_null_false
+0
+SELECT '{"a":1}'::JSONB ? NULL                                AS q_null_key_null;
+q_null_key_null
+NULL
+=== - minus — SQL NULL propagates ===
+SELECT NULL::JSONB - 'key'                                    AS minus_sql_null_null;
+minus_sql_null_null
+NULL
+SELECT 'null'::JSONB - 'key'                                  AS minus_jsonb_null_unchanged;
+minus_jsonb_null_unchanged
+null
+SELECT '{"a":1}'::JSONB - NULL                                AS minus_null_key_null;
+minus_null_key_null
+NULL
+=== IS NOT DISTINCT FROM — null-safe equality bridges ===
+SELECT NULL::JSONB IS NOT DISTINCT FROM NULL::JSONB           AS isnd_sql_null_pair_true;
+isnd_sql_null_pair_true
+1
+SELECT 'null'::JSONB IS NOT DISTINCT FROM 'null'::JSONB       AS isnd_jsonb_null_pair_true;
+isnd_jsonb_null_pair_true
+1
+SELECT NULL::JSONB IS NOT DISTINCT FROM 'null'::JSONB         AS isnd_mixed_false;
+isnd_mixed_false
+0
