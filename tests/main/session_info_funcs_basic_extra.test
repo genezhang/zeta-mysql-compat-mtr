@@ -125,7 +125,13 @@ SELECT CURRENT_ROLE;
 # returns the session db name ("test" — the runner's default
 # connect db), NOT the hardcoded "zeta" from lib.rs:47291.
 # CURRENT_DATABASE() / CURRENT_CATALOG go through the runtime
-# arm and DO return "zeta".
+# arm and DO return "zeta" — used below as the NEGATIVE
+# CONTROL for the shim-intercept bug section.
+#
+# NOTE: The DATABASE() and SCHEMA() bare-call values
+# intentionally overlap with database_schema_basic_extra.test
+# — they are setup here to set up the contrast with the
+# shim-intercept bug rows that follow. Do NOT consolidate.
 SELECT DATABASE()                                             AS db_returns_session;
 SELECT SCHEMA()                                               AS schema_returns_session;
 SELECT CURRENT_DATABASE()                                     AS current_db_paren;
