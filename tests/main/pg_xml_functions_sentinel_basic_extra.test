@@ -5,23 +5,33 @@
 # Existing coverage (do NOT duplicate):
 #   - PG XML surface (XML data type, XMLPARSE,
 #     XMLELEMENT, XMLAGG, XPATH, XMLEXISTS, XMLCOMMENT,
-#     XMLCONCAT, XMLPI): ZERO prior coverage. Wide-grep
-#     of tests/main/*.test for `\bXML` returns no hits.
+#     XMLCONCAT, XMLPI): ZERO prior coverage on the
+#     SUBSTANTIVE surface. `\bXML\b` wide-grep DOES hit
+#     `explain_format_basic_extra.test:87` for
+#     `EXPLAIN (FORMAT XML)` — but that's the EXPLAIN-
+#     option keyword, an unrelated surface. No `::XML`
+#     cast, no XML data-type DDL, no XMLPARSE /
+#     XMLELEMENT / XMLAGG / XPATH / XMLEXISTS /
+#     XMLCOMMENT / XMLCONCAT / XMLPI / XMLATTRIBUTES
+#     anywhere else.
 #
 #   The SHAPE patterns pinned by each row are well-
 #   established by prior slices — this slice is novel
 #   for the XML SURFACE specifically, not for the
 #   rejection mechanics. Per PR #386's shape (c)
 #   taxonomy reframing:
-#     - "unsupported CAST target type:" — 15 prior
-#       result files (network types PR #387 et al.).
-#     - "unsupported data type:" — 7 prior result files.
+#     - "unsupported CAST target type:" — 7 prior
+#       result files (29 occurrences) — heavy reuse
+#       across PR #387 INET/CIDR/MACADDR et al.
+#     - "unsupported data type:" — 4 prior result files.
 #     - sqlparser "Expected: ), found: <X>" — multiple
 #       priors (partition_basic_extra, agg_func_basic_
 #       extra, window_func_basic_extra, charset_
 #       collation_basic_extra). This is sqlparser's
-#       standard "function called with PG-special
-#       syntax it doesn't grok" pattern.
+#       generic "function-arg expression parser ran
+#       into an adjacent token it can't continue with"
+#       pattern — NOT a PG-spec arm in sqlparser (which
+#       has none for XMLPARSE/XMLELEMENT/XMLPI/XMLEXISTS).
 #     - "unknown function: <X>" — heavy reuse across
 #       the function-arm gap closure PRs (#349-#369).
 #
@@ -37,17 +47,27 @@
 #
 #   Shape C — PG-special-syntax XML functions (1064
 #   sqlparser "Expected: ), found: ..."):
-#     - `XMLPARSE(DOCUMENT 'x')` and `XMLPARSE(CONTENT
-#       'x')` — PG-spec DOCUMENT/CONTENT keyword inside
-#       parens not recognized.
-#     - `XMLELEMENT(NAME foo, ...)` — PG-spec NAME
-#       keyword not recognized.
-#     - `XMLPI(NAME foo)` — same NAME issue.
-#     - `XMLEXISTS('/a' PASSING BY VALUE ...)` — PG-
-#       spec PASSING BY VALUE clause not recognized.
-#     - sqlparser fails INSIDE the function-call arg
-#       list. Distinct site from Shape D (which is
-#       at function-name lookup).
+#     - `XMLPARSE(DOCUMENT 'x')` — sqlparser is parsing
+#       the function-arg list as ordinary expressions;
+#       after the bare identifier `DOCUMENT` it sees a
+#       string literal `'<a>1</a>'` adjacent (no
+#       operator between them) and bails because that
+#       sequence isn't a valid expression continuation.
+#     - `XMLPARSE(CONTENT 'x')` — same.
+#     - `XMLELEMENT(NAME foo, ...)` — bare-identifier
+#       NAME followed by bare-identifier foo (no
+#       operator); same parse failure.
+#     - `XMLPI(NAME foo)` — same.
+#     - `XMLEXISTS('/a' PASSING BY VALUE ...)` — after
+#       string literal `'/a'` sees bare-identifier
+#       PASSING (no operator); same parse failure.
+#     - These are NOT PG-spec grammar arms in sqlparser
+#       (it has none for XML functions). The mechanism
+#       is the generic expression-arg-list parser
+#       hitting adjacent non-operator tokens. Distinct
+#       site from Shape D — Shape C fails BEFORE the
+#       AST is even built; Shape D fails at function-
+#       table lookup AFTER AST construction.
 #
 #   Shape D — regular-function-call XML functions (1105
 #   "unknown function: <X>"):
