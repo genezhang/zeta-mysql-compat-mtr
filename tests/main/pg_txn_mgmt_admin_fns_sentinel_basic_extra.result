@@ -1,0 +1,21 @@
+=== Transaction-ID fns (snapshot-mgmt API) ===
+SELECT txid_current();
+ERROR 1105: execution error: unknown function: txid_current
+SELECT pg_current_xact_id();
+ERROR 1105: execution error: unknown function: pg_current_xact_id
+SELECT pg_xact_status(1);
+ERROR 1105: execution error: unknown function: pg_xact_status
+SELECT txid_status('1');
+ERROR 1105: execution error: unknown function: txid_status
+=== Backend/session-mgmt fns (cluster admin) ===
+SELECT pg_backend_pid();
+ERROR 1105: execution error: unknown function: pg_backend_pid
+SELECT pg_terminate_backend(123);
+ERROR 1105: execution error: unknown function: pg_terminate_backend
+SELECT pg_cancel_backend(123);
+ERROR 1105: execution error: unknown function: pg_cancel_backend
+SELECT pg_blocking_pids(123);
+ERROR 1105: execution error: unknown function: pg_blocking_pids
+=== Schema-namespace fn ===
+SELECT pg_my_temp_schema();
+ERROR 1105: execution error: unknown function: pg_my_temp_schema
