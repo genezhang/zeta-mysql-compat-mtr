@@ -53,16 +53,26 @@
 #       is standard PG-style behavior.
 #     - GENUINELY NEW fingerprint — by-fingerprint
 #       wide-grep returns zero priors.
-#     - BUG — `ROLLBACK TO SAVEPOINT sp` also gets
-#       absorbed by the cascade, contrary to PG where
-#       "you can roll back to a savepoint even after
-#       the transaction has been aborted" (PG docs).
-#       This means apps porting from PG that rely on
-#       SAVEPOINT for in-transaction error recovery
-#       (the canonical pattern) do NOT have a recovery
-#       path in zeta — must rollback the whole txn and
-#       retry. RELEASE SAVEPOINT and post-rollback-to-sp
-#       statements also fail with the cascade message.
+#     - BUG (MYSQL-WIRE-ONLY) — `ROLLBACK TO SAVEPOINT
+#       sp` gets absorbed by the cascade on the MySQL
+#       wire, contrary to PG ("you can roll back to a
+#       savepoint even after the transaction has been
+#       aborted"). zeta-mysqlwire/src/shim.rs:6840-6848
+#       has an aborted-txn guard that fires for any
+#       statement not matched by parse_mysql_txn_command,
+#       which explicitly does NOT recognize ROLLBACK TO
+#       SAVEPOINT (see assertion at shim.rs:8234).
+#       In contrast, zeta-pgwire/src/handler.rs:1620-
+#       1656 + 1870-1886 routes ALL txn commands
+#       through handle_txn_command BEFORE the abort
+#       guard, and the RollbackToSavepoint arm clears
+#       `aborted = false` on success (line 1876) —
+#       PG-compliant. So this is a MYSQL-WIRE-ONLY
+#       bug; PG-wire (psql) users see correct behavior.
+#       MySQL-wire apps porting from PG with the
+#       canonical SAVEPOINT recovery pattern have NO
+#       in-transaction recovery path — must full-
+#       rollback and retry.
 #
 # Big-picture finding:
 #
@@ -73,13 +83,15 @@
 #   statement-list (Shape (d)).
 #
 #   The transaction-abort cascade is mostly PG-compat
-#   — but the canonical PG recovery path (ROLLBACK TO
-#   SAVEPOINT) is BROKEN: zeta absorbs ROLLBACK TO sp
-#   into the cascade. Apps porting PG code that wraps
+#   — but on the MySQL wire the canonical PG recovery
+#   path (ROLLBACK TO SAVEPOINT) is BROKEN: mysqlwire's
+#   shim absorbs ROLLBACK TO sp into the cascade.
+#   pgwire handles it correctly (clears the abort
+#   flag). MySQL-wire apps porting PG code that wraps
 #   risky statements in SAVEPOINT … ROLLBACK TO sp for
 #   error recovery have NO in-transaction recovery
-#   path in zeta — must rollback the whole transaction
-#   and retry from scratch.
+#   path — must full-rollback and retry. PG-wire users
+#   get the correct PG-compatible behavior.
 #
 #   For apps needing cursor-like iteration, rewrite to:
 #     - LIMIT/OFFSET pagination (supported)
@@ -97,9 +109,12 @@
 #     inside a BEGIN block causes all subsequent stmts
 #     to error 1105 "current transaction is aborted"
 #     until COMMIT/ROLLBACK. Cascade matches PG.
-#   # zeta-adapt: KNOWN BUG — `ROLLBACK TO SAVEPOINT
-#     sp` does NOT escape the cascade in zeta (PG
-#     allows it). Apps must full-rollback and retry.
+#   # zeta-adapt: KNOWN BUG (MYSQL-WIRE-ONLY) —
+#     `ROLLBACK TO SAVEPOINT sp` does NOT escape the
+#     cascade on the MySQL wire (mysqlwire shim
+#     absorbs it). pgwire implements PG-compliant
+#     escape. MySQL-wire apps must full-rollback and
+#     retry; PG-wire (psql) users are fine.
 
 CREATE TABLE cur_t (id INT PRIMARY KEY, n INT);
 INSERT INTO cur_t VALUES (1, 10), (2, 20), (3, 30);
@@ -173,12 +188,14 @@ COMMIT;
 SELECT 1 AS after_commit;
 SELECT id FROM cur_t WHERE id = 1;
 
---echo === BUG — SAVEPOINT escape FAILS (ROLLBACK TO sp absorbed by cascade) ===
+--echo === MYSQL-WIRE BUG — SAVEPOINT escape FAILS (ROLLBACK TO sp absorbed by cascade) ===
 
 # PG docs: "you can roll back to a savepoint even after
-# the transaction has been aborted" — but zeta absorbs
-# ROLLBACK TO SAVEPOINT into the cascade. This breaks
-# the canonical PG in-transaction error-recovery pattern.
+# the transaction has been aborted" — pgwire honors this
+# (handler.rs:1620+1870 clears aborted on success), but
+# mysqlwire's aborted-txn guard (shim.rs:6840) fires
+# BEFORE ROLLBACK TO sp is dispatched, absorbing it
+# into the cascade. MYSQL-WIRE-ONLY bug.
 BEGIN;
 SAVEPOINT sp;
 --error 1064
