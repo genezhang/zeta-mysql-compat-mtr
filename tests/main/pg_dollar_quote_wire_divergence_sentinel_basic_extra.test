@@ -1,0 +1,167 @@
+# Independently authored PG dollar-quote wire-
+# divergence sentinel slice. NOT copied or adapted
+# from MySQL's mysql-test/. (MySQL has no DO block;
+# this is PG surface.)
+#
+# REFINES + CORRECTS a misattribution in the existing
+# do_block_basic_extra.test (lines 32-38), which
+# attributed multi-statement DO body failures to the
+# "mysql client splitting on ;". That's only HALF
+# correct. The actual root cause is in zeta's
+# MySQL-wire-side `split_top_level_statements` at
+# zeta-mysqlwire/src/shim.rs:4918: the state machine
+# tracks SingleQuoted / DoubleQuoted / Backtick /
+# LineComment / BlockComment but DOES NOT track
+# DollarQuoted (`$$...$$` or `$tag$...$tag$`). So
+# even when the mysql client sends the FULL statement
+# in one piece (via `-e "..."` which bypasses client-
+# side splitting), the wire-side splitter STILL
+# fragments the DO body at every inner `;`. Each
+# fragment then errors at the parser with a different
+# message depending on which token the fragment ends
+# on.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "Unterminated DO block (missing closing $$)" —
+#     from zeta-parser/src/plpgsql.rs:673. Already
+#     pinned in pg_misc_ddl_sentinel and elsewhere
+#     for malformed DO. NEW WITNESS that the SAME
+#     message fires for valid multi-statement DO on
+#     mysqlwire because the wire splitter sends only
+#     the prefix up to the first inner `;` to the
+#     parser, and that prefix is missing the closing
+#     `$$`.
+#   - "Unterminated dollar-quoted string at Line: 1,
+#     Column: <N>" / "Unterminated dollar-quoted,
+#     expected $ at Line: 1, Column: <N>" — two
+#     sqlparser-level fingerprint variants (CREATE
+#     FUNCTION body with inner `;` exhibits these).
+#     The wire splitter sends the prefix up to the
+#     first `;`, which IS missing the closing `$$`
+#     (or `$body$`), and the parser's dollar-quote
+#     lexer reports one of these distinct messages
+#     rather than the DO-specific one. Which variant
+#     fires depends on whether the prefix ends
+#     mid-string (variant 1) or after consuming the
+#     opening tag (variant 2).
+#
+# This slice pins:
+#
+#   ROOT CAUSE — split_top_level_statements at
+#   zeta-mysqlwire/src/shim.rs:4918 doesn't track
+#   dollar-quoted strings. Adding a `DollarQuoted`
+#   state (with tag matching for `$tag$...$tag$`)
+#   would fix all observed symptoms in one place.
+#
+#   Symptom A — DO with inner `;` → "Unterminated DO
+#   block (missing closing $$)". The wire splits at
+#   the first inner `;`, sending only the prefix
+#   `DO $$ BEGIN RAISE NOTICE 'hi'` to the parser.
+#   plpgsql.rs:673 sees no closing `$$` and reports
+#   the DO-specific message.
+#
+#   Symptom B — CREATE FUNCTION with `;` in body →
+#   "Unterminated dollar-quoted string at Line: 1,
+#   Column: <N>". Same root cause, different parser
+#   error path because the wire-split prefix lands
+#   in sqlparser's dollar-quote lexer rather than
+#   the plpgsql.rs DO handler.
+#
+#   Symptom C — DO with NO inner `;` works on
+#   mysqlwire. Already pinned at do_block_basic_
+#   extra.test:42-56 (DO $$ SELECT 1 $$, DO $$ BEGIN
+#   END $$, etc.). NOT re-pinned here.
+#
+#   Cross-wire (pgwire): the SAME statements (with
+#   inner `;` and with CREATE FUNCTION body
+#   semicolons) all succeed cleanly on pgwire. The
+#   pgwire path uses the SQL-parser-level lexer
+#   which IS dollar-quote-aware (sqlparser handles
+#   it correctly when the WHOLE statement reaches
+#   the parser; only mysqlwire's pre-parser splitter
+#   chops it up first).
+#
+# Big-picture finding:
+#
+#   Multi-statement PL-pgSQL is ENTIRELY UNREACHABLE
+#   on the MySQL wire. Any PL-pgSQL with `;` inside
+#   a `$$...$$` block — which is nearly all real-
+#   world DO blocks and PL-pgSQL functions — fails
+#   with one of the two error shapes above. The fix
+#   is single-point: add `DollarQuoted` state to
+#   the splitter at shim.rs:4918, mirroring how the
+#   parser-level `split_sql_at_semicolons` in
+#   zeta-parser/src/lib.rs already handles it (see
+#   the existing tests at parser lib.rs:848-858
+#   `semicolon_inside_dollar_quote_not_split` —
+#   that test proves the PARSER's splitter is
+#   dollar-quote-aware, just not the WIRE's).
+#
+#   This joins the running wire-divergence catalog
+#   (PR #366 LISTEN/NOTIFY, PR #385 Array Debug,
+#   PR #392 ROLLBACK TO SAVEPOINT, PR #396 ALTER
+#   DATABASE compat-noop, PR #398 TIMESTAMPTZ TZ
+#   truncation, PR #399 SET prefix-intercept, PR
+#   #405 pg_replication_slots, PR #406 SHOW catch-
+#   all). This one is structurally NEW: a STATEFUL
+#   wire-side text processor (split_top_level_
+#   statements) that doesn't mirror the parser's
+#   state-tracking — silent corruption of input
+#   before parsing.
+#
+#   App-impact: NO multi-statement DO bodies. NO
+#   CREATE OR REPLACE FUNCTION with multi-statement
+#   bodies. App porters of PG functions / DO scripts
+#   that contain ANY `;` inside the body MUST use
+#   pgwire instead.
+#
+# Adaptation notes:
+#   # zeta-adapt: WIRE DIVERGENCE — mysqlwire's
+#     split_top_level_statements (shim.rs:4918) does
+#     NOT track $$...$$, fragmenting any DO body or
+#     CREATE FUNCTION body containing `;`. Fix is
+#     single-point: add DollarQuoted state to the
+#     splitter's state machine (mirroring parser-
+#     level lib.rs:848-858 test coverage).
+#   # zeta-adapt: KNOWN GAP — multi-statement DO
+#     blocks UNUSABLE on MySQL wire. Use pgwire for
+#     any DO body containing `;`. Single-statement
+#     DO ($$ SELECT 1 $$) works.
+#   # zeta-adapt: KNOWN GAP — CREATE OR REPLACE
+#     FUNCTION with multi-statement body UNUSABLE
+#     on MySQL wire. Use pgwire.
+
+--echo === Symptom A — DO with inner ; → "Unterminated DO block (missing closing $$)" ===
+
+# Wire splitter sends only `DO $$ BEGIN RAISE NOTICE
+# 'hi'` to parser; plpgsql.rs:673 reports the
+# DO-specific message.
+--error 1064
+DO $$ BEGIN RAISE NOTICE 'hi'; END $$;
+--error 1064
+DO $$ BEGIN PERFORM 1; END $$;
+--error 1064
+DO $$ DECLARE x INT; BEGIN NULL; END $$;
+--error 1064
+DO $$ BEGIN IF true THEN NULL; END IF; END $$;
+--error 1064
+DO $$ BEGIN FOR i IN 1..3 LOOP NULL; END LOOP; END $$;
+
+--echo === Symptom B — CREATE FUNCTION with ; in body → "Unterminated dollar-quoted string" ===
+
+# Wire splitter sends only `CREATE OR REPLACE
+# FUNCTION f1() RETURNS INT AS $$ SELECT 1` to
+# parser; sqlparser's dollar-quote lexer reports
+# this distinct message.
+--error 1064
+CREATE OR REPLACE FUNCTION f1() RETURNS INT AS $$ SELECT 1; $$ LANGUAGE sql;
+--error 1064
+CREATE OR REPLACE FUNCTION f2() RETURNS INT AS $body$ SELECT 1; SELECT 2; $body$ LANGUAGE sql;
+
+--echo === Counter-check — single-statement DO and FUNCTION (no inner ;) WORK on mysqlwire ===
+
+# Confirms the split-on-; mechanism: when the body
+# has no `;`, the wire splitter doesn't fragment.
+DO $$ SELECT 1 $$;
+CREATE OR REPLACE FUNCTION f3() RETURNS INT AS $$ SELECT 1 $$ LANGUAGE sql;
+DROP FUNCTION f3;

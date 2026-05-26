@@ -1,0 +1,20 @@
+=== Symptom A — DO with inner ; → "Unterminated DO block (missing closing $$)" ===
+DO $$ BEGIN RAISE NOTICE 'hi'; END $$;
+ERROR 1064: SQL parse error: Unterminated DO block (missing closing $$)
+DO $$ BEGIN PERFORM 1; END $$;
+ERROR 1064: SQL parse error: Unterminated DO block (missing closing $$)
+DO $$ DECLARE x INT; BEGIN NULL; END $$;
+ERROR 1064: SQL parse error: Unterminated DO block (missing closing $$)
+DO $$ BEGIN IF true THEN NULL; END IF; END $$;
+ERROR 1064: SQL parse error: Unterminated DO block (missing closing $$)
+DO $$ BEGIN FOR i IN 1..3 LOOP NULL; END LOOP; END $$;
+ERROR 1064: SQL parse error: Unterminated DO block (missing closing $$)
+=== Symptom B — CREATE FUNCTION with ; in body → "Unterminated dollar-quoted string" ===
+CREATE OR REPLACE FUNCTION f1() RETURNS INT AS $$ SELECT 1; $$ LANGUAGE sql;
+ERROR 1064: SQL parse error: sql parser error: Unterminated dollar-quoted string at Line: 1, Column: 59
+CREATE OR REPLACE FUNCTION f2() RETURNS INT AS $body$ SELECT 1; SELECT 2; $body$ LANGUAGE sql;
+ERROR 1064: SQL parse error: sql parser error: Unterminated dollar-quoted, expected $ at Line: 1, Column: 63
+=== Counter-check — single-statement DO and FUNCTION (no inner ;) WORK on mysqlwire ===
+DO $$ SELECT 1 $$;
+CREATE OR REPLACE FUNCTION f3() RETURNS INT AS $$ SELECT 1 $$ LANGUAGE sql;
+DROP FUNCTION f3;
