@@ -1,0 +1,99 @@
+# Independently authored TABLESAMPLE NO-OP SENTINEL smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - TABLESAMPLE — NONE (zero compat-mtr coverage).
+#     SQL-standard sampling clause; parser accepts but
+#     execution is a no-op (returns ALL rows).
+#
+# This slice pins:
+#   - TABLESAMPLE BERNOULLI(<percent>) parses without error.
+#   - TABLESAMPLE SYSTEM(<percent>) parses without error.
+#   - TABLESAMPLE BERNOULLI(0) returns ALL rows (sampling
+#     ignored, NOT zero rows).
+#   - TABLESAMPLE BERNOULLI(100) returns all rows.
+#   - TABLESAMPLE BERNOULLI(10) returns all rows (NOT 10%).
+#   - TABLESAMPLE BERNOULLI(<negative>) silently accepted.
+#   - TABLESAMPLE BERNOULLI(<>100>) silently accepted.
+#   - TABLESAMPLE ... REPEATABLE(<seed>) syntax accepted.
+#   - Sampling clause is a complete NO-OP at execution.
+#
+# Big-picture finding:
+#   zeta accepts the SQL-standard TABLESAMPLE syntax for
+#   parser compatibility (so apps using it don't crash on
+#   parse), but the executor IGNORES the clause entirely.
+#   Every TABLESAMPLE variant returns 100% of the rows.
+#   This means:
+#     - Apps doing `TABLESAMPLE BERNOULLI(1)` to estimate
+#       table statistics will get the full table.
+#     - Apps doing `TABLESAMPLE BERNOULLI(0)` to "preview"
+#       schema with no data will get all rows.
+#     - REPEATABLE(seed) for deterministic sampling has no
+#       effect — no sampling happens at all.
+#   The accepted out-of-range percentages (negative, >100)
+#   are NOT a deliberate spec-divergence — they're a
+#   side-effect of the no-op: the parser accepts any
+#   expression in the percentage slot since the value is
+#   never used.
+#
+#   Sentinel value: if a future zeta version implements
+#   actual sampling, every row in this slice that pins
+#   COUNT(*)=10 would START FAILING — intentional trip-
+#   wire that forces a re-evaluation + .result update.
+#
+# Adaptation notes:
+#   # zeta-adapt: TABLESAMPLE syntax is ACCEPTED but a
+#     COMPLETE NO-OP at execution. Don't rely on it for
+#     sampling. To approximate, use ORDER BY RANDOM() LIMIT n
+#     (note: ORDER BY full scan).
+#   # zeta-adapt: Out-of-range percentages and REPEATABLE
+#     seeds are SILENTLY accepted (since they're ignored).
+#     A future implementation may tighten validation.
+
+--echo === Setup: 10-row table ===
+
+CREATE TABLE samp_t (id INT);
+INSERT INTO samp_t VALUES
+  (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
+
+--echo === TABLESAMPLE BERNOULLI — all percentages return ALL 10 rows ===
+
+# 0% should return 0 rows in real sampling — but returns all.
+SELECT COUNT(*) FROM samp_t TABLESAMPLE BERNOULLI(0);
+# 1% should return ~0 rows — but returns all.
+SELECT COUNT(*) FROM samp_t TABLESAMPLE BERNOULLI(1);
+# 50% — but returns all.
+SELECT COUNT(*) FROM samp_t TABLESAMPLE BERNOULLI(50);
+# 100% trivially returns all (matches sampling spec).
+SELECT COUNT(*) FROM samp_t TABLESAMPLE BERNOULLI(100);
+
+--echo === TABLESAMPLE SYSTEM — same no-op behavior ===
+
+SELECT COUNT(*) FROM samp_t TABLESAMPLE SYSTEM(0);
+SELECT COUNT(*) FROM samp_t TABLESAMPLE SYSTEM(50);
+SELECT COUNT(*) FROM samp_t TABLESAMPLE SYSTEM(100);
+
+--echo === TABLESAMPLE REPEATABLE(seed) — seed silently ignored ===
+
+# REPEATABLE(seed) should make sampling deterministic.
+# zeta accepts the syntax but no sampling happens.
+SELECT COUNT(*) FROM samp_t TABLESAMPLE BERNOULLI(50) REPEATABLE(42);
+SELECT COUNT(*) FROM samp_t TABLESAMPLE SYSTEM(25) REPEATABLE(7);
+
+--echo === TABLESAMPLE: out-of-range percentages silently accepted ===
+
+# Real samplers would error on these. Accepted silently
+# because the percentage is never evaluated.
+SELECT COUNT(*) FROM samp_t TABLESAMPLE BERNOULLI(-5);
+SELECT COUNT(*) FROM samp_t TABLESAMPLE BERNOULLI(150);
+
+--echo === TABLESAMPLE: SELECT * still returns all rows (not just COUNT) ===
+
+# Sanity that COUNT(*)=10 isn't a special aggregate path —
+# the actual rows are returned too.
+SELECT id FROM samp_t TABLESAMPLE BERNOULLI(1) ORDER BY id;
+
+--echo === Cleanup ===
+
+DROP TABLE samp_t;
