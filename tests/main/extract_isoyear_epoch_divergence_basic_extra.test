@@ -1,0 +1,159 @@
+# Independently authored EXTRACT(ISOYEAR) / EXTRACT(EPOCH
+# FROM INTERVAL) divergence-pinning slice for the GPL
+# MTR-format runner. Follow-up to PR #361 reviewer
+# nice-to-haves. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - extract_extended_fields_basic_extra (PR #361) pins
+#     ISOYEAR for `2024-05-19` and `2025-01-01` —
+#     BOTH cases where ISOYEAR == YEAR (no divergence).
+#     The reviewer flagged this as a coverage gap: the
+#     real value of ISOYEAR is at year boundaries where
+#     it diverges from YEAR. This slice pins TWO such
+#     divergence cases.
+#   - extract_extended_fields_basic_extra also pins
+#     EPOCH for `'1 hour'` interval — doesn't exercise
+#     the 1-month=30-days normalization. This slice
+#     pins that quirk.
+#
+# This slice pins:
+#   - **ISOYEAR < YEAR divergence**: `'2024-12-30'` is
+#     the Monday of ISO week 1 of 2025 → ISOYEAR=2025
+#     while YEAR=2024.
+#   - **ISOYEAR > YEAR divergence**: `'2023-01-01'` is
+#     a Sunday in ISO week 52 of 2022 → ISOYEAR=2022
+#     while YEAR=2023.
+#   - Paired ISOYEAR vs YEAR rows so a regression to a
+#     silent ISOYEAR→YEAR fallback gets caught.
+#   - **EPOCH(INTERVAL '1 month') = 30 * 86400 = 2592000**
+#     (NOT the calendar-aware 28..31 days × 86400).
+#   - **EPOCH(INTERVAL '1 year') = 12 * 30 * 86400 =
+#     31104000** (NOT 365.25 × 86400 like PG would).
+#
+# Big-picture finding (PR #361 reviewer nice-to-haves
+# made into runner-enforced pins):
+#
+#   **ISOYEAR vs YEAR divergence is REAL.** PR #361 only
+#   exercised the equal-cases. Without these divergence
+#   rows, an accidental fallback (e.g., `ISOYEAR =>
+#   year_only(*days)` instead of `iso_year(y, *days)`)
+#   would silently pass the existing tests. The
+#   `bug_witness_*` rows here pin the actual divergence
+#   so the fallback bug would surface immediately.
+#
+#   **EPOCH from INTERVAL uses 1-month=30-days normalization.**
+#   Per impl at lib.rs:51952-51958:
+#
+#     total_secs = months * 30 * 86400
+#                + days * 86400
+#                + microseconds / 1_000_000
+#
+#   So `EPOCH(INTERVAL '1 month') = 2592000` (NOT the
+#   calendar-aware value which would depend on the
+#   reference month). Apps porting from PG (which also
+#   uses 30-day normalization here) or from systems with
+#   calendar-aware interval semantics need to know this.
+#
+#   For year intervals: `EPOCH(INTERVAL '1 year') =
+#   31104000` (= 12 * 30 * 86400). PG's behavior on
+#   year intervals is the same — the EPOCH function on
+#   intervals is documented to use 30-day months and
+#   12-month years, NOT calendar-aware.
+#
+#   STRIKING — these calendar quirks mean EPOCH(INTERVAL
+#   '1 year') = 31104000, but `EXTRACT(EPOCH FROM
+#   TIMESTAMP '2025-01-01 00:00:00') - EXTRACT(EPOCH
+#   FROM TIMESTAMP '2024-01-01 00:00:00')` = 31622400
+#   (366 days × 86400 — 2024 is a leap year). They
+#   DIVERGE by 518400 seconds (6 days). Apps using
+#   EPOCH(INTERVAL) for date math will get wrong answers
+#   across leap-year boundaries.
+#
+# Adaptation notes:
+#   # zeta-adapt: ISOYEAR vs YEAR DIVERGES at year
+#     boundaries (ISO 8601 week-year). Use ISOYEAR for
+#     ISO week calculations, YEAR for calendar year.
+#   # zeta-adapt: EPOCH(INTERVAL '1 month') = 2592000
+#     (30-day month). NOT calendar-aware.
+#   # zeta-adapt: EPOCH(INTERVAL '1 year') = 31104000
+#     (12 × 30 × 86400 = 360 days). Diverges from real
+#     calendar year by 5-6 days.
+#   # zeta-adapt: For calendar-aware interval-to-seconds,
+#     subtract two timestamps and EXTRACT(EPOCH FROM ...)
+#     the resulting interval is NOT the answer either —
+#     use the timestamp-diff directly.
+
+--echo === ISOYEAR < YEAR — Monday of ISO week 1 in PREVIOUS calendar year ===
+
+# 2024-12-30 is a Monday. ISO 8601 says: week 1 starts
+# on the Monday whose week contains Jan 4. Since 2024-12-30
+# is the Monday of the week containing 2025-01-01, it's
+# ISO week 1 of 2025 → ISOYEAR=2025 while YEAR=2024.
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-12-30')                AS isoyear_2025;
+SELECT EXTRACT(YEAR    FROM DATE '2024-12-30')                AS calendar_year_2024;
+# Divergence witness — these MUST differ.
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-12-30')
+    <> EXTRACT(YEAR    FROM DATE '2024-12-30')                AS bug_witness_isoyear_diverges_pos;
+
+--echo === ISOYEAR > YEAR — Sunday in ISO week 52 of PREVIOUS year ===
+
+# 2023-01-01 is a Sunday. It's part of the week containing
+# 2022-12-26 (Monday) through 2023-01-01 — ISO week 52 of
+# 2022 → ISOYEAR=2022 while YEAR=2023.
+SELECT EXTRACT(ISOYEAR FROM DATE '2023-01-01')                AS isoyear_2022;
+SELECT EXTRACT(YEAR    FROM DATE '2023-01-01')                AS calendar_year_2023;
+SELECT EXTRACT(ISOYEAR FROM DATE '2023-01-01')
+    <> EXTRACT(YEAR    FROM DATE '2023-01-01')                AS bug_witness_isoyear_diverges_neg;
+
+--echo === ISOYEAR == YEAR control case (mid-year, no divergence) ===
+
+# Mid-year always has ISOYEAR == YEAR. Includes this row
+# so the divergence pins above are obviously distinct from
+# the no-divergence case.
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-06-15')
+     = EXTRACT(YEAR    FROM DATE '2024-06-15')                AS control_no_divergence;
+
+--echo === EPOCH(INTERVAL '1 month') = 30 * 86400 = 2592000 ===
+
+# 1-month-as-30-days normalization (lib.rs:51952-51958).
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 month')                 AS one_month_2592000;
+# 2 months = 60 * 86400.
+SELECT EXTRACT(EPOCH FROM INTERVAL '2 months')                AS two_months_5184000;
+# 12 months EXPLICITLY = 360 * 86400 (12 * 30 day-equivalent).
+SELECT EXTRACT(EPOCH FROM INTERVAL '12 months')               AS twelve_months_31104000;
+
+--echo === EPOCH(INTERVAL '1 year') = 12 * 30 * 86400 = 31104000 ===
+
+# Year intervals normalize to 12 months = 360 days.
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')                  AS one_year_31104000;
+# Equivalence: '1 year' ≡ '12 months' for EPOCH purposes.
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')
+     = EXTRACT(EPOCH FROM INTERVAL '12 months')               AS year_eq_12_months_epoch;
+
+--echo === STRIKING: leap-year divergence from real-calendar second-count ===
+
+# Real calendar: 2024-01-01 → 2025-01-01 is 366 days (2024
+# is a leap year) = 31622400 seconds.
+SELECT EXTRACT(EPOCH FROM TIMESTAMP '2025-01-01 00:00:00')
+     - EXTRACT(EPOCH FROM TIMESTAMP '2024-01-01 00:00:00')    AS leap_year_real_31622400;
+# EPOCH(INTERVAL '1 year') normalized = 31104000.
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')                  AS interval_year_normalized_31104000;
+# Divergence = 518400 seconds = 6 days.
+SELECT (EXTRACT(EPOCH FROM TIMESTAMP '2025-01-01 00:00:00')
+      - EXTRACT(EPOCH FROM TIMESTAMP '2024-01-01 00:00:00'))
+      - EXTRACT(EPOCH FROM INTERVAL '1 year')                 AS divergence_518400_seconds;
+
+--echo === EPOCH on mixed-component interval — additive composition ===
+
+# (months=1) + (days=15) + (hours=2)
+#  = 30*86400 + 15*86400 + 2*3600
+#  = 2592000 + 1296000 + 7200
+#  = 3895200
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 month 15 days 2 hours') AS composed_3895200;
+
+--echo === EPOCH on negative interval ===
+
+# Negative interval → negative seconds (sign propagates).
+SELECT EXTRACT(EPOCH FROM INTERVAL '-1 hour')                 AS neg_3600;
+SELECT EXTRACT(EPOCH FROM INTERVAL '-1 month')                AS neg_2592000;

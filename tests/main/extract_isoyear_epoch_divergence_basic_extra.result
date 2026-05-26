@@ -1,0 +1,69 @@
+=== ISOYEAR < YEAR — Monday of ISO week 1 in PREVIOUS calendar year ===
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-12-30')                AS isoyear_2025;
+isoyear_2025
+2025
+SELECT EXTRACT(YEAR    FROM DATE '2024-12-30')                AS calendar_year_2024;
+calendar_year_2024
+2024
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-12-30')
+    <> EXTRACT(YEAR    FROM DATE '2024-12-30')                AS bug_witness_isoyear_diverges_pos;
+bug_witness_isoyear_diverges_pos
+1
+=== ISOYEAR > YEAR — Sunday in ISO week 52 of PREVIOUS year ===
+SELECT EXTRACT(ISOYEAR FROM DATE '2023-01-01')                AS isoyear_2022;
+isoyear_2022
+2022
+SELECT EXTRACT(YEAR    FROM DATE '2023-01-01')                AS calendar_year_2023;
+calendar_year_2023
+2023
+SELECT EXTRACT(ISOYEAR FROM DATE '2023-01-01')
+    <> EXTRACT(YEAR    FROM DATE '2023-01-01')                AS bug_witness_isoyear_diverges_neg;
+bug_witness_isoyear_diverges_neg
+1
+=== ISOYEAR == YEAR control case (mid-year, no divergence) ===
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-06-15')
+     = EXTRACT(YEAR    FROM DATE '2024-06-15')                AS control_no_divergence;
+control_no_divergence
+1
+=== EPOCH(INTERVAL '1 month') = 30 * 86400 = 2592000 ===
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 month')                 AS one_month_2592000;
+one_month_2592000
+2592000
+SELECT EXTRACT(EPOCH FROM INTERVAL '2 months')                AS two_months_5184000;
+two_months_5184000
+5184000
+SELECT EXTRACT(EPOCH FROM INTERVAL '12 months')               AS twelve_months_31104000;
+twelve_months_31104000
+31104000
+=== EPOCH(INTERVAL '1 year') = 12 * 30 * 86400 = 31104000 ===
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')                  AS one_year_31104000;
+one_year_31104000
+31104000
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')
+     = EXTRACT(EPOCH FROM INTERVAL '12 months')               AS year_eq_12_months_epoch;
+year_eq_12_months_epoch
+1
+=== STRIKING: leap-year divergence from real-calendar second-count ===
+SELECT EXTRACT(EPOCH FROM TIMESTAMP '2025-01-01 00:00:00')
+     - EXTRACT(EPOCH FROM TIMESTAMP '2024-01-01 00:00:00')    AS leap_year_real_31622400;
+leap_year_real_31622400
+31622400
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')                  AS interval_year_normalized_31104000;
+interval_year_normalized_31104000
+31104000
+SELECT (EXTRACT(EPOCH FROM TIMESTAMP '2025-01-01 00:00:00')
+      - EXTRACT(EPOCH FROM TIMESTAMP '2024-01-01 00:00:00'))
+      - EXTRACT(EPOCH FROM INTERVAL '1 year')                 AS divergence_518400_seconds;
+divergence_518400_seconds
+518400
+=== EPOCH on mixed-component interval — additive composition ===
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 month 15 days 2 hours') AS composed_3895200;
+composed_3895200
+3895200
+=== EPOCH on negative interval ===
+SELECT EXTRACT(EPOCH FROM INTERVAL '-1 hour')                 AS neg_3600;
+neg_3600
+-3600
+SELECT EXTRACT(EPOCH FROM INTERVAL '-1 month')                AS neg_2592000;
+neg_2592000
+-2592000
