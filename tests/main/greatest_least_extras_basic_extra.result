@@ -1,0 +1,119 @@
+=== Setup ===
+CREATE TABLE gl_temporal (
+  id INT PRIMARY KEY,
+  d  DATE,
+  ts TIMESTAMP,
+  t  TIME
+);
+INSERT INTO gl_temporal VALUES
+  (1, DATE '2024-03-15', TIMESTAMP '2024-03-15 14:30:00', TIME '14:30:00'),
+  (2, DATE '2024-06-20', TIMESTAMP '2024-06-20 09:00:00', TIME '09:00:00'),
+  (3, NULL,              NULL,                            NULL);
+=== GREATEST / LEAST on DATE args ===
+SELECT GREATEST(DATE '2024-01-01', DATE '2024-06-15', DATE '2024-03-10')
+                                                              AS g_date;
+g_date
+2024-06-15
+SELECT LEAST(DATE '2024-01-01', DATE '2024-06-15', DATE '2024-03-10')
+                                                              AS l_date;
+l_date
+2024-01-01
+=== GREATEST / LEAST on TIMESTAMP args ===
+SELECT GREATEST(TIMESTAMP '2024-03-15 14:30:00',
+                TIMESTAMP '2024-03-15 09:00:00',
+                TIMESTAMP '2024-03-15 23:59:59')              AS g_ts;
+g_ts
+2024-03-15 23:59:59
+SELECT LEAST(TIMESTAMP '2024-03-15 14:30:00',
+             TIMESTAMP '2024-03-15 09:00:00',
+             TIMESTAMP '2024-03-15 23:59:59')                 AS l_ts;
+l_ts
+2024-03-15 09:00:00
+=== GREATEST / LEAST on TIME args ===
+SELECT GREATEST(TIME '14:30:00', TIME '09:00:00', TIME '23:59:59')
+                                                              AS g_time;
+g_time
+23:59:59
+SELECT LEAST(TIME '14:30:00', TIME '09:00:00', TIME '23:59:59')
+                                                              AS l_time;
+l_time
+09:00:00
+=== STRIKING: value-coercive DATE vs TIMESTAMP-at-midnight + first-kept ===
+SELECT CAST(GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00') AS TEXT)
+                                                              AS date_first_text;
+date_first_text
+2024-03-15
+SELECT CAST(GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15') AS TEXT)
+                                                              AS ts_first_text;
+ts_first_text
+2024-03-15 00:00:00.000000
+SELECT GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
+     = GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15')
+                                                              AS order_invariant_under_eq;
+order_invariant_under_eq
+1
+=== GREATEST / LEAST: Bool args ===
+SELECT GREATEST(TRUE, FALSE) IS NOT NULL                      AS g_bool_returns_value;
+g_bool_returns_value
+1
+SELECT LEAST(TRUE, FALSE)    IS NOT NULL                      AS l_bool_returns_value;
+l_bool_returns_value
+1
+SELECT GREATEST(TRUE, FALSE) = TRUE                           AS g_bool_is_true;
+g_bool_is_true
+1
+SELECT LEAST(TRUE, FALSE)    = FALSE                          AS l_bool_is_false;
+l_bool_is_false
+1
+=== GREATEST / LEAST: JSONB args ===
+SELECT GREATEST(CAST('{"a":1}' AS JSONB), CAST('{"a":2}' AS JSONB))
+                                                              AS g_jsonb_pick;
+g_jsonb_pick
+{"a":2}
+SELECT LEAST(CAST('{"a":1}' AS JSONB), CAST('{"a":2}' AS JSONB))
+                                                              AS l_jsonb_pick;
+l_jsonb_pick
+{"a":1}
+SELECT GREATEST(CAST('{"a":1}' AS JSONB), CAST('{"a":1}' AS JSONB))
+     = CAST('{"a":1}' AS JSONB)                               AS g_jsonb_identity;
+g_jsonb_identity
+1
+=== GREATEST / LEAST in WHERE clause ===
+SELECT id FROM gl_temporal
+ WHERE GREATEST(id, 2) = 2 ORDER BY id;
+id
+1
+2
+SELECT id FROM gl_temporal
+ WHERE LEAST(id, 2) = 1 ORDER BY id;
+id
+1
+=== GREATEST / LEAST in ORDER BY clause ===
+SELECT id FROM gl_temporal
+ WHERE id IS NOT NULL
+ ORDER BY GREATEST(id, 0), id;
+id
+1
+2
+3
+=== GREATEST / LEAST on column args with NULL rows (MYSQL_* NULL prop) ===
+SELECT id,
+       GREATEST(d, DATE '2024-01-01') IS NULL AS g_is_null,
+       LEAST(d, DATE '2024-12-31')    IS NULL AS l_is_null
+  FROM gl_temporal
+ ORDER BY id;
+id	g_is_null	l_is_null
+1	0	0
+2	0	0
+3	1	1
+=== GREATEST / LEAST: 16-arg boundary (no docs args.len ceiling) ===
+SELECT GREATEST(14, 3, 8, 11, 2, 15, 6, 1, 9, 13, 4, 16, 7, 5, 12, 10)
+                                                              AS g_16_args;
+g_16_args
+16
+SELECT LEAST(14, 3, 8, 11, 2, 15, 6, 1, 9, 13, 4, 16, 7, 5, 12, 10)
+                                                              AS l_16_args;
+l_16_args
+1
+=== Cleanup ===
+DROP TABLE gl_temporal;
