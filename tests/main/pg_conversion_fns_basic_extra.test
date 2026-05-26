@@ -1,0 +1,197 @@
+# Independently authored PG-flavor conversion functions
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - AGE — function_basic.test:113 has ONE row
+#     (AGE(DATE, DATE) basic). No 1-arg form, no TIMESTAMP
+#     form, no error-path coverage.
+#   - TO_CHAR — function_basic.test:118 has ONE row
+#     (DATE format with YYYY-MM-DD). No TIMESTAMP arg,
+#     no error coverage. (Out of scope for THIS slice;
+#     covered separately if needed.)
+#   - TO_TIMESTAMP — NONE (zero compat coverage).
+#   - TO_NUMBER — NONE (zero compat coverage).
+#   - unix_timestamp_from_unixtime_extras (PR #326) covers
+#     UNIX_TIMESTAMP / FROM_UNIXTIME — DIFFERENT functions.
+#     FROM_UNIXTIME is MySQL-flavor; TO_TIMESTAMP is PG-flavor.
+#     Both convert int-epoch to timestamp but go through
+#     different impl arms.
+#
+# This slice pins:
+#   - AGE 2-arg form on DATE inputs → calendar-aware interval
+#     (years/mons/days decomposition).
+#   - AGE 2-arg on TIMESTAMP inputs → calendar + time
+#     components (years/mons/days HH:MM:SS).
+#   - AGE wrong-type arg → 1105 'requires timestamp or date'.
+#   - AGE arity (0, 3 args) → 1105.
+#   - AGE NULL prop on either arg.
+#   - TO_TIMESTAMP on Int64 → Timestamp at epoch_seconds.
+#   - TO_TIMESTAMP(0) → 1970-01-01 00:00:00.
+#   - TO_TIMESTAMP negative int (pre-1970).
+#   - TO_TIMESTAMP on Float64 (via CAST AS DOUBLE PRECISION)
+#     preserves fractional microseconds.
+#   - TO_TIMESTAMP rejects bare Decimal literal (e.g. 1.5)
+#     because the impl only handles Int32/Int64/Float64.
+#     STRIKING gotcha: `1700000000.5` parses as Decimal, NOT
+#     Float64, so the bare-literal call errors.
+#   - TO_TIMESTAMP NULL prop + arity.
+#   - TO_NUMBER basic parse with '99' format.
+#   - TO_NUMBER leading-sign with 'S99' format.
+#   - TO_NUMBER decimal-point with '9.99' format.
+#   - TO_NUMBER NULL + arity.
+#
+# Big-picture finding:
+#   AGE returns INTERVAL with calendar-aware decomposition
+#   (years → mons → days → time). The 1-arg form is
+#   `AGE(t) = AGE(NOW(), t)` — non-deterministic, so pinned
+#   only structurally (via IS NOT NULL).
+#
+#   TO_TIMESTAMP is the PG-flavor int→timestamp converter
+#   (FROM_UNIXTIME is the MySQL-flavor). Both produce the
+#   same value for the same int input, but they have
+#   DIFFERENT impls and DIFFERENT type-acceptance rules:
+#     - FROM_UNIXTIME accepts ONLY Int32/Int64 (PR #326
+#       finding); rejects Float, Decimal.
+#     - TO_TIMESTAMP accepts Int32/Int64/Float64; rejects
+#       Decimal.
+#   So `TO_TIMESTAMP(1.5)` errors at runtime because `1.5`
+#   parses as Decimal (not Float64). To reach the Float64
+#   arm, use CAST AS DOUBLE PRECISION. Pinned both:
+#     - `TO_TIMESTAMP(CAST(1700000000.5 AS DOUBLE PRECISION))`
+#       preserves the .500000 microsecond fraction.
+#     - Bare `TO_TIMESTAMP(1700000000.5)` (Decimal) errors.
+#
+#   TO_NUMBER is a format-driven scalar parser. It walks the
+#   input collecting digits + `.` + optional sign, ignoring
+#   literal commas. Leading/trailing `S` is detected via
+#   `format.chars().last() == 'S'` (trailing) — but the
+#   leading-`S` case in the format is read structurally and
+#   the sign-char in the input must appear in the correct
+#   position. Locale separators (`G`, `D`) are rejected
+#   loudly per the Spark golden.
+#
+# Adaptation notes:
+#   # zeta-adapt: AGE(t1, t2) returns INTERVAL; calendar-
+#     aware (years/mons/days decomposition for DATE; adds
+#     HH:MM:SS for TIMESTAMP).
+#   # zeta-adapt: TO_TIMESTAMP(int) is PG-flavor — accepts
+#     Int32/Int64/Float64 but NOT Decimal. Bare 1.5 parses
+#     as Decimal and errors. Use FROM_UNIXTIME for the
+#     MySQL-flavor or CAST AS DOUBLE PRECISION for Float64.
+#   # zeta-adapt: TO_NUMBER format tokens supported: digits
+#     '9'/'0', '.', leading/trailing 'S', literal ','. G/D
+#     locale separators rejected with clear error.
+
+--echo === AGE 2-arg on DATE inputs ===
+
+# Calendar-aware: 2023-04-05 - 2020-01-01 = 3 years, 3 mons, 4 days.
+SELECT AGE(DATE '2023-04-05', DATE '2020-01-01')              AS age_dates;
+# Same-day → zero interval.
+SELECT AGE(DATE '2024-03-15', DATE '2024-03-15')              AS age_same_day;
+# Negative interval (t1 < t2).
+SELECT AGE(DATE '2020-01-01', DATE '2023-04-05')              AS age_negative;
+
+--echo === AGE 2-arg on TIMESTAMP inputs ===
+
+# Time components retained.
+SELECT AGE(TIMESTAMP '2024-12-31 23:59:59',
+           TIMESTAMP '2024-01-01 00:00:00')                   AS age_full_year_minus_1s;
+# Sub-second precision (microseconds preserved).
+SELECT AGE(TIMESTAMP '2024-06-15 12:00:00.500000',
+           TIMESTAMP '2024-06-15 12:00:00.000000')            AS age_half_second;
+
+--echo === AGE 1-arg = AGE(now(), t) — structural pin only ===
+
+# 1-arg form uses CURRENT_TIMESTAMP; non-deterministic value.
+# Pin structurally: returns NON-NULL Interval.
+SELECT AGE(DATE '2020-01-01') IS NOT NULL                     AS age_1arg_returns_value;
+
+--echo === AGE: wrong-type arg → ERROR 1105 ===
+
+--error 1105
+SELECT AGE(42, 100);
+--error 1105
+SELECT AGE('hello', 'world');
+--error 1105
+SELECT AGE(DATE '2024-01-01', 42);
+
+--echo === AGE: NULL propagation + arity ===
+
+SELECT AGE(NULL, DATE '2020-01-01')                           AS null_t1;
+SELECT AGE(DATE '2020-01-01', NULL)                           AS null_t2;
+SELECT AGE(NULL) IS NULL                                      AS null_1arg_pred;
+--error 1105
+SELECT AGE();
+--error 1105
+SELECT AGE(DATE '2024-01-01', DATE '2024-01-02', DATE '2024-01-03');
+
+--echo === TO_TIMESTAMP: Int → Timestamp (epoch seconds) ===
+
+# Same value as FROM_UNIXTIME(1700000000) for cross-flavor sanity.
+SELECT TO_TIMESTAMP(1700000000)                               AS ts_2023_11_14;
+SELECT TO_TIMESTAMP(0)                                        AS ts_unix_epoch;
+SELECT TO_TIMESTAMP(-86400)                                   AS ts_pre_epoch;
+# Cross-flavor equivalence: TO_TIMESTAMP ≡ FROM_UNIXTIME on
+# Int input.
+SELECT TO_TIMESTAMP(1700000000) = FROM_UNIXTIME(1700000000)   AS to_ts_eq_from_unix;
+
+--echo === TO_TIMESTAMP: Float64 preserves fractional microseconds ===
+
+# CAST AS DOUBLE PRECISION needed because bare `1.5` is
+# Decimal (NOT Float64) in zeta — see STRIKING row below.
+SELECT TO_TIMESTAMP(CAST(1700000000.5 AS DOUBLE PRECISION))   AS ts_with_microsec;
+
+--echo === STRIKING: bare-decimal literal → ERROR 1105 ===
+
+# `1.5` parses as Value::Decimal, NOT Value::Float64. The
+# TO_TIMESTAMP impl only matches Int32/Int64/Float64;
+# Decimal hits the catch-all error. Use CAST AS DOUBLE
+# PRECISION to reach the Float64 arm.
+--error 1105
+SELECT TO_TIMESTAMP(1700000000.5);
+
+--echo === TO_TIMESTAMP: NULL + arity ===
+
+SELECT TO_TIMESTAMP(NULL)                                     AS null_propagates;
+SELECT TO_TIMESTAMP(NULL) IS NULL                             AS null_pred;
+--error 1105
+SELECT TO_TIMESTAMP();
+--error 1105
+SELECT TO_TIMESTAMP(1, 2);
+
+--echo === TO_NUMBER: basic digit parse with '99' format ===
+
+SELECT TO_NUMBER('42', '99')                                  AS basic;
+SELECT TO_NUMBER('1', '9')                                    AS single_digit;
+SELECT TO_NUMBER('100', '999')                                AS three_digits;
+
+--echo === TO_NUMBER: leading-sign with 'S99' format ===
+
+SELECT TO_NUMBER('-42', 'S99')                                AS negative;
+SELECT TO_NUMBER('+42', 'S99')                                AS positive_sign;
+
+--echo === TO_NUMBER: decimal-point with '9.99' format ===
+
+SELECT TO_NUMBER('3.14', '9.99')                              AS pi_like;
+SELECT TO_NUMBER('0.5',  '9.99')                              AS half;
+
+--echo === TO_NUMBER: G/D locale separators → ERROR 1105 ===
+
+# Per Spark golden: G/D format tokens are rejected loudly.
+--error 1105
+SELECT TO_NUMBER('1,000', '9G999');
+--error 1105
+SELECT TO_NUMBER('3,14',  '9D99');
+
+--echo === TO_NUMBER: NULL prop + arity ===
+
+SELECT TO_NUMBER(NULL, '99')                                  AS null_input;
+SELECT TO_NUMBER('42', NULL)                                  AS null_format;
+SELECT TO_NUMBER(NULL, '99') IS NULL                          AS null_input_pred;
+--error 1105
+SELECT TO_NUMBER();
+--error 1105
+SELECT TO_NUMBER('42');
+--error 1105
+SELECT TO_NUMBER('42', '99', '0');
