@@ -1,0 +1,22 @@
+=== BETWEEN SYMMETRIC (3 forms) → "Expected: AND, found: <bound>" ===
+SELECT 5 BETWEEN SYMMETRIC 10 AND 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: AND, found: 10 at Line: 1, Column: 28
+SELECT 5 BETWEEN SYMMETRIC 1 AND 10;
+ERROR 1064: SQL parse error: sql parser error: Expected: AND, found: 1 at Line: 1, Column: 28
+SELECT 'm' BETWEEN SYMMETRIC 'z' AND 'a';
+ERROR 1064: SQL parse error: sql parser error: Expected: AND, found: 'z' at Line: 1, Column: 30
+=== BETWEEN ASYMMETRIC (2 forms) → same shape, ASYMMETRIC consumed as low-bound ===
+SELECT 5 BETWEEN ASYMMETRIC 1 AND 10;
+ERROR 1064: SQL parse error: sql parser error: Expected: AND, found: 1 at Line: 1, Column: 29
+SELECT 5 BETWEEN ASYMMETRIC 10 AND 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: AND, found: 10 at Line: 1, Column: 29
+=== NOT BETWEEN SYMMETRIC → same shape, col shifts by len("NOT ") ===
+SELECT 5 NOT BETWEEN SYMMETRIC 10 AND 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: AND, found: 10 at Line: 1, Column: 32
+SELECT 5 NOT BETWEEN ASYMMETRIC 1 AND 10;
+ERROR 1064: SQL parse error: sql parser error: Expected: AND, found: 1 at Line: 1, Column: 33
+=== Recommended PG-portability rewrite (works: LEAST/GREATEST pair) ===
+SELECT (LEAST(1,10) <= 5 AND 5 <= GREATEST(1,10)) AS sym_low_high,
+       (LEAST(10,1) <= 5 AND 5 <= GREATEST(10,1)) AS sym_high_low;
+sym_low_high	sym_high_low
+1	1

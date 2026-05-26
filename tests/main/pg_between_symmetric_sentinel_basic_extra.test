@@ -1,0 +1,102 @@
+# Independently authored BETWEEN SYMMETRIC /
+# BETWEEN ASYMMETRIC sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - BETWEEN SYMMETRIC / BETWEEN ASYMMETRIC: ZERO
+#     prior coverage (grep'd ALL .test files in
+#     tests/ — only one hit is a comment in
+#     pg_set_truncate_vacuum_sentinel_basic_extra:67).
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: AND, found: <X>" — pre-existing shape
+#     fingerprint for malformed BETWEEN. Pinned at
+#     misc_extra parser tests for "BETWEEN x" without
+#     AND. Same shape applies here because sqlparser's
+#     BETWEEN arm sees `BETWEEN SYMMETRIC 10 AND 1`
+#     and treats `SYMMETRIC` as the low-bound
+#     expression, then expects AND, gets the literal
+#     `10` instead.
+#
+# This slice pins:
+#
+#   BETWEEN SYMMETRIC (3 forms) — "Expected: AND,
+#   found: <next-token>":
+#     - sqlparser has no SYMMETRIC keyword in its
+#       BETWEEN arm. The token is consumed as the
+#       low-bound expression, then the AND lookahead
+#       fails. PG SQL-standard SYMMETRIC (auto-swaps
+#       bounds when low > high) is unreachable.
+#
+#   BETWEEN ASYMMETRIC (2 forms) — same shape, same
+#   mechanism. ASYMMETRIC is the SQL-standard explicit
+#   form of the default behavior; PG accepts both.
+#   zeta accepts neither.
+#
+#   NOT BETWEEN SYMMETRIC — same shape (col shifts
+#   from 28 → 32 because NOT adds 4 chars).
+#
+# Big-picture finding:
+#
+#   PG SQL-standard BETWEEN modifier keywords
+#   (SYMMETRIC, ASYMMETRIC, NOT BETWEEN SYMMETRIC)
+#   are entirely unreachable on zeta. Apps porting
+#   PG code that uses BETWEEN SYMMETRIC (which
+#   silently swaps bounds when low > high, useful
+#   for range-checks on values where the caller
+#   doesn't know which end is which) must:
+#     - Replace with `LEAST(a,b) <= x AND x <=
+#       GREATEST(a,b)` (explicit swap, supported).
+#     - Or normalize bounds before the query.
+#   ASYMMETRIC is the default; just drop the keyword.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# rejection shapes. No wire-specific intercept.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — BETWEEN SYMMETRIC /
+#     BETWEEN ASYMMETRIC / NOT BETWEEN SYMMETRIC
+#     all parse-reject ("Expected: AND, found: ..."
+#     where the modifier keyword gets consumed as
+#     low-bound). Use LEAST/GREATEST pair instead:
+#       x BETWEEN SYMMETRIC a AND b
+#         → LEAST(a,b) <= x AND x <= GREATEST(a,b)
+
+--echo === BETWEEN SYMMETRIC (3 forms) → "Expected: AND, found: <bound>" ===
+
+# sqlparser consumes SYMMETRIC as the low-bound
+# expression; AND lookahead fails on the actual
+# low-bound literal.
+--error 1064
+SELECT 5 BETWEEN SYMMETRIC 10 AND 1;
+--error 1064
+SELECT 5 BETWEEN SYMMETRIC 1 AND 10;
+--error 1064
+SELECT 'm' BETWEEN SYMMETRIC 'z' AND 'a';
+
+--echo === BETWEEN ASYMMETRIC (2 forms) → same shape, ASYMMETRIC consumed as low-bound ===
+
+# ASYMMETRIC is SQL-standard explicit form of the
+# default; PG accepts both, zeta accepts neither.
+--error 1064
+SELECT 5 BETWEEN ASYMMETRIC 1 AND 10;
+--error 1064
+SELECT 5 BETWEEN ASYMMETRIC 10 AND 1;
+
+--echo === NOT BETWEEN SYMMETRIC → same shape, col shifts by len("NOT ") ===
+
+--error 1064
+SELECT 5 NOT BETWEEN SYMMETRIC 10 AND 1;
+--error 1064
+SELECT 5 NOT BETWEEN ASYMMETRIC 1 AND 10;
+
+--echo === Recommended PG-portability rewrite (works: LEAST/GREATEST pair) ===
+
+# This demonstrates the workaround that DOES work,
+# so app porters have a copy-paste-ready substitute.
+# 5 between [1,10] symmetric → TRUE regardless of
+# bound order; same value with explicit swap below.
+SELECT (LEAST(1,10) <= 5 AND 5 <= GREATEST(1,10)) AS sym_low_high,
+       (LEAST(10,1) <= 5 AND 5 <= GREATEST(10,1)) AS sym_high_low;
