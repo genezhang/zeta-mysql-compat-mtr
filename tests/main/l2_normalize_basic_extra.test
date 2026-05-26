@@ -1,0 +1,107 @@
+# Independently authored L2_NORMALIZE smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - L2_NORMALIZE — NONE (zero compat-mtr coverage). PR #347
+#     reviewer flagged as uncovered sibling of the vector
+#     functions in vector_fns_basic_extra.
+#   - vector_fns_basic_extra (PR #347) covers L2_DISTANCE,
+#     COSINE_DISTANCE, INNER_PRODUCT, VECTOR_DIMS,
+#     VECTOR_NORM, and the <->/<=>/<#> operators.
+#
+# This slice pins:
+#   - L2_NORMALIZE(vec) returns a unit-vector in the same
+#     direction. L2_NORMALIZE('[3,4]') = [0.6, 0.8] (3/5,
+#     4/5 — classical unit-vector decomposition).
+#   - Round-trip: VECTOR_NORM(L2_NORMALIZE(v)) ≈ 1 (with
+#     slight f32 rounding — pinned via <=1.0001 threshold).
+#   - Already-unit vector: L2_NORMALIZE('[1,0,0]') =
+#     [1.0, 0.0, 0.0] (idempotent on unit vectors).
+#   - ZERO vector edge: L2_NORMALIZE('[0,0,0]') = [0,0,0]
+#     (NO divide-by-zero error, returns input unchanged).
+#     Subsequent VECTOR_NORM = 0.
+#   - NULL prop → NULL.
+#   - Wrong-type → 1105 'requires a vector argument'.
+#   - Arity (0, 2) → 1105 'requires 1 argument'.
+#
+# Big-picture finding:
+#   L2_NORMALIZE has the same Debug-format wire-render leak
+#   as the rest of the Vector surface (PR #343, PR #347) —
+#   Vector renders as `Vector([0.6, 0.8])` over the MySQL
+#   wire.
+#
+#   Vector elements are stored as f32 in zeta (not f64), so
+#   the round-trip norm is slightly off from exact 1.0
+#   (recording shows 1.000000023841858 for the [3,4] case).
+#   This is genuine Float32 precision loss propagated through
+#   the f64 norm computation. Pinned via inequality with
+#   a tolerance (not strict =) so the test isn't fragile
+#   under future f32/f64 type changes.
+#
+#   ZERO-VECTOR handling is the most surprising edge: instead
+#   of NaN or error (divide by zero), L2_NORMALIZE returns
+#   the input unchanged. This means subsequent operations
+#   like cosine distance against the normalized zero vector
+#   would return non-finite results — apps should check
+#   VECTOR_NORM > 0 before normalizing if they need a true
+#   unit vector.
+#
+# Adaptation notes:
+#   # zeta-adapt: L2_NORMALIZE returns unit-vector in same
+#     direction. Zero-vector input → zero-vector output
+#     (no error). NULL → NULL.
+#   # zeta-adapt: Vector elements are f32. Round-trip norm
+#     is approximately (not exactly) 1.0.
+#   # zeta-adapt: Wire-renders as Rust Debug Vector([...]) —
+#     same shim leak as other Vector returns.
+
+--echo === L2_NORMALIZE: classical unit-vector decomposition ===
+
+# [3,4] → [0.6, 0.8] (3/5, 4/5).
+SELECT L2_NORMALIZE('[3,4]'::vector)                          AS unit_3_4;
+
+--echo === Round-trip: VECTOR_NORM after L2_NORMALIZE ≈ 1 ===
+
+# Float32 precision means the result is slightly off from
+# exact 1.0 (recording: 1.000000023841858). Pin via
+# tolerance rather than strict equality so the test is
+# robust to future f32→f64 changes.
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) > 0.999     AS norm_gt_above_threshold;
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) < 1.001     AS norm_below_threshold;
+SELECT VECTOR_NORM(L2_NORMALIZE('[5,12]'::vector)) > 0.999    AS norm_gt_5_12;
+
+--echo === Idempotent on unit vectors ===
+
+# [1,0,0] is already unit; output preserves direction +
+# magnitude.
+SELECT L2_NORMALIZE('[1,0,0]'::vector)                        AS already_unit;
+SELECT VECTOR_NORM(L2_NORMALIZE('[1,0,0]'::vector)) > 0.999   AS unit_norm_preserved;
+
+--echo === STRIKING: ZERO vector — no divide-by-zero, returns zero ===
+
+# L2_NORMALIZE on [0,0,0] returns [0,0,0] (NOT NaN, NOT
+# error). Subsequent norm = 0 (not 1, since the result
+# isn't actually unit-length).
+SELECT L2_NORMALIZE('[0,0,0]'::vector)                        AS zero_in_zero_out;
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))           AS zero_norm_still_0;
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS zero_norm_eq_0;
+
+--echo === NULL propagation ===
+
+SELECT L2_NORMALIZE(NULL::vector)                             AS null_propagates;
+SELECT L2_NORMALIZE(NULL::vector) IS NULL                     AS null_pred;
+
+--echo === Wrong-type → ERROR 1105 ===
+
+--error 1105
+SELECT L2_NORMALIZE('not_a_vector');
+--error 1105
+SELECT L2_NORMALIZE(42);
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT L2_NORMALIZE();
+--error 1105
+SELECT L2_NORMALIZE('[1,2]'::vector, '[3,4]'::vector);
