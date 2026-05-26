@@ -10,25 +10,33 @@ COLLATION_NAME	CHARACTER_SET_NAME	ID	IS_DEFAULT	IS_COMPILED	SORTLEN
 utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
 === EMPTY STUBS — always zero rows ===
 SELECT * FROM information_schema.parameters LIMIT 5;
-SELECT * FROM information_schema.routines LIMIT 5;
 SELECT * FROM information_schema.triggers LIMIT 5;
 SELECT * FROM information_schema.user_privileges LIMIT 5;
 SELECT * FROM information_schema.processlist LIMIT 5;
 SELECT * FROM information_schema.global_variables LIMIT 5;
 SELECT * FROM information_schema.session_variables LIMIT 5;
-=== GAP: count(*) over information_schema errors 1235 ===
+=== CONTEXT-DEPENDENT: information_schema.routines populated by CREATE FUNCTION ===
+SELECT * FROM information_schema.routines LIMIT 5;
+CREATE FUNCTION info_schema_stub_fn(x INT) RETURNS INT
+  AS $$ SELECT x + 1 $$ LANGUAGE SQL;
+SELECT * FROM information_schema.routines LIMIT 5;
+ROUTINE_CATALOG	ROUTINE_SCHEMA	ROUTINE_NAME	ROUTINE_TYPE	DATA_TYPE	ROUTINE_BODY	ROUTINE_DEFINITION	EXTERNAL_LANGUAGE	SECURITY_TYPE
+def	test	info_schema_stub_fn	FUNCTION	trigger	SQL	 SELECT x + 1 	SQL	DEFINER
+DROP FUNCTION info_schema_stub_fn;
+SELECT * FROM information_schema.routines LIMIT 5;
+=== PROJECTION-SHAPE GAP: errno 1235 — FIVE rejected classes ===
+SELECT DISTINCT ENGINE FROM information_schema.engines;
+ERROR 1235: information_schema queries with DISTINCT are not yet supported by zeta's MySQL wire shim
 SELECT count(*) FROM information_schema.engines;
-ERROR 1235: information_schema queries with function call or expression are not yet supported by zeta's MySQL wire shim
-SELECT count(*) FROM information_schema.routines;
 ERROR 1235: information_schema queries with function call or expression are not yet supported by zeta's MySQL wire shim
 SELECT UPPER(ENGINE) FROM information_schema.engines;
 ERROR 1235: information_schema queries with function call or expression are not yet supported by zeta's MySQL wire shim
+SELECT ENGINE, FROM information_schema.engines;
+ERROR 1235: information_schema queries with empty projection element are not yet supported by zeta's MySQL wire shim
 SELECT MAXLEN + 1 FROM information_schema.character_sets;
 ERROR 1235: information_schema queries with multi-token projection element are not yet supported by zeta's MySQL wire shim
-=== Sentinel: SELECT-LIST with COLUMN refs works (no aggregate/fn) ===
-SELECT ENGINE, SUPPORT FROM information_schema.engines LIMIT 5;
-ENGINE	SUPPORT
-InnoDB	DEFAULT
-SELECT CHARACTER_SET_NAME FROM information_schema.character_sets LIMIT 5;
-CHARACTER_SET_NAME
-utf8mb4
+SELECT t.* FROM information_schema.engines t;
+ERROR 1235: information_schema queries with qualified star are not yet supported by zeta's MySQL wire shim
+=== FRAGILE BOUNDARY: no-whitespace expression bypasses 1235, errors 1054 ===
+SELECT MAXLEN+1 FROM information_schema.character_sets;
+ERROR 1054: Unknown column 'maxlen+1' in 'field list'
