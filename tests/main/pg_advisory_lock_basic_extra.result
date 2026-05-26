@@ -1,0 +1,85 @@
+=== PG_ADVISORY_LOCK — returns NULL (void) ===
+SELECT PG_ADVISORY_LOCK(1)                                    AS lock_1_void;
+lock_1_void
+NULL
+SELECT PG_ADVISORY_LOCK(2) IS NULL                            AS lock_2_void_pred;
+lock_2_void_pred
+1
+=== STRIKING: PG_TRY_ADVISORY_LOCK always returns TRUE ===
+SELECT PG_TRY_ADVISORY_LOCK(100)                              AS try_fresh_true;
+try_fresh_true
+1
+SELECT PG_TRY_ADVISORY_LOCK(100)                              AS try_held_still_true;
+try_held_still_true
+1
+SELECT PG_TRY_ADVISORY_LOCK(200)                              AS try_new_key_true;
+try_new_key_true
+1
+=== PG_ADVISORY_UNLOCK — refcount-driven boolean ===
+SELECT PG_ADVISORY_UNLOCK(100)                                AS unlock_100_true_1;
+unlock_100_true_1
+1
+SELECT PG_ADVISORY_UNLOCK(100)                                AS unlock_100_true_2;
+unlock_100_true_2
+1
+SELECT PG_ADVISORY_UNLOCK(100)                                AS unlock_100_false;
+unlock_100_false
+0
+SELECT PG_ADVISORY_UNLOCK(99999)                              AS unlock_unheld_false;
+unlock_unheld_false
+0
+=== PG_ADVISORY_UNLOCK_ALL — releases everything ===
+SELECT PG_ADVISORY_UNLOCK_ALL()                               AS unlock_all_void;
+unlock_all_void
+NULL
+SELECT PG_ADVISORY_UNLOCK_ALL() IS NULL                       AS unlock_all_void_pred;
+unlock_all_void_pred
+1
+SELECT PG_ADVISORY_UNLOCK(1)                                  AS post_all_unlock_1_false;
+post_all_unlock_1_false
+0
+SELECT PG_ADVISORY_UNLOCK(200)                                AS post_all_unlock_200_false;
+post_all_unlock_200_false
+0
+=== INT and BIGINT keys both accepted ===
+SELECT PG_TRY_ADVISORY_LOCK(CAST(42 AS INTEGER))              AS int_key_true;
+int_key_true
+1
+SELECT PG_TRY_ADVISORY_LOCK(CAST(42 AS BIGINT))               AS bigint_key_true;
+bigint_key_true
+1
+SELECT PG_ADVISORY_UNLOCK_ALL()                               AS cleanup_void;
+cleanup_void
+NULL
+=== Negative keys accepted (i64 range) ===
+SELECT PG_TRY_ADVISORY_LOCK(-1)                               AS neg_key_true;
+neg_key_true
+1
+SELECT PG_ADVISORY_UNLOCK(-1)                                 AS neg_key_unlock_true;
+neg_key_unlock_true
+1
+=== STRIKING: NULL key is ERROR, not NULL-prop ===
+SELECT PG_ADVISORY_LOCK(NULL);
+ERROR 1105: execution error: pg_advisory_lock argument must be an integer
+SELECT PG_TRY_ADVISORY_LOCK(NULL);
+ERROR 1105: execution error: pg_try_advisory_lock argument must be an integer
+SELECT PG_ADVISORY_UNLOCK(NULL);
+ERROR 1105: execution error: pg_advisory_unlock argument must be an integer
+=== Wrong-type key → ERROR 1105 ===
+SELECT PG_ADVISORY_LOCK('one');
+ERROR 1105: execution error: pg_advisory_lock argument must be an integer
+SELECT PG_TRY_ADVISORY_LOCK(CAST(1.5 AS DOUBLE PRECISION));
+ERROR 1105: execution error: pg_try_advisory_lock argument must be an integer
+SELECT PG_ADVISORY_UNLOCK(CAST('2026-01-01' AS DATE));
+ERROR 1105: execution error: pg_advisory_unlock argument must be an integer
+=== Arity errors → 1105 ===
+SELECT PG_ADVISORY_LOCK();
+ERROR 1105: execution error: pg_advisory_lock requires 1 argument
+SELECT PG_ADVISORY_LOCK(1, 2);
+ERROR 1105: execution error: pg_advisory_lock requires 1 argument
+SELECT PG_TRY_ADVISORY_LOCK();
+ERROR 1105: execution error: pg_try_advisory_lock requires 1 argument
+SELECT PG_ADVISORY_UNLOCK();
+ERROR 1105: execution error: pg_advisory_unlock requires 1 argument
+SELECT PG_ADVISORY_UNLOCK_ALL(1);
+ERROR 1105: execution error: pg_advisory_unlock_all takes no arguments
