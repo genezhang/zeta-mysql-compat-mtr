@@ -12,8 +12,9 @@
 #     surface from CURRENT_SCHEMA which returns the
 #     schema-namespace name (in zeta: hardcoded 'public'),
 #     not the database name.
-#   - cast_basic_extra and cast_target_type_aliases cover
-#     other CAST targets but NOT CITEXT.
+#   - cast_basic_extra and
+#     cast_target_type_aliases_basic_extra cover other
+#     CAST targets but NOT CITEXT.
 #
 # This slice pins:
 #   - CURRENT_SCHEMA returns the literal 'public'.
