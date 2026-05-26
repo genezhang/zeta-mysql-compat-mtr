@@ -1,0 +1,41 @@
+=== Shape A — `CREATE FOREIGN ...` (sqlparser CREATE-dispatcher unknown) ===
+CREATE FOREIGN DATA WRAPPER pgsql_fdw HANDLER pgsql_fdw_handler;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FOREIGN at Line: 1, Column: 8
+CREATE FOREIGN DATA WRAPPER stub_fdw;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FOREIGN at Line: 1, Column: 8
+CREATE FOREIGN TABLE ext_t (id INT) SERVER foo_server;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FOREIGN at Line: 1, Column: 8
+=== Shape (c) — `CREATE SERVER ...` (catch-all dispatcher, internal type leak) ===
+CREATE SERVER foo_server FOREIGN DATA WRAPPER pgsql_fdw OPTIONS (host '127.0.0.1');
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE SERVER bar_server TYPE 'csv' FOREIGN DATA WRAPPER file_fdw;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== NEW FINGERPRINT — CREATE USER MAPPING (sqlparser CREATE USER fall-through) ===
+CREATE USER MAPPING FOR alice SERVER foo_server OPTIONS (user 'a', password 'p');
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: alice at Line: 1, Column: 25
+CREATE USER MAPPING FOR PUBLIC SERVER foo_server;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: PUBLIC at Line: 1, Column: 25
+=== Shape (d) — `IMPORT FOREIGN SCHEMA` (statement-level keyword unknown) ===
+IMPORT FOREIGN SCHEMA public FROM SERVER foo_server INTO public;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: IMPORT at Line: 1, Column: 1
+IMPORT FOREIGN SCHEMA public LIMIT TO (t1, t2) FROM SERVER foo_server INTO public;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: IMPORT at Line: 1, Column: 1
+=== SUPPORTED — CREATE TABLE ... INHERITS (parent) — with empty-column quirk ===
+CREATE TABLE parent_t (id INT PRIMARY KEY);
+CREATE TABLE child_t () INHERITS (parent_t);
+ERROR 1105: internal error: at least one column required
+CREATE TABLE child2_t (extra INT) INHERITS (parent_t);
+=== SUPPORTED — ALTER TYPE ... ADD VALUE (PG enum extension) ===
+CREATE TYPE mood AS ENUM ('sad', 'ok');
+ALTER TYPE mood ADD VALUE 'happy';
+ALTER TYPE mood ADD VALUE 'glad' BEFORE 'happy';
+=== Rejected — Large-object lo_* functions (unknown function) ===
+SELECT lo_create(0);
+ERROR 1105: execution error: unknown function: lo_create
+SELECT lo_open(12345, 262144);
+ERROR 1105: execution error: unknown function: lo_open
+SELECT lo_unlink(12345);
+ERROR 1105: execution error: unknown function: lo_unlink
+DROP TABLE IF EXISTS child2_t;
+DROP TABLE IF EXISTS parent_t;
+DROP TYPE IF EXISTS mood;

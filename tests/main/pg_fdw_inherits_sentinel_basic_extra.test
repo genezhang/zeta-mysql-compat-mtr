@@ -1,0 +1,187 @@
+# Independently authored PG Foreign Data Wrapper +
+# INHERITS + ALTER TYPE ADD VALUE + lo_* sentinel slice
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE FOREIGN DATA WRAPPER / CREATE FOREIGN
+#     TABLE / CREATE SERVER / CREATE USER MAPPING /
+#     IMPORT FOREIGN SCHEMA / CREATE TABLE ... INHERITS
+#     / ALTER TYPE ... ADD VALUE / lo_create / lo_open
+#     / lo_unlink: ZERO prior coverage. Wide-grep of
+#     tests/main/*.test for each surface returns no
+#     hits.
+#   - "at least one column required" 1105 fingerprint
+#     ALREADY pinned at partition_basic_extra.result:
+#     64 (in a different DDL context). Re-acknowledged
+#     here for the INHERITS empty-column-list quirk.
+#
+# Pre-existing rejection shapes from prior taxonomies:
+#   - Shape A — "Expected: an object type after CREATE,
+#     found: <KW>" — see PR #390 enumeration (now 10+
+#     priors total).
+#   - Shape (c) — "unsupported statement: sqlparser::
+#     ast::Statement" — see PR #371 mysql_maintenance_
+#     cmds_sentinel_basic_extra:79-83.
+#   - Shape (d) — "Expected: an SQL statement, found:
+#     <KW>" — see PR #371 mysql_maintenance_cmds_
+#     sentinel_basic_extra:84-86 (HANDLER, SHUTDOWN).
+#
+# This slice pins:
+#
+#   Rejected — Shape A (PG-DDL keyword unknown):
+#     - `CREATE FOREIGN DATA WRAPPER` — "Expected: an
+#       object type after CREATE, found: FOREIGN".
+#     - `CREATE FOREIGN TABLE` — same.
+#
+#   Rejected — Shape (c) catch-all dispatcher:
+#     - `CREATE SERVER ...` — sqlparser HAS a CREATE
+#       SERVER AST arm, zeta dispatcher has no match
+#       arm, falls through to convert.rs:432 with the
+#       internal-type leak.
+#
+#   Rejected — Shape (d) (statement-level keyword unknown):
+#     - `IMPORT FOREIGN SCHEMA ... FROM SERVER ...` —
+#       "Expected: an SQL statement, found: IMPORT".
+#       Same shape as PR #371's HANDLER/SHUTDOWN; new
+#       keyword (IMPORT) added to the shape (d) bucket.
+#
+#   Rejected — NEW FINGERPRINT — CREATE USER MAPPING
+#   partial-grammar 1064:
+#     - "Expected: =, found: alice/PUBLIC at Line: 1,
+#       Column: 25"
+#     - sqlparser's CREATE USER arm fires on `CREATE
+#       USER ...` and starts parsing it as a normal
+#       CREATE USER statement (which would be
+#       `CREATE USER <name> WITH OPTION = ...`). The
+#       `MAPPING` token gets consumed as the user-name,
+#       then the parser expects `=` for an OPTION
+#       assignment and fails on `FOR alice`/`FOR
+#       PUBLIC`. GENUINELY NEW fingerprint — by-
+#       fingerprint wide-grep returns zero priors for
+#       "Expected: =, found:".
+#
+#   SUPPORTED — CREATE TABLE ... INHERITS:
+#     - `CREATE TABLE child (extra INT) INHERITS
+#       (parent)` works end-to-end (parses, executes,
+#       table created). This is a genuinely-supported
+#       PG-extension surface.
+#     - QUIRK: `CREATE TABLE child () INHERITS (...)`
+#       with an EMPTY column list errors 1105 "internal
+#       error: at least one column required". PG allows
+#       empty child-column lists (children just inherit
+#       all parent columns). Zeta requires at least
+#       one explicit column. Same fingerprint already
+#       pinned at partition_basic_extra:64 for the
+#       partition-DDL context.
+#
+#   SUPPORTED — ALTER TYPE ... ADD VALUE (PG enum
+#   extension):
+#     - `ALTER TYPE mood ADD VALUE 'happy'` works.
+#     - `ALTER TYPE mood ADD VALUE 'glad' BEFORE
+#       'happy'` (positional form) also works.
+#
+#   Rejected — Large-object functions (lo_* family):
+#     - `lo_create(0)`, `lo_open(oid, mode)`,
+#       `lo_unlink(oid)` → 1105 "unknown function:
+#       lo_<X>" (lowercase function name).
+#
+# Big-picture finding:
+#
+#   The FDW family (CREATE SERVER / CREATE FOREIGN
+#   TABLE / CREATE FOREIGN DATA WRAPPER / CREATE USER
+#   MAPPING / IMPORT FOREIGN SCHEMA) hits THREE
+#   distinct rejection sites: Shape A for FOREIGN-
+#   prefixed DDL, Shape (c) for CREATE SERVER (which
+#   sqlparser parses but zeta doesn't), Shape (d) for
+#   IMPORT (statement-level), and a NEW partial-
+#   grammar shape for CREATE USER MAPPING (where
+#   sqlparser's CREATE USER arm consumes the wrong
+#   tokens).
+#
+#   On the supported side: INHERITS and ALTER TYPE
+#   ADD VALUE are genuinely supported — apps using
+#   PG table inheritance or extending enums work,
+#   subject to the empty-column-list quirk for
+#   INHERITS.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — FDW family (CREATE
+#     SERVER, CREATE FOREIGN DATA WRAPPER, CREATE
+#     FOREIGN TABLE, CREATE USER MAPPING, IMPORT
+#     FOREIGN SCHEMA) all error 1064. Drop from
+#     migration scripts — no substitute.
+#   # zeta-adapt: SUPPORTED — CREATE TABLE ... INHERITS
+#     (parent) works but child must declare at least
+#     ONE column. PG allows empty child column list;
+#     zeta does not.
+#   # zeta-adapt: SUPPORTED — ALTER TYPE ... ADD VALUE
+#     (and ... BEFORE 'literal' positional form) works.
+#   # zeta-adapt: KNOWN GAP — Large-object functions
+#     (lo_create, lo_open, lo_unlink, etc.) are
+#     unknown. Use BYTEA storage instead.
+
+--echo === Shape A — `CREATE FOREIGN ...` (sqlparser CREATE-dispatcher unknown) ===
+
+--error 1064
+CREATE FOREIGN DATA WRAPPER pgsql_fdw HANDLER pgsql_fdw_handler;
+--error 1064
+CREATE FOREIGN DATA WRAPPER stub_fdw;
+--error 1064
+CREATE FOREIGN TABLE ext_t (id INT) SERVER foo_server;
+
+--echo === Shape (c) — `CREATE SERVER ...` (catch-all dispatcher, internal type leak) ===
+
+--error 1064
+CREATE SERVER foo_server FOREIGN DATA WRAPPER pgsql_fdw OPTIONS (host '127.0.0.1');
+--error 1064
+CREATE SERVER bar_server TYPE 'csv' FOREIGN DATA WRAPPER file_fdw;
+
+--echo === NEW FINGERPRINT — CREATE USER MAPPING (sqlparser CREATE USER fall-through) ===
+
+# sqlparser's CREATE USER arm consumes `MAPPING` as
+# the user-name token then expects `=` for an OPTION
+# assignment. "Expected: =, found: alice/PUBLIC".
+--error 1064
+CREATE USER MAPPING FOR alice SERVER foo_server OPTIONS (user 'a', password 'p');
+--error 1064
+CREATE USER MAPPING FOR PUBLIC SERVER foo_server;
+
+--echo === Shape (d) — `IMPORT FOREIGN SCHEMA` (statement-level keyword unknown) ===
+
+--error 1064
+IMPORT FOREIGN SCHEMA public FROM SERVER foo_server INTO public;
+--error 1064
+IMPORT FOREIGN SCHEMA public LIMIT TO (t1, t2) FROM SERVER foo_server INTO public;
+
+--echo === SUPPORTED — CREATE TABLE ... INHERITS (parent) — with empty-column quirk ===
+
+CREATE TABLE parent_t (id INT PRIMARY KEY);
+
+# QUIRK: empty child-column list errors 1105 (same
+# fingerprint as partition_basic_extra:64).
+--error 1105
+CREATE TABLE child_t () INHERITS (parent_t);
+
+# WORKS — at least one column declared.
+CREATE TABLE child2_t (extra INT) INHERITS (parent_t);
+
+--echo === SUPPORTED — ALTER TYPE ... ADD VALUE (PG enum extension) ===
+
+CREATE TYPE mood AS ENUM ('sad', 'ok');
+ALTER TYPE mood ADD VALUE 'happy';
+# Positional form — works.
+ALTER TYPE mood ADD VALUE 'glad' BEFORE 'happy';
+
+--echo === Rejected — Large-object lo_* functions (unknown function) ===
+
+--error 1105
+SELECT lo_create(0);
+--error 1105
+SELECT lo_open(12345, 262144);
+--error 1105
+SELECT lo_unlink(12345);
+
+DROP TABLE IF EXISTS child2_t;
+DROP TABLE IF EXISTS parent_t;
+DROP TYPE IF EXISTS mood;
