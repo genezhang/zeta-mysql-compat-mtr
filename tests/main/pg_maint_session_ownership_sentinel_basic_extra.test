@@ -1,0 +1,168 @@
+# Independently authored PG maint/session/ownership
+# DDL sentinel slice for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CHECKPOINT, DISCARD (ALL/TEMP/TEMPORARY/PLANS/
+#     SEQUENCES), REASSIGN OWNED, DROP OWNED, SECURITY
+#     LABEL, ALTER DATABASE, ALTER OPERATOR: ZERO prior
+#     coverage. Wide-grep for each keyword returns no
+#     hits.
+#
+# Pre-existing rejection shape patterns:
+#   - Shape (d) — "Expected: an SQL statement, found:
+#     <KW>" at column 1 (PR #371 et al.).
+#   - Shape (c) — "unsupported statement: sqlparser::
+#     ast::Statement" (PR #371 mysql_maintenance_cmds_
+#     sentinel:79-83).
+#   - "DROP restricted-list" — "Expected: CONNECTOR,
+#     DATABASE, ... after DROP, found: <KW>" (PR #391/
+#     #395 + temp_table_basic_extra:91).
+#   - "CREATE/ALTER OPERATOR partial-grammar" — "Expected:
+#     (, found: =" (PR #390 Shape C with CREATE OPERATOR
+#     at col 19; this slice extends to ALTER OPERATOR
+#     at col 18).
+#
+# This slice pins:
+#
+#   Shape (d) — CHECKPOINT / REASSIGN OWNED / SECURITY
+#   LABEL (3 keywords at col 1):
+#     - sqlparser doesn't recognize these as statement-
+#       level keywords. Adds 3 new keywords to the
+#       shape (d) bucket alongside HANDLER/SHUTDOWN/
+#       IMPORT/MOVE/CLUSTER.
+#
+#   Shape (c) — DISCARD ALL/TEMP/TEMPORARY/PLANS/
+#   SEQUENCES (5 forms):
+#     - sqlparser parses DISCARD into AST, zeta
+#       dispatcher has no arm, falls through to
+#       convert.rs:432 catch-all with internal type
+#       name leak.
+#
+#   "DROP restricted-list" — DROP OWNED BY (2 forms):
+#     - "Expected: ... after DROP, found: OWNED" at
+#       column 6. Same fingerprint as PR #395 (with
+#       TEXT keyword). New OWNED keyword.
+#
+#   Shape C — ALTER OPERATOR partial-grammar (1 form):
+#     - "Expected: (, found: =" at column 18. sqlparser
+#       has an ALTER OPERATOR keyword arm (gets past
+#       `ALTER OPERATOR ===`), but doesn't parse the
+#       definition body. Same Shape C fingerprint as PR
+#       #390 CREATE OPERATOR (col 19); new keyword
+#       (ALTER instead of CREATE) at col 18.
+#
+#   DOCUMENTED INTENTIONAL COMPAT NO-OP — ALTER DATABASE:
+#     - All three ALTER DATABASE forms (OWNER TO,
+#       RENAME TO, SET) silently succeed with NO ERROR.
+#     - This is NOT a BUG — it is a documented
+#       intentional compat shim. Source witnesses:
+#         - zeta-parser/src/lib.rs:155 — comment
+#           "Handle ALTER DATABASE (accepted as no-op
+#           for compatibility)"
+#         - zeta-parser/src/ast.rs:272 — doc-comment
+#           "ALTER DATABASE ... (accepted as no-op
+#           for compatibility)"
+#         - zeta-server/src/lib.rs:15199-15202 —
+#           handler with "No-op for compatibility."
+#         - zeta-server/tests/multi_database.rs:185
+#           — `test_alter_database_noop` explicitly
+#           tests it succeeds without error
+#     - Pinned here so the compat behavior is visible
+#       on the MySQL wire as well. Applies symmetric
+#       reading of the wire-divergence memory: just as
+#       no-error doesn't prove SUPPORT, silent-no-op
+#       doesn't prove BUG — must check engine source
+#       first. Same NoOp category as Statement::Copy
+#       and AlterIndex at convert.rs:425-427.
+#
+# Big-picture finding:
+#
+#   The PG maint/session/ownership surface has FOUR
+#   distinct rejection routes (shape (d), shape (c),
+#   DROP restricted-list, Shape C partial-grammar) +
+#   ONE documented intentional compat no-op (ALTER
+#   DATABASE). All four shape mechanisms are pre-
+#   existing; novelty is per-keyword surface plus the
+#   ALTER DATABASE no-op pin.
+#
+#   Apps porting PG operational/maintenance scripts:
+#     - CHECKPOINT, DISCARD ALL/etc, REASSIGN OWNED,
+#       SECURITY LABEL, DROP OWNED, ALTER OPERATOR
+#       all fail at parse — drop from scripts.
+#     - ALTER DATABASE returns success without doing
+#       anything (documented intentional behavior).
+#       Apps relying on ALTER DATABASE for actual
+#       database-state mutation should rebuild the DB
+#       and use GRANT for ownership instead — but they
+#       can expect no error from the migration script.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CHECKPOINT, REASSIGN
+#     OWNED, SECURITY LABEL all error 1064 at shape (d).
+#   # zeta-adapt: KNOWN GAP — DISCARD (ALL/TEMP/TEMPORARY/
+#     PLANS/SEQUENCES) all error 1064 at shape (c).
+#   # zeta-adapt: KNOWN GAP — DROP OWNED BY errors 1064
+#     at DROP restricted-list ("found: OWNED").
+#   # zeta-adapt: KNOWN GAP — ALTER OPERATOR partial-
+#     grammar (parallel to CREATE OPERATOR Shape C from
+#     PR #390).
+#   # zeta-adapt: INTENTIONAL COMPAT NO-OP — ALTER
+#     DATABASE silently succeeds without effect
+#     (zeta-server/src/lib.rs:15199 — "No-op for
+#     compatibility"). Database-management migrations
+#     can expect no error but no mutation either.
+
+--echo === Shape (d) — CHECKPOINT / REASSIGN OWNED / SECURITY LABEL → "found: <KW>" at col 1 ===
+
+--error 1064
+CHECKPOINT;
+--error 1064
+REASSIGN OWNED BY alice TO bob;
+--error 1064
+SECURITY LABEL ON TABLE t IS 'classified';
+--error 1064
+SECURITY LABEL FOR provider ON TABLE t IS 'classified';
+
+--echo === Shape (c) — DISCARD ALL/TEMP/TEMPORARY/PLANS/SEQUENCES (catch-all internal-type leak) ===
+
+--error 1064
+DISCARD ALL;
+--error 1064
+DISCARD TEMP;
+--error 1064
+DISCARD TEMPORARY;
+--error 1064
+DISCARD PLANS;
+--error 1064
+DISCARD SEQUENCES;
+
+--echo === DROP restricted-list — DROP OWNED BY (2 forms) → "found: OWNED" at col 6 ===
+
+--error 1064
+DROP OWNED BY alice;
+--error 1064
+DROP OWNED BY alice CASCADE;
+
+--echo === Shape C — ALTER OPERATOR partial-grammar → "Expected: (, found: =" at col 18 ===
+
+# sqlparser has an ALTER OPERATOR arm — parses past
+# `ALTER OPERATOR ===` then fails at the definition
+# body. Parallel to CREATE OPERATOR Shape C from PR
+# #390 (which fires at col 19 for `CREATE OPERATOR`).
+--error 1064
+ALTER OPERATOR === (INT, INT) OWNER TO bob;
+
+--echo === INTENTIONAL COMPAT NO-OP — ALTER DATABASE silently succeeds (documented in zeta source) ===
+
+# DOCUMENTED INTENTIONAL — not a bug. zeta source:
+#   - zeta-parser/src/lib.rs:155 (comment)
+#   - zeta-parser/src/ast.rs:272 (doc-comment)
+#   - zeta-server/src/lib.rs:15199-15202 (handler:
+#     "No-op for compatibility.")
+#   - zeta-server/tests/multi_database.rs:185
+#     (`test_alter_database_noop` asserts success)
+# All three forms succeed without error or mutation:
+ALTER DATABASE myapp OWNER TO bob;
+ALTER DATABASE myapp RENAME TO renamed_target;
+ALTER DATABASE myapp SET search_path = public;
