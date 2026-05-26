@@ -1,0 +1,240 @@
+# Independently authored PG logical replication DDL
+# sentinel slice (PUBLICATION / SUBSCRIPTION + slot
+# management functions) for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE / ALTER / DROP PUBLICATION: ZERO prior.
+#   - CREATE / ALTER / DROP SUBSCRIPTION: ZERO prior.
+#   - pg_create_logical_replication_slot / pg_drop_
+#     replication_slot SQL functions: ZERO prior.
+#   - pg_catalog.pg_replication_slots qualified-name:
+#     ALREADY pinned at pg_catalog_views_sentinel_
+#     basic_extra:11-12 (mysqlwire "table not found:
+#     pg_catalog.pg_replication_slots"). NOT re-pinned.
+#   - BARE pg_replication_slots (unqualified): ZERO
+#     prior — net-new probe target that exposes a
+#     CLEAN WIRE-DIVERGENCE finding.
+#   - CREATE ROLE REPLICATION: ZERO prior (CREATE ROLE
+#     bare-form pinned elsewhere; the REPLICATION
+#     attribute is net-new).
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: an object type after CREATE, found:
+#     <KW>" — pre-existing fingerprint (pg_misc_ddl_
+#     sentinel:17-23 TEXT; event_use_partition_
+#     sentinel:3 EVENT; index_options_basic_extra:102
+#     FULLTEXT). PUBLICATION / SUBSCRIPTION are new
+#     keyword witnesses.
+#   - "Expected: one of VIEW or TYPE or TABLE or INDEX
+#     or ROLE or POLICY or CONNECTOR or ICEBERG or
+#     SCHEMA or USER or OPERATOR, found: <KW>" — pre-
+#     existing fingerprint (pg_misc_ddl_sentinel:10-14
+#     DEFAULT; event_use_partition_sentinel:6 EVENT;
+#     sequence_basic_extra:50 comment). PUBLICATION /
+#     SUBSCRIPTION new keyword witnesses.
+#   - "Expected: CONNECTOR, DATABASE, EXTENSION,
+#     FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE,
+#     ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE,
+#     TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER
+#     after DROP, found: <KW>" — pre-existing
+#     fingerprint (pg_misc_ddl_sentinel:26-28 TEXT;
+#     event_use_partition_sentinel:11 EVENT).
+#   - "unsupported statement: sqlparser::ast::Statement"
+#     — Shape (c) catch-all from PR #371. CREATE ROLE
+#     REPLICATION (the REPLICATION attribute) lands
+#     here.
+#   - "execution error: unknown function: <FN>" —
+#     pre-existing fingerprint (many). pg_create_
+#     logical_replication_slot / pg_drop_replication_
+#     slot are new function-name witnesses.
+#
+# This slice pins:
+#
+#   CREATE PUBLICATION (3 forms) → Shape "Expected:
+#   an object type after CREATE, found: PUBLICATION"
+#   at col 8. Three semantically-distinct forms
+#   (FOR ALL TABLES, FOR TABLE t, FOR TABLES IN
+#   SCHEMA s) all fail at the same parser arm — the
+#   FOR-clause is never reached.
+#
+#   ALTER PUBLICATION → Shape "Expected: one of VIEW
+#   or TYPE or TABLE or INDEX or ROLE or POLICY or
+#   CONNECTOR or ICEBERG or SCHEMA or USER or
+#   OPERATOR, found: PUBLICATION" at col 7.
+#
+#   DROP PUBLICATION → Shape "Expected: CONNECTOR,
+#   DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR,
+#   POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE,
+#   STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED
+#   VIEW or USER after DROP, found: PUBLICATION" at
+#   col 6.
+#
+#   CREATE / ALTER / DROP SUBSCRIPTION — identical
+#   three shapes, SUBSCRIPTION keyword in same
+#   positions.
+#
+#   pg_create_logical_replication_slot('s', 'pgoutput')
+#   / pg_drop_replication_slot('s') — unknown function
+#   on BOTH wires. zeta-pgwire/src/pipeline_classifier.
+#   rs:351-352 lists these as "mutating/volatile"
+#   (forcing serial-pipeline) but the actual function
+#   IS NOT IMPLEMENTED. The classifier reference is
+#   defensive in case they're ever added, not evidence
+#   of support.
+#
+#   bare `pg_replication_slots` (catalog-table read,
+#   no pg_catalog. qualifier) — WIRE-DIVERGENT:
+#     - mysqlwire: 1146 "table not found: test.public.
+#       pg_replication_slots" (no catalog shim).
+#     - pgwire: returns the standard 15-column
+#       pg_replication_slots schema (slot_name, plugin,
+#       slot_type, datoid, database, temporary, active,
+#       active_pid, xmin, catalog_xmin, restart_lsn,
+#       confirmed_flush_lsn, wal_status, safe_wal_size,
+#       two_phase) with 0 rows in a fresh server.
+#     Source: zeta-pgwire/src/pg_catalog.rs:1606-1607
+#     `if contains_word(&lower, "pg_replication_slots")
+#     { return Some(handle_pg_replication_slots(...))
+#     }`. This is a pgwire-only catalog intercept that
+#     bypasses the schema-resolution path mysqlwire
+#     uses.
+#
+#   CREATE ROLE REPLICATION (the REPLICATION role
+#   attribute) → Shape (c) catch-all from PR #371.
+#   New attribute-keyword witness.
+#
+# Big-picture finding:
+#
+#   PG logical replication is partially reachable on
+#   zeta — but only as a CDC SOURCE (server EMITS
+#   pgoutput via the PG replication protocol, per
+#   CLAUDE.md and zeta-pgwire/src/replication/), NOT
+#   as a SUBSCRIBER (no CREATE SUBSCRIPTION) and NOT
+#   via SQL slot-management functions. The
+#   relationship is:
+#     - Slot lifecycle: only via the PG replication
+#       protocol (CREATE_REPLICATION_SLOT command),
+#       NOT via pg_create_logical_replication_slot()
+#       SQL function.
+#     - Slot inspection: pgwire has a catalog
+#       intercept for pg_replication_slots that
+#       returns real slot state. mysqlwire has none.
+#     - Publication DDL: entirely unreachable (parser
+#       enumeration rejects PUBLICATION at all three
+#       CREATE/ALTER/DROP dispatch points).
+#     - Subscription DDL: entirely unreachable (same
+#       enumeration shapes for SUBSCRIPTION).
+#
+#   Apps depending on PG logical replication via SQL
+#   must:
+#     - Use pg_recvlogical or Debezium for the
+#       receiver side (works against zeta per
+#       docs/replication_user_guide.md).
+#     - Create slots via the replication protocol
+#       handshake, not SQL.
+#     - Forget about PUBLICATION DDL — there is no
+#       publication grouping mechanism; the
+#       replication protocol emits all changes from
+#       the slot.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307):
+#   - All DDL shapes identical (PUBLICATION /
+#     SUBSCRIPTION enumeration rejections).
+#   - pg_create_logical_replication_slot /
+#     pg_drop_replication_slot identical unknown
+#     function on both.
+#   - pg_replication_slots DIVERGES: pgwire intercept
+#     returns empty rows; mysqlwire table-not-found.
+#   This is a NEW witness for the wire-divergence
+#   pattern alongside PR #366 (LISTEN/NOTIFY), PR
+#   #385 (Array Debug), PR #392 (ROLLBACK TO
+#   SAVEPOINT), PR #396 (ALTER DATABASE compat-noop),
+#   PR #398 (TIMESTAMPTZ TZ truncation), PR #399
+#   (SET prefix-intercept).
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CREATE / ALTER / DROP
+#     PUBLICATION + CREATE / ALTER / DROP SUBSCRIPTION
+#     all parse-reject at sqlparser dispatch
+#     enumerations. No publication grouping; emit
+#     comes from the replication-protocol slot.
+#   # zeta-adapt: KNOWN GAP — pg_create_logical_
+#     replication_slot / pg_drop_replication_slot SQL
+#     functions are unknown (1105). Use the
+#     CREATE_REPLICATION_SLOT replication-protocol
+#     command via pg_recvlogical / Debezium instead.
+#   # zeta-adapt: WIRE DIVERGENCE —
+#     `pg_replication_slots` catalog read works on
+#     pgwire (returns empty rows for the standard
+#     15-column schema) but fails table-not-found on
+#     mysqlwire. Apps probing slot state must use
+#     pgwire.
+#   # zeta-adapt: KNOWN GAP — CREATE ROLE REPLICATION
+#     (the REPLICATION attribute) hits Shape (c)
+#     catch-all. Replication-role distinction does
+#     not exist on zeta — apps using pg_recvlogical
+#     just connect as zeta superuser.
+
+--echo === CREATE PUBLICATION (3 forms) — "Expected: an object type after CREATE, found: PUBLICATION" ===
+
+# All three semantic forms fail at the same parser
+# arm (col 8) — the FOR-clause is never reached.
+--error 1064
+CREATE PUBLICATION p FOR ALL TABLES;
+--error 1064
+CREATE PUBLICATION p FOR TABLE t;
+--error 1064
+CREATE PUBLICATION p FOR TABLES IN SCHEMA public;
+
+--echo === ALTER PUBLICATION / DROP PUBLICATION — pre-existing enumeration shapes, PUBLICATION witness ===
+
+--error 1064
+ALTER PUBLICATION p ADD TABLE t;
+--error 1064
+DROP PUBLICATION p;
+
+--echo === CREATE / ALTER / DROP SUBSCRIPTION — same three enumeration shapes, SUBSCRIPTION witness ===
+
+--error 1064
+CREATE SUBSCRIPTION s CONNECTION 'host=remote' PUBLICATION p;
+--error 1064
+ALTER SUBSCRIPTION s ENABLE;
+--error 1064
+DROP SUBSCRIPTION s;
+
+--echo === pg_create_logical_replication_slot / pg_drop_replication_slot — unknown function (BOTH wires) ===
+
+# zeta-pgwire/src/pipeline_classifier.rs:351-352
+# lists these as mutating/volatile (defensive), but
+# they are NOT implemented as SQL functions on
+# either wire. The actual slot lifecycle is the PG
+# replication protocol CREATE_REPLICATION_SLOT
+# command.
+--error 1105
+SELECT pg_create_logical_replication_slot('s1', 'pgoutput');
+--error 1105
+SELECT pg_drop_replication_slot('s1');
+
+--echo === BARE pg_replication_slots (no pg_catalog. qualifier) — WIRE DIVERGENT ===
+
+# Pinned shape is mysqlwire's behavior: table-not-
+# found because mysqlwire has no catalog shim for
+# bare pg_replication_slots.
+# CROSS-WIRE: pgwire (zeta-pgwire/src/pg_catalog.rs:
+# 1606-1607) intercepts the name and returns the
+# standard 15-column pg_replication_slots schema
+# with 0 rows in a fresh server. See sentinel header
+# for the full column list.
+--error 1146
+SELECT * FROM pg_replication_slots;
+
+--echo === CREATE ROLE REPLICATION — Shape (c) catch-all, REPLICATION attribute witness ===
+
+# The REPLICATION role attribute (used by PG to
+# permit slot creation / pg_recvlogical connections)
+# is unsupported. CREATE ROLE bare-form is pinned
+# elsewhere; this is the attribute-keyword variant.
+--error 1064
+CREATE ROLE r REPLICATION;
