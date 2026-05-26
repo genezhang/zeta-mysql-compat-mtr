@@ -1,0 +1,49 @@
+=== GROUP 1 — Size functions (3 wire-divergent: db/table/size_pretty; 3 both-unknown) ===
+SELECT pg_relation_size('t');
+ERROR 1105: execution error: unknown function: pg_relation_size
+SELECT pg_table_size('t');
+ERROR 1105: execution error: unknown function: pg_table_size
+SELECT pg_total_relation_size('t');
+ERROR 1105: execution error: unknown function: pg_total_relation_size
+SELECT pg_database_size('test');
+ERROR 1105: execution error: unknown function: pg_database_size
+SELECT pg_size_pretty(1024);
+ERROR 1105: execution error: unknown function: pg_size_pretty
+SELECT pg_relation_filepath('t');
+ERROR 1105: execution error: unknown function: pg_relation_filepath
+=== GROUP 2 — DEF-introspection (pg_get_*) — all both-wires unknown ===
+SELECT pg_get_indexdef(1);
+ERROR 1105: execution error: unknown function: pg_get_indexdef
+SELECT pg_get_constraintdef(1);
+ERROR 1105: execution error: unknown function: pg_get_constraintdef
+SELECT pg_get_expr('foo', 1);
+ERROR 1105: execution error: unknown function: pg_get_expr
+SELECT pg_get_function_identity_arguments(1);
+ERROR 1105: execution error: unknown function: pg_get_function_identity_arguments
+SELECT pg_get_serial_sequence('t', 'id');
+ERROR 1105: execution error: unknown function: pg_get_serial_sequence
+SELECT pg_get_userbyid(10);
+ERROR 1105: execution error: unknown function: pg_get_userbyid
+=== GROUP 3 — Privilege-check fns — all both-wires unknown ===
+SELECT pg_has_role('alice', 'admin', 'MEMBER');
+ERROR 1105: execution error: unknown function: pg_has_role
+SELECT has_table_privilege('t', 'SELECT');
+ERROR 1105: execution error: unknown function: has_table_privilege
+SELECT has_column_privilege('t', 'id', 'SELECT');
+ERROR 1105: execution error: unknown function: has_column_privilege
+SELECT has_schema_privilege('public', 'USAGE');
+ERROR 1105: execution error: unknown function: has_schema_privilege
+=== GROUP 4 — NOTIFY-family fns — all both-wires unknown ===
+SELECT pg_notify('c', 'p');
+ERROR 1105: execution error: unknown function: pg_notify
+SELECT pg_listening_channels();
+ERROR 1105: execution error: unknown function: pg_listening_channels
+SELECT pg_notification_queue_usage();
+ERROR 1105: execution error: unknown function: pg_notification_queue_usage
+=== GROUP 5 — Config-introspection — all both-wires unknown ===
+SELECT current_setting('search_path');
+ERROR 1105: execution error: unknown function: current_setting
+SELECT set_config('search_path', 'public', false);
+ERROR 1105: execution error: unknown function: set_config
+SELECT pg_typeof(1);
+ERROR 1105: execution error: unknown function: pg_typeof
