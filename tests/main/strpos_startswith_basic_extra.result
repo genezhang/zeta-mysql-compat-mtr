@@ -1,0 +1,126 @@
+=== STRPOS — basic ASCII positions ===
+SELECT STRPOS('abcdef', 'abc')                                AS pos_at_1;
+pos_at_1
+1
+SELECT STRPOS('abcdef', 'cd')                                 AS pos_at_3;
+pos_at_3
+3
+SELECT STRPOS('abcdef', 'ef')                                 AS pos_at_5;
+pos_at_5
+5
+SELECT STRPOS('abcdef', 'xyz')                                AS not_found_0;
+not_found_0
+0
+SELECT STRPOS('abcdef', 'd')                                  AS single_char_4;
+single_char_4
+4
+=== STRPOS — empty inputs ===
+SELECT STRPOS('abc', '')                                      AS empty_needle_1;
+empty_needle_1
+1
+SELECT STRPOS('', 'abc')                                      AS empty_haystack_0;
+empty_haystack_0
+0
+SELECT STRPOS('', '')                                         AS both_empty_1;
+both_empty_1
+1
+=== STRPOS — BYTE INDEX (diverges from POSITION on multi-byte) ===
+SELECT STRPOS('☃cat', 'cat')                                  AS bug_byte_index_4;
+bug_byte_index_4
+4
+SELECT POSITION('cat' IN '☃cat')                              AS position_char_index_2;
+position_char_index_2
+2
+SELECT STRPOS('a☃b', '☃')                                     AS single_prefix_2;
+single_prefix_2
+2
+=== STRPOS — NULL propagation ===
+SELECT STRPOS(NULL, 'abc')                                    AS null_hay;
+null_hay
+NULL
+SELECT STRPOS('abc', NULL)                                    AS null_needle;
+null_needle
+NULL
+SELECT STRPOS(NULL, NULL)                                     AS null_both;
+null_both
+NULL
+SELECT STRPOS(NULL, 'abc') IS NULL                            AS null_pred;
+null_pred
+1
+=== STRPOS — non-string args silently STRINGIFY ===
+SELECT STRPOS(12345, 23)                                      AS int_int_2;
+int_int_2
+2
+SELECT STRPOS(CAST('2026-01-15' AS DATE), '-')                AS date_dash_5;
+date_dash_5
+5
+=== STARTS_WITH — basic prefix tests ===
+SELECT STARTS_WITH('abcdef', 'abc')                           AS prefix_true;
+prefix_true
+1
+SELECT STARTS_WITH('abcdef', 'xyz')                           AS prefix_false;
+prefix_false
+0
+SELECT STARTS_WITH('abc', 'abcdef')                           AS prefix_too_long_false;
+prefix_too_long_false
+0
+SELECT STARTS_WITH('abc', 'abc')                              AS same_true;
+same_true
+1
+=== STARTS_WITH — empty prefix is true for any string ===
+SELECT STARTS_WITH('abc', '')                                 AS empty_prefix_of_abc_true;
+empty_prefix_of_abc_true
+1
+SELECT STARTS_WITH('', '')                                    AS empty_prefix_of_empty_true;
+empty_prefix_of_empty_true
+1
+SELECT STARTS_WITH('', 'a')                                   AS nonempty_prefix_of_empty_false;
+nonempty_prefix_of_empty_false
+0
+=== STARTS_WITH — case-sensitive ===
+SELECT STARTS_WITH('ABC', 'abc')                              AS case_mismatch_false;
+case_mismatch_false
+0
+SELECT STARTS_WITH('ABC', 'ABC')                              AS case_match_true;
+case_match_true
+1
+=== STARTS_WITH — multi-byte safe (boundary at byte 0 is char boundary) ===
+SELECT STARTS_WITH('☃cat', '☃')                               AS snowman_prefix_true;
+snowman_prefix_true
+1
+SELECT STARTS_WITH('☃cat', 'c')                               AS char_after_multibyte_false;
+char_after_multibyte_false
+0
+=== STARTS_WITH — NULL propagation ===
+SELECT STARTS_WITH(NULL, 'abc')                               AS null_str;
+null_str
+NULL
+SELECT STARTS_WITH('abc', NULL)                               AS null_prefix;
+null_prefix
+NULL
+SELECT STARTS_WITH(NULL, NULL)                                AS null_both;
+null_both
+NULL
+SELECT STARTS_WITH(NULL, 'abc') IS NULL                       AS null_pred;
+null_pred
+1
+=== STARTS_WITH — non-string args stringified ===
+SELECT STARTS_WITH(12345, '12')                               AS int_int_true;
+int_int_true
+1
+SELECT STARTS_WITH(12345, '99')                               AS int_int_false;
+int_int_false
+0
+=== Arity errors → 1105 ===
+SELECT STRPOS();
+ERROR 1105: execution error: STRPOS requires 2 arguments
+SELECT STRPOS('abc');
+ERROR 1105: execution error: STRPOS requires 2 arguments
+SELECT STRPOS('abc', 'b', 'c');
+ERROR 1105: execution error: STRPOS requires 2 arguments
+SELECT STARTS_WITH();
+ERROR 1105: execution error: STARTS_WITH requires 2 arguments
+SELECT STARTS_WITH('abc');
+ERROR 1105: execution error: STARTS_WITH requires 2 arguments
+SELECT STARTS_WITH('abc', 'b', 'c');
+ERROR 1105: execution error: STARTS_WITH requires 2 arguments

@@ -1,0 +1,177 @@
+# Independently authored STRPOS / STARTS_WITH smoke for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - STRPOS — NONE (zero compat-mtr coverage). PG/Spark
+#     POSITION-like function with reversed signature.
+#   - STARTS_WITH — NONE. Spark prefix-test boolean.
+#   - instr_locate_position_basic_extra covers
+#     INSTR/LOCATE/POSITION semantics — STRPOS is a
+#     separate function with a key implementation detail
+#     that diverges from POSITION (see big-picture finding).
+#   - sql_pattern_basic_extra covers LIKE prefix patterns,
+#     not the STARTS_WITH function.
+#
+# This slice pins:
+#   - STRPOS(haystack, needle) returns Int32 1-based
+#     position, 0 if not found.
+#   - STARTS_WITH(string, prefix) returns Bool.
+#   - Both NULL-prop on either arg.
+#   - Both stringify non-string args (no error).
+#   - STRPOS is BYTE-INDEXED, not char-indexed (diverges
+#     from POSITION — see big-picture).
+#   - STARTS_WITH('', '') = TRUE (empty starts with empty).
+#   - STARTS_WITH('abc', '') = TRUE (any string starts with
+#     empty).
+#   - STARTS_WITH('', 'a') = FALSE.
+#   - Empty needle: STRPOS('abc', '') = 1 (empty matches at
+#     position 1).
+#   - Arity errors → 1105.
+#
+# Big-picture finding (CORRECTNESS BUG on multi-byte input):
+#   STRPOS at lib.rs:48026 computes the result as
+#   `s.find(&substr).map(|i| i + 1).unwrap_or(0)`. Rust's
+#   `str::find` returns the BYTE index of the match, not
+#   the char index. The +1 then produces a 1-based BYTE
+#   offset.
+#
+#   POSITION at lib.rs:49665 uses `char_indices().zip(0..)`
+#   to return a 1-based CHAR index.
+#
+#   So on single-byte (ASCII) input, the two functions
+#   match. On multi-byte input (UTF-8 like '☃'), they
+#   DIVERGE. STRPOS('☃cat', 'cat') = 4 (byte 3 + 1, since
+#   '☃' is 3 bytes) but POSITION('cat' IN '☃cat') = 2 (the
+#   second char). This is almost certainly a bug in STRPOS
+#   — PG's strpos returns char index too — but it's the
+#   current observable behavior and apps need to know.
+#
+#   STARTS_WITH does not have this problem: prefix-test
+#   only checks byte boundary at position 0, which is
+#   always a valid char boundary in UTF-8.
+#
+#   Both functions silently STRINGIFY non-string args via
+#   value_to_sql_string. STRPOS(12345, 23) returns 2
+#   (string '12345' contains '23' starting at char 2).
+#
+# Adaptation notes:
+#   # zeta-adapt: STRPOS RETURNS BYTE INDEX, not char index.
+#     Diverges from POSITION for multi-byte input. Likely
+#     a bug; use POSITION if you need char-correct results.
+#   # zeta-adapt: STARTS_WITH('x', '') = TRUE for any x
+#     (including empty). Standard string-theory: empty is
+#     prefix of everything.
+#   # zeta-adapt: STRPOS('x', '') = 1 (empty needle matches
+#     at position 1). Compatible with INSTR but different
+#     from C/Java strstr which would also return position 0
+#     in their 0-based convention.
+
+--echo === STRPOS — basic ASCII positions ===
+
+# Found at start.
+SELECT STRPOS('abcdef', 'abc')                                AS pos_at_1;
+# Found in middle.
+SELECT STRPOS('abcdef', 'cd')                                 AS pos_at_3;
+# Found at end.
+SELECT STRPOS('abcdef', 'ef')                                 AS pos_at_5;
+# Not found → 0.
+SELECT STRPOS('abcdef', 'xyz')                                AS not_found_0;
+# Single-char needle.
+SELECT STRPOS('abcdef', 'd')                                  AS single_char_4;
+
+--echo === STRPOS — empty inputs ===
+
+# Empty needle: matches at position 1 (PG/MySQL convention).
+SELECT STRPOS('abc', '')                                      AS empty_needle_1;
+# Empty haystack with non-empty needle → 0.
+SELECT STRPOS('', 'abc')                                      AS empty_haystack_0;
+# Both empty → 1.
+SELECT STRPOS('', '')                                         AS both_empty_1;
+
+--echo === STRPOS — BYTE INDEX (diverges from POSITION on multi-byte) ===
+
+# '☃' (snowman) is 3 bytes in UTF-8. 'cat' starts at byte
+# index 3 in '☃cat' → STRPOS returns 4 (byte 3 + 1).
+# POSITION would return 2 (char index of 'c').
+SELECT STRPOS('☃cat', 'cat')                                  AS bug_byte_index_4;
+# Confirm POSITION returns the char-correct answer for the
+# same input — proves the divergence.
+SELECT POSITION('cat' IN '☃cat')                              AS position_char_index_2;
+# Multi-byte mid-string: 'a☃b'. ☃ at byte 1, char 2.
+# STRPOS for '☃' returns 2 (byte 1 + 1) which HAPPENS to
+# match char 2 because 'a' is single-byte. Not a divergence
+# in this particular case — only diverges when SEARCH STARTS
+# AFTER a multi-byte sequence.
+SELECT STRPOS('a☃b', '☃')                                     AS single_prefix_2;
+
+--echo === STRPOS — NULL propagation ===
+
+SELECT STRPOS(NULL, 'abc')                                    AS null_hay;
+SELECT STRPOS('abc', NULL)                                    AS null_needle;
+SELECT STRPOS(NULL, NULL)                                     AS null_both;
+SELECT STRPOS(NULL, 'abc') IS NULL                            AS null_pred;
+
+--echo === STRPOS — non-string args silently STRINGIFY ===
+
+# 12345 → '12345'; 23 → '23'. '23' starts at char 2.
+SELECT STRPOS(12345, 23)                                      AS int_int_2;
+# Date stringifies to YYYY-MM-DD; '-' at position 5.
+SELECT STRPOS(CAST('2026-01-15' AS DATE), '-')                AS date_dash_5;
+
+--echo === STARTS_WITH — basic prefix tests ===
+
+SELECT STARTS_WITH('abcdef', 'abc')                           AS prefix_true;
+SELECT STARTS_WITH('abcdef', 'xyz')                           AS prefix_false;
+SELECT STARTS_WITH('abc', 'abcdef')                           AS prefix_too_long_false;
+# Identity.
+SELECT STARTS_WITH('abc', 'abc')                              AS same_true;
+
+--echo === STARTS_WITH — empty prefix is true for any string ===
+
+# Standard string-theory: empty is prefix of everything.
+SELECT STARTS_WITH('abc', '')                                 AS empty_prefix_of_abc_true;
+SELECT STARTS_WITH('', '')                                    AS empty_prefix_of_empty_true;
+# Non-empty prefix of empty string is false.
+SELECT STARTS_WITH('', 'a')                                   AS nonempty_prefix_of_empty_false;
+
+--echo === STARTS_WITH — case-sensitive ===
+
+SELECT STARTS_WITH('ABC', 'abc')                              AS case_mismatch_false;
+SELECT STARTS_WITH('ABC', 'ABC')                              AS case_match_true;
+
+--echo === STARTS_WITH — multi-byte safe (boundary at byte 0 is char boundary) ===
+
+# Unlike STRPOS, STARTS_WITH on multi-byte input is correct
+# because prefix-check only touches byte 0 which is always
+# a valid char boundary in UTF-8.
+SELECT STARTS_WITH('☃cat', '☃')                               AS snowman_prefix_true;
+SELECT STARTS_WITH('☃cat', 'c')                               AS char_after_multibyte_false;
+
+--echo === STARTS_WITH — NULL propagation ===
+
+SELECT STARTS_WITH(NULL, 'abc')                               AS null_str;
+SELECT STARTS_WITH('abc', NULL)                               AS null_prefix;
+SELECT STARTS_WITH(NULL, NULL)                                AS null_both;
+SELECT STARTS_WITH(NULL, 'abc') IS NULL                       AS null_pred;
+
+--echo === STARTS_WITH — non-string args stringified ===
+
+# 12345 → '12345'; '12' is prefix → TRUE.
+SELECT STARTS_WITH(12345, '12')                               AS int_int_true;
+SELECT STARTS_WITH(12345, '99')                               AS int_int_false;
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT STRPOS();
+--error 1105
+SELECT STRPOS('abc');
+--error 1105
+SELECT STRPOS('abc', 'b', 'c');
+--error 1105
+SELECT STARTS_WITH();
+--error 1105
+SELECT STARTS_WITH('abc');
+--error 1105
+SELECT STARTS_WITH('abc', 'b', 'c');
