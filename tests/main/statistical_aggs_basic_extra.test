@@ -40,10 +40,13 @@
 #        form appear in the SAME SELECT, the WITHIN GROUP
 #        result COLLAPSES to the arg-form result (both
 #        columns return the percentile arg, NOT the median).
-#        Likely an aggregate-collection bug where the planner
-#        dedups by aggregate name and drops the WITHIN GROUP
-#        clause from the second call. Pinned as the
-#        bug-witness row.
+#        Root cause: planner.rs:913-926 — `agg_calls.
+#        dedup_by` key tuple includes (name, arg, arg2,
+#        distinct, filter, order_by, distinct_extra_args)
+#        but OMITS `within_group`. Two calls hash identical
+#        and the WITHIN GROUP entry is dropped, then the
+#        projection reads the wrong accumulator. Pinned as
+#        `bug_present_both_collapse`.
 #
 # Adaptation notes:
 #   # zeta-adapt: Use WITHIN GROUP (ORDER BY col) form for
@@ -80,25 +83,34 @@ SELECT PERCENTILE_DISC(0.25) WITHIN GROUP (ORDER BY v) AS q1_disc FROM stats_pp;
 --echo === STRIKING quirks: PERCENTILE_CONT(p, v) form + aggregate-collapse bug ===
 
 # QUIRK 1: The 2-arg form `PERCENTILE_CONT(p, v)` parses but
-# DOES NOT compute the percentile of `v`. It RETURNS THE
-# PERCENTILE ARG VERBATIM (0.5). The `v` is ignored.
+# DOES NOT compute the percentile of `v`. The actual mechanism
+# (per planner.rs:3262): PERCENTILE_CONT is not in the
+# `uses_arg2_as_second_positional` set, so the second arg `v`
+# is SILENTLY DROPPED at planner intake. The accumulator then
+# pushes the literal `0.5` once per row and "computes the
+# percentile" of {0.5, 0.5, …, 0.5} = 0.5. Observable result:
+# the arg-form returns the percentile arg verbatim.
 SELECT PERCENTILE_CONT(0.5, v)                                AS arg_form_returns_pct FROM stats_pp;
 SELECT PERCENTILE_CONT(0.5, v) = 0.5                          AS arg_form_eq_arg FROM stats_pp;
 #
 # QUIRK 2 (BUG): When BOTH the 2-arg form AND the WITHIN
 # GROUP form appear in the SAME SELECT projection, the
 # WITHIN GROUP call's result COLLAPSES to the 2-arg result.
-# Recording shows both columns return 0.5, even though the
-# WITHIN GROUP form alone would return 3 (the median).
-# Likely an aggregate-collection bug — both calls share
-# the same name "PERCENTILE_CONT", and the planner drops
-# the WITHIN GROUP clause when it dedups by name. Pinned:
+# Both columns return 0.5 even though the WITHIN GROUP form
+# alone returns 3 (the median). Root cause: planner.rs:913-926
+# has `agg_calls.dedup_by` with a key tuple of (name, arg,
+# arg2, distinct, filter, order_by, distinct_extra_args) that
+# OMITS `within_group`. The two calls hash identical and the
+# WITHIN GROUP entry is dropped — the projection then reads
+# the wrong accumulator. Single-line fix.
 SELECT PERCENTILE_CONT(0.5, v),
        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)         FROM stats_pp;
-# Inequality predicate sees both sides as 0.5 → FALSE.
-# This row's expected value of 0 IS the bug-witness.
+# Equality predicate sees both sides as 0.5 → TRUE. With the
+# bug fixed, this row would record 0 (FALSE) since 0.5 != 3.
+# Inverted from `<>` to `=` so the alias is intuitive: the
+# "bug present" state evaluates to 1.
 SELECT PERCENTILE_CONT(0.5, v)
-    <> PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)        AS bug_both_collapse_to_arg_form FROM stats_pp;
+     = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)         AS bug_present_both_collapse FROM stats_pp;
 
 --echo === REGR_* family — y = x linear regression (slope=1, intercept=0, R²=1) ===
 

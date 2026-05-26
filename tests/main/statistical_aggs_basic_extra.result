@@ -35,9 +35,9 @@ SELECT PERCENTILE_CONT(0.5, v),
 PERCENTILE_CONT	PERCENTILE_CONT
 0.5	0.5
 SELECT PERCENTILE_CONT(0.5, v)
-    <> PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)        AS bug_both_collapse_to_arg_form FROM stats_pp;
-bug_both_collapse_to_arg_form
-0
+     = PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY v)         AS bug_present_both_collapse FROM stats_pp;
+bug_present_both_collapse
+1
 === REGR_* family — y = x linear regression (slope=1, intercept=0, R²=1) ===
 SELECT REGR_COUNT(v, id)                                      AS rc FROM stats_pp;
 rc
