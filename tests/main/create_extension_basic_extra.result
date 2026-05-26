@@ -1,0 +1,42 @@
+=== CREATE EXTENSION — six whitelisted (silent accept) ===
+CREATE EXTENSION plpgsql;
+CREATE EXTENSION "uuid-ossp";
+CREATE EXTENSION pgcrypto;
+CREATE EXTENSION pg_stat_statements;
+CREATE EXTENSION citext;
+CREATE EXTENSION pg_trgm;
+=== CREATE EXTENSION IF NOT EXISTS — silent on whitelisted ===
+CREATE EXTENSION IF NOT EXISTS plpgsql;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+=== Unknown extension WITHOUT IF NOT EXISTS → 1105 ===
+CREATE EXTENSION postgis;
+ERROR 1105: execution error: extension "postgis" is not available — Zeta does not support PostgreSQL C extensions. Natively supported: plpgsql, uuid-ossp, pgcrypto, pg_stat_statements, citext, pg_trgm
+CREATE EXTENSION "hstore";
+ERROR 1105: execution error: extension "hstore" is not available — Zeta does not support PostgreSQL C extensions. Natively supported: plpgsql, uuid-ossp, pgcrypto, pg_stat_statements, citext, pg_trgm
+CREATE EXTENSION ltree;
+ERROR 1105: execution error: extension "ltree" is not available — Zeta does not support PostgreSQL C extensions. Natively supported: plpgsql, uuid-ossp, pgcrypto, pg_stat_statements, citext, pg_trgm
+=== CREATE EXTENSION IF NOT EXISTS — swallows unknown ===
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS "hstore";
+CREATE EXTENSION IF NOT EXISTS unknown_made_up_name;
+=== STRIKING: case-insensitive in both unquoted AND quoted forms ===
+CREATE EXTENSION PLPGSQL;
+CREATE EXTENSION PgCrypto;
+CREATE EXTENSION "PLPGSQL";
+CREATE EXTENSION "PgCrypto";
+CREATE EXTENSION "UUID-OSSP";
+=== DROP EXTENSION — ALWAYS no-op (whitelisted and unknown) ===
+DROP EXTENSION plpgsql;
+DROP EXTENSION "uuid-ossp";
+DROP EXTENSION pgcrypto;
+DROP EXTENSION made_up_name;
+=== DROP EXTENSION IF EXISTS — also silent ===
+DROP EXTENSION IF EXISTS plpgsql;
+DROP EXTENSION IF EXISTS never_existed;
+=== Sanity after DROPs — whitelisted functions STILL work ===
+SELECT LENGTH(GEN_RANDOM_UUID()) AS uuid_still_works;
+uuid_still_works
+36
+SELECT SIMILARITY('cat', 'cat') AS trgm_still_works;
+trgm_still_works
+1
