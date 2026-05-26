@@ -36,20 +36,40 @@
 #   - SHOW FIELDS FROM <table> alias for SHOW COLUMNS —
 #     same silent empty when table doesn't exist.
 #
-# Big-picture finding (UNIVERSAL SHOW CATCH-ALL):
+# Big-picture finding (SHOW EMPTY-ROW PATHS):
 #
 #   The mysqlwire shim at shim.rs:1904-2023 intercepts
-#   ANY query starting with "show " and uses substring
-#   matching to dispatch. If NO specific handler matches
-#   (line 2023: `return Some(MySqlResult::EmptyShow)`),
-#   the query SILENTLY returns zero rows.
+#   ANY query starting with "show " via substring
+#   matching. Three distinct paths lead to empty rows:
 #
-#   This means MANY made-up SHOW variants ALSO silently
-#   succeed. Apps trying `SHOW XYZZY` or `SHOW
-#   nonsense_command` will see "0 rows returned" rather
-#   than the MySQL 1064 parse error they expect. This
-#   is a significant DIVERGENCE from PG-style errors-on-
-#   unknown and from MySQL-style 1064-on-unknown.
+#   1. **"status" substring match at line 1905-1906**:
+#      `if q_lower.contains("variables") || q_lower.
+#      contains("status")` returns EmptyShow at line 1906.
+#      Catches SHOW MASTER STATUS, SHOW SLAVE STATUS,
+#      SHOW FUNCTION STATUS, SHOW PROCEDURE STATUS —
+#      because all four contain the substring "status".
+#      Observable behavior is empty rows, same as the
+#      catch-all.
+#
+#   2. **Per-handler "table not found → empty"** at
+#      lines 1958/1970/1983: SHOW KEYS / SHOW FIELDS /
+#      SHOW COLUMNS on a nonexistent table reach a
+#      per-handler EmptyShow fallback (NOT the universal
+#      catch-all). Real MySQL would error 1146.
+#
+#   3. **Universal catch-all at line 2023**: `return
+#      Some(MySqlResult::EmptyShow)` after all specific
+#      handlers fall through. Catches SHOW EVENTS, SHOW
+#      TRIGGERS, SHOW PLUGINS, and ANY garbage like
+#      SHOW XYZZY / SHOW MADE_UP_THING.
+#
+#   The PRACTICAL upshot is the same: apps cannot probe
+#   for "does this SHOW form exist" via 1064 vs empty —
+#   everything is empty. This is a significant
+#   DIVERGENCE from PG-style errors-on-unknown and from
+#   MySQL-style 1064-on-unknown. The PATH that produces
+#   the empty differs across rows below; the observable
+#   empty-row result is identical.
 #
 #   STRIKING — even garbage SHOW commands SUCCEED. Apps
 #   doing `SHOW FAKE_VARIABLE` will see empty results,
