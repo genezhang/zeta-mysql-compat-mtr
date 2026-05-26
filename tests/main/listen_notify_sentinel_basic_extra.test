@@ -1,0 +1,103 @@
+# Independently authored LISTEN / UNLISTEN / NOTIFY
+# sentinel smoke for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - LISTEN / UNLISTEN / NOTIFY — NONE (checked all
+#     *.test files per PR #357 lesson).
+#   - sleep_stub_basic_extra, name_const_basic_extra,
+#     unsupported_fn_sentinels_basic_extra cover other
+#     parse-then-no-op style stubs, but NOT these.
+#
+# This slice pins:
+#   - LISTEN <channel> parses and silently succeeds
+#     (no error, no observable effect).
+#   - UNLISTEN <channel> parses and silently succeeds.
+#   - UNLISTEN * (wildcard) parses and silently succeeds.
+#   - NOTIFY <channel> parses and silently succeeds.
+#   - NOTIFY <channel>, '<payload>' (with payload) parses
+#     and silently succeeds.
+#   - Statements that produce no rows return no rows
+#     (the runner's MTR-style "echo only" path).
+#
+# Big-picture finding (PARSE-THEN-NO-OP SENTINEL):
+#
+#   PostgreSQL's LISTEN/NOTIFY pub/sub is silently
+#   no-op'd in zeta. The parser at convert.rs:408-417
+#   recognizes all three forms; the executor at
+#   lib.rs:14581-14583 routes them to
+#   `return Ok(ExecuteResult::Ok)` without doing
+#   anything.
+#
+#   This is a REAL PORTABILITY FOOTGUN for apps that
+#   rely on PG's NOTIFY for cache invalidation, job
+#   queues, or change feeds. They'll see "success" on
+#   every NOTIFY call and never receive any events on
+#   subscribed channels. The lack of any error message
+#   makes the silent-no-op pattern especially dangerous —
+#   compare to UNSUPPORTED-FN sentinels which DO error.
+#
+#   To replace LISTEN/NOTIFY semantics on zeta, apps
+#   should use the logical-replication path
+#   (pg_recvlogical / Debezium) consuming the CDC log
+#   stream, or roll their own pub/sub on top of a
+#   shared table + polling. See README.md replication
+#   section.
+#
+#   STRIKING — UNLISTEN '*' (wildcard "unsubscribe from
+#   all") is also accepted silently. PG documents this
+#   as "unlisten all channels"; zeta accepts the syntax
+#   but had nothing to unlisten from in the first place.
+#
+# Adaptation notes:
+#   # zeta-adapt: LISTEN / UNLISTEN / NOTIFY are SILENT
+#     no-ops in zeta. Parse-only sentinels — no events
+#     are delivered, no errors raised.
+#   # zeta-adapt: For pub/sub semantics, use the
+#     CDC/replication path (see README) or roll your
+#     own polling-table pattern.
+#   # zeta-adapt: UNLISTEN * is accepted silently too;
+#     don't read success as "all channels unsubscribed".
+
+--echo === LISTEN — accepts channel name, no rows returned ===
+
+LISTEN cache_invalidate;
+LISTEN job_queue;
+# Reserved-word-style names work too (quoted).
+LISTEN "with spaces";
+
+--echo === UNLISTEN — accepts channel name ===
+
+UNLISTEN cache_invalidate;
+UNLISTEN job_queue;
+
+--echo === UNLISTEN * — wildcard "all channels" ===
+
+UNLISTEN *;
+
+--echo === NOTIFY — accepts channel name, no rows ===
+
+NOTIFY cache_invalidate;
+
+--echo === NOTIFY with payload string ===
+
+NOTIFY cache_invalidate, 'cache_key_42';
+NOTIFY cache_invalidate, 'payload with spaces';
+# Empty payload.
+NOTIFY cache_invalidate, '';
+
+--echo === Sequence: LISTEN then NOTIFY then UNLISTEN — all silent ===
+
+# A real PG client would queue a NOTIFY event for any
+# session that LISTENed to the same channel. In zeta,
+# all three statements silently succeed with no
+# observable effect.
+LISTEN test_seq;
+NOTIFY test_seq, 'hello';
+UNLISTEN test_seq;
+
+--echo === Subsequent SELECT confirms no rows were generated ===
+
+# NOTIFY does not produce a result row; the next SELECT
+# starts clean.
+SELECT 1 AS sanity;
