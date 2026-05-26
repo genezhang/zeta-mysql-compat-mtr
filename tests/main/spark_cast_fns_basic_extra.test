@@ -83,7 +83,9 @@ SELECT BINARY(NULL)                                           AS null_propagates
 SELECT BINARY(NULL) IS NULL                                   AS null_pred;
 # Non-string coerces via value_to_sql_string.
 SELECT BINARY(42)                                             AS int_coerce;
-SELECT LENGTH(BINARY(42))                                     AS int_coerce_len_2;
+# LENGTH = 2 reflects the BYTE count of the stringified
+# representation '42' (2 ASCII chars), NOT i32 byte width.
+SELECT LENGTH(BINARY(42))                                     AS int_str_repr_2_bytes;
 SELECT BINARY(TRUE)                                           AS bool_coerce;
 
 --echo === BINARY: arity errors → 1105 ===
@@ -124,8 +126,10 @@ SELECT DECIMAL(CAST('NaN' AS DOUBLE PRECISION)) IS NULL       AS dec_nan_pred;
 
 --echo === DECIMAL: Bool → 1 / 0 via coerce_value ===
 
-SELECT DECIMAL(TRUE)                                          AS bool_true_to_1;
-SELECT DECIMAL(FALSE)                                         AS bool_false_to_0;
+# Aliases call out wire-RENDERING (not internal coercion) —
+# the very next rows show the internal value is still Bool.
+SELECT DECIMAL(TRUE)                                          AS bool_true_renders_as_1;
+SELECT DECIMAL(FALSE)                                         AS bool_false_renders_as_0;
 # STRIKING: DECIMAL(TRUE) wire-renders as "1" (Bool TRUE
 # always renders as TINYINT 1), but BOTH `DECIMAL(TRUE) = 1`
 # AND `DECIMAL(TRUE) = DECIMAL(1)` return 0 (FALSE). This

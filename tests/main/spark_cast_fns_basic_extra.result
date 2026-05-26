@@ -24,8 +24,8 @@ null_pred
 SELECT BINARY(42)                                             AS int_coerce;
 int_coerce
 42
-SELECT LENGTH(BINARY(42))                                     AS int_coerce_len_2;
-int_coerce_len_2
+SELECT LENGTH(BINARY(42))                                     AS int_str_repr_2_bytes;
+int_str_repr_2_bytes
 2
 SELECT BINARY(TRUE)                                           AS bool_coerce;
 bool_coerce
@@ -68,11 +68,11 @@ SELECT DECIMAL(CAST('NaN' AS DOUBLE PRECISION)) IS NULL       AS dec_nan_pred;
 dec_nan_pred
 1
 === DECIMAL: Bool → 1 / 0 via coerce_value ===
-SELECT DECIMAL(TRUE)                                          AS bool_true_to_1;
-bool_true_to_1
+SELECT DECIMAL(TRUE)                                          AS bool_true_renders_as_1;
+bool_true_renders_as_1
 1
-SELECT DECIMAL(FALSE)                                         AS bool_false_to_0;
-bool_false_to_0
+SELECT DECIMAL(FALSE)                                         AS bool_false_renders_as_0;
+bool_false_renders_as_0
 0
 SELECT DECIMAL(TRUE) = 1                                      AS bool_dec_ne_int_1;
 bool_dec_ne_int_1
