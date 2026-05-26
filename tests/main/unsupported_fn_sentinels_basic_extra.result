@@ -38,7 +38,7 @@ SELECT INTERNAL_INDEX_BLOCK_SIZE(1);
 ERROR 1105: execution error: unknown function: INTERNAL_INDEX_BLOCK_SIZE
 SELECT MERGE_PURGE(1);
 ERROR 1105: execution error: unknown function: MERGE_PURGE
-=== Case-normalization: unknown-fn name uppercased in error msg ===
+=== Case-normalization: PATH-DEPENDENT (not input-dependent) ===
 SELECT convert_tz('2024-01-01', '+00:00', '+09:00');
 ERROR 1105: execution error: unknown function: CONVERT_TZ
 SELECT Microsecond(TIMESTAMP '2024-01-01 00:00:00.5');

@@ -31,15 +31,27 @@
 #   The unknown-function error code in zeta is 1105 (MySQL's
 #   1305 is NOT used). The error message has the form:
 #     execution error: unknown function: <NAME>
-#   STRIKING: case normalization is INCONSISTENT — fully
-#   lowercase input gets uppercased (`convert_tz` →
-#   `CONVERT_TZ` in the message), but mixed-case input is
-#   PRESERVED as-typed (`Microsecond` → `Microsecond` in
-#   the message). Recording surfaced this; pinned below.
-#   The two-arm normalization likely splits on
-#   `is_all_lowercase` somewhere upstream of the dispatcher.
-#   Porting tools doing 1105 + message-prefix matching need
-#   to handle BOTH casings.
+#   STRIKING: the <NAME> casing is PATH-DEPENDENT (not
+#   input-dependent). The dispatcher (eval_function in
+#   lib.rs) is called from three sites:
+#     - lib.rs:41701 (literal-folding): pre-uppercases the
+#       name (`name.to_uppercase()`) before dispatching.
+#     - lib.rs:41741 (zero-arg fallthrough): pre-uppercases
+#       via a local `upper` binding.
+#     - lib.rs:42317 (row-eval): passes RAW `name` through.
+#   The unknown-function catch-all at lib.rs:55698
+#   interpolates raw `name` into the message. So the casing
+#   surfaced depends on WHICH CALL SITE reached the
+#   dispatcher with this input, not whether the input was
+#   originally lowercase vs mixed-case. Pinned below via
+#   `convert_tz` (CONVERT_TZ in msg) and `Microsecond`
+#   (Microsecond in msg).
+#   A 1-line fix (use `upper` in the catch-all format
+#   string) would eliminate the inconsistency.
+#
+#   Porting tools doing 1105 + message-prefix matching
+#   should ALWAYS UPPERCASE the captured name before
+#   matching — that handles all paths uniformly.
 #
 #   Notable: TEMPORAL gaps surprise. MICROSECOND() is a
 #   common MySQL function for extracting the microsecond
@@ -123,11 +135,14 @@ SELECT INTERNAL_INDEX_BLOCK_SIZE(1);
 --error 1105
 SELECT MERGE_PURGE(1);
 
---echo === Case-normalization: unknown-fn name uppercased in error msg ===
+--echo === Case-normalization: PATH-DEPENDENT (not input-dependent) ===
 
-# The error includes the function name normalized to UPPERCASE
-# regardless of input case. Pin via mixed-case input to lock
-# the normalization behavior.
+# The unknown-function error message's <NAME> reflects the
+# casing of the dispatcher's RAW input — which varies by
+# call site. Two of the three sites pre-uppercase, the third
+# passes raw. The catch-all at lib.rs:55698 interpolates raw
+# `name`. So porting tools must uppercase before matching;
+# the casing surfaced here is NOT a reliable input signal.
 --error 1105
 SELECT convert_tz('2024-01-01', '+00:00', '+09:00');
 --error 1105
