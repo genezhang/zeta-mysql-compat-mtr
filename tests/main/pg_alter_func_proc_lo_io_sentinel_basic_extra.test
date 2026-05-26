@@ -1,0 +1,106 @@
+# Independently authored ALTER FUNCTION + ALTER
+# PROCEDURE + lo_import/lo_export sentinel slice for
+# the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - ALTER FUNCTION / ALTER PROCEDURE (all forms):
+#     ZERO prior coverage.
+#   - lo_import / lo_export: ZERO prior coverage.
+#
+# Pre-existing rejection shape patterns:
+#   - "ALTER restricted-list" — "Expected: one of VIEW
+#     or TYPE or TABLE or INDEX or ROLE or POLICY or
+#     CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR,
+#     found: <KW>" at col 7. Pre-existing at event_use_
+#     partition_sentinel:6,8 (EVENT), sequence_basic_
+#     extra:116, and PR #395 (DEFAULT).
+#   - "unknown function: lo_<X>" — pre-existing at
+#     PR #391 (lo_create, lo_open, lo_unlink).
+#
+# This slice pins (per-keyword surface application —
+# both shape patterns are pre-existing):
+#
+#   ALTER restricted-list — ALTER FUNCTION (9 forms):
+#     - RENAME TO, OWNER TO, SET search_path, IMMUTABLE,
+#       STABLE, VOLATILE, STRICT, SECURITY DEFINER,
+#       RESET search_path
+#     - All hit "found: FUNCTION" at col 7 — sqlparser's
+#       ALTER dispatcher doesn't accept FUNCTION as an
+#       object-type. The downstream clause (RENAME/OWNER/
+#       SET/IMMUTABLE/etc.) is never reached.
+#
+#   ALTER restricted-list — ALTER PROCEDURE (3 forms):
+#     - RENAME TO, OWNER TO, SECURITY INVOKER
+#     - All hit "found: PROCEDURE" at col 7 — same shape,
+#       new keyword.
+#
+#   "unknown function: lo_<X>" — lo_import / lo_export
+#   (3 forms):
+#     - lo_import(path), lo_import(path, oid), lo_export
+#       (oid, path) — all unknown. Adds lo_import and
+#       lo_export to the lo_* unknown-function bucket
+#       alongside PR #391's lo_create/lo_open/lo_unlink.
+#
+# Big-picture finding:
+#
+#   ALTER FUNCTION and ALTER PROCEDURE are entirely
+#   unreachable in zeta — sqlparser doesn't accept
+#   FUNCTION/PROCEDURE in its ALTER restricted-list,
+#   so no variant ever reaches the executor. Same
+#   shape as ALTER DEFAULT PRIVILEGES from PR #395 and
+#   ALTER EVENT from event_use_partition_sentinel.
+#
+#   PG large-object I/O (lo_import file → oid, lo_export
+#   oid → file) is also unreachable. Apps porting PG
+#   code that uses lo_* for blob storage must rewrite
+#   to BYTEA storage with application-side file I/O.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — ALTER FUNCTION (any form)
+#     and ALTER PROCEDURE (any form) all error 1064 at
+#     ALTER restricted-list ("found: FUNCTION/PROCEDURE"
+#     at col 7). No substitute — drop from migration
+#     scripts.
+#   # zeta-adapt: KNOWN GAP — lo_import / lo_export
+#     unknown function. PG large-object I/O has no
+#     equivalent — use BYTEA + app-side file I/O.
+
+--echo === ALTER FUNCTION (9 forms) — ALTER restricted-list "found: FUNCTION" at col 7 ===
+
+--error 1064
+ALTER FUNCTION foo() RENAME TO bar;
+--error 1064
+ALTER FUNCTION foo(int) OWNER TO bob;
+--error 1064
+ALTER FUNCTION foo() SET search_path = public;
+--error 1064
+ALTER FUNCTION foo() IMMUTABLE;
+--error 1064
+ALTER FUNCTION foo() STABLE;
+--error 1064
+ALTER FUNCTION foo() VOLATILE;
+--error 1064
+ALTER FUNCTION foo() STRICT;
+--error 1064
+ALTER FUNCTION foo() SECURITY DEFINER;
+--error 1064
+ALTER FUNCTION foo() RESET search_path;
+
+--echo === ALTER PROCEDURE (3 forms) — ALTER restricted-list "found: PROCEDURE" at col 7 ===
+
+--error 1064
+ALTER PROCEDURE proc1() RENAME TO new_proc;
+--error 1064
+ALTER PROCEDURE proc1() OWNER TO bob;
+--error 1064
+ALTER PROCEDURE proc1() SECURITY INVOKER;
+
+--echo === lo_import / lo_export — unknown function (joins PR #391 lo_* bucket) ===
+
+--error 1105
+SELECT lo_import('/tmp/file.bin');
+--error 1105
+SELECT lo_import('/tmp/file.bin', 12345);
+--error 1105
+SELECT lo_export(12345, '/tmp/out.bin');
