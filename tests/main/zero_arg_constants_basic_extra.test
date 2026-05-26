@@ -3,12 +3,15 @@
 # or adapted from MySQL's mysql-test/.
 #
 # Existing coverage (do NOT duplicate):
-#   - PI — NONE (zero compat-mtr coverage). Math constant
-#     (MySQL-compat spelling of PG's `pi()`).
-#   - UUID_NIL — NONE. uuid-ossp all-zero UUID.
-#   - ZETA_LAST_COMMIT_HLC — NONE. Zeta-vendor HLC inspector.
-#   - trig_math_basic_extra and math_func_edges cover other
-#     math primitives but NOT the constant PI.
+#   - UUID_NIL — NONE (zero compat-mtr coverage).
+#     uuid-ossp all-zero UUID.
+#   - ZETA_LAST_COMMIT_HLC — NONE. Zeta-vendor HLC
+#     inspector.
+#   - PI() is ALREADY covered by numeric_func_basic.test:101
+#     (value test) and trig_math_basic_extra.test:55-68
+#     (trig identities) and :142-148 (arity error rows
+#     PI(1) / PI('foo')). DROPPED from this slice per
+#     PR #357 review.
 #   - uuid_basic_extra and uuid_short_basic_extra cover
 #     gen_random_uuid / uuid_short / uuid_bin functions
 #     but NOT the NIL constant.
@@ -16,55 +19,58 @@
 #     first.
 #
 # This slice pins:
-#   - PI() returns Float64 close to math::consts::PI.
 #   - UUID_NIL() returns the all-zero UUID
 #     ('00000000-0000-0000-0000-000000000000').
 #   - ZETA_LAST_COMMIT_HLC() returns Int64; the value in
 #     this MTR-runner context depends on whether the
 #     connection's HLC slot was scoped.
-#   - All three error with "takes no arguments" message
+#   - Both error with "takes no arguments" message
 #     when given any arg.
 #
-# Big-picture finding (THREE DIFFERENT ZERO-ARG IDIOMS):
+# Big-picture finding:
 #
-#   1. **PI** — pure math constant. Returns Value::Float64
-#      with `std::f64::consts::PI` (≈ 3.141592653589793).
-#      Wire-renders with all 15-17 digits visible (mysql-
-#      async Double → string default precision). Apps that
-#      compare PI to a string-literal need exact match; use
-#      relational predicates if you only want approximate
-#      equality.
+#   **UUID_NIL** is a sentinel-style constant function.
+#   Returns Value::Uuid with all 16 bytes zero. Wire-
+#   renders via the mysqlwire shim's format_uuid as the
+#   standard 36-char '00000000-0000-0000-0000-000000000000'
+#   string. Distinct from GEN_RANDOM_UUID (different value
+#   each call). Useful as a sentinel for "no UUID assigned
+#   yet" columns.
 #
-#   2. **UUID_NIL** — special-cased UUID. Returns Value::
-#      Uuid with all 16 bytes zero. Wire-renders as the
-#      standard '00000000-0000-0000-0000-000000000000'
-#      string. Distinct from GEN_RANDOM_UUID (returns
-#      different value each call). Useful as a sentinel
-#      for "no UUID assigned yet" columns.
+#   **ZETA_LAST_COMMIT_HLC** is a vendor inspection
+#   function. Per the impl docstring at lib.rs:47245-
+#   47252: "Returns the HLC of the most recent commit on
+#   this connection (`0` if no commit yet, OR if the
+#   caller didn't scope a slot — e.g. embedded
+#   `db.execute_sql(...)` without pgwire)." In the MTR
+#   runner over MySQL wire (mysqlwire), the HLC slot MAY
+#   be scoped or not — pin only that the type is Int64
+#   and the value is non-negative; don't pin specific
+#   values that depend on runner/context state.
 #
-#   3. **ZETA_LAST_COMMIT_HLC** — vendor inspection
-#      function. Per the impl docstring at lib.rs:47245-
-#      47252: "Returns the HLC of the most recent commit
-#      on this connection (`0` if no commit yet, OR if the
-#      caller didn't scope a slot — e.g. embedded
-#      `db.execute_sql(...)` without pgwire)." In the MTR
-#      runner over MySQL wire (mysqlwire), the HLC slot
-#      MAY be scoped or not — pin both the type (Int64)
-#      and that it's non-negative.
-#
-#   Implementation surfaces ZETA_LAST_COMMIT_HLC in TWO
-#   paths: the eval_function arm at lib.rs:47244 and a
+#   STRIKING: ZETA_LAST_COMMIT_HLC has TWO impl sites:
+#   the standard eval_function arm at lib.rs:47244 and a
 #   fast-path in eval_literal_expr at lib.rs:41706. Both
 #   call the same `read_last_commit_hlc()` and saturate
-#   u64 → i64 at i64::MAX. The duplication exists because
+#   u64 → i64 at i64::MAX. The duplication is intentional:
 #   the literal-eval path runs before schema resolution
 #   for zero-arg expressions (faster), and adding the
-#   function there avoids the schema-derefence cost for
-#   pure HLC reads.
+#   function there avoids the schema-deref cost for pure
+#   HLC reads. Per the fall-through comment at lib.rs:
+#   41717-41725, other zero-arg functions (gen_random_
+#   uuid, current_date, random, …) DO take the slower
+#   schema-deref path — only ZETA_LAST_COMMIT_HLC,
+#   CURRENT_TIMESTAMP / NOW / SYSDATE get this optimization.
+#
+#   `read_last_commit_hlc()` at lib.rs:45067 returns 0 if
+#   no commit has been recorded for the connection's slot
+#   (or if the slot wasn't scoped at all). An empty
+#   BEGIN; COMMIT; cycle does NOT advance the HLC since
+#   no DML happened — only real commits advance the slot.
+#   So the post-empty-commit row pins only `IS NOT NULL`
+#   (always true for a non-nullable Int64 return).
 #
 # Adaptation notes:
-#   # zeta-adapt: PI() returns a Float64 close to math
-#     PI; for exact comparisons use a tolerance range.
 #   # zeta-adapt: UUID_NIL() = '00000000-0000-0000-0000-
 #     000000000000'. Use as a sentinel "uninitialized
 #     UUID" value.
@@ -72,27 +78,6 @@
 #     (vendor extension). Returns a u64 HLC saturated to
 #     i64::MAX on overflow. Returns 0 if no commit yet on
 #     this connection or slot wasn't scoped.
-
---echo === PI — math constant (Float64) ===
-
-# Identity within Float64 epsilon. Use tight range to
-# detect regression to single-precision or wrong constant.
-SELECT PI() > 3.14159265                                      AS pi_above_lower;
-SELECT PI() < 3.14159266                                      AS pi_below_upper;
-# Common math identity: 2*PI ≈ 6.283 (use range).
-SELECT 2 * PI() > 6.2831                                      AS two_pi_above;
-SELECT 2 * PI() < 6.2833                                      AS two_pi_below;
-# Confirm it's not literally 3 (catches an int-vs-float bug).
-SELECT PI() <> 3                                              AS pi_not_three;
-# Type is Float64 — compare against a Float64 cast literal.
-SELECT PI() = CAST(3.141592653589793 AS DOUBLE PRECISION)     AS exact_f64_match;
-
---echo === PI — wrong-arg error ===
-
---error 1105
-SELECT PI(1);
---error 1105
-SELECT PI('arg');
 
 --echo === UUID_NIL — all-zero UUID sentinel ===
 
@@ -120,9 +105,9 @@ SELECT ZETA_LAST_COMMIT_HLC() >= 0                            AS hlc_non_negativ
 # Two calls in same statement; they may differ if commits
 # interleave but in this MTR context they should equal.
 SELECT ZETA_LAST_COMMIT_HLC() = ZETA_LAST_COMMIT_HLC()        AS hlc_stable_in_stmt;
-# After a no-op commit (BEGIN; COMMIT;), the HLC may
-# advance OR stay at 0 depending on whether the commit
-# allocated a slot. Pin only that result is Int64-shaped.
+# After an empty BEGIN/COMMIT (no DML), the HLC does NOT
+# advance — only real commits do. Pin only that the
+# return type is well-defined.
 BEGIN;
 COMMIT;
 SELECT ZETA_LAST_COMMIT_HLC() IS NOT NULL                     AS post_commit_hlc_defined;
@@ -136,8 +121,8 @@ SELECT ZETA_LAST_COMMIT_HLC('a');
 
 --echo === Cross-function: type independence ===
 
-# Three different return types in one row. Just confirms
+# Two different return types in one row. Just confirms
 # zeta doesn't accidentally collapse them to a single
 # type via some shared zero-arg handler.
-SELECT PI() > 0, UUID_NIL() IS NOT NULL,
+SELECT UUID_NIL() IS NOT NULL,
        ZETA_LAST_COMMIT_HLC() >= 0                            AS types_distinct;

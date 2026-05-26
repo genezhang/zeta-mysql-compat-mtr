@@ -1,27 +1,3 @@
-=== PI — math constant (Float64) ===
-SELECT PI() > 3.14159265                                      AS pi_above_lower;
-pi_above_lower
-1
-SELECT PI() < 3.14159266                                      AS pi_below_upper;
-pi_below_upper
-1
-SELECT 2 * PI() > 6.2831                                      AS two_pi_above;
-two_pi_above
-1
-SELECT 2 * PI() < 6.2833                                      AS two_pi_below;
-two_pi_below
-1
-SELECT PI() <> 3                                              AS pi_not_three;
-pi_not_three
-1
-SELECT PI() = CAST(3.141592653589793 AS DOUBLE PRECISION)     AS exact_f64_match;
-exact_f64_match
-1
-=== PI — wrong-arg error ===
-SELECT PI(1);
-ERROR 1105: execution error: PI() takes no arguments
-SELECT PI('arg');
-ERROR 1105: execution error: PI() takes no arguments
 === UUID_NIL — all-zero UUID sentinel ===
 SELECT UUID_NIL()                                             AS nil_uuid;
 nil_uuid
@@ -61,7 +37,7 @@ ERROR 1105: execution error: zeta_last_commit_hlc() takes no arguments
 SELECT ZETA_LAST_COMMIT_HLC('a');
 ERROR 1105: execution error: zeta_last_commit_hlc() takes no arguments
 === Cross-function: type independence ===
-SELECT PI() > 0, UUID_NIL() IS NOT NULL,
+SELECT UUID_NIL() IS NOT NULL,
        ZETA_LAST_COMMIT_HLC() >= 0                            AS types_distinct;
-PI() > 0	UUID_NIL() IS NOT NULL	types_distinct
-1	1	1
+UUID_NIL() IS NOT NULL	types_distinct
+1	1
