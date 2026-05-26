@@ -19,10 +19,15 @@
 #     UNIX_TIMESTAMP PR #326 — same value-coercive equality
 #     surface).
 #   - Bool args — Bool is its own Value variant; pin behavior.
+#     SURPRISE finding: GREATEST(TRUE, FALSE) is genuinely
+#     Bool-typed (not coerced), so `= 1` returns FALSE under
+#     strict-type equality. Cross-link to PR #314 / PR #325.
 #   - JSONB args — compare_values may sort by binary encoding.
 #     Pin observable behavior.
-#   - GREATEST/LEAST in WHERE, ORDER BY, GROUP BY clauses
-#     (different code paths through eval_row_expr).
+#   - GREATEST/LEAST in WHERE, ORDER BY, and GROUP BY
+#     clauses (different code paths through eval_row_expr;
+#     GROUP BY additionally exercises the aggregate-key-
+#     build path).
 #   - Column-arg with NULL rows (full NULL-prop test against
 #     actual table data, not literal args).
 #   - Many-args boundary (16 args — exercises the loop's
@@ -119,17 +124,33 @@ SELECT GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
      = GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15')
                                                               AS order_invariant_under_eq;
 
---echo === GREATEST / LEAST: Bool args ===
+--echo === GREATEST / LEAST: Bool args (STRICT-TYPE result discovery) ===
 
-# Bool is its own Value variant. Pin observable behavior:
-# TRUE > FALSE in compare_values, so GREATEST returns TRUE.
-# Use IS NOT NULL discriminator to dodge mysql_async's
-# Bool-vs-Int rendering ambiguity (cross-link to PR #325).
+# Bool is its own Value variant. SURPRISE finding from recording:
+# `GREATEST(TRUE, FALSE) = 1` returns 0 (FALSE), NOT 1. This
+# means the SQL `=` operator is STRICT-TYPE between Bool and
+# Int (cross-link to PR #314 JSON_OVERLAPS, PR #325 NULLIF
+# findings — Bool ≠ Int under values_equal). So the GREATEST
+# result is genuinely Bool-typed, not coerced to Int.
+# The wire-render layer renders Bool TRUE as TINYINT 1, but
+# the SQL-level comparison happens BEFORE rendering and
+# returns FALSE.
+#
+# Pinned:
+#   (a) IS NOT NULL — call doesn't error / NULL-prop.
+#   (b) `= 1` returns FALSE — proves result is Bool, not Int.
+#   (c) Strict inequality between G and L — proves the
+#       comparator direction (Bool > Bool compare arm works).
 SELECT GREATEST(TRUE, FALSE) IS NOT NULL                      AS g_bool_returns_value;
 SELECT LEAST(TRUE, FALSE)    IS NOT NULL                      AS l_bool_returns_value;
-# Equality predicate proves ordering: GREATEST(TRUE, FALSE) = TRUE.
-SELECT GREATEST(TRUE, FALSE) = TRUE                           AS g_bool_is_true;
-SELECT LEAST(TRUE, FALSE)    = FALSE                          AS l_bool_is_false;
+# Strict-type proof: Bool TRUE != Int 1, so eq returns 0.
+SELECT GREATEST(TRUE, FALSE) = 1                              AS g_bool_neq_int_1_strict;
+SELECT LEAST(TRUE, FALSE)    = 0                              AS l_bool_neq_int_0_strict;
+# Comparator-direction pin (works regardless of result type
+# because both sides are SAME-typed Bool).
+SELECT GREATEST(TRUE, FALSE) > LEAST(TRUE, FALSE)             AS g_strictly_greater_than_l;
+# Bool-vs-Bool equality DOES work (same type).
+SELECT GREATEST(TRUE, FALSE) = TRUE                           AS g_bool_eq_bool_true;
 
 --echo === GREATEST / LEAST: JSONB args ===
 
@@ -155,6 +176,20 @@ SELECT id FROM gl_temporal
 SELECT id FROM gl_temporal
  WHERE id IS NOT NULL
  ORDER BY GREATEST(id, 0), id;
+
+--echo === GREATEST / LEAST in GROUP BY clause ===
+
+# GROUP BY uses a yet-different eval path (aggregation key
+# build). Pin row counts grouped by GREATEST(id, 2): rows
+# id=1,2 both bucket to 2; row id=3 buckets to 3.
+SELECT GREATEST(id, 2) AS g_key, COUNT(*) AS c
+  FROM gl_temporal
+ GROUP BY GREATEST(id, 2)
+ ORDER BY g_key;
+SELECT LEAST(id, 2)    AS l_key, COUNT(*) AS c
+  FROM gl_temporal
+ GROUP BY LEAST(id, 2)
+ ORDER BY l_key;
 
 --echo === GREATEST / LEAST on column args with NULL rows (MYSQL_* NULL prop) ===
 

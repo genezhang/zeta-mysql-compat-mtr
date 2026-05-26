@@ -52,18 +52,24 @@ SELECT GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
                                                               AS order_invariant_under_eq;
 order_invariant_under_eq
 1
-=== GREATEST / LEAST: Bool args ===
+=== GREATEST / LEAST: Bool args (STRICT-TYPE result discovery) ===
 SELECT GREATEST(TRUE, FALSE) IS NOT NULL                      AS g_bool_returns_value;
 g_bool_returns_value
 1
 SELECT LEAST(TRUE, FALSE)    IS NOT NULL                      AS l_bool_returns_value;
 l_bool_returns_value
 1
-SELECT GREATEST(TRUE, FALSE) = TRUE                           AS g_bool_is_true;
-g_bool_is_true
+SELECT GREATEST(TRUE, FALSE) = 1                              AS g_bool_neq_int_1_strict;
+g_bool_neq_int_1_strict
+0
+SELECT LEAST(TRUE, FALSE)    = 0                              AS l_bool_neq_int_0_strict;
+l_bool_neq_int_0_strict
+0
+SELECT GREATEST(TRUE, FALSE) > LEAST(TRUE, FALSE)             AS g_strictly_greater_than_l;
+g_strictly_greater_than_l
 1
-SELECT LEAST(TRUE, FALSE)    = FALSE                          AS l_bool_is_false;
-l_bool_is_false
+SELECT GREATEST(TRUE, FALSE) = TRUE                           AS g_bool_eq_bool_true;
+g_bool_eq_bool_true
 1
 === GREATEST / LEAST: JSONB args ===
 SELECT GREATEST(CAST('{"a":1}' AS JSONB), CAST('{"a":2}' AS JSONB))
@@ -96,6 +102,21 @@ id
 1
 2
 3
+=== GREATEST / LEAST in GROUP BY clause ===
+SELECT GREATEST(id, 2) AS g_key, COUNT(*) AS c
+  FROM gl_temporal
+ GROUP BY GREATEST(id, 2)
+ ORDER BY g_key;
+g_key	c
+2	2
+3	1
+SELECT LEAST(id, 2)    AS l_key, COUNT(*) AS c
+  FROM gl_temporal
+ GROUP BY LEAST(id, 2)
+ ORDER BY l_key;
+l_key	c
+1	1
+2	2
 === GREATEST / LEAST on column args with NULL rows (MYSQL_* NULL prop) ===
 SELECT id,
        GREATEST(d, DATE '2024-01-01') IS NULL AS g_is_null,
