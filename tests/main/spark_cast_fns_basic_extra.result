@@ -1,0 +1,97 @@
+=== BINARY: String → Bytes via UTF-8 ===
+SELECT BINARY('hello')                                        AS bin_hello;
+bin_hello
+hello
+SELECT LENGTH(BINARY('hello'))                                AS bin_hello_len_5;
+bin_hello_len_5
+5
+SELECT LENGTH(BINARY('café'))                                 AS bin_cafe_len_5_bytes;
+bin_cafe_len_5_bytes
+5
+SELECT LENGTH(BINARY('café')) > LENGTH('café')                AS bytes_gt_chars;
+bytes_gt_chars
+1
+SELECT HEX(BINARY('café'))                                    AS hex_cafe_bytes;
+hex_cafe_bytes
+636166C3A9
+=== BINARY: NULL + non-string coerce ===
+SELECT BINARY(NULL)                                           AS null_propagates;
+null_propagates
+NULL
+SELECT BINARY(NULL) IS NULL                                   AS null_pred;
+null_pred
+1
+SELECT BINARY(42)                                             AS int_coerce;
+int_coerce
+42
+SELECT LENGTH(BINARY(42))                                     AS int_coerce_len_2;
+int_coerce_len_2
+2
+SELECT BINARY(TRUE)                                           AS bool_coerce;
+bool_coerce
+true
+=== BINARY: arity errors → 1105 ===
+SELECT BINARY();
+ERROR 1105: execution error: BINARY requires 1 argument
+SELECT BINARY('a', 'b');
+ERROR 1105: execution error: BINARY requires 1 argument
+=== CAST(x AS BINARY) is DIFFERENT — type-not-recognized ===
+SELECT CAST('hello' AS BINARY);
+ERROR 1105: execution error: unsupported CAST target type: BINARY
+=== DECIMAL: scalar → Decimal ===
+SELECT DECIMAL(42)                                            AS int_to_dec;
+int_to_dec
+42
+SELECT DECIMAL('3.14')                                        AS str_to_dec;
+str_to_dec
+3.14
+SELECT DECIMAL(3.14)                                          AS dec_passthrough;
+dec_passthrough
+3.14
+SELECT DECIMAL(-5)                                            AS neg_int;
+neg_int
+-5
+SELECT DECIMAL(3.14) = 3.14                                   AS dec_eq_lit;
+dec_eq_lit
+1
+=== DECIMAL: non-finite Float → NULL (rust_decimal can't represent) ===
+SELECT DECIMAL(CAST('NaN'      AS DOUBLE PRECISION))          AS dec_nan_null;
+dec_nan_null
+NULL
+SELECT DECIMAL(CAST('Infinity' AS DOUBLE PRECISION))          AS dec_inf_null;
+dec_inf_null
+NULL
+SELECT DECIMAL(CAST('-Infinity' AS DOUBLE PRECISION))         AS dec_neg_inf_null;
+dec_neg_inf_null
+NULL
+SELECT DECIMAL(CAST('NaN' AS DOUBLE PRECISION)) IS NULL       AS dec_nan_pred;
+dec_nan_pred
+1
+=== DECIMAL: Bool → 1 / 0 via coerce_value ===
+SELECT DECIMAL(TRUE)                                          AS bool_true_to_1;
+bool_true_to_1
+1
+SELECT DECIMAL(FALSE)                                         AS bool_false_to_0;
+bool_false_to_0
+0
+SELECT DECIMAL(TRUE) = 1                                      AS bool_dec_ne_int_1;
+bool_dec_ne_int_1
+0
+SELECT DECIMAL(TRUE) = DECIMAL(1)                             AS bool_dec_ne_dec_1;
+bool_dec_ne_dec_1
+0
+SELECT DECIMAL(TRUE) = TRUE                                   AS bool_dec_eq_bool_true;
+bool_dec_eq_bool_true
+1
+=== DECIMAL: NULL propagation ===
+SELECT DECIMAL(NULL)                                          AS null_propagates;
+null_propagates
+NULL
+SELECT DECIMAL(NULL) IS NULL                                  AS null_pred;
+null_pred
+1
+=== DECIMAL: arity errors → 1105 ===
+SELECT DECIMAL();
+ERROR 1105: execution error: DECIMAL requires 1 argument
+SELECT DECIMAL(1, 2);
+ERROR 1105: execution error: DECIMAL requires 1 argument
