@@ -3,107 +3,61 @@
 # from MySQL's mysql-test/.
 #
 # Existing coverage (do NOT duplicate):
+#   - variable_basic_extra.test:107-133 already pins SHOW
+#     VARIABLES / VARIABLES LIKE / STATUS / WARNINGS /
+#     ENGINES / PROCESSLIST. Same `--echo === KNOWN
+#     DIVERGENCE ===` + empty-result framing.
+#   - charset_collation_basic_extra.test:78-80 pins SHOW
+#     COLLATION (and :116-118 for SHOW COLLATION LIKE).
+#   - variable_basic_extra.test:85-87 also pins SHOW
+#     COLLATION via a second framing.
+#   - auth_basic_extra.test:74-80 pins SHOW GRANTS and
+#     SHOW GRANTS FOR 'u'@'h'.
 #   - show_basic_extra.test pins SHOW DATABASES / TABLES /
-#     COLUMNS / CREATE TABLE / TABLES LIKE. Its header
-#     mentions in prose that VARIABLES / STATUS / PROCESSLIST
-#     / GRANTS "all parse and execute without error but
-#     return empty result sets" and explicitly says they are
-#     "NOT pinned positively in the body". This slice closes
-#     that gap.
+#     COLUMNS / CREATE TABLE / TABLES LIKE.
 #
-# This slice pins:
-#   - SHOW VARIABLES — empty result, no error.
-#   - SHOW STATUS — empty result, no error.
-#   - SHOW PROCESSLIST — empty result, no error.
-#   - SHOW GRANTS — empty result, no error.
-#   - SHOW ENGINES — empty result, no error.
-#   - SHOW WARNINGS — empty result, no error.
-#   - SHOW ERRORS — empty result, no error.
-#   - SHOW CHARSET — empty result, no error.
-#   - SHOW PRIVILEGES — empty result, no error.
-#   - SHOW COLLATION — RETURNS ONE ROW (utf8mb4_general_ci).
-#     OUTLIER: the only SHOW in this group that returns data.
+# After full duplicate audit, only THREE empty-stub SHOWs
+# remain uncovered:
+#   - SHOW ERRORS
+#   - SHOW CHARSET (the CHARSET-only variant, not COLLATION)
+#   - SHOW PRIVILEGES
+# This slice pins exactly those three. Initial draft of this
+# slice over-claimed coverage gaps; narrowed after review
+# pointed out the duplicates.
 #
 # Big-picture finding:
-#   zeta's SHOW surface accepts 10 commands that MySQL apps
-#   commonly probe for capability detection, but 9 of them
-#   return empty result sets (no rows). The 10th, SHOW
-#   COLLATION, hardcodes a single row representing the
-#   default UTF-8 collation. This means MySQL apps doing
-#   `SHOW VARIABLES LIKE '%timeout%'` to detect connection-
-#   timeout config will get empty results (no error), and
-#   apps doing `SHOW COLLATION` to detect charset support
-#   get exactly one row.
-#
-#   The sentinel value: if a future implementation lands any
-#   of these (e.g. SHOW VARIABLES starts returning real
-#   server vars), the corresponding row will start returning
-#   rows and break the test. That's intentional — the test
-#   triggers a re-evaluation of whether the new behavior is
-#   the right behavior, AND ensures the .result file gets
-#   updated to capture the new output.
-#
-#   Empty-result detection: the MTR runner format emits an
-#   echo line for the SQL followed by NOTHING when zero rows
-#   are returned (no header, no data). When a row IS
-#   returned, the header line + data line both appear. So
-#   the format reliably distinguishes "empty" from "non-
-#   empty". (Verified: SHOW COLLATION below records the
-#   header + data, while the others record only the echo.)
+#   zeta's MySQL shim has TWO classes of empty-result SHOW
+#   dispatch:
+#     - SHOW WARNINGS routes to MySqlResult::Warnings
+#       (3-column shape).
+#     - SHOW VARIABLES/STATUS/ERRORS/CHARSET/PRIVILEGES route
+#       to MySqlResult::EmptyShow (2-column shape:
+#       Variable_name, Value). SHOW ERRORS technically has
+#       the wrong shape (MySQL gives Level/Code/Message),
+#       but the empty rendering masks this.
+#   The MTR format only emits the header line when there's
+#   at least one row — so this shape-divergence is invisible
+#   in the recorded .result. Pinning these documents the
+#   no-error parse path; a future fix that wires real data
+#   would also need to fix the column shape.
 #
 # Adaptation notes:
-#   # zeta-adapt: SHOW VARIABLES / STATUS / PROCESSLIST /
-#     GRANTS / ENGINES / WARNINGS / ERRORS / CHARSET /
-#     PRIVILEGES all execute without error but return EMPTY
-#     result sets. Apps doing capability probing with these
-#     get no rows back.
-#   # zeta-adapt: SHOW COLLATION returns ONE row:
-#     utf8mb4_general_ci, charset utf8mb4, id 45, default
-#     yes, compiled yes, sortlen 1.
+#   # zeta-adapt: SHOW ERRORS, SHOW CHARSET, SHOW PRIVILEGES
+#     all execute without error but return EMPTY result sets.
+#   # zeta-adapt: If you need actual server-state introspection,
+#     query information_schema / pg_catalog directly — those
+#     surfaces are at least partially populated.
 
---echo === SHOW VARIABLES — empty stub ===
-
-SHOW VARIABLES;
-
---echo === SHOW STATUS — empty stub ===
-
-SHOW STATUS;
-
---echo === SHOW PROCESSLIST — empty stub ===
-
-SHOW PROCESSLIST;
-
---echo === SHOW GRANTS — empty stub ===
-
-SHOW GRANTS;
-
---echo === SHOW ENGINES — empty stub ===
-
-SHOW ENGINES;
-
---echo === SHOW WARNINGS — empty stub ===
-
-SHOW WARNINGS;
-
---echo === SHOW ERRORS — empty stub ===
+--echo === SHOW ERRORS — empty stub (MySQL: Level/Code/Message; zeta empty) ===
 
 SHOW ERRORS;
 
 --echo === SHOW CHARSET — empty stub ===
 
+# Distinct from charset_collation_basic_extra.test (which
+# covers SHOW COLLATION, NOT SHOW CHARSET).
 SHOW CHARSET;
 
 --echo === SHOW PRIVILEGES — empty stub ===
 
 SHOW PRIVILEGES;
-
---echo === SHOW COLLATION — OUTLIER, returns one row ===
-
-SHOW COLLATION;
-
---echo === SHOW WARNINGS pattern variants — also empty ===
-
-# MySQL allows SHOW WARNINGS LIMIT n, SHOW COUNT(*) WARNINGS,
-# etc. Pin the LIMIT variant; the count form may parse
-# differently (skip for now to keep slice focused).
-SHOW WARNINGS LIMIT 10;
