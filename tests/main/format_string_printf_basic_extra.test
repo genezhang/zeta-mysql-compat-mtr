@@ -37,9 +37,13 @@
 #   arg slot is wasted. This makes the function safe against
 #   typos in the format string — no panic, no error.
 #
-#   The `%n` conversion produces a LITERAL NEWLINE (not the
-#   C-style "count chars written"). This matches Java's
-#   String.format semantics.
+#   The `%n` conversion produces a LITERAL '\n' (POSIX
+#   newline, NOT the C-style "count chars written" nor
+#   Java's String.format `%n` which emits the platform
+#   line separator — `\r\n` on Windows, 2 bytes). The impl
+#   unconditionally pushes a single '\n' byte; this matches
+#   Spark `format_string`'s POSIX-only behavior. LENGTH=8
+#   below would FAIL under real Java semantics on Windows.
 #
 #   Positional args use `%N$` (1-based) prefix. The auto-
 #   index continues from where positional refs left off (per
@@ -48,7 +52,9 @@
 #
 # Adaptation notes:
 #   # zeta-adapt: FORMAT_STRING ≡ PRINTF — pick whichever.
-#   # zeta-adapt: %n = literal newline (Java-style, not C).
+#   # zeta-adapt: %n = literal POSIX '\n' (Spark
+#     format_string, NOT Java's platform-dependent
+#     line separator, NOT C's "char count").
 #   # zeta-adapt: Unknown spec (e.g. %q) emits verbatim;
 #     does NOT error. Catches typos silently — review
 #     format strings carefully.
@@ -94,7 +100,10 @@ SELECT FORMAT_STRING('%1$s %1$s', 'hi')                       AS positional_reus
 --echo === Escapes: %% literal percent, %n literal newline ===
 
 SELECT FORMAT_STRING('percent %%')                            AS literal_percent;
-# %n produces a LITERAL newline char (Java semantics, not C).
+# %n produces a LITERAL POSIX '\n' (1 byte, Spark
+# format_string semantics — NOT Java's
+# System.lineSeparator() which would be 2 bytes on
+# Windows, NOT C's "char count written").
 # LENGTH proves the newline is real (8 chars: 'newline' + '\n').
 SELECT LENGTH(FORMAT_STRING('newline%n'))                     AS newline_len_8;
 
