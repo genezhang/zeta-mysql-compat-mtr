@@ -4,7 +4,13 @@
 #
 # Existing coverage (do NOT duplicate):
 #   - WIDTH_BUCKET — NONE (zero compat-mtr coverage).
-#     PG/SQL-standard equiwidth bucketing function.
+#     SQL-standard equiwidth bucketing function. NOTE on
+#     dialect: zeta's IMPL is SPARK-flavored, not PG-flavored.
+#     Per the impl docstring at lib.rs:49333-49336, PG would
+#     RAISE on invalid inputs (count<=0, NaN, etc.); Spark
+#     and zeta return NULL. App ports from PG using
+#     WIDTH_BUCKET need to handle the NULL-on-invalid
+#     surface instead of trapping errors.
 #
 # This slice pins:
 #   - WIDTH_BUCKET(operand, low, high, count) returns the
