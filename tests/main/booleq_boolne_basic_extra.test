@@ -1,0 +1,141 @@
+# Independently authored BOOLEQ / BOOLNE smoke for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - BOOLEQ — NONE (zero compat-mtr coverage across ALL
+#     test files, not just _basic_extra — checked broadly
+#     after PR #357 lesson).
+#   - BOOLNE — NONE.
+#   - boolean_logic_basic_extra and boolean_edges_basic_extra
+#     cover the `=`, `<>` operators on boolean expressions
+#     but NOT the named function-style forms.
+#   - xor_logic_basic_extra and null_3vl_basic_extra cover
+#     three-valued logic; this slice adds NULL prop pinning
+#     specifically through the function-call path.
+#
+# This slice pins:
+#   - BOOLEQ(a, b) ≡ a = b on Bool inputs.
+#   - BOOLNE(a, b) ≡ a <> b on Bool inputs.
+#   - Both strictly require Value::Bool — NO type coercion
+#     from Int / String / etc.
+#   - Both NULL-prop on either arg (3VL — NULL in → NULL out,
+#     consistent with PG `=` / `<>` semantics).
+#   - Wrong-type per-position error message uses
+#     "{name} first/second argument must be boolean".
+#   - Arity (0, 1, 3) → 1105 "requires exactly 2 arguments".
+#
+# Big-picture finding:
+#   These are PG operator-functions for the boolean
+#   equality operators — they exist primarily so that the
+#   PG regression test suite (boolean.sql) can call them
+#   directly. The impl shares one arm at lib.rs:45895 with
+#   dispatch via `upper == "BOOLEQ"` / else for BOOLNE
+#   (last line at lib.rs:45923).
+#
+#   STRIKING — STRICT BOOL TYPING. The match arms at
+#   lib.rs:45906-45921 accept ONLY Value::Bool. Even
+#   though zeta has many places where Int 0/1 implicitly
+#   coerces to Bool (e.g., MySQL `WHERE int_col`), these
+#   functions REFUSE the coercion: `BOOLEQ(1, 1)` errors
+#   with "BOOLEQ first argument must be boolean". This
+#   is the inverse of the looser stringification fallback
+#   pattern seen in PR #355 (STRPOS/STARTS_WITH) and the
+#   PG_ADVISORY_LOCK family (PR #354) which only accept
+#   integers.
+#
+#   3VL NULL-prop applies to BOTH args — there is no
+#   "NULL = NULL" shortcut. PG distinguishes `IS NOT
+#   DISTINCT FROM` for null-safe equality; BOOLEQ does
+#   NOT provide that semantic.
+#
+# Adaptation notes:
+#   # zeta-adapt: BOOLEQ/BOOLNE require STRICT Value::Bool
+#     — no Int/String coercion. To compare via these
+#     functions, cast args to BOOLEAN first.
+#   # zeta-adapt: 3VL NULL prop on either arg. Use
+#     `IS NOT DISTINCT FROM` if you need null-safe
+#     equality.
+#   # zeta-adapt: BOOLEQ ≡ `=`; BOOLNE ≡ `<>`. The
+#     function-style spelling exists for PG regression-
+#     suite compatibility.
+
+--echo === BOOLEQ — basic truth table ===
+
+SELECT BOOLEQ(TRUE, TRUE)                                     AS tt_true;
+SELECT BOOLEQ(TRUE, FALSE)                                    AS tf_false;
+SELECT BOOLEQ(FALSE, TRUE)                                    AS ft_false;
+SELECT BOOLEQ(FALSE, FALSE)                                   AS ff_true;
+
+--echo === BOOLNE — basic truth table (inverse of BOOLEQ) ===
+
+SELECT BOOLNE(TRUE, TRUE)                                     AS tt_false;
+SELECT BOOLNE(TRUE, FALSE)                                    AS tf_true;
+SELECT BOOLNE(FALSE, TRUE)                                    AS ft_true;
+SELECT BOOLNE(FALSE, FALSE)                                   AS ff_false;
+
+--echo === BOOLEQ / BOOLNE — equivalence with operators ===
+
+SELECT BOOLEQ(TRUE, FALSE) = (TRUE = FALSE)                   AS booleq_eq_op_eq;
+SELECT BOOLNE(TRUE, FALSE) = (TRUE <> FALSE)                  AS boolne_eq_op_ne;
+SELECT BOOLEQ(TRUE, TRUE)  = NOT BOOLNE(TRUE, TRUE)           AS booleq_is_not_boolne;
+
+--echo === STRIKING: STRICT Bool typing (no Int coercion) ===
+
+# Even though Int 1 commonly coerces to Bool TRUE elsewhere,
+# BOOLEQ/BOOLNE refuse the coercion at the function arm.
+--error 1105
+SELECT BOOLEQ(1, 1);
+--error 1105
+SELECT BOOLEQ(TRUE, 1);
+--error 1105
+SELECT BOOLNE(0, 1);
+--error 1105
+SELECT BOOLNE(FALSE, 0);
+# String inputs also rejected.
+--error 1105
+SELECT BOOLEQ('t', 'f');
+# Even a Bool-shaped string ('true') doesn't get coerced.
+--error 1105
+SELECT BOOLEQ(TRUE, 'true');
+
+--echo === Wrong-type position pinpointing ===
+
+# First-arg-bad error format: "{name} first argument
+# must be boolean".
+--error 1105
+SELECT BOOLEQ(42, TRUE);
+# Second-arg-bad error format: "{name} second argument
+# must be boolean".
+--error 1105
+SELECT BOOLEQ(TRUE, 42);
+
+--echo === 3VL — NULL prop on either arg ===
+
+SELECT BOOLEQ(NULL, TRUE)                                     AS null_left_eq;
+SELECT BOOLEQ(TRUE, NULL)                                     AS null_right_eq;
+SELECT BOOLEQ(NULL, NULL)                                     AS null_both_eq;
+SELECT BOOLNE(NULL, TRUE)                                     AS null_left_ne;
+SELECT BOOLNE(FALSE, NULL)                                    AS null_right_ne;
+SELECT BOOLNE(NULL, NULL)                                     AS null_both_ne;
+SELECT BOOLEQ(NULL, NULL) IS NULL                             AS null_pred;
+
+--echo === Contrast: IS NOT DISTINCT FROM IS the null-safe equality (NOT BOOLEQ) ===
+
+# BOOLEQ propagates NULL; IS NOT DISTINCT FROM treats NULL
+# as a value (NULL = NULL is true under DISTINCT semantics).
+SELECT BOOLEQ(NULL, NULL) IS NULL                             AS booleq_null_null_propagates;
+SELECT (NULL IS NOT DISTINCT FROM NULL)                       AS isnotdistinct_null_null_true;
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT BOOLEQ();
+--error 1105
+SELECT BOOLEQ(TRUE);
+--error 1105
+SELECT BOOLEQ(TRUE, FALSE, TRUE);
+--error 1105
+SELECT BOOLNE();
+--error 1105
+SELECT BOOLNE(TRUE, FALSE, TRUE);
