@@ -1,0 +1,59 @@
+=== CREATE DOMAIN — basic type alias ===
+CREATE DOMAIN dom_email AS TEXT;
+CREATE DOMAIN dom_score AS INTEGER;
+=== Use domain in CREATE TABLE — column gets base type ===
+CREATE TABLE users_with_dom (
+    id    INT PRIMARY KEY,
+    email dom_email,
+    score dom_score
+);
+INSERT INTO users_with_dom VALUES (1, 'alice@example.com', 42);
+SELECT id, email, score FROM users_with_dom ORDER BY id;
+id	email	score
+1	alice@example.com	42
+=== CREATE DOMAIN — DEFAULT clause parses ===
+CREATE DOMAIN dom_with_default AS INTEGER DEFAULT 99;
+CREATE TABLE need_default (id INT, val dom_with_default);
+INSERT INTO need_default VALUES (1, 5);
+SELECT * FROM need_default;
+id	val
+1	5
+=== CREATE DOMAIN — CHECK clause parses (NOT ENFORCED on insert) ===
+CREATE DOMAIN dom_positive_check AS INTEGER CHECK (VALUE > 0);
+CREATE TABLE check_test (id INT, val dom_positive_check);
+INSERT INTO check_test VALUES (1, 5);
+INSERT INTO check_test VALUES (2, -1);
+INSERT INTO check_test VALUES (3, 0);
+SELECT * FROM check_test ORDER BY id;
+id	val
+1	5
+2	-1
+3	0
+=== STRIKING: NOT NULL clause is NOT PARSEABLE ===
+CREATE DOMAIN dom_required AS TEXT NOT NULL;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: NOT at Line: 1, Column: 36
+CREATE DOMAIN dom_required2 AS TEXT CONSTRAINT nn NOT NULL;
+ERROR 1064: SQL parse error: sql parser error: Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK, found: NOT at Line: 1, Column: 51
+=== STRIKING: CHECK + DEFAULT in one CREATE DOMAIN — not parseable ===
+CREATE DOMAIN dom_combined AS INTEGER CHECK (VALUE > 0) DEFAULT 99;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: DEFAULT at Line: 1, Column: 57
+=== DROP DOMAIN — basic + idempotent IF EXISTS ===
+CREATE DOMAIN dom_disposable AS TEXT;
+DROP DOMAIN dom_disposable;
+DROP DOMAIN dom_disposable;
+ERROR 1105: execution error: domain "dom_disposable" does not exist
+DROP DOMAIN IF EXISTS dom_disposable;
+DROP DOMAIN IF EXISTS dom_never_existed;
+=== STRIKING: DROP DOMAIN with dependent table — succeeds ===
+DROP DOMAIN dom_email;
+INSERT INTO users_with_dom VALUES (4, 'survives@example.com', 99);
+SELECT id, email FROM users_with_dom WHERE id = 4;
+id	email
+4	survives@example.com
+=== Cleanup ===
+DROP TABLE users_with_dom;
+DROP TABLE need_default;
+DROP TABLE check_test;
+DROP DOMAIN dom_score;
+DROP DOMAIN dom_with_default;
+DROP DOMAIN dom_positive_check;
