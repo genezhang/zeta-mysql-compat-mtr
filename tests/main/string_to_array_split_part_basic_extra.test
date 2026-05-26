@@ -1,0 +1,186 @@
+# Independently authored STRING_TO_ARRAY + SPLIT_PART smoke
+# for the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - STRING_TO_ARRAY — NONE (zero compat-mtr coverage).
+#     PG-flavor split into ARRAY.
+#   - SPLIT_PART — NONE (zero compat-mtr coverage). PG-flavor
+#     split + indexed extract.
+#   - array_type_basic_extra covers ARRAY_TO_STRING (the
+#     inverse direction); doesn't cover STRING_TO_ARRAY.
+#   - SUBSTRING_INDEX (MySQL-flavor) is covered in
+#     substring_index_basic_extra; semantically overlapping
+#     with SPLIT_PART but different syntax/semantics.
+#
+# This slice pins:
+#   - STRING_TO_ARRAY(s, delim) basic split → ARRAY.
+#   - STRING_TO_ARRAY(s, delim, null_str) — matching elements
+#     become NULL.
+#   - STRING_TO_ARRAY with NULL delimiter → char-by-char
+#     split (every char becomes an element).
+#   - STRING_TO_ARRAY with NULL string → NULL.
+#   - STRING_TO_ARRAY edge: empty string → 1-element array
+#     containing one empty string (Rust split semantics).
+#   - STRING_TO_ARRAY arity (0, 1, 4 args) → 1105.
+#   - SPLIT_PART(s, delim, pos) basic extract.
+#   - SPLIT_PART pos out of range → EMPTY STRING (NOT NULL,
+#     NOT error — uses `unwrap_or(&"")` at lib.rs:49535).
+#   - SPLIT_PART pos < 1 → ERROR 1105 'position must be >= 1'.
+#   - SPLIT_PART NULL prop (any of 3 args NULL → NULL).
+#   - SPLIT_PART non-int position → ERROR 1105.
+#   - SPLIT_PART UTF-8 multibyte preserved through split.
+#   - SPLIT_PART vs SUBSTRING_INDEX comparison row (cross-
+#     surface contrast since both extract from a delimited
+#     string).
+#
+# Big-picture finding:
+#   STRING_TO_ARRAY has a SURPRISE: NULL delimiter is NOT a
+#   NULL-propagation case — instead it triggers char-by-char
+#   splitting (one element per char). The impl explicitly
+#   handles this at lib.rs:48823-48831. This differs from
+#   PG which returns NULL for NULL delimiter. Pinned as a
+#   zeta-specific behavior.
+#
+#   CRASH BUG (NOT PINNED — runner can't --error a
+#   connection-close): STRING_TO_ARRAY('a') with exactly 1
+#   arg passes the arity check at lib.rs:48813 (which only
+#   rejects is_empty() || > 3) and then panics at args[1]
+#   index-out-of-bounds. The wire returns "connection
+#   closed" with no errno. Fix: tighten the guard to
+#   `args.len() < 2 || args.len() > 3`. Documented here
+#   as a known bug.
+#
+#   SPLIT_PART has a different out-of-range behavior than
+#   most extractors: it returns EMPTY STRING (not NULL, not
+#   error) when the position exceeds the number of parts.
+#   This matches PG. But pos < 1 is an ERROR (PG returns
+#   empty string for pos == 0 in older versions; the modern
+#   pos < 1 → error matches PG 14+).
+#
+#   Cross-link: SUBSTRING_INDEX (MySQL) is the closest
+#   analog but has different semantics:
+#     - SUBSTRING_INDEX(s, delim, n) returns everything
+#       BEFORE the n-th occurrence (or after if n < 0).
+#     - SPLIT_PART(s, delim, n) returns the n-th part
+#       (1-indexed) ONLY, not before/after.
+#
+# Adaptation notes:
+#   # zeta-adapt: STRING_TO_ARRAY(s, NULL) → char-split
+#     array (NOT NULL — divergent from PG, which returns
+#     NULL for NULL delim).
+#   # zeta-adapt: STRING_TO_ARRAY(s, delim, null_str) → null
+#     elements where s parts match null_str.
+#   # zeta-adapt: SPLIT_PART pos > parts.count → empty
+#     string (NOT NULL, NOT error).
+#   # zeta-adapt: SPLIT_PART pos < 1 → 1105 'position must
+#     be >= 1'.
+
+--echo === STRING_TO_ARRAY: basic 2-arg split ===
+
+SELECT STRING_TO_ARRAY('a,b,c', ',')                          AS basic;
+SELECT STRING_TO_ARRAY('one|two|three', '|')                  AS pipe_delim;
+# Multi-char delimiter.
+SELECT STRING_TO_ARRAY('foo--bar--baz', '--')                 AS multi_char_delim;
+# Single element when delimiter not found.
+SELECT STRING_TO_ARRAY('alone', ',')                          AS no_delim_found;
+# Empty string → 1-element array of empty string.
+SELECT STRING_TO_ARRAY('', ',')                               AS empty_string;
+
+--echo === STRING_TO_ARRAY: 3-arg with null_string ===
+
+# Matching elements become NULL.
+SELECT STRING_TO_ARRAY('a,N,c', ',', 'N')                     AS null_marker_N;
+# null_string can be empty string.
+SELECT STRING_TO_ARRAY('a,,c', ',', '')                       AS null_empty_marker;
+
+--echo === STRING_TO_ARRAY: SURPRISE — NULL delim → char-by-char split ===
+
+# NOT NULL — the impl explicitly char-splits when delim
+# is NULL (lib.rs:48823-48831). Divergent from PG, which
+# returns NULL for NULL delim.
+SELECT STRING_TO_ARRAY('abc', NULL)                           AS null_delim_char_split;
+
+--echo === STRING_TO_ARRAY: NULL string → NULL ===
+
+SELECT STRING_TO_ARRAY(NULL, ',')                             AS null_s;
+SELECT STRING_TO_ARRAY(NULL, ',') IS NULL                     AS null_s_pred;
+
+--echo === STRING_TO_ARRAY: arity errors → 1105 ===
+
+# 0-arg and 4-arg cleanly error 1105 via the arity check.
+--error 1105
+SELECT STRING_TO_ARRAY();
+--error 1105
+SELECT STRING_TO_ARRAY('a', ',', 'N', 'X');
+# CRASH BUG: STRING_TO_ARRAY('a') (1-arg) crashes the server
+# with "connection closed" (no errno). The arity guard at
+# lib.rs:48813 only rejects args.is_empty() || args.len() > 3,
+# so 1-arg passes the guard but then panics at args[1]
+# index-out-of-bounds. NOT PINNED here because the runner
+# cannot --error against a connection-close (no errno).
+# Documented in the header as a known crash bug; do NOT
+# call STRING_TO_ARRAY('a') in production.
+
+--echo === SPLIT_PART: basic 3-arg extract (1-indexed) ===
+
+SELECT SPLIT_PART('a,b,c,d', ',', 1)                          AS first_part;
+SELECT SPLIT_PART('a,b,c,d', ',', 2)                          AS second_part;
+SELECT SPLIT_PART('a,b,c,d', ',', 4)                          AS last_part;
+# Multi-char delim.
+SELECT SPLIT_PART('foo--bar--baz', '--', 2)                   AS multi_char_part_2;
+
+--echo === SPLIT_PART: pos > parts.count → EMPTY STRING (not NULL) ===
+
+# 4 parts; pos 5 → empty string.
+SELECT SPLIT_PART('a,b,c,d', ',', 5)                          AS overflow_empty;
+SELECT SPLIT_PART('a,b,c,d', ',', 5) = ''                     AS overflow_empty_eq_string;
+SELECT SPLIT_PART('a,b,c,d', ',', 5) IS NULL                  AS overflow_NOT_null;
+
+--echo === SPLIT_PART: pos < 1 → ERROR 1105 ===
+
+--error 1105
+SELECT SPLIT_PART('a,b,c', ',', 0);
+--error 1105
+SELECT SPLIT_PART('a,b,c', ',', -1);
+
+--echo === SPLIT_PART: NULL prop on any arg ===
+
+SELECT SPLIT_PART(NULL, ',', 1)                               AS null_s;
+SELECT SPLIT_PART('a,b,c', NULL, 1)                           AS null_delim;
+SELECT SPLIT_PART('a,b,c', ',', NULL)                         AS null_pos;
+SELECT SPLIT_PART(NULL, ',', 1) IS NULL                       AS null_pred;
+
+--echo === SPLIT_PART: non-int position → ERROR 1105 ===
+
+--error 1105
+SELECT SPLIT_PART('a,b,c', ',', 'not_an_int');
+--error 1105
+SELECT SPLIT_PART('a,b,c', ',', CAST(1.5 AS DOUBLE PRECISION));
+
+--echo === SPLIT_PART: UTF-8 multibyte preserved through split ===
+
+# Multibyte chars in the parts survive intact.
+SELECT SPLIT_PART('café-test-bréve', '-', 1)                  AS utf8_part_1;
+SELECT SPLIT_PART('café-test-bréve', '-', 3)                  AS utf8_part_3;
+
+--echo === Cross-link: SPLIT_PART vs SUBSTRING_INDEX (DIFFERENT semantics) ===
+
+# SUBSTRING_INDEX('a,b,c', ',', 2) returns 'a,b' (everything
+# BEFORE the 2nd occurrence of ','). SPLIT_PART('a,b,c', ',', 2)
+# returns 'b' (just the 2nd part). They're NOT interchangeable.
+SELECT SUBSTRING_INDEX('a,b,c', ',', 2)                       AS substr_index_before_2;
+SELECT SPLIT_PART('a,b,c', ',', 2)                            AS split_part_at_2;
+SELECT SUBSTRING_INDEX('a,b,c', ',', 2)
+    <> SPLIT_PART('a,b,c', ',', 2)                            AS different_semantics;
+
+--echo === SPLIT_PART: arity errors → 1105 ===
+
+--error 1105
+SELECT SPLIT_PART();
+--error 1105
+SELECT SPLIT_PART('a,b');
+--error 1105
+SELECT SPLIT_PART('a,b', ',');
+--error 1105
+SELECT SPLIT_PART('a,b', ',', 1, 2);
