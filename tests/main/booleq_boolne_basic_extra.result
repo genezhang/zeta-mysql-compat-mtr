@@ -1,0 +1,94 @@
+=== BOOLEQ — basic truth table ===
+SELECT BOOLEQ(TRUE, TRUE)                                     AS tt_true;
+tt_true
+1
+SELECT BOOLEQ(TRUE, FALSE)                                    AS tf_false;
+tf_false
+0
+SELECT BOOLEQ(FALSE, TRUE)                                    AS ft_false;
+ft_false
+0
+SELECT BOOLEQ(FALSE, FALSE)                                   AS ff_true;
+ff_true
+1
+=== BOOLNE — basic truth table (inverse of BOOLEQ) ===
+SELECT BOOLNE(TRUE, TRUE)                                     AS tt_false;
+tt_false
+0
+SELECT BOOLNE(TRUE, FALSE)                                    AS tf_true;
+tf_true
+1
+SELECT BOOLNE(FALSE, TRUE)                                    AS ft_true;
+ft_true
+1
+SELECT BOOLNE(FALSE, FALSE)                                   AS ff_false;
+ff_false
+0
+=== BOOLEQ / BOOLNE — equivalence with operators ===
+SELECT BOOLEQ(TRUE, FALSE) = (TRUE = FALSE)                   AS booleq_eq_op_eq;
+booleq_eq_op_eq
+1
+SELECT BOOLNE(TRUE, FALSE) = (TRUE <> FALSE)                  AS boolne_eq_op_ne;
+boolne_eq_op_ne
+1
+SELECT BOOLEQ(TRUE, TRUE)  = NOT BOOLNE(TRUE, TRUE)           AS booleq_is_not_boolne;
+booleq_is_not_boolne
+1
+=== STRIKING: STRICT Bool typing (no Int coercion) ===
+SELECT BOOLEQ(1, 1);
+ERROR 1105: execution error: BOOLEQ first argument must be boolean
+SELECT BOOLEQ(TRUE, 1);
+ERROR 1105: execution error: BOOLEQ second argument must be boolean
+SELECT BOOLNE(0, 1);
+ERROR 1105: execution error: BOOLNE first argument must be boolean
+SELECT BOOLNE(FALSE, 0);
+ERROR 1105: execution error: BOOLNE second argument must be boolean
+SELECT BOOLEQ('t', 'f');
+ERROR 1105: execution error: BOOLEQ first argument must be boolean
+SELECT BOOLEQ(TRUE, 'true');
+ERROR 1105: execution error: BOOLEQ second argument must be boolean
+=== Wrong-type position pinpointing ===
+SELECT BOOLEQ(42, TRUE);
+ERROR 1105: execution error: BOOLEQ first argument must be boolean
+SELECT BOOLEQ(TRUE, 42);
+ERROR 1105: execution error: BOOLEQ second argument must be boolean
+=== 3VL — NULL prop on either arg ===
+SELECT BOOLEQ(NULL, TRUE)                                     AS null_left_eq;
+null_left_eq
+NULL
+SELECT BOOLEQ(TRUE, NULL)                                     AS null_right_eq;
+null_right_eq
+NULL
+SELECT BOOLEQ(NULL, NULL)                                     AS null_both_eq;
+null_both_eq
+NULL
+SELECT BOOLNE(NULL, TRUE)                                     AS null_left_ne;
+null_left_ne
+NULL
+SELECT BOOLNE(FALSE, NULL)                                    AS null_right_ne;
+null_right_ne
+NULL
+SELECT BOOLNE(NULL, NULL)                                     AS null_both_ne;
+null_both_ne
+NULL
+SELECT BOOLEQ(NULL, NULL) IS NULL                             AS null_pred;
+null_pred
+1
+=== Contrast: IS NOT DISTINCT FROM IS the null-safe equality (NOT BOOLEQ) ===
+SELECT BOOLEQ(NULL, NULL) IS NULL                             AS booleq_null_null_propagates;
+booleq_null_null_propagates
+1
+SELECT (NULL IS NOT DISTINCT FROM NULL)                       AS isnotdistinct_null_null_true;
+isnotdistinct_null_null_true
+1
+=== Arity errors → 1105 ===
+SELECT BOOLEQ();
+ERROR 1105: execution error: BOOLEQ requires exactly 2 arguments
+SELECT BOOLEQ(TRUE);
+ERROR 1105: execution error: BOOLEQ requires exactly 2 arguments
+SELECT BOOLEQ(TRUE, FALSE, TRUE);
+ERROR 1105: execution error: BOOLEQ requires exactly 2 arguments
+SELECT BOOLNE();
+ERROR 1105: execution error: BOOLNE requires exactly 2 arguments
+SELECT BOOLNE(TRUE, FALSE, TRUE);
+ERROR 1105: execution error: BOOLNE requires exactly 2 arguments
