@@ -1,0 +1,19 @@
+=== Unknown info_schema views — SELECT * silent empty ===
+SELECT * FROM information_schema.partitions LIMIT 1;
+SELECT * FROM information_schema.events LIMIT 1;
+SELECT * FROM information_schema.plugins LIMIT 1;
+SELECT * FROM information_schema.profiling LIMIT 1;
+SELECT * FROM information_schema.applicable_roles LIMIT 1;
+=== Privilege views (no zeta ACL surface) — silent empty ===
+SELECT * FROM information_schema.column_privileges LIMIT 1;
+SELECT * FROM information_schema.table_privileges LIMIT 1;
+SELECT * FROM information_schema.schema_privileges LIMIT 1;
+=== STRIKING: garbage view name also silent empty ===
+SELECT * FROM information_schema.completely_madeup_view LIMIT 1;
+SELECT * FROM information_schema.this_does_not_exist LIMIT 1;
+=== STRIKING: explicit-column SELECT also succeeds silently ===
+SELECT PARTITION_NAME FROM information_schema.partitions LIMIT 1;
+SELECT EVENT_NAME FROM information_schema.events LIMIT 1;
+SELECT PLUGIN_NAME FROM information_schema.plugins LIMIT 1;
+SELECT NONSENSE_COLUMN_NAME FROM information_schema.partitions LIMIT 1;
+SELECT XYZZY FROM information_schema.completely_madeup_view LIMIT 1;

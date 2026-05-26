@@ -1,0 +1,122 @@
+# Independently authored information_schema catch-all
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - info_schema_basic_extra and info_schema_stubs_basic_extra
+#     cover the 13+ HANDLED views: tables, columns,
+#     schemata, statistics, key_column_usage,
+#     table_constraints, referential_constraints, views,
+#     character_sets, collations, routines, parameters,
+#     engines, triggers, processlist, user_privileges,
+#     session_variables, global_variables.
+#   - show_catchall_emptyshow_basic_extra (PR #374) covers
+#     the parallel SHOW catch-all at shim.rs:2023.
+#   - pg_catalog_views_sentinel_basic_extra (PR #376)
+#     covers pg_catalog catch-all (1146 errors).
+#
+# This slice covers the information_schema catch-all at
+# zeta-mysqlwire/src/shim.rs:1667-1675 — UNKNOWN
+# information_schema views fall through to
+# `MySqlResult::InformationSchemaEmpty` with a generic
+# 4-column header (TABLE_CATALOG, TABLE_SCHEMA,
+# TABLE_NAME, CONSTRAINT_NAME) and ZERO rows.
+#
+# This slice pins (all silent empty):
+#   - information_schema.partitions (MySQL partition
+#     metadata; zeta has no real partitions).
+#   - information_schema.events (MySQL event scheduler;
+#     CREATE/ALTER/DROP EVENT error 1064 per PR #373).
+#   - information_schema.plugins (no plugin architecture).
+#   - information_schema.profiling (deprecated even in
+#     MySQL 8).
+#   - information_schema.applicable_roles (role
+#     hierarchy; zeta has no roles).
+#   - information_schema.column_privileges (per-column
+#     ACL; zeta has no column-level ACLs).
+#   - information_schema.table_privileges (table-level
+#     ACL; covered loosely by user_privileges).
+#   - information_schema.schema_privileges (schema-level
+#     ACL).
+#   - information_schema.completely_madeup_view (garbage
+#     name — also silent empty).
+#
+# Big-picture finding (CATCH-ALL PARALLELS SHOW):
+#
+#   The mysqlwire shim has TWO parallel "catch-all
+#   absorb to empty" paths:
+#
+#   1. SHOW <unknown> → universal catch-all at
+#      shim.rs:2023 → MySqlResult::EmptyShow (PR #374).
+#
+#   2. SELECT ... FROM information_schema.<unknown> →
+#      catch-all at shim.rs:1667-1675 →
+#      MySqlResult::InformationSchemaEmpty with the
+#      hardcoded 4-col header (TABLE_CATALOG/SCHEMA/
+#      NAME/CONSTRAINT_NAME).
+#
+#   Both swallow garbage silently. Apps can't probe
+#   "does this view exist" via 1146 — they always get
+#   empty rows. Use the HANDLED-view list at shim.rs:
+#   1038-1647 to know what's real vs catch-all.
+#
+#   STRIKING — explicit-column SELECTs ALSO succeed
+#   silently, INCLUDING for completely made-up column
+#   names. The catch-all returns zero rows regardless of
+#   what columns are requested — column-validation
+#   doesn't fire because the planner never reaches the
+#   underlying empty result set. So apps doing `SELECT
+#   PARTITION_NAME FROM ...partitions` or `SELECT
+#   NONSENSE_COL FROM ...partitions` both get empty rows
+#   silently. Maximum permissiveness.
+#
+#   Distinct from pg_catalog (PR #376) which errors
+#   1146 on mysql wire for ALL views — information_
+#   schema is more permissive (silent empty rather than
+#   error).
+#
+# Adaptation notes:
+#   # zeta-adapt: Unknown information_schema views
+#     return silent empty rows over mysql wire (4-col
+#     generic header). Real MySQL would either return
+#     real rows or error 1109 (Unknown table). The
+#     silent-empty behavior catches typos invisibly.
+#   # zeta-adapt: SELECT * AND explicit-column SELECTs
+#     both succeed silently on unknown info_schema views,
+#     even for completely made-up column names. The
+#     catch-all swallows column validation.
+#   # zeta-adapt: Distinct from pg_catalog which 1146s
+#     on mysql wire for everything — info_schema is
+#     more permissive.
+
+--echo === Unknown info_schema views — SELECT * silent empty ===
+
+SELECT * FROM information_schema.partitions LIMIT 1;
+SELECT * FROM information_schema.events LIMIT 1;
+SELECT * FROM information_schema.plugins LIMIT 1;
+SELECT * FROM information_schema.profiling LIMIT 1;
+SELECT * FROM information_schema.applicable_roles LIMIT 1;
+
+--echo === Privilege views (no zeta ACL surface) — silent empty ===
+
+SELECT * FROM information_schema.column_privileges LIMIT 1;
+SELECT * FROM information_schema.table_privileges LIMIT 1;
+SELECT * FROM information_schema.schema_privileges LIMIT 1;
+
+--echo === STRIKING: garbage view name also silent empty ===
+
+# Real MySQL: ERROR 1109 (Unknown table 'X' in
+# information_schema). zeta: silent empty rows.
+SELECT * FROM information_schema.completely_madeup_view LIMIT 1;
+SELECT * FROM information_schema.this_does_not_exist LIMIT 1;
+
+--echo === STRIKING: explicit-column SELECT also succeeds silently ===
+
+# Even completely-made-up column names are accepted by
+# the catch-all — column validation never fires because
+# the result set is empty.
+SELECT PARTITION_NAME FROM information_schema.partitions LIMIT 1;
+SELECT EVENT_NAME FROM information_schema.events LIMIT 1;
+SELECT PLUGIN_NAME FROM information_schema.plugins LIMIT 1;
+SELECT NONSENSE_COLUMN_NAME FROM information_schema.partitions LIMIT 1;
+SELECT XYZZY FROM information_schema.completely_madeup_view LIMIT 1;
