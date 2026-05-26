@@ -1,0 +1,52 @@
+=== WITH ORDINALITY — SILENT-DROP BUG (ordinality column never appears) ===
+SELECT * FROM unnest(ARRAY[10,20,30]) WITH ORDINALITY;
+unnest
+10
+20
+30
+SELECT * FROM unnest(ARRAY[10,20,30]) WITH ORDINALITY AS t(val);
+val
+10
+20
+30
+SELECT * FROM unnest(ARRAY[10,20,30]) WITH ORDINALITY AS t(val, idx);
+ERROR 1105: plan error: table-valued function `unnest` has 1 column available but 2 column aliases specified
+=== FK MATCH FULL — SILENT-SEMANTIC-DEGRADATION BUG (composite partial-NULL row accepted) ===
+CREATE TABLE rs_parent (a INT, b INT, PRIMARY KEY (a, b));
+CREATE TABLE rs_child  (pa INT, pb INT, FOREIGN KEY (pa, pb) REFERENCES rs_parent (a, b) MATCH FULL);
+INSERT INTO rs_child VALUES (NULL, 5);
+SELECT pa, pb FROM rs_child;
+pa	pb
+NULL	5
+DROP TABLE rs_child;
+DROP TABLE rs_parent;
+=== FK MATCH PARTIAL / SIMPLE — accepted as MATCH SIMPLE (same degradation) ===
+CREATE TABLE rp_parent (a INT, b INT, PRIMARY KEY (a, b));
+CREATE TABLE rp_child  (pa INT, pb INT, FOREIGN KEY (pa, pb) REFERENCES rp_parent (a, b) MATCH PARTIAL);
+INSERT INTO rp_child VALUES (NULL, 5);
+DROP TABLE rp_child;
+DROP TABLE rp_parent;
+CREATE TABLE rss_parent (a INT, b INT, PRIMARY KEY (a, b));
+CREATE TABLE rss_child  (pa INT, pb INT, FOREIGN KEY (pa, pb) REFERENCES rss_parent (a, b) MATCH SIMPLE);
+INSERT INTO rss_child VALUES (NULL, 5);
+DROP TABLE rss_child;
+DROP TABLE rss_parent;
+=== Reflection helpers — 9 unknown-function witnesses ===
+SELECT to_regclass('public.unknown_table');
+ERROR 1105: execution error: unknown function: to_regclass
+SELECT to_regtype('integer');
+ERROR 1105: execution error: unknown function: to_regtype
+SELECT to_regproc('sum');
+ERROR 1105: execution error: unknown function: to_regproc
+SELECT to_regoperator('+(int,int)');
+ERROR 1105: execution error: unknown function: to_regoperator
+SELECT pg_get_viewdef('v');
+ERROR 1105: execution error: unknown function: pg_get_viewdef
+SELECT pg_get_functiondef('f');
+ERROR 1105: execution error: unknown function: pg_get_functiondef
+SELECT pg_get_indexdef('idx');
+ERROR 1105: execution error: unknown function: pg_get_indexdef
+SELECT pg_get_constraintdef('c');
+ERROR 1105: execution error: unknown function: pg_get_constraintdef
+SELECT format_type(23, NULL);
+ERROR 1105: execution error: unknown function: format_type

@@ -1,0 +1,236 @@
+# Independently authored PG WITH ORDINALITY +
+# FK MATCH modes + reflection helpers sentinel
+# slice for the GPL MTR-format runner. NOT copied
+# or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - WITH ORDINALITY: ZERO prior (grep'd ALL
+#     .test files).
+#   - FK MATCH PARTIAL: ZERO prior.
+#   - FK MATCH FULL: prior executable coverage at
+#     fk_alter_basic_extra.test:148-155 pins
+#     SINGLE-COLUMN FK acceptance ("parses, silent
+#     no-op"). This slice adds the genuinely novel
+#     contribution: a COMPOSITE partial-NULL
+#     FALSIFIER (one of two referenced columns
+#     NULL) that pins SIMPLE-semantics behavior
+#     and proves silent semantic DEGRADATION, not
+#     just silent acceptance. The single-column
+#     prior cannot distinguish FULL from SIMPLE
+#     because single-column NULL behaves the same
+#     under both modes; the composite partial-NULL
+#     row is the only probe that separates them.
+#   - to_regclass / to_regtype / to_regproc /
+#     to_regoperator: ZERO prior.
+#   - pg_get_viewdef / pg_get_functiondef /
+#     pg_get_indexdef / pg_get_constraintdef:
+#     ZERO prior.
+#   - format_type: ZERO prior.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "execution error: unknown function: <FN>" —
+#     pre-existing fingerprint (many). All 9
+#     reflection helpers join as new function-name
+#     witnesses.
+#   - SILENT-DROP at convert.rs layer — pinned at
+#     INHERITS (PR #391) and SCHEMA AUTHORIZATION
+#     (PR #407). NEW witness joining the family:
+#     WITH ORDINALITY (the ordinality column is
+#     silently dropped from the result set; PG
+#     would add an integer column starting at 1).
+#   - SILENT-SEMANTIC-DEGRADATION at convert.rs
+#     layer — NEW sub-pattern, distinct from
+#     silent-DROP. FK MATCH FULL / MATCH PARTIAL
+#     are accepted by the parser, the keyword is
+#     extracted, and the FK constraint is created
+#     — BUT the match-mode is silently degraded
+#     to MATCH SIMPLE (the SQL default). This is
+#     SECURITY/CORRECTNESS-RELEVANT: PG MATCH FULL
+#     REJECTS partial-NULL referencing rows; zeta
+#     silently ACCEPTS them.
+#
+# This slice pins:
+#
+#   WITH ORDINALITY (UNNEST family) — SILENT-DROP
+#   BUG witness:
+#     - PG: `unnest(ARRAY[10,20,30]) WITH ORDINALITY`
+#       returns TWO columns: the unnest value AND an
+#       integer ordinality column (1, 2, 3).
+#     - zeta (BOTH wires): returns ONLY the unnest
+#       value column. The ORDINALITY column is
+#       silently dropped. Probed BOTH with and
+#       without column-alias forms:
+#         - `... WITH ORDINALITY` → single column
+#           named `unnest`.
+#         - `... WITH ORDINALITY AS t(val)` →
+#           single column `val`. The 2-alias form
+#           `AS t(val, idx)` errors at planner
+#           ("table-valued function unnest has 1
+#           column available but 2 column aliases
+#           specified"), CONFIRMING the ordinality
+#           column was dropped before alias binding.
+#     - SECURITY: apps using ORDINALITY for row-
+#       numbering get NO ordinals — must use
+#       row_number() OVER () explicitly.
+#
+#   FK MATCH PARTIAL / MATCH FULL / MATCH SIMPLE —
+#   SILENT-SEMANTIC-DEGRADATION BUG witness:
+#     - All three MATCH modes are silently treated
+#       as MATCH SIMPLE (the default). The keyword
+#       is consumed by the parser but the mode is
+#       lost at the AST→IR conversion.
+#     - PROBE: MATCH SIMPLE / PARTIAL / FULL all
+#       reject `INSERT (99)` against an empty
+#       parent — same FK violation. Cannot
+#       distinguish MATCH modes from this.
+#     - DISTINGUISHING PROBE (the FALSIFIER per
+#       [[feedback_wire_path_divergence_check]]
+#       probe-design rule): composite FK with
+#       partial-NULL row.
+#         - PG MATCH FULL: REJECTS `(NULL, 5)` —
+#           must be ALL NULL or ALL non-NULL.
+#         - PG MATCH SIMPLE (default): ACCEPTS
+#           `(NULL, 5)` — any NULL skips FK check.
+#         - zeta MATCH FULL: ACCEPTS `(NULL, 5)`,
+#           same as MATCH SIMPLE. PROVES silent
+#           degradation.
+#     - Probed both wires (mysqlwire and pgwire) —
+#       both accept the row identically.
+#     - SECURITY: apps depending on MATCH FULL to
+#       reject partial-NULL composite FKs get NO
+#       enforcement.
+#
+#   Reflection helpers — unknown function family,
+#   9 new function-name witnesses:
+#     - to_regclass(text) — class/relation OID lookup
+#     - to_regtype(text) — type OID lookup
+#     - to_regproc(text) — function OID lookup
+#     - to_regoperator(text) — operator OID lookup
+#     - pg_get_viewdef(view) — view source SQL
+#     - pg_get_functiondef(func) — function source
+#     - pg_get_indexdef(index) — CREATE INDEX SQL
+#     - pg_get_constraintdef(constraint) — constraint
+#       definition SQL
+#     - format_type(typid, typmod) — pretty type name
+#     None of these are implemented. Apps porting
+#     PG introspection / pg_catalog-aware tooling
+#     must rewrite to information_schema queries
+#     where possible.
+#
+# Big-picture finding:
+#
+#   Three distinct silent-failure patterns surfaced:
+#     1. SILENT-DROP at convert.rs (INHERITS, SCHEMA
+#        AUTHORIZATION, WITH ORDINALITY): a clause is
+#        parsed but never reaches the AST→IR layer's
+#        active processing. The associated SEMANTIC
+#        is missing (no inherited columns / no
+#        ownership binding / no ordinality column).
+#     2. SILENT-SEMANTIC-DEGRADATION at convert.rs
+#        (FK MATCH FULL → MATCH SIMPLE): a clause is
+#        parsed and the relevant feature IS created
+#        (FK constraint), but with a degraded
+#        semantic that fails to enforce the
+#        specified strictness. This is MORE
+#        DANGEROUS than silent-drop because the
+#        feature appears to exist (CREATE TABLE
+#        succeeds, FK is enforced for the SIMPLE
+#        case) but enforcement is partial.
+#     3. LOUD unknown function (reflection helpers):
+#        the call reaches the executor and errors.
+#        Caller sees the error.
+#
+#   PG porters should worry about (1) and (2) most:
+#   silent-drop hides feature absence; silent-
+#   degradation hides feature WEAKNESS. (3) is the
+#   benign case — caller knows the function is
+#   missing.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# behavior on every shape. The silent-drop and
+# silent-degradation are at the parser→IR
+# conversion layer, BEFORE either wire's executor.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-DROP BUG — WITH ORDINALITY
+#     drops the ordinality column. Use row_number()
+#     OVER () explicitly for row numbering.
+#   # zeta-adapt: SILENT-SEMANTIC-DEGRADATION BUG —
+#     FK MATCH FULL / MATCH PARTIAL are silently
+#     treated as MATCH SIMPLE. PG enforces
+#     all-or-nothing NULL semantics; zeta does not.
+#     Apps depending on MATCH FULL composite-NULL
+#     rejection must add app-side validation.
+#   # zeta-adapt: KNOWN GAP — to_regclass /
+#     to_regtype / to_regproc / to_regoperator /
+#     pg_get_viewdef / pg_get_functiondef /
+#     pg_get_indexdef / pg_get_constraintdef /
+#     format_type all unknown functions (1105).
+#     Rewrite to information_schema where possible.
+
+--echo === WITH ORDINALITY — SILENT-DROP BUG (ordinality column never appears) ===
+
+# Bare form: only the unnest column named `unnest`.
+# PG would also return an ordinality column (1, 2,
+# 3 here).
+SELECT * FROM unnest(ARRAY[10,20,30]) WITH ORDINALITY;
+# Single-alias form: only `val` (the value column).
+SELECT * FROM unnest(ARRAY[10,20,30]) WITH ORDINALITY AS t(val);
+# Two-alias form ERRORS at planner — proves the
+# ordinality column was dropped BEFORE alias
+# binding (the table-valued function reports only
+# 1 column available, not 2).
+--error 1105
+SELECT * FROM unnest(ARRAY[10,20,30]) WITH ORDINALITY AS t(val, idx);
+
+--echo === FK MATCH FULL — SILENT-SEMANTIC-DEGRADATION BUG (composite partial-NULL row accepted) ===
+
+# Setup: composite FK with MATCH FULL.
+CREATE TABLE rs_parent (a INT, b INT, PRIMARY KEY (a, b));
+CREATE TABLE rs_child  (pa INT, pb INT, FOREIGN KEY (pa, pb) REFERENCES rs_parent (a, b) MATCH FULL);
+# PG MATCH FULL rejects partial-NULL ((NULL, 5));
+# zeta silently accepts it (treating as MATCH
+# SIMPLE which skips FK check on any NULL).
+INSERT INTO rs_child VALUES (NULL, 5);
+# The row IS in the table.
+SELECT pa, pb FROM rs_child;
+DROP TABLE rs_child;
+DROP TABLE rs_parent;
+
+--echo === FK MATCH PARTIAL / SIMPLE — accepted as MATCH SIMPLE (same degradation) ===
+
+# Same setup with MATCH PARTIAL (PG itself never
+# implemented PARTIAL; zeta silently accepts):
+CREATE TABLE rp_parent (a INT, b INT, PRIMARY KEY (a, b));
+CREATE TABLE rp_child  (pa INT, pb INT, FOREIGN KEY (pa, pb) REFERENCES rp_parent (a, b) MATCH PARTIAL);
+INSERT INTO rp_child VALUES (NULL, 5);
+DROP TABLE rp_child;
+DROP TABLE rp_parent;
+# MATCH SIMPLE — the default; same accept behavior:
+CREATE TABLE rss_parent (a INT, b INT, PRIMARY KEY (a, b));
+CREATE TABLE rss_child  (pa INT, pb INT, FOREIGN KEY (pa, pb) REFERENCES rss_parent (a, b) MATCH SIMPLE);
+INSERT INTO rss_child VALUES (NULL, 5);
+DROP TABLE rss_child;
+DROP TABLE rss_parent;
+
+--echo === Reflection helpers — 9 unknown-function witnesses ===
+
+--error 1105
+SELECT to_regclass('public.unknown_table');
+--error 1105
+SELECT to_regtype('integer');
+--error 1105
+SELECT to_regproc('sum');
+--error 1105
+SELECT to_regoperator('+(int,int)');
+--error 1105
+SELECT pg_get_viewdef('v');
+--error 1105
+SELECT pg_get_functiondef('f');
+--error 1105
+SELECT pg_get_indexdef('idx');
+--error 1105
+SELECT pg_get_constraintdef('c');
+--error 1105
+SELECT format_type(23, NULL);
