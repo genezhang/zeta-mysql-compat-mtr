@@ -1,0 +1,32 @@
+=== Shape A — `::XML` cast (1105) ===
+SELECT '<a>1</a>'::XML;
+ERROR 1105: execution error: unsupported CAST target type: XML
+SELECT '<a>1</a>'::XML AS x;
+ERROR 1105: execution error: unsupported CAST target type: XML
+=== Shape B — `XML` DDL column type (1064) ===
+CREATE TABLE xml_t (id INT PRIMARY KEY, x XML);
+ERROR 1064: SQL parse error: unsupported data type: xml
+CREATE TABLE xml_d (id INT PRIMARY KEY, x XML DEFAULT '<root/>');
+ERROR 1064: SQL parse error: unsupported data type: xml
+=== Shape C — PG-special-syntax XML functions (1064 sqlparser) ===
+SELECT XMLPARSE(DOCUMENT '<a>1</a>');
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: '<a>1</a>' at Line: 1, Column: 26
+SELECT XMLPARSE(CONTENT '<a>1</a>');
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: '<a>1</a>' at Line: 1, Column: 25
+SELECT XMLELEMENT(NAME foo, 'value');
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: foo at Line: 1, Column: 24
+SELECT XMLELEMENT(NAME foo, XMLATTRIBUTES('id' AS attr), 'value');
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: foo at Line: 1, Column: 24
+SELECT XMLPI(NAME foo);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: foo at Line: 1, Column: 19
+SELECT XMLEXISTS('/a' PASSING BY VALUE '<a>1</a>'::XML);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: PASSING at Line: 1, Column: 23
+=== Shape D — plain-function-call XML functions (1105 unknown function) ===
+SELECT XMLAGG(x) FROM (SELECT '<a>1</a>' AS x) t;
+ERROR 1105: execution error: unknown function: XMLAGG
+SELECT XPATH('/a/text()', '<a>1</a>');
+ERROR 1105: execution error: unknown function: XPATH
+SELECT XMLCOMMENT('hi');
+ERROR 1105: execution error: unknown function: XMLCOMMENT
+SELECT XMLCONCAT('<a/>', '<b/>');
+ERROR 1105: execution error: unknown function: XMLCONCAT
