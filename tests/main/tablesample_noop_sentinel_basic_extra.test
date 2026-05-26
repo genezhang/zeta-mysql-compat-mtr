@@ -42,6 +42,21 @@
 #   COUNT(*)=10 would START FAILING — intentional trip-
 #   wire that forces a re-evaluation + .result update.
 #
+#   Exact discard site (per reviewer trace): zeta-parser/
+#   src/convert.rs:3385 matches sp::TableFactor::Table {
+#   name, alias, args, .. } — the `..` rest-pattern
+#   silently drops the `sample: Option<TableSampleKind>`
+#   field that sqlparser populates. Same drop applies to
+#   TableFactor::Derived at line 3464. REPEATABLE(seed)
+#   lives inside TableSampleKind and dies in the same
+#   drop. No warning, no plan node.
+#
+#   Future-fix note: when range validation eventually
+#   lands (matches the negative-LIMIT pattern at
+#   limit_offset_basic_extra.test:87 → --error 1105), the
+#   `BERNOULLI(-5)` and `BERNOULLI(150)` rows should move
+#   to `--error 1105` form.
+#
 # Adaptation notes:
 #   # zeta-adapt: TABLESAMPLE syntax is ACCEPTED but a
 #     COMPLETE NO-OP at execution. Don't rely on it for
@@ -53,6 +68,7 @@
 
 --echo === Setup: 10-row table ===
 
+DROP TABLE IF EXISTS samp_t;
 CREATE TABLE samp_t (id INT);
 INSERT INTO samp_t VALUES
   (1),(2),(3),(4),(5),(6),(7),(8),(9),(10);
