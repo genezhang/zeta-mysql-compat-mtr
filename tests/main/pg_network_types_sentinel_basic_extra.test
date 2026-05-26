@@ -1,0 +1,132 @@
+# Independently authored PG network-type sentinel slice
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - inet_fns_basic_extra and inet6_fns_basic_extra
+#     cover MySQL's INET_ATON / INET_NTOA / INET6_ATON
+#     / INET6_NTOA / IS_IPV4 / IS_IPV6 family — these
+#     are FUNCTIONS that operate on TEXT and BINARY
+#     storage. They are NOT the PG network TYPE surface
+#     pinned here.
+#   - PG types `INET`, `CIDR`, `MACADDR`, `MACADDR8`
+#     and their cast / column / operator / function
+#     surface: ZERO prior coverage. Wide-grep of
+#     tests/main/*.test for `::INET` / `::CIDR` /
+#     `::MACADDR` returns no hits.
+#
+# This slice pins (THREE distinct rejection shapes +
+# an evaluation-order subtlety):
+#
+#   Shape A — `::TYPE` cast target (1105):
+#     - `'192.168.1.1'::INET` etc. → "unsupported CAST
+#       target type: <TYPE>" (uppercase type name).
+#     - Hits all 5 cast forms: INET (v4), INET (v6),
+#       CIDR, MACADDR, MACADDR8.
+#
+#   Shape B — column type in DDL (1064):
+#     - `CREATE TABLE t (..., addr INET)` → "unsupported
+#       data type: inet" (LOWERCASE — sqlparser
+#       normalizes the type name in the data-type-slot
+#       error message, while the cast-target shape A
+#       preserves uppercase).
+#     - Hits CREATE TABLE column declarations for INET,
+#       CIDR, MACADDR. (MACADDR8 not re-tested in DDL
+#       since it follows the same shape as MACADDR.)
+#
+#   Shape C — network functions (1105):
+#     - `host(...)`, `masklen(...)`, `network(...)`,
+#       `broadcast(...)`, `abbrev(...)` → "unknown
+#       function: <name>" (lowercase function name).
+#     - The OUTER function-lookup fires BEFORE the
+#       INNER `'..'::INET` cast — distinct from Shape D
+#       below.
+#
+#   Shape D — operator with `::INET` operand (1105):
+#     - `'192.168.1.5'::INET << '..'::CIDR` → hits the
+#       INNER cast error first: "unsupported CAST
+#       target type: INET", NOT a "unknown operator"
+#       message. The cast evaluates BEFORE operator
+#       dispatch.
+#     - DIFFERENT evaluation order from Shape C —
+#       functions look up name first, operators
+#       evaluate args first.
+#
+# Big-picture finding:
+#
+#   PG network types are a clean, well-bounded zero-
+#   support surface: cast 1105, DDL 1064, functions
+#   1105, operators 1105-via-inner-cast. Four rejection
+#   sites for the same conceptual "no INET/CIDR/MACADDR
+#   support" condition.
+#
+#   Apps porting PG queries with network types MUST
+#   rewrite as TEXT storage + application-side parsing
+#   or use the MySQL INET_ATON/NTOA function family
+#   (pinned in inet_fns_basic_extra) for IPv4 packing.
+#   There is NO INET-equivalent type or operator surface
+#   in zeta — this is a complete gap.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — PG network types (INET,
+#     CIDR, MACADDR, MACADDR8) are unsupported across
+#     ALL surfaces: CAST target (1105 "unsupported CAST
+#     target type"), DDL column type (1064 "unsupported
+#     data type"), and the dedicated functions (host,
+#     masklen, network, broadcast, abbrev — 1105
+#     "unknown function").
+#   # zeta-adapt: ERROR-CASE QUIRK — cast-target shape
+#     emits UPPERCASE type name; DDL data-type shape
+#     emits LOWERCASE. Don't pattern-match on case.
+#   # zeta-adapt: ERROR-ORDER QUIRK — `func('..'::INET)`
+#     hits "unknown function" first; `'..'::INET <op>
+#     '..'::CIDR` hits inner-cast error first. The
+#     OUTER call kind determines which sub-error fires.
+#   # zeta-adapt: Substitute storage is TEXT + app-side
+#     parsing, or INET_ATON/NTOA for IPv4-only packing
+#     (per inet_fns_basic_extra).
+
+--echo === ::INET / ::CIDR / ::MACADDR / ::MACADDR8 — 1105 ===
+
+--error 1105
+SELECT '192.168.1.1'::INET;
+--error 1105
+SELECT '::1'::INET;
+--error 1105
+SELECT '192.168.1.0/24'::CIDR;
+--error 1105
+SELECT '08:00:2b:01:02:03'::MACADDR;
+--error 1105
+SELECT '08:00:2b:01:02:03:04:05'::MACADDR8;
+
+--echo === CREATE TABLE with INET / CIDR / MACADDR column — 1064 (different shape than cast) ===
+
+--error 1064
+CREATE TABLE n_inet (id INT PRIMARY KEY, addr INET);
+--error 1064
+CREATE TABLE n_cidr (id INT PRIMARY KEY, net CIDR);
+--error 1064
+CREATE TABLE n_mac (id INT PRIMARY KEY, mac MACADDR);
+
+--echo === Network functions — 1105 "unknown function" (function lookup fires BEFORE inner cast) ===
+
+--error 1105
+SELECT host('192.168.1.5/24'::INET);
+--error 1105
+SELECT masklen('192.168.1.0/24'::CIDR);
+--error 1105
+SELECT network('192.168.1.5/24'::INET);
+--error 1105
+SELECT broadcast('192.168.1.0/24'::CIDR);
+--error 1105
+SELECT abbrev('10.0.0.0/8'::CIDR);
+
+--echo === Network operators — 1105 "unsupported CAST target" (INNER cast fires BEFORE operator) ===
+
+# DIFFERENT evaluation order from function calls:
+# operator dispatch evaluates args first, so the inner
+# `'..'::INET` cast errors before the `<<` / `>>` op.
+--error 1105
+SELECT '192.168.1.5'::INET << '192.168.1.0/24'::CIDR;
+--error 1105
+SELECT '192.168.1.0/24'::CIDR >> '192.168.1.5'::INET;
