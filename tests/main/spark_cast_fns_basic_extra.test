@@ -1,0 +1,159 @@
+# Independently authored Spark-flavor SINGLE-ARG TYPE CAST
+# FUNCTIONS smoke for the GPL MTR-format runner. NOT copied
+# or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - BINARY function — NONE (zero compat coverage). Spark
+#     `BINARY(s)` casts a scalar to bytes. Distinct from:
+#       * MySQL CAST(x AS BINARY) — type-not-recognized
+#         (cast_target_type_aliases_basic_extra PR #328
+#         pins 1105 'unsupported CAST target type: BINARY')
+#       * MySQL BINARY(n) column type — 1064 unsupported
+#         (bytea_blob_basic_extra:151)
+#   - DECIMAL function — NONE (zero compat coverage). Spark
+#     `DECIMAL(x)` casts a scalar to DECIMAL(10,0) (Spark
+#     default precision/scale). Distinct from:
+#       * CAST(x AS DECIMAL(p,s)) — covered in cast_basic_
+#         extra (the TYPE form, not the function form).
+#       * DECIMAL column type — covered in datatype_basic /
+#         cast_basic_extra.
+#
+# This slice pins:
+#   - BINARY(s) on String → Value::Bytes (UTF-8 raw bytes).
+#   - BINARY(s) NULL prop, non-string coerce via
+#     value_to_sql_string then encode as bytes.
+#   - BINARY arity (0, 2 args) → 1105 'requires 1 argument'.
+#   - LENGTH(BINARY('café')) = 5 bytes (UTF-8), divergent
+#     from LENGTH('café') = 4 chars (zeta's String semantic).
+#   - HEX(BINARY('café')) round-trips to UTF-8 byte sequence.
+#   - DECIMAL(int/string/float) → Value::Decimal.
+#   - DECIMAL(NaN) / DECIMAL(Infinity) → NULL (rust_decimal
+#     can't represent non-finite floats; deliberate per
+#     impl comment at lib.rs:49305-49307).
+#   - DECIMAL(TRUE) → 1 (Bool coerced via coerce_value).
+#   - DECIMAL arity (0, 2 args) → 1105.
+#
+# Big-picture finding:
+#   Both BINARY and DECIMAL are FUNCTIONS that LOOK like
+#   type names but go through the scalar dispatcher
+#   (lib.rs:49288 and :49308), NOT the CAST machinery. This
+#   means:
+#     - BINARY('hello') WORKS (function dispatch), but
+#       CAST('hello' AS BINARY) ERRORS 1105 (type-not-
+#       recognized via cast_target_type_aliases).
+#     - DECIMAL(3.14) WORKS (function dispatch), and
+#       CAST('3.14' AS DECIMAL) also WORKS (type recognized).
+#       For DECIMAL the two surfaces overlap; for BINARY
+#       they diverge.
+#   The DECIMAL function deliberately maps non-finite Float
+#   inputs (NaN, ±Inf) to NULL — rust_decimal can't
+#   represent those, and Spark's golden behavior is NULL.
+#   Pinned via CAST AS DOUBLE PRECISION to force Float64.
+#
+# Adaptation notes:
+#   # zeta-adapt: BINARY(s) is a function returning bytes,
+#     NOT a CAST target. For type-cast-to-bytes you need
+#     to use the impl-specific path (BINARY(s) function);
+#     CAST AS BINARY fails.
+#   # zeta-adapt: DECIMAL(x) is a function returning
+#     DECIMAL(10,0). For precision/scale control, use
+#     CAST(x AS DECIMAL(p,s)) — also supported.
+#   # zeta-adapt: DECIMAL(NaN) / DECIMAL(±Infinity) → NULL,
+#     not an error. Deliberate to match Spark's golden.
+#   # zeta-adapt: BINARY(NULL) / DECIMAL(NULL) → NULL.
+#   # zeta-adapt: Arity errors → 1105.
+
+--echo === BINARY: String → Bytes via UTF-8 ===
+
+# 'hello' → bytes "hello" (rendered as text since UTF-8
+# valid; LENGTH counts bytes).
+SELECT BINARY('hello')                                        AS bin_hello;
+SELECT LENGTH(BINARY('hello'))                                AS bin_hello_len_5;
+# 'café' is 4 chars / 5 bytes (é = 2 bytes).
+SELECT LENGTH(BINARY('café'))                                 AS bin_cafe_len_5_bytes;
+# Cross-check: LENGTH on the original String returns 4
+# (chars), confirming BINARY converts to bytes.
+SELECT LENGTH(BINARY('café')) > LENGTH('café')                AS bytes_gt_chars;
+# Hex round-trip exposes the raw UTF-8 bytes.
+SELECT HEX(BINARY('café'))                                    AS hex_cafe_bytes;
+
+--echo === BINARY: NULL + non-string coerce ===
+
+SELECT BINARY(NULL)                                           AS null_propagates;
+SELECT BINARY(NULL) IS NULL                                   AS null_pred;
+# Non-string coerces via value_to_sql_string.
+SELECT BINARY(42)                                             AS int_coerce;
+# LENGTH = 2 reflects the BYTE count of the stringified
+# representation '42' (2 ASCII chars), NOT i32 byte width.
+SELECT LENGTH(BINARY(42))                                     AS int_str_repr_2_bytes;
+SELECT BINARY(TRUE)                                           AS bool_coerce;
+
+--echo === BINARY: arity errors → 1105 ===
+
+--error 1105
+SELECT BINARY();
+--error 1105
+SELECT BINARY('a', 'b');
+
+--echo === CAST(x AS BINARY) is DIFFERENT — type-not-recognized ===
+
+# Cross-link to cast_target_type_aliases_basic_extra PR #328.
+# Documents that the function dispatch and the CAST dispatch
+# do NOT share the BINARY name. BINARY(...) works; CAST...AS
+# BINARY errors at the type-recognition layer.
+--error 1105
+SELECT CAST('hello' AS BINARY);
+
+--echo === DECIMAL: scalar → Decimal ===
+
+SELECT DECIMAL(42)                                            AS int_to_dec;
+SELECT DECIMAL('3.14')                                        AS str_to_dec;
+SELECT DECIMAL(3.14)                                          AS dec_passthrough;
+SELECT DECIMAL(-5)                                            AS neg_int;
+
+# Equality check: DECIMAL(3.14) and 3.14 (already Decimal) are equal.
+SELECT DECIMAL(3.14) = 3.14                                   AS dec_eq_lit;
+
+--echo === DECIMAL: non-finite Float → NULL (rust_decimal can't represent) ===
+
+# CAST AS DOUBLE PRECISION to force Float64 input (the
+# non-finite guard at lib.rs:49318 only fires for Value
+# ::Float64).
+SELECT DECIMAL(CAST('NaN'      AS DOUBLE PRECISION))          AS dec_nan_null;
+SELECT DECIMAL(CAST('Infinity' AS DOUBLE PRECISION))          AS dec_inf_null;
+SELECT DECIMAL(CAST('-Infinity' AS DOUBLE PRECISION))         AS dec_neg_inf_null;
+SELECT DECIMAL(CAST('NaN' AS DOUBLE PRECISION)) IS NULL       AS dec_nan_pred;
+
+--echo === DECIMAL: Bool → 1 / 0 via coerce_value ===
+
+# Aliases call out wire-RENDERING (not internal coercion) —
+# the very next rows show the internal value is still Bool.
+SELECT DECIMAL(TRUE)                                          AS bool_true_renders_as_1;
+SELECT DECIMAL(FALSE)                                         AS bool_false_renders_as_0;
+# STRIKING: DECIMAL(TRUE) wire-renders as "1" (Bool TRUE
+# always renders as TINYINT 1), but BOTH `DECIMAL(TRUE) = 1`
+# AND `DECIMAL(TRUE) = DECIMAL(1)` return 0 (FALSE). This
+# proves DECIMAL(Bool) does NOT actually coerce Bool to
+# Decimal — `coerce_value(Bool, Numeric)` returns the Bool
+# unchanged (or fails to convert), and the result is still
+# Value::Bool. The wire-render is the only place where it
+# looks like "1". Strict-type compare on either side fails
+# because Bool ≠ Int AND Bool ≠ Decimal under values_equal
+# (same pattern as PR #329 GREATEST/LEAST Bool finding).
+SELECT DECIMAL(TRUE) = 1                                      AS bool_dec_ne_int_1;
+SELECT DECIMAL(TRUE) = DECIMAL(1)                             AS bool_dec_ne_dec_1;
+# The Bool-eq-Bool path DOES work — confirms the underlying
+# type is still Bool.
+SELECT DECIMAL(TRUE) = TRUE                                   AS bool_dec_eq_bool_true;
+
+--echo === DECIMAL: NULL propagation ===
+
+SELECT DECIMAL(NULL)                                          AS null_propagates;
+SELECT DECIMAL(NULL) IS NULL                                  AS null_pred;
+
+--echo === DECIMAL: arity errors → 1105 ===
+
+--error 1105
+SELECT DECIMAL();
+--error 1105
+SELECT DECIMAL(1, 2);
