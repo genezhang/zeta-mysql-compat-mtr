@@ -67,25 +67,40 @@ SELECT L2_NORMALIZE('[3,4]'::vector)                          AS unit_3_4;
 # exact 1.0 (recording: 1.000000023841858). Pin via
 # tolerance rather than strict equality so the test is
 # robust to future f32→f64 changes.
-SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) > 0.999     AS norm_gt_above_threshold;
-SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) < 1.001     AS norm_below_threshold;
-SELECT VECTOR_NORM(L2_NORMALIZE('[5,12]'::vector)) > 0.999    AS norm_gt_5_12;
+# Tightened tolerance (<1.0001) per PR #348 review — observed
+# f32 drift is ~2.4e-8, so 1e-4 tolerance still survives
+# realistic precision loss while catching real regressions
+# (e.g. drift to 0.92 or 1.03).
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) > 0.9999    AS norm_above_threshold;
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) < 1.0001    AS norm_below_threshold;
+SELECT VECTOR_NORM(L2_NORMALIZE('[5,12]'::vector)) > 0.9999   AS norm_5_12_above;
 
 --echo === Idempotent on unit vectors ===
 
 # [1,0,0] is already unit; output preserves direction +
 # magnitude.
 SELECT L2_NORMALIZE('[1,0,0]'::vector)                        AS already_unit;
-SELECT VECTOR_NORM(L2_NORMALIZE('[1,0,0]'::vector)) > 0.999   AS unit_norm_preserved;
+SELECT VECTOR_NORM(L2_NORMALIZE('[1,0,0]'::vector)) > 0.9999  AS unit_norm_preserved;
 
---echo === STRIKING: ZERO vector — no divide-by-zero, returns zero ===
+--echo === ZERO vector — no divide-by-zero, returns zero ===
 
 # L2_NORMALIZE on [0,0,0] returns [0,0,0] (NOT NaN, NOT
-# error). Subsequent norm = 0 (not 1, since the result
-# isn't actually unit-length).
+# error). Per impl at lib.rs:43597+, the `if norm == 0.0`
+# guard returns the input unchanged. Subsequent norm = 0
+# (not 1, since the result isn't actually unit-length).
 SELECT L2_NORMALIZE('[0,0,0]'::vector)                        AS zero_in_zero_out;
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))           AS zero_norm_still_0;
-SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS zero_norm_eq_0;
+# STRIKING: value-equality is TYPE-DEPENDENT. VECTOR_NORM
+# returns Float64. `Float64(0.0) = Int(0)` is FALSE under
+# zeta's strict-type values_equal — same pattern as Bool/Int
+# from PR #329 GREATEST/LEAST and Decimal/Int from PR #341
+# spark_cast_fns. `= 0.0` (Decimal-literal) IS TRUE because
+# Float/Decimal cross-arm coerces; `= CAST(0 AS DOUBLE
+# PRECISION)` also TRUE (same-type Float64=Float64).
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS float64_ne_int_strict;
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0.0     AS float64_eq_decimal_coerce;
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))
+     = CAST(0 AS DOUBLE PRECISION)                            AS float64_eq_float64_same_type;
 
 --echo === NULL propagation ===
 

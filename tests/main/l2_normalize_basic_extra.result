@@ -3,32 +3,39 @@ SELECT L2_NORMALIZE('[3,4]'::vector)                          AS unit_3_4;
 unit_3_4
 Vector([0.6, 0.8])
 === Round-trip: VECTOR_NORM after L2_NORMALIZE ≈ 1 ===
-SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) > 0.999     AS norm_gt_above_threshold;
-norm_gt_above_threshold
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) > 0.9999    AS norm_above_threshold;
+norm_above_threshold
 1
-SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) < 1.001     AS norm_below_threshold;
+SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) < 1.0001    AS norm_below_threshold;
 norm_below_threshold
 1
-SELECT VECTOR_NORM(L2_NORMALIZE('[5,12]'::vector)) > 0.999    AS norm_gt_5_12;
-norm_gt_5_12
+SELECT VECTOR_NORM(L2_NORMALIZE('[5,12]'::vector)) > 0.9999   AS norm_5_12_above;
+norm_5_12_above
 1
 === Idempotent on unit vectors ===
 SELECT L2_NORMALIZE('[1,0,0]'::vector)                        AS already_unit;
 already_unit
 Vector([1.0, 0.0, 0.0])
-SELECT VECTOR_NORM(L2_NORMALIZE('[1,0,0]'::vector)) > 0.999   AS unit_norm_preserved;
+SELECT VECTOR_NORM(L2_NORMALIZE('[1,0,0]'::vector)) > 0.9999  AS unit_norm_preserved;
 unit_norm_preserved
 1
-=== STRIKING: ZERO vector — no divide-by-zero, returns zero ===
+=== ZERO vector — no divide-by-zero, returns zero ===
 SELECT L2_NORMALIZE('[0,0,0]'::vector)                        AS zero_in_zero_out;
 zero_in_zero_out
 Vector([0.0, 0.0, 0.0])
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))           AS zero_norm_still_0;
 zero_norm_still_0
 0
-SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS zero_norm_eq_0;
-zero_norm_eq_0
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS float64_ne_int_strict;
+float64_ne_int_strict
 0
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0.0     AS float64_eq_decimal_coerce;
+float64_eq_decimal_coerce
+1
+SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))
+     = CAST(0 AS DOUBLE PRECISION)                            AS float64_eq_float64_same_type;
+float64_eq_float64_same_type
+1
 === NULL propagation ===
 SELECT L2_NORMALIZE(NULL::vector)                             AS null_propagates;
 null_propagates
