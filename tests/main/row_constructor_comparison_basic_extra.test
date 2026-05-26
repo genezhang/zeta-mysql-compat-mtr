@@ -70,8 +70,11 @@
 #       distinct: false, filter: None, within_group:
 #       None, agg_order_by: None }.f1"
 #     - The error formatter embeds the full
-#       sqlparser::ast::Function Debug-printed value
-#       into the column-not-found message. NEW LEAK
+#       zeta `Expr::Function` (zeta-parser/src/ast.rs:
+#       853-865 — field-shape is identical to sqlparser's
+#       `ast::Function` so the wire output is
+#       indistinguishable) Debug-printed value into the
+#       column-not-found message. NEW LEAK
 #       fingerprint — wide-grep of tests/main/*.result
 #       for `column not found: Function` returns zero
 #       priors (different from the PR #385/#386 leaks
@@ -120,10 +123,11 @@
 #     lookup, errors 1054 "column not found". Use
 #     `tbl.*` (Shape D) to enumerate columns.
 #   # zeta-adapt: KNOWN BUG — `(ROW(...)).f1` field
-#     access leaks the entire sqlparser::ast::Function
-#     Debug-printed AST node into the column-not-found
-#     error message. Third instance of the recurring
-#     internal-Rust-types-in-error-messages pattern.
+#     access leaks the entire zeta `Expr::Function`
+#     Debug-printed AST node (zeta-parser/src/ast.rs:
+#     853-865) into the column-not-found error message.
+#     Third instance of the recurring internal-Rust-
+#     types-in-error-messages pattern.
 
 CREATE TABLE rc (id INT PRIMARY KEY, a INT, b INT);
 INSERT INTO rc VALUES (1, 10, 20), (2, 30, 40);
@@ -166,7 +170,7 @@ SELECT rc FROM rc WHERE id = 1;
 
 SELECT rc.* FROM rc WHERE id = 1;
 
---echo === Shape E — DEBUG-LEAK BUG: `(ROW(...)).f1` leaks sqlparser::ast::Function ===
+--echo === Shape E — DEBUG-LEAK BUG: `(ROW(...)).f1` leaks Expr::Function ===
 
 # Error message embeds full Debug-printed Function AST
 # node — `column not found: Function { name: "ROW",
