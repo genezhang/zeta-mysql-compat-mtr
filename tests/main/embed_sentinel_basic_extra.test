@@ -1,0 +1,125 @@
+# Independently authored EMBED no-provider sentinel
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - EMBED — NONE (zero compat-mtr coverage — checked
+#     all *.test files per PR #357 lesson). The MTR
+#     runner does NOT register an embedding provider,
+#     so the function always reaches the no-provider
+#     error path for non-NULL inputs.
+#   - vector_fns_basic_extra (PR #347) covers the
+#     SURROUND vector functions (L2_DISTANCE,
+#     COSINE_DISTANCE, etc) but NOT the EMBED producer.
+#   - l2_normalize_basic_extra (PR #348) covers
+#     L2_NORMALIZE.
+#
+# This slice pins:
+#   - EMBED('text') with no provider registered errors
+#     with the multi-line "no provider — call
+#     register_embed_fn() or use a zeta-embed-providers
+#     helper (use_local_embed / use_openai_embed /
+#     use_voyage_embed) before using embed() in SQL"
+#     message.
+#   - EMBED(NULL) returns NULL — the NULL-prop check
+#     at lib.rs:55183 runs BEFORE the provider guard
+#     at lib.rs:55187, so NULL never triggers the
+#     no-provider error.
+#   - Non-string args stringify via value_to_sql_string
+#     before hitting the provider — but since no provider
+#     is registered, they still produce the no-provider
+#     error (not a stringification error).
+#   - Arity (0, 2+) → 1105 "embed() requires exactly 1
+#     argument".
+#
+# Big-picture finding (NULL-PRECEDES-MISSING-PROVIDER):
+#
+#   The most interesting behavior is the ORDERING of
+#   checks in the impl at lib.rs:55175-55198. The
+#   sequence is:
+#
+#     1. arity check (line 55176)
+#     2. evaluate arg → handle NULL (line 55183)
+#     3. acquire provider guard (line 55186)
+#     4. call provider OR error if missing (line 55187+)
+#
+#   This means `EMBED(NULL)` returns NULL CLEANLY even
+#   with no provider — the early return at step 2 short-
+#   circuits the missing-provider check. Apps writing
+#   `SELECT EMBED(col)` where `col` may be NULL won't
+#   error on the NULL rows even in a no-provider
+#   environment.
+#
+#   STRIKING — the no-provider error message is unusually
+#   long and PRESCRIPTIVE. It names THREE specific
+#   provider-registration helpers (use_local_embed /
+#   use_openai_embed / use_voyage_embed) AND the lower-
+#   level register_embed_fn(). This is rare in zeta's
+#   error surface — most errors are short. The verbose
+#   message is intentional documentation-by-error so
+#   ops/dev folks have an immediate fix path.
+#
+#   The MTR runner's session is a one-shot mysqlwire
+#   connection that doesn't go through any zeta-embed-
+#   providers setup, so the no-provider path is the only
+#   reachable behavior from this slice. To test the
+#   actual ONNX / OpenAI / Voyage code paths, you need
+#   a different test harness (embedded zeta with
+#   register_embed_fn() called pre-execution).
+#
+# Adaptation notes:
+#   # zeta-adapt: EMBED requires a registered provider —
+#     the MTR runner has none, so non-NULL inputs error.
+#     For production, call use_local_embed() or
+#     register_embed_fn() at startup.
+#   # zeta-adapt: EMBED(NULL) → NULL even without a
+#     provider. NULL-prop short-circuits the provider
+#     check. Useful for SELECT-against-nullable-cols
+#     patterns.
+#   # zeta-adapt: The no-provider error names specific
+#     registration helpers (use_local_embed,
+#     use_openai_embed, use_voyage_embed) — read the
+#     message verbatim, it's prescriptive.
+
+--echo === EMBED — NULL propagates BEFORE provider check ===
+
+# Critical: EMBED(NULL) does NOT trigger the no-provider
+# error. The NULL-early-return short-circuits.
+SELECT EMBED(NULL)                                            AS null_returns_null;
+SELECT EMBED(NULL) IS NULL                                    AS null_pred;
+
+--echo === EMBED — no-provider error for non-NULL input ===
+
+# MTR runner registers no provider, so every non-NULL
+# call errors with the prescriptive multi-line message.
+--error 1105
+SELECT EMBED('hello');
+--error 1105
+SELECT EMBED('');
+--error 1105
+SELECT EMBED('a longer string');
+
+--echo === EMBED — non-string args ALSO trigger no-provider (after stringify) ===
+
+# Non-string args stringify via value_to_sql_string
+# (lib.rs:55184), then hit the provider check → error.
+--error 1105
+SELECT EMBED(42);
+--error 1105
+SELECT EMBED(TRUE);
+
+--echo === EMBED — arity errors → 1105 ===
+
+--error 1105
+SELECT EMBED();
+--error 1105
+SELECT EMBED('a', 'b');
+--error 1105
+SELECT EMBED('a', 'b', 'c');
+
+--echo === EMBED — NULL-prop survives non-NULL siblings in COALESCE ===
+
+# COALESCE evaluates left-to-right; EMBED(NULL) returns
+# NULL (no error), then COALESCE picks the next non-NULL
+# branch.
+SELECT COALESCE(EMBED(NULL), 'fallback')                      AS coalesce_to_fallback;
