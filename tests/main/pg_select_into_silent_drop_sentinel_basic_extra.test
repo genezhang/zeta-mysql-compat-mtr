@@ -1,0 +1,196 @@
+# Independently authored PG SELECT INTO silent-drop
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - INSERT INTO table SELECT ... : SUPPORTED, pinned
+#     at insert_basic. That's a DIFFERENT statement
+#     shape (INSERT, not SELECT-INTO).
+#   - CREATE TABLE AS SELECT (CTAS): partially
+#     supported. Out of scope here — separate slice
+#     for CTAS would need to address an unrelated
+#     bug where CTAS with FROM clause errors "table
+#     not found: <src>" while CTAS with literal-only
+#     SELECT works.
+#   - SELECT INTO new-table (PG shorthand for CTAS):
+#     ZERO prior coverage.
+#   - SELECT INTO @var (MySQL session-var):
+#     ZERO prior coverage.
+#   - SELECT INTO STRICT var (PG PL/pgSQL):
+#     ZERO prior coverage.
+#   - SELECT INTO OUTFILE (MySQL bulk export):
+#     ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - SILENT-DROP BUG pattern: pre-existing at PR #391
+#     (INHERITS), PR #407 (SCHEMA AUTHORIZATION), and
+#     PR #408 (WITH ORDINALITY). All share the same
+#     mechanism: sqlparser parses the modifier into
+#     the AST, zeta's convert.rs (parser-to-IR pass)
+#     never reads the field, the rest of the statement
+#     executes normally. Witness here: `SELECT id, v
+#     INTO si_dst FROM si_src` returns the 3 SELECT
+#     rows successfully BUT si_dst is NEVER created
+#     (SHOW TABLES still shows only si_src). The
+#     `select.into` field is dropped during conversion.
+#   - "Expected: identifier, found: @" — pre-existing
+#     for MySQL session-var syntax at many slices
+#     (variables_basic etc.).
+#   - "Expected: end of statement, found: <X>" —
+#     pre-existing fingerprint at many slices.
+#
+# This slice pins:
+#
+#   PG SELECT-INTO new-table — SILENT-DROP BUG:
+#     - `SELECT id, v INTO si_dst FROM si_src`
+#       returns the 3 SELECT rows. FALSIFIER probe:
+#       `SELECT * FROM si_dst` then errors "table not
+#       found: test.public.si_dst" — proves the INTO
+#       target was silently dropped at parse-convert.
+#     - Same silent-drop for INTO TEMP <tbl> and INTO
+#       TEMPORARY <tbl> and INTO UNLOGGED <tbl> (all
+#       PG-recognized table-strictness modifiers).
+#
+#   MySQL SELECT INTO @var — distinct parser-reject:
+#     - `SELECT id INTO @x FROM si_src` parser-rejects
+#       at column 16 with "Expected: identifier, found:
+#       @". The @-prefix session-var form is the
+#       MySQL-native way to capture single values; PG
+#       has no equivalent. zeta inherits sqlparser's
+#       PG-flavored rejection of @vars.
+#
+#   PG PL/pgSQL SELECT INTO STRICT var — distinct
+#   parser-reject:
+#     - `SELECT id INTO STRICT v_id FROM si_src` parser-
+#       rejects at column 23 with "Expected: end of
+#       statement, found: v_id". The STRICT keyword
+#       is a PL/pgSQL-only modifier (raise on zero or
+#       multiple rows); zeta's top-level parser doesn't
+#       support PL/pgSQL constructs outside DO blocks.
+#
+#   MySQL SELECT INTO OUTFILE 'path' — distinct
+#   parser-reject:
+#     - `SELECT id INTO OUTFILE '/tmp/out.csv' FROM
+#       si_src` parser-rejects at column 24 with
+#       "Expected: end of statement, found: '<path>'".
+#       Bulk-export INTO OUTFILE not in sqlparser's
+#       SELECT grammar.
+#
+# Big-picture finding:
+#
+#   PG SELECT INTO <new-table> (the CTAS-shorthand
+#   form) is a SILENT-DROP BUG. Apps porting PG code
+#   that uses `SELECT col INTO new_tbl FROM src` to
+#   materialize a query result will see the SELECT
+#   succeed but the target table absent — leading to
+#   "table not found" on the next reference, with no
+#   indication that INTO was the cause. This is more
+#   dangerous than a parse-reject because the SELECT
+#   side-effects (e.g., function calls in the
+#   projection) DO execute.
+#
+#   Source: zeta-parser/src/convert.rs convert_select-
+#   stmt path reads select.projection, select.distinct,
+#   select.from, etc., but never reads the
+#   `select.into` field that sqlparser populates for
+#   the INTO clause. Pattern matches PR #391 INHERITS,
+#   PR #407 SCHEMA AUTHORIZATION, PR #408 WITH
+#   ORDINALITY (all silent-drop via convert.rs field-
+#   ignore).
+#
+#   Adaptation: use CREATE TABLE AS SELECT explicitly
+#   (note: CTAS has a separate FROM-resolution bug
+#   when the source is a real table; CTAS with
+#   literal-only SELECT works). Alternative: INSERT
+#   INTO existing_tbl SELECT ... if the target
+#   pre-exists.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL
+# silent-drop. pgwire: SELECT INTO si_dst_pg returns
+# rows; subsequent SELECT * FROM si_dst_pg errors
+# "relation does not exist". mysqlwire: same shape
+# with mysql error 1146. The silent drop is at parser-
+# convert (convert.rs) which is shared by both wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-DROP BUG — SELECT col INTO
+#     new_tbl FROM src returns SELECT rows but does
+#     NOT create new_tbl. Use CREATE TABLE new_tbl AS
+#     SELECT col FROM src instead (with caveat that
+#     CTAS has a separate FROM-resolution bug).
+#   # zeta-adapt: SILENT-DROP — INTO TEMP / TEMPORARY
+#     / UNLOGGED modifiers all silently dropped too.
+#   # zeta-adapt: KNOWN GAP — SELECT INTO @var
+#     (MySQL session-var) parse-reject.
+#   # zeta-adapt: KNOWN GAP — SELECT INTO STRICT var
+#     (PG PL/pgSQL form) parse-reject; only legal in
+#     PL/pgSQL function bodies / DO blocks.
+#   # zeta-adapt: KNOWN GAP — SELECT INTO OUTFILE
+#     (MySQL bulk export) parse-reject.
+
+DROP TABLE IF EXISTS si_src;
+DROP TABLE IF EXISTS si_dst;
+DROP TABLE IF EXISTS si_dst_t;
+DROP TABLE IF EXISTS si_dst_t2;
+DROP TABLE IF EXISTS si_dst_u;
+CREATE TABLE si_src (id INT, v TEXT);
+INSERT INTO si_src VALUES (1, 'a'), (2, 'b'), (3, 'c');
+
+--echo === PG SELECT INTO new-table — SILENT-DROP: SELECT runs, target table NOT created ===
+
+# The SELECT returns 3 rows successfully — proof that
+# the SELECT side executes. The INTO clause is then
+# silently dropped by convert.rs.
+SELECT id, v INTO si_dst FROM si_src ORDER BY id;
+
+--echo === FALSIFIER — si_dst should exist if INTO worked; instead "table not found" ===
+
+# This is the mechanical evidence of silent-drop. The
+# prior SELECT INTO did NOT create si_dst, so the
+# query below errors. If INTO had worked, this would
+# return 3 rows.
+--error 1146
+SELECT * FROM si_dst;
+
+--echo === SELECT INTO TEMP <tbl> — same silent-drop with TEMP modifier ===
+
+SELECT id INTO TEMP si_dst_t FROM si_src ORDER BY id;
+--error 1146
+SELECT * FROM si_dst_t;
+
+--echo === SELECT INTO TEMPORARY <tbl> — same silent-drop ===
+
+SELECT id INTO TEMPORARY si_dst_t2 FROM si_src ORDER BY id;
+--error 1146
+SELECT * FROM si_dst_t2;
+
+--echo === SELECT INTO UNLOGGED <tbl> (PG) — same silent-drop ===
+
+SELECT id INTO UNLOGGED si_dst_u FROM si_src ORDER BY id;
+--error 1146
+SELECT * FROM si_dst_u;
+
+--echo === SELECT INTO @var (MySQL session-var) → "Expected: identifier, found: @" at col 16 ===
+
+# @-prefix session-vars are MySQL-native; sqlparser's
+# PG-flavored grammar rejects them in INTO clause.
+--error 1064
+SELECT id INTO @x FROM si_src LIMIT 1;
+
+--echo === SELECT INTO STRICT var (PG PL/pgSQL) → "Expected: end of statement, found: <var>" at col 23 ===
+
+# STRICT is a PL/pgSQL-only modifier on SELECT INTO;
+# only legal inside function bodies / DO blocks. zeta's
+# top-level parser doesn't recognize it.
+--error 1064
+SELECT id INTO STRICT v_id FROM si_src LIMIT 1;
+
+--echo === SELECT INTO OUTFILE 'path' (MySQL bulk) → "Expected: end of statement, found: '<path>'" at col 24 ===
+
+# Bulk-export INTO OUTFILE not in sqlparser's SELECT
+# grammar.
+--error 1064
+SELECT id INTO OUTFILE '/tmp/out.csv' FROM si_src;
+
+DROP TABLE si_src;

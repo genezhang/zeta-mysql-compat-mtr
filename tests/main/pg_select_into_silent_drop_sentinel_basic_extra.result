@@ -1,0 +1,50 @@
+DROP TABLE IF EXISTS si_src;
+DROP TABLE IF EXISTS si_dst;
+DROP TABLE IF EXISTS si_dst_t;
+DROP TABLE IF EXISTS si_dst_t2;
+DROP TABLE IF EXISTS si_dst_u;
+CREATE TABLE si_src (id INT, v TEXT);
+INSERT INTO si_src VALUES (1, 'a'), (2, 'b'), (3, 'c');
+=== PG SELECT INTO new-table — SILENT-DROP: SELECT runs, target table NOT created ===
+SELECT id, v INTO si_dst FROM si_src ORDER BY id;
+id	v
+1	a
+2	b
+3	c
+=== FALSIFIER — si_dst should exist if INTO worked; instead "table not found" ===
+SELECT * FROM si_dst;
+ERROR 1146: table not found: test.public.si_dst
+=== SELECT INTO TEMP <tbl> — same silent-drop with TEMP modifier ===
+SELECT id INTO TEMP si_dst_t FROM si_src ORDER BY id;
+id
+1
+2
+3
+SELECT * FROM si_dst_t;
+ERROR 1146: table not found: test.public.si_dst_t
+=== SELECT INTO TEMPORARY <tbl> — same silent-drop ===
+SELECT id INTO TEMPORARY si_dst_t2 FROM si_src ORDER BY id;
+id
+1
+2
+3
+SELECT * FROM si_dst_t2;
+ERROR 1146: table not found: test.public.si_dst_t2
+=== SELECT INTO UNLOGGED <tbl> (PG) — same silent-drop ===
+SELECT id INTO UNLOGGED si_dst_u FROM si_src ORDER BY id;
+id
+1
+2
+3
+SELECT * FROM si_dst_u;
+ERROR 1146: table not found: test.public.si_dst_u
+=== SELECT INTO @var (MySQL session-var) → "Expected: identifier, found: @" at col 16 ===
+SELECT id INTO @x FROM si_src LIMIT 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: identifier, found: @ at Line: 1, Column: 16
+=== SELECT INTO STRICT var (PG PL/pgSQL) → "Expected: end of statement, found: <var>" at col 23 ===
+SELECT id INTO STRICT v_id FROM si_src LIMIT 1;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: v_id at Line: 1, Column: 23
+=== SELECT INTO OUTFILE 'path' (MySQL bulk) → "Expected: end of statement, found: '<path>'" at col 24 ===
+SELECT id INTO OUTFILE '/tmp/out.csv' FROM si_src;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: '/tmp/out.csv' at Line: 1, Column: 24
+DROP TABLE si_src;
