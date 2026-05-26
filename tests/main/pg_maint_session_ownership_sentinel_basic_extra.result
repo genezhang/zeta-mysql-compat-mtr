@@ -1,0 +1,38 @@
+=== Shape (d) — CHECKPOINT / REASSIGN OWNED / SECURITY LABEL → "found: <KW>" at col 1 ===
+CHECKPOINT;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: CHECKPOINT at Line: 1, Column: 1
+REASSIGN OWNED BY alice TO bob;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REASSIGN at Line: 1, Column: 1
+SECURITY LABEL ON TABLE t IS 'classified';
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: SECURITY at Line: 1, Column: 1
+SECURITY LABEL FOR provider ON TABLE t IS 'classified';
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: SECURITY at Line: 1, Column: 1
+=== Shape (c) — DISCARD ALL/TEMP/TEMPORARY/PLANS/SEQUENCES (catch-all internal-type leak) ===
+DISCARD ALL;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DISCARD TEMP;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DISCARD TEMPORARY;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DISCARD PLANS;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DISCARD SEQUENCES;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== DROP restricted-list — DROP OWNED BY (2 forms) → "found: OWNED" at col 6 ===
+DROP OWNED BY alice;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: OWNED at Line: 1, Column: 6
+DROP OWNED BY alice CASCADE;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: OWNED at Line: 1, Column: 6
+=== Shape C — ALTER OPERATOR partial-grammar → "Expected: (, found: =" at col 18 ===
+ALTER OPERATOR === (INT, INT) OWNER TO bob;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: = at Line: 1, Column: 18
+=== BUG — ALTER DATABASE silent-no-op (5th silent-no-op witness) ===
+SELECT current_database()                                                AS before_alter;
+before_alter
+zeta
+ALTER DATABASE definitely_nonexistent_xyz OWNER TO some_random_role;
+ALTER DATABASE definitely_nonexistent_xyz RENAME TO renamed_target;
+ALTER DATABASE definitely_nonexistent_xyz SET search_path = public;
+SELECT current_database()                                                AS after_alter;
+after_alter
+zeta

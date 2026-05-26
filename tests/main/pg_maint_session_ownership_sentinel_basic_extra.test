@@ -1,0 +1,166 @@
+# Independently authored PG maint/session/ownership
+# DDL sentinel slice for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CHECKPOINT, DISCARD (ALL/TEMP/TEMPORARY/PLANS/
+#     SEQUENCES), REASSIGN OWNED, DROP OWNED, SECURITY
+#     LABEL, ALTER DATABASE, ALTER OPERATOR: ZERO prior
+#     coverage. Wide-grep for each keyword returns no
+#     hits.
+#
+# Pre-existing rejection shape patterns:
+#   - Shape (d) — "Expected: an SQL statement, found:
+#     <KW>" at column 1 (PR #371 et al.).
+#   - Shape (c) — "unsupported statement: sqlparser::
+#     ast::Statement" (PR #371 mysql_maintenance_cmds_
+#     sentinel:79-83).
+#   - "DROP restricted-list" — "Expected: CONNECTOR,
+#     DATABASE, ... after DROP, found: <KW>" (PR #391/
+#     #395 + temp_table_basic_extra:91).
+#   - "CREATE/ALTER OPERATOR partial-grammar" — "Expected:
+#     (, found: =" (PR #390 Shape C with CREATE OPERATOR
+#     at col 19; this slice extends to ALTER OPERATOR
+#     at col 18).
+#
+# This slice pins:
+#
+#   Shape (d) — CHECKPOINT / REASSIGN OWNED / SECURITY
+#   LABEL (3 keywords at col 1):
+#     - sqlparser doesn't recognize these as statement-
+#       level keywords. Adds 3 new keywords to the
+#       shape (d) bucket alongside HANDLER/SHUTDOWN/
+#       IMPORT/MOVE/CLUSTER.
+#
+#   Shape (c) — DISCARD ALL/TEMP/TEMPORARY/PLANS/
+#   SEQUENCES (5 forms):
+#     - sqlparser parses DISCARD into AST, zeta
+#       dispatcher has no arm, falls through to
+#       convert.rs:432 catch-all with internal type
+#       name leak.
+#
+#   "DROP restricted-list" — DROP OWNED BY (2 forms):
+#     - "Expected: ... after DROP, found: OWNED" at
+#       column 6. Same fingerprint as PR #395 (with
+#       TEXT keyword). New OWNED keyword.
+#
+#   Shape C — ALTER OPERATOR partial-grammar (1 form):
+#     - "Expected: (, found: =" at column 18. sqlparser
+#       has an ALTER OPERATOR keyword arm (gets past
+#       `ALTER OPERATOR ===`), but doesn't parse the
+#       definition body. Same Shape C fingerprint as PR
+#       #390 CREATE OPERATOR (col 19); new keyword
+#       (ALTER instead of CREATE) at col 18.
+#
+#   KNOWN BUG — `ALTER DATABASE` silently accepted-and-
+#   dropped (4th silent-no-op witness):
+#     - All three ALTER DATABASE forms (OWNER TO,
+#       RENAME TO, SET search_path) return NO ERROR
+#       — but the operation does NOTHING.
+#     - PROBE: `ALTER DATABASE definitely_nonexistent_xyz
+#       OWNER TO some_random_role` succeeds. PG would
+#       error "database does not exist" or "role does
+#       not exist". `SELECT current_database()` returns
+#       'zeta' before and after — no rename happened
+#       on the current db either.
+#     - This is the silent-no-op trap pattern from
+#       feedback_wire_path_divergence_check memory.
+#       Joins the witness list:
+#         1. LISTEN/NOTIFY mysqlwire silent (PR #366)
+#         2. Multi-dim ARRAY Debug-repr (PR #385)
+#         3. INHERITS column-drop (PR #391)
+#         4. ROLLBACK TO SAVEPOINT mysqlwire (PR #392)
+#         5. ALTER DATABASE silent-drop (this slice)
+#     - Pinned with the non-existent-db probe to prove
+#       the no-op nature.
+#
+# Big-picture finding:
+#
+#   The PG maint/session/ownership surface has FIVE
+#   distinct rejection routes (shape (d), shape (c),
+#   DROP restricted-list, Shape C partial-grammar,
+#   and a NEW silent-no-op BUG for ALTER DATABASE).
+#   The shape mechanisms are all pre-existing; the
+#   surface and the silent-no-op bug are the novelty.
+#
+#   Apps porting PG operational/maintenance scripts:
+#     - CHECKPOINT, DISCARD ALL/etc, REASSIGN OWNED,
+#       SECURITY LABEL, DROP OWNED, ALTER OPERATOR
+#       all fail at parse — drop from scripts.
+#     - ALTER DATABASE is DANGEROUS: returns success
+#       but does nothing. Apps that ALTER DATABASE
+#       and then check pg_database for confirmation
+#       will get stale data. Migrate via re-CREATE
+#       and explicit ownership-via-GRANT instead.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CHECKPOINT, REASSIGN
+#     OWNED, SECURITY LABEL all error 1064 at shape (d).
+#   # zeta-adapt: KNOWN GAP — DISCARD (ALL/TEMP/TEMPORARY/
+#     PLANS/SEQUENCES) all error 1064 at shape (c).
+#   # zeta-adapt: KNOWN GAP — DROP OWNED BY errors 1064
+#     at DROP restricted-list ("found: OWNED").
+#   # zeta-adapt: KNOWN GAP — ALTER OPERATOR partial-
+#     grammar (parallel to CREATE OPERATOR Shape C from
+#     PR #390).
+#   # zeta-adapt: KNOWN BUG — ALTER DATABASE silently
+#     succeeds but does nothing. Database-management
+#     migrations cannot rely on it.
+
+--echo === Shape (d) — CHECKPOINT / REASSIGN OWNED / SECURITY LABEL → "found: <KW>" at col 1 ===
+
+--error 1064
+CHECKPOINT;
+--error 1064
+REASSIGN OWNED BY alice TO bob;
+--error 1064
+SECURITY LABEL ON TABLE t IS 'classified';
+--error 1064
+SECURITY LABEL FOR provider ON TABLE t IS 'classified';
+
+--echo === Shape (c) — DISCARD ALL/TEMP/TEMPORARY/PLANS/SEQUENCES (catch-all internal-type leak) ===
+
+--error 1064
+DISCARD ALL;
+--error 1064
+DISCARD TEMP;
+--error 1064
+DISCARD TEMPORARY;
+--error 1064
+DISCARD PLANS;
+--error 1064
+DISCARD SEQUENCES;
+
+--echo === DROP restricted-list — DROP OWNED BY (2 forms) → "found: OWNED" at col 6 ===
+
+--error 1064
+DROP OWNED BY alice;
+--error 1064
+DROP OWNED BY alice CASCADE;
+
+--echo === Shape C — ALTER OPERATOR partial-grammar → "Expected: (, found: =" at col 18 ===
+
+# sqlparser has an ALTER OPERATOR arm — parses past
+# `ALTER OPERATOR ===` then fails at the definition
+# body. Parallel to CREATE OPERATOR Shape C from PR
+# #390 (which fires at col 19 for `CREATE OPERATOR`).
+--error 1064
+ALTER OPERATOR === (INT, INT) OWNER TO bob;
+
+--echo === BUG — ALTER DATABASE silent-no-op (5th silent-no-op witness) ===
+
+# All three forms return NO ERROR despite the target
+# database (definitely_nonexistent_xyz) not existing.
+# PG would error "database does not exist" or "role
+# does not exist". Pinned as silent successes to make
+# the BUG concrete.
+SELECT current_database()                                                AS before_alter;
+ALTER DATABASE definitely_nonexistent_xyz OWNER TO some_random_role;
+ALTER DATABASE definitely_nonexistent_xyz RENAME TO renamed_target;
+ALTER DATABASE definitely_nonexistent_xyz SET search_path = public;
+# Probe: current_database() unchanged → confirms nothing
+# happened. If RENAME had actually fired (even on a non-
+# existent target), the parse path would have at least
+# attempted something. Three silent successes prove the
+# whole ALTER DATABASE handler is a no-op.
+SELECT current_database()                                                AS after_alter;
