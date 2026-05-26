@@ -1,9 +1,6 @@
-=== JSONB - 'key' — single-key removal from object ===
-SELECT '{"a":1,"b":2,"c":3}'::JSONB - 'b'                     AS remove_b;
-remove_b
-{"a":1,"c":3}
-SELECT '{"a":1}'::JSONB - 'a'                                 AS remove_last_key;
-remove_last_key
+=== JSONB - 'key' — empty-object edge (single-key form covered in jsonb_basic_extra:126) ===
+SELECT '{"a":1}'::JSONB - 'a'                                 AS remove_last_key_empty;
+remove_last_key_empty
 {}
 === JSONB - int — array element removal by index ===
 SELECT '[1,2,3,4]'::JSONB - 0                                 AS remove_first;

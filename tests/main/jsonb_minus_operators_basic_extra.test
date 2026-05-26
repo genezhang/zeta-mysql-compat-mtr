@@ -4,12 +4,19 @@
 # mysql-test/.
 #
 # Existing coverage (do NOT duplicate):
-#   - jsonb_basic_extra.test:154 pins `JSONB - ARRAY['a','b']`
-#     (multi-key removal). This slice covers the
-#     remaining `-` forms (single key, int index,
-#     negative index, type-mismatch silent no-ops) AND
-#     the `#-` path-removal operator which is
-#     UNSUPPORTED at parse level.
+#   - jsonb_basic_extra.test:126 pins single-key form
+#     `data - 'b'` (delete-key, supported).
+#   - jsonb_basic_extra.test:154 pins ARRAY[...] form as
+#     a KNOWN-GAP (errno 1105 — "arithmetic op requires
+#     numbers", planner misroutes). My initial
+#     description claim that it was "covered" was wrong
+#     per PR #378 review.
+#   - This slice covers the remaining `-` forms NOT in
+#     jsonb_basic_extra: int-index (positive and
+#     negative), out-of-range, missing-key/empty
+#     no-ops, type-mismatch silent no-ops, AND the
+#     `#-` path-removal operator which is UNSUPPORTED
+#     at parse level.
 #   - json_remove_basic_extra and json_modify_extras_basic_extra
 #     cover JSON_REMOVE function (different surface).
 #
@@ -75,10 +82,12 @@
 #     UNSUPPORTED. Rewrite using JSONB_SET +
 #     JSONB_REMOVE or JSON_REMOVE function.
 
---echo === JSONB - 'key' — single-key removal from object ===
+--echo === JSONB - 'key' — empty-object edge (single-key form covered in jsonb_basic_extra:126) ===
 
-SELECT '{"a":1,"b":2,"c":3}'::JSONB - 'b'                     AS remove_b;
-SELECT '{"a":1}'::JSONB - 'a'                                 AS remove_last_key;
+# `data - 'b'` is already pinned in
+# jsonb_basic_extra:126. This row adds the empty-object
+# edge case (remove last key → '{}').
+SELECT '{"a":1}'::JSONB - 'a'                                 AS remove_last_key_empty;
 
 --echo === JSONB - int — array element removal by index ===
 
