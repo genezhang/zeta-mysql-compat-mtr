@@ -1,0 +1,75 @@
+=== FORMAT_STRING / PRINTF — basic conversions ===
+SELECT FORMAT_STRING('hello %s', 'world')                     AS s_basic;
+s_basic
+hello world
+SELECT PRINTF('integer %d', 42)                               AS d_basic;
+d_basic
+integer 42
+SELECT FORMAT_STRING('hex %x', 255)                           AS x_lowercase;
+x_lowercase
+hex ff
+SELECT FORMAT_STRING('hex %X', 255)                           AS x_uppercase;
+x_uppercase
+hex FF
+SELECT FORMAT_STRING('octal %o', 8)                           AS o_basic;
+o_basic
+octal 10
+SELECT FORMAT_STRING('float %f', CAST(3.14 AS DOUBLE PRECISION))
+                                                              AS f_basic;
+f_basic
+float 3.140000
+=== FORMAT_STRING ≡ PRINTF (alias equivalence) ===
+SELECT FORMAT_STRING('integer %d', 42) = PRINTF('integer %d', 42)
+                                                              AS alias_eq;
+alias_eq
+1
+=== Width, precision, zero-pad flags ===
+SELECT FORMAT_STRING('|%10s|', 'hi')                          AS width_10_right_pad;
+width_10_right_pad
+|        hi|
+SELECT FORMAT_STRING('|%-10s|', 'hi')                         AS width_left_align;
+width_left_align
+|hi        |
+SELECT FORMAT_STRING('%.3f', CAST(3.14159 AS DOUBLE PRECISION))
+                                                              AS precision_3;
+precision_3
+3.142
+SELECT FORMAT_STRING('%05d', 42)                              AS zero_pad_5;
+zero_pad_5
+00042
+SELECT FORMAT_STRING('%+d', 42)                               AS force_sign_pos;
+force_sign_pos
++42
+SELECT FORMAT_STRING('%+d', -42)                              AS force_sign_neg;
+force_sign_neg
+-42
+=== Positional args (%N$ syntax) ===
+SELECT FORMAT_STRING('%2$s %1$s', 'world', 'hello')           AS positional_swap;
+positional_swap
+hello world
+SELECT FORMAT_STRING('%1$s %1$s', 'hi')                       AS positional_reuse;
+positional_reuse
+hi hi
+=== Escapes: %% literal percent, %n literal newline ===
+SELECT FORMAT_STRING('percent %%')                            AS literal_percent;
+literal_percent
+percent %
+SELECT LENGTH(FORMAT_STRING('newline%n'))                     AS newline_len_8;
+newline_len_8
+8
+=== STRIKING: unknown spec emits VERBATIM (no error) ===
+SELECT FORMAT_STRING('unknown %q here', 'arg')                AS unknown_q_verbatim;
+unknown_q_verbatim
+unknown %q here
+=== NULL format → NULL ===
+SELECT FORMAT_STRING(NULL, 'arg')                             AS null_fmt_null;
+null_fmt_null
+NULL
+SELECT FORMAT_STRING(NULL, 'arg') IS NULL                     AS null_fmt_pred;
+null_fmt_pred
+1
+=== Arity error — zero args → 1105 ===
+SELECT FORMAT_STRING();
+ERROR 1105: execution error: FORMAT_STRING requires at least one argument
+SELECT PRINTF();
+ERROR 1105: execution error: FORMAT_STRING requires at least one argument

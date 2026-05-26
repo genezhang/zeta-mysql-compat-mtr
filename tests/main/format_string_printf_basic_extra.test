@@ -1,0 +1,127 @@
+# Independently authored FORMAT_STRING / PRINTF smoke for the
+# GPL MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - FORMAT_STRING — NONE (zero compat-mtr coverage).
+#     Spark-flavored printf-like template-formatting function.
+#   - PRINTF — NONE (Spark alias for FORMAT_STRING; same impl
+#     arm at lib.rs:50686).
+#   - format_basic_extra.test covers MySQL FORMAT(num, dec) —
+#     a DIFFERENT function (number → comma-grouped string).
+#     Not relevant here.
+#
+# This slice pins:
+#   - FORMAT_STRING ≡ PRINTF (same impl arm).
+#   - Conversions: %s (string), %d (decimal int), %x/%X (hex),
+#     %o (octal), %f/%F (float).
+#   - Width specifier: `%10s` right-pads to width 10.
+#   - Precision specifier: `%.3f` rounds to 3 decimal places.
+#   - Zero-pad flag: `%05d` zero-pads to width 5.
+#   - Positional args: `%1$s %2$s` swaps order.
+#   - Escape: `%%` literal percent; `%n` literal newline.
+#   - Unknown spec: emits verbatim (NO error, NO arg
+#     consumed).
+#   - NULL format → NULL.
+#   - Arity 0 → 1105.
+#
+# Big-picture finding:
+#   FORMAT_STRING and PRINTF share ONE impl arm at
+#   lib.rs:50686 — PRINTF is a Spark alias not a separate
+#   function.
+#
+#   The format parser (format_string_render at lib.rs:44078)
+#   follows Java/printf semantics for unknown conversions:
+#   emit the spec VERBATIM and do NOT advance the auto-arg
+#   index. So `'%q'` literally appears in output and the
+#   arg slot is wasted. This makes the function safe against
+#   typos in the format string — no panic, no error.
+#
+#   The `%n` conversion produces a LITERAL '\n' (POSIX
+#   newline, NOT the C-style "count chars written" nor
+#   Java's String.format `%n` which emits the platform
+#   line separator — `\r\n` on Windows, 2 bytes). The impl
+#   unconditionally pushes a single '\n' byte; this matches
+#   Spark `format_string`'s POSIX-only behavior. LENGTH=8
+#   below would FAIL under real Java semantics on Windows.
+#
+#   Positional args use `%N$` (1-based) prefix. The auto-
+#   index continues from where positional refs left off (per
+#   impl at lib.rs:44113-44129). Implementation detail
+#   worth noting.
+#
+# Adaptation notes:
+#   # zeta-adapt: FORMAT_STRING ≡ PRINTF — pick whichever.
+#   # zeta-adapt: %n = literal POSIX '\n' (Spark
+#     format_string, NOT Java's platform-dependent
+#     line separator, NOT C's "char count").
+#   # zeta-adapt: Unknown spec (e.g. %q) emits verbatim;
+#     does NOT error. Catches typos silently — review
+#     format strings carefully.
+#   # zeta-adapt: NULL format → NULL.
+
+--echo === FORMAT_STRING / PRINTF — basic conversions ===
+
+SELECT FORMAT_STRING('hello %s', 'world')                     AS s_basic;
+SELECT PRINTF('integer %d', 42)                               AS d_basic;
+SELECT FORMAT_STRING('hex %x', 255)                           AS x_lowercase;
+SELECT FORMAT_STRING('hex %X', 255)                           AS x_uppercase;
+SELECT FORMAT_STRING('octal %o', 8)                           AS o_basic;
+SELECT FORMAT_STRING('float %f', CAST(3.14 AS DOUBLE PRECISION))
+                                                              AS f_basic;
+
+--echo === FORMAT_STRING ≡ PRINTF (alias equivalence) ===
+
+SELECT FORMAT_STRING('integer %d', 42) = PRINTF('integer %d', 42)
+                                                              AS alias_eq;
+
+--echo === Width, precision, zero-pad flags ===
+
+# Width 10, right-pads with spaces (default behavior).
+SELECT FORMAT_STRING('|%10s|', 'hi')                          AS width_10_right_pad;
+# Left-align via `-` flag.
+SELECT FORMAT_STRING('|%-10s|', 'hi')                         AS width_left_align;
+# Precision rounds float.
+SELECT FORMAT_STRING('%.3f', CAST(3.14159 AS DOUBLE PRECISION))
+                                                              AS precision_3;
+# Zero-pad int.
+SELECT FORMAT_STRING('%05d', 42)                              AS zero_pad_5;
+# Force sign.
+SELECT FORMAT_STRING('%+d', 42)                               AS force_sign_pos;
+SELECT FORMAT_STRING('%+d', -42)                              AS force_sign_neg;
+
+--echo === Positional args (%N$ syntax) ===
+
+# Swap arg order.
+SELECT FORMAT_STRING('%2$s %1$s', 'world', 'hello')           AS positional_swap;
+# Reuse same arg.
+SELECT FORMAT_STRING('%1$s %1$s', 'hi')                       AS positional_reuse;
+
+--echo === Escapes: %% literal percent, %n literal newline ===
+
+SELECT FORMAT_STRING('percent %%')                            AS literal_percent;
+# %n produces a LITERAL POSIX '\n' (1 byte, Spark
+# format_string semantics — NOT Java's
+# System.lineSeparator() which would be 2 bytes on
+# Windows, NOT C's "char count written").
+# LENGTH proves the newline is real (8 chars: 'newline' + '\n').
+SELECT LENGTH(FORMAT_STRING('newline%n'))                     AS newline_len_8;
+
+--echo === STRIKING: unknown spec emits VERBATIM (no error) ===
+
+# `%q` isn't a recognized conversion. The impl emits the
+# spec literally and does NOT consume the arg or fail.
+# Catches typos silently — review format strings carefully.
+SELECT FORMAT_STRING('unknown %q here', 'arg')                AS unknown_q_verbatim;
+
+--echo === NULL format → NULL ===
+
+SELECT FORMAT_STRING(NULL, 'arg')                             AS null_fmt_null;
+SELECT FORMAT_STRING(NULL, 'arg') IS NULL                     AS null_fmt_pred;
+
+--echo === Arity error — zero args → 1105 ===
+
+--error 1105
+SELECT FORMAT_STRING();
+--error 1105
+SELECT PRINTF();
