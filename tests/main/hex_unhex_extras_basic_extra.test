@@ -1,0 +1,213 @@
+# Independently authored HEX / UNHEX extras smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - string_func_basic.test:85: HEX('A') / UNHEX('41').
+#   - string_func_basic_extra.test:78-79: HEX(255), HEX(123456).
+#   - bit_op_extra_basic_extra.test:104,108-109: TO_HEX(255),
+#     FROM_HEX('616263'), FROM_HEX('1') (odd-length) → ?,
+#     FROM_HEX(NULL).
+#   - aes_encrypt_decrypt_basic_extra.test: HEX/UNHEX used as
+#     binary-compare wrappers around AES.
+#
+# This slice pins what those slices DO NOT:
+#   - HEX ≡ TO_HEX, UNHEX ≡ FROM_HEX (same impl arms at
+#     lib.rs:49892 and 50061).
+#   - Round-trips: UNHEX(HEX(s)) = s for valid UTF-8;
+#     HEX(UNHEX(h)) = h for valid uppercase hex.
+#   - NULL propagation (NULL + typed-NULL) for both.
+#   - UNHEX odd-length → NULL (documented; only one
+#     odd-length pin elsewhere, no companion even-length
+#     contrast).
+#   - UNHEX invalid hex char → NULL.
+#   - HEX of NEGATIVE Int — uses `n as i64 as u64` cast at
+#     lib.rs:49903-49904 — produces 16 F's prefix for i32
+#     -1, full 64-bit FFFFFF... for i64 -1. Pin both.
+#   - HEX of i64::MAX / i64::MIN boundary.
+#   - HEX of Float64 / Decimal / Bool — catch-all arm at
+#     lib.rs:49907-49911 routes through value_to_sql_string
+#     then encodes the string bytes.
+#   - HEX of Bytes (BYTEA) — separate arm at lib.rs:49906.
+#   - Uppercase invariant: HEX always uppercase; lowercase
+#     reached only via LOWER(HEX(...)).
+#   - UNHEX String-vs-Bytes return type for UTF-8 vs raw.
+#   - Empty string: HEX('') = '', UNHEX('') = ''.
+#   - HEX/UNHEX arity errors.
+#   - CONV equivalence: CONV(255, 10, 16) = HEX(255).
+#
+# Big-picture finding:
+#   The HEX impl has FOUR distinct numeric/binary arms and a
+#   CATCH-ALL: Int32 (sign-extend via i64-cast then unsigned),
+#   Int64 (unsigned cast), UInt64 (direct), Bytes (per-byte),
+#   and other (value_to_sql_string then hex). For Int32 -1 →
+#   0xFFFFFFFFFFFFFFFF (16 chars, sign-extended); for Int64
+#   max → 7FFFFFFFFFFFFFFF (16 chars, no extension).
+#   This means HEX is NOT just numeric-base-16 — it's a
+#   binary-representation render with sign-extension to 64
+#   bits for signed Int types.
+#
+#   UNHEX is type-shape-sensitive on output: valid UTF-8 → Value
+#   ::String, invalid UTF-8 → Value::Bytes. So `LENGTH(UNHEX(h))`
+#   reports character count for the String case but byte count
+#   for the Bytes case. Pin both shapes.
+#
+# Adaptation notes:
+#   # zeta-adapt: HEX(negative_int) sign-extends to 64 bits.
+#     For Int32 -1 → 'FFFFFFFFFFFFFFFF' (NOT 'FFFFFFFF'); for
+#     Int64 -1 → 'FFFFFFFFFFFFFFFF'. MySQL has the same
+#     behavior.
+#   # zeta-adapt: HEX result is ALWAYS uppercase. lowercase via
+#     LOWER(HEX(...)).
+#   # zeta-adapt: UNHEX returns String when decoded bytes are
+#     valid UTF-8, Bytes otherwise. Round-trip through HEX
+#     keeps the original hex.
+#   # zeta-adapt: UNHEX odd-length input → NULL.
+#   # zeta-adapt: UNHEX invalid hex char (non-0-9A-Fa-f) → NULL.
+#   # zeta-adapt: Arity errors → 1105.
+
+--echo === HEX / TO_HEX alias equivalence ===
+
+SELECT HEX(255)    = TO_HEX(255)                              AS int_alias;
+SELECT HEX('abc')  = TO_HEX('abc')                            AS str_alias;
+SELECT HEX(NULL)   IS NULL                                    AS null_alias_left;
+SELECT TO_HEX(NULL) IS NULL                                   AS null_alias_right;
+
+--echo === UNHEX / FROM_HEX alias equivalence ===
+
+SELECT UNHEX('616263') = FROM_HEX('616263')                   AS bytes_alias;
+SELECT UNHEX('41')     = FROM_HEX('41')                       AS single_alias;
+
+--echo === Uppercase invariant — HEX always uppercase ===
+
+# Both letters and the leading digit case pin uppercase.
+SELECT HEX('z')                                               AS hex_z;
+# 0xDEADBEEF hex literal is parser-rejected; use decimal 3735928559.
+SELECT HEX(3735928559)                                        AS hex_deadbeef_decimal;
+# Lowercase reachable only via wrap.
+SELECT LOWER(HEX('z'))                                        AS hex_z_lower;
+
+--echo === Round-trips ===
+
+# UNHEX(HEX(s)) == s for valid UTF-8.
+SELECT UNHEX(HEX('hello'))    = 'hello'                       AS rt_ascii;
+SELECT UNHEX(HEX('café'))     = 'café'                        AS rt_utf8_multibyte;
+SELECT UNHEX(HEX(''))         = ''                            AS rt_empty;
+# HEX(UNHEX(h)) == h for valid uppercase hex (UNHEX strips
+# nothing; HEX uppercases the byte-encoding).
+SELECT HEX(UNHEX('48656C6C6F')) = '48656C6C6F'                AS rt_hex_to_hex;
+
+--echo === HEX of negative Int (i32 sign-extends to 64 bits) ===
+
+# Int32 -1 cast to i64 → -1, then `as u64` → 0xFFFFFFFFFFFFFFFF.
+# 16 chars of F. MySQL behaves the same.
+SELECT HEX(-1)                                                AS neg_one;
+SELECT LENGTH(HEX(-1))                                        AS neg_one_hex_len_is_16;
+# Smaller negative int — still 64-bit sign-extended.
+SELECT HEX(-2)                                                AS neg_two;
+# Sanity: positive int doesn't sign-extend pad.
+SELECT HEX(255)                                               AS pos_255;
+
+--echo === HEX of Int64 boundaries (BIGINT) ===
+
+# i64::MAX = 9223372036854775807 = 0x7FFFFFFFFFFFFFFF (16 chars,
+# leading 7 not F because not sign-extended).
+SELECT HEX(CAST(9223372036854775807 AS BIGINT))               AS i64_max;
+SELECT LENGTH(HEX(CAST(9223372036854775807 AS BIGINT)))       AS i64_max_len;
+# Zero.
+SELECT HEX(0)                                                 AS zero;
+
+--echo === HEX of non-numeric types — catch-all via value_to_sql_string ===
+
+# Bool / Date / Timestamp / Float go through the catch-all
+# arm: value_to_sql_string THEN per-byte hex. So HEX(TRUE)
+# is HEX of the rendered string "true" or "1", not the wire
+# representation. Pin the actual output.
+SELECT HEX(TRUE)                                              AS hex_bool_true;
+SELECT HEX(DATE '2024-03-15')                                 AS hex_date;
+SELECT HEX(TIMESTAMP '2024-03-15 14:30:00')                   AS hex_timestamp;
+SELECT HEX(CAST(1.5 AS DOUBLE PRECISION))                     AS hex_float64;
+
+--echo === HEX of Bytes (BYTEA via CAST chain) ===
+
+# zeta-adapt: BYTEA cast IS plan-recognized (cast_target_type_
+# aliases PR #328) but runtime rejected via cast_value. To
+# reach the Bytes arm in HEX, use UNHEX which DOES return
+# Value::Bytes for non-UTF-8 input.
+SELECT HEX(UNHEX('FF'))                                       AS hex_of_bytes_FF;
+SELECT HEX(UNHEX('DEADBEEF'))                                 AS hex_of_bytes_deadbeef;
+
+--echo === UNHEX String-vs-Bytes — round-trip preserves bytes regardless of shape ===
+
+# UNHEX('48656C6C6F') = 'Hello' → ASCII → Value::String.
+# UNHEX('FF') = 0xFF → INVALID UTF-8 → Value::Bytes.
+# HEX of either re-encodes the bytes identically — the round-
+# trip is shape-agnostic. (The two shapes are not directly
+# distinguishable over the MySQL wire; this row just pins
+# that BOTH paths preserve byte content. A proper String/
+# Bytes shape discriminator would need a String-only op like
+# UPPER on the Bytes side; not pinned here.)
+SELECT HEX(UNHEX('48656C6C6F'))                               AS unhex_string_path_rt;
+SELECT HEX(UNHEX('FF'))                                       AS unhex_bytes_path_rt;
+# Direct comparison: the String path can be compared to a
+# string literal because both sides are String.
+SELECT UNHEX('48656C6C6F') = 'Hello'                          AS unhex_string_eq_literal;
+
+--echo === UNHEX odd-length → NULL ===
+
+# Documented at lib.rs:50073 — odd-length input is invalid
+# and returns NULL, NOT an error. Pin both as nulls.
+SELECT UNHEX('A')                                             AS odd_one_char_null;
+SELECT UNHEX('ABC')                                           AS odd_three_char_null;
+SELECT UNHEX('A') IS NULL                                     AS odd_predicate_null;
+
+--echo === UNHEX invalid hex char → NULL ===
+
+# Non-0-9A-Fa-f char anywhere in input → entire result NULL.
+SELECT UNHEX('GH')                                            AS bad_g_h_null;
+SELECT UNHEX('41G2')                                          AS mixed_valid_bad_null;
+SELECT UNHEX('41G2') IS NULL                                  AS bad_predicate_null;
+# Spaces also invalid.
+SELECT UNHEX('41 42')                                         AS space_in_middle_null;
+
+--echo === Empty string handling ===
+
+# Empty string of length 0 (even) — passes the modulo-2 check,
+# loop processes no chunks, returns empty String.
+SELECT HEX('')                                                AS hex_empty;
+SELECT UNHEX('')                                              AS unhex_empty;
+SELECT HEX('')   = ''                                         AS hex_empty_eq;
+SELECT UNHEX('') = ''                                         AS unhex_empty_eq;
+
+--echo === NULL propagation (NULL + typed NULL) ===
+
+SELECT HEX(NULL)                                              AS hex_null;
+SELECT UNHEX(NULL)                                            AS unhex_null;
+SELECT HEX(CAST(NULL AS INTEGER))                             AS hex_typed_null;
+SELECT UNHEX(CAST(NULL AS TEXT))                              AS unhex_typed_null;
+SELECT HEX(NULL)   IS NULL                                    AS hex_null_pred;
+SELECT UNHEX(NULL) IS NULL                                    AS unhex_null_pred;
+
+--echo === Arity errors → 1105 ===
+
+--error 1105
+SELECT HEX();
+--error 1105
+SELECT HEX(1, 2);
+--error 1105
+SELECT UNHEX();
+--error 1105
+SELECT UNHEX('41', '42');
+--error 1105
+SELECT TO_HEX();
+--error 1105
+SELECT FROM_HEX();
+
+--echo === CONV equivalence: CONV(n, 10, 16) = HEX(n) for positive int ===
+
+# For positive integers, CONV(n, 10, 16) and HEX(n) agree.
+# (For negative, CONV returns a different unsigned encoding;
+# see conv_bin_oct_bit_count_basic_extra.test for CONV
+# specifics — do NOT duplicate.)
+SELECT CONV(255, 10, 16) = HEX(255)                           AS conv_eq_hex_255;
+SELECT CONV(0,   10, 16) = HEX(0)                             AS conv_eq_hex_0;
