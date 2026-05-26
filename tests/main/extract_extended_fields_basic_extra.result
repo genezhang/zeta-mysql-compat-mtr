@@ -1,0 +1,104 @@
+=== EXTRACT(CENTURY) — PG formula floor((year-1)/100)+1 ===
+SELECT EXTRACT(CENTURY FROM TIMESTAMP '2024-05-19 14:30:45') AS century_21;
+century_21
+21
+SELECT EXTRACT(CENTURY FROM DATE '2000-01-01')               AS year_2000_century_20;
+year_2000_century_20
+20
+SELECT EXTRACT(CENTURY FROM DATE '2001-01-01')               AS year_2001_century_21;
+year_2001_century_21
+21
+=== EXTRACT(DECADE) — floor(year/10) ===
+SELECT EXTRACT(DECADE FROM TIMESTAMP '2024-05-19 14:30:45') AS decade_202;
+decade_202
+202
+SELECT EXTRACT(DECADE FROM DATE '2030-01-01')                AS year_2030_decade_203;
+year_2030_decade_203
+203
+SELECT EXTRACT(DECADE FROM DATE '1999-12-31')                AS year_1999_decade_199;
+year_1999_decade_199
+199
+=== EXTRACT(MILLENNIUM) — floor((year-1)/1000)+1 ===
+SELECT EXTRACT(MILLENNIUM FROM TIMESTAMP '2024-05-19 00:00:00') AS millennium_3;
+millennium_3
+3
+SELECT EXTRACT(MILLENNIUM FROM DATE '2000-01-01')            AS year_2000_millennium_2;
+year_2000_millennium_2
+2
+SELECT EXTRACT(MILLENNIUM FROM DATE '2001-01-01')            AS year_2001_millennium_3;
+year_2001_millennium_3
+3
+=== EXTRACT(ISOYEAR) — ISO 8601 week-year ===
+SELECT EXTRACT(ISOYEAR FROM DATE '2024-05-19')               AS mid_2024;
+mid_2024
+2024
+SELECT EXTRACT(ISOYEAR FROM DATE '2025-01-01')               AS new_year_2025;
+new_year_2025
+2025
+=== EXTRACT(EPOCH) — seconds since Unix epoch ===
+SELECT EXTRACT(EPOCH FROM TIMESTAMP '1970-01-01 00:00:00')   AS epoch_0;
+epoch_0
+0
+SELECT EXTRACT(EPOCH FROM TIMESTAMP '1970-01-01 01:00:00')   AS epoch_3600;
+epoch_3600
+3600
+SELECT EXTRACT(EPOCH FROM DATE '1970-01-02')                 AS day_after_epoch_86400;
+day_after_epoch_86400
+86400
+SELECT EXTRACT(EPOCH FROM INTERVAL '1 hour')                 AS one_hour_3600;
+one_hour_3600
+3600
+=== EXTRACT(MILLISECOND/MILLISECONDS) — both singular AND plural ===
+SELECT EXTRACT(MILLISECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789') AS ms_plural;
+ms_plural
+56789
+SELECT EXTRACT(MILLISECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789') AS ms_singular;
+ms_singular
+56789
+SELECT EXTRACT(MILLISECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789')
+     = EXTRACT(MILLISECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789') AS sing_eq_plur_ms;
+sing_eq_plur_ms
+1
+=== EXTRACT(MICROSECOND/MICROSECONDS) — both forms accepted ===
+SELECT EXTRACT(MICROSECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789012') AS us_plural;
+us_plural
+56789012
+SELECT EXTRACT(MICROSECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789012') AS us_singular;
+us_singular
+56789012
+SELECT EXTRACT(MICROSECOND  FROM TIMESTAMP '2024-01-01 12:34:56.789012')
+     = EXTRACT(MICROSECONDS FROM TIMESTAMP '2024-01-01 12:34:56.789012') AS sing_eq_plur_us;
+sing_eq_plur_us
+1
+=== DATE_PART equivalence (PG alias) ===
+SELECT DATE_PART('century',    TIMESTAMP '2024-05-19 14:30:45')
+     = EXTRACT(CENTURY FROM TIMESTAMP '2024-05-19 14:30:45')   AS date_part_century_eq;
+date_part_century_eq
+1
+SELECT DATE_PART('decade',     TIMESTAMP '2024-05-19 14:30:45')
+     = EXTRACT(DECADE FROM TIMESTAMP '2024-05-19 14:30:45')    AS date_part_decade_eq;
+date_part_decade_eq
+1
+SELECT DATE_PART('millennium', TIMESTAMP '2024-05-19 14:30:45')
+     = EXTRACT(MILLENNIUM FROM TIMESTAMP '2024-05-19 14:30:45') AS date_part_mill_eq;
+date_part_mill_eq
+1
+SELECT DATE_PART('epoch',      TIMESTAMP '1970-01-01 01:00:00')
+     = EXTRACT(EPOCH FROM TIMESTAMP '1970-01-01 01:00:00')      AS date_part_epoch_eq;
+date_part_epoch_eq
+1
+=== Per-type validity — Date rejects time fields ===
+SELECT EXTRACT(HOUR FROM DATE '2024-05-19');
+ERROR 1105: execution error: unsupported EXTRACT field for DATE: HOUR
+SELECT EXTRACT(MICROSECOND FROM DATE '2024-05-19');
+ERROR 1105: execution error: unsupported EXTRACT field for DATE: MICROSECOND
+=== Per-type validity — Time rejects date fields ===
+SELECT EXTRACT(YEAR FROM TIME '14:30:45');
+ERROR 1105: execution error: unsupported EXTRACT field for TIME: YEAR
+SELECT EXTRACT(CENTURY FROM TIME '14:30:45');
+ERROR 1105: execution error: unsupported EXTRACT field for TIME: CENTURY
+=== Per-type validity — Interval rejects extras (only Y/M/D/H/M/S/EPOCH) ===
+SELECT EXTRACT(CENTURY FROM INTERVAL '1 year');
+ERROR 1105: execution error: unsupported EXTRACT field for INTERVAL: CENTURY
+SELECT EXTRACT(ISOYEAR FROM INTERVAL '1 year');
+ERROR 1105: execution error: unsupported EXTRACT field for INTERVAL: ISOYEAR
