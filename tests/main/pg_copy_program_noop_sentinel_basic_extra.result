@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS cp;
+CREATE TABLE cp (id INT, v TEXT);
+INSERT INTO cp VALUES (1, 'alpha'), (2, 'beta');
+=== COPY <t> TO PROGRAM '<cmd>' — silent no-op (no error, no file produced) ===
+COPY cp TO PROGRAM 'cat > /tmp/zeta_copy_program_noop_should_not_exist.txt';
+=== COPY <t> FROM PROGRAM '<cmd>' — silent no-op (no rows inserted) ===
+COPY cp FROM PROGRAM 'printf "99\tfrom-program\n"';
+=== FALSIFIER — SELECT shows table contents unchanged (FROM PROGRAM did not insert id=99) ===
+SELECT * FROM cp ORDER BY id;
+id	v
+1	alpha
+2	beta
+DROP TABLE cp;
