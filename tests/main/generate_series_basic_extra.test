@@ -1,0 +1,157 @@
+# Independently authored GENERATE_SERIES smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - datatype_basic_extra.test:109 has ONE incidental row:
+#     `SELECT v FROM generate_series(1, 3) AS t(v) ORDER BY v;`
+#     (the basic ascending happy path). Everything else
+#     uncovered. This is a PG-flavor set-returning function;
+#     MySQL has no direct equivalent.
+#
+# This slice pins:
+#   - Integer form: GENERATE_SERIES(start, stop) with default
+#     step 1, GENERATE_SERIES(start, stop, step) with custom
+#     positive/negative step.
+#   - start > stop with positive step → EMPTY series.
+#   - start < stop with negative step → EMPTY series.
+#   - step = 0 → ERROR 1105.
+#   - Timestamp form: GENERATE_SERIES(start, stop) with
+#     default step INTERVAL 1 DAY.
+#   - GENERATE_SERIES(timestamp, timestamp, interval) custom
+#     step.
+#   - Timestamp form with non-interval step → ERROR 1105.
+#   - SCALAR-EXPRESSION CALL GAP: GENERATE_SERIES used
+#     outside a FROM clause errors 1105 "unknown function".
+#   - arity error (1 arg) → 1105.
+#   - JOIN compatibility: GENERATE_SERIES is usable as a
+#     FROM clause source alongside other FROM items.
+#   - WHERE clause filter on the generated series.
+#
+# Big-picture finding:
+#   GENERATE_SERIES is registered as a set-returning function
+#   handled in the executor's FROM clause via exec_generate_
+#   series (lib.rs:37049). It does NOT go through the
+#   scalar function dispatcher — so SELECT GENERATE_SERIES(1,3)
+#   (no FROM) hits the unknown-function path. This means the
+#   PG idiom `SELECT generate_series(1, 5)` (scalar) requires
+#   rewriting to `SELECT * FROM generate_series(1, 5)` (FROM-
+#   clause) for zeta.
+#
+#   The integer form has TWO match arms — (Int64, Int64) at
+#   lib.rs:37058 and (Int32, Int32) at lib.rs:37107 (which
+#   promotes to i64 and recurses). Integer LITERALS in zeta
+#   parse as Int64 (eval_literal_expr at lib.rs:41641), so
+#   this slice's literal-arg queries all hit the
+#   (Int64, Int64) arm — the Int32 arm is reachable only via
+#   CAST AS INTEGER or Int32-typed columns. Mixed-type
+#   (Int32, Int64) hits the catch-all error (not pinned
+#   here; out of scope).
+#
+#   Safety: a 1M row hard cap protects against runaway
+#   generators (lib.rs:37085-37088 and :37098-37101). Out of
+#   slice scope to test (too slow to drive 1M+ rows).
+#
+# Adaptation notes:
+#   # zeta-adapt: GENERATE_SERIES MUST be in FROM clause.
+#     `SELECT GENERATE_SERIES(1,3)` → 1105 unknown function.
+#     Use `SELECT * FROM GENERATE_SERIES(1,3)`.
+#   # zeta-adapt: Integer form defaults step to 1; descending
+#     ranges need explicit negative step.
+#   # zeta-adapt: Timestamp form defaults step to INTERVAL 1
+#     DAY; explicit step must be an INTERVAL (Int rejected).
+#   # zeta-adapt: step = 0 → 1105 in both forms.
+#   # zeta-adapt: Output column is named `generate_series`
+#     (lowercase, matching PG).
+
+--echo === Integer form — basic ascending ===
+
+SELECT * FROM GENERATE_SERIES(1, 5);
+# With explicit step 2.
+SELECT * FROM GENERATE_SERIES(1, 10, 2);
+# Single-element range (start == stop).
+SELECT * FROM GENERATE_SERIES(7, 7);
+
+--echo === Integer form — descending with negative step ===
+
+SELECT * FROM GENERATE_SERIES(5, 1, -1);
+SELECT * FROM GENERATE_SERIES(10, 0, -3);
+
+--echo === Integer form — empty results ===
+
+# start > stop with default (positive) step → empty.
+SELECT * FROM GENERATE_SERIES(5, 1);
+# start < stop with explicit negative step → empty.
+SELECT * FROM GENERATE_SERIES(1, 5, -1);
+
+--echo === Integer form — error cases ===
+
+# step = 0 → 1105.
+--error 1105
+SELECT * FROM GENERATE_SERIES(1, 5, 0);
+# 1 arg → 1105.
+--error 1105
+SELECT * FROM GENERATE_SERIES(5);
+
+--echo === Timestamp form — default step = INTERVAL 1 DAY ===
+
+SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01', TIMESTAMP '2024-01-04');
+
+--echo === Timestamp form — custom INTERVAL step ===
+
+SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
+                              TIMESTAMP '2024-01-10',
+                              INTERVAL 3 DAY);
+# Hour step (smaller granularity).
+SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01 00:00:00',
+                              TIMESTAMP '2024-01-01 06:00:00',
+                              INTERVAL 2 HOUR);
+
+--echo === Timestamp form — wrong-type step → ERROR 1105 ===
+
+# Integer step on Timestamp args rejected (impl requires
+# INTERVAL when both args are Timestamp).
+--error 1105
+SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
+                              TIMESTAMP '2024-01-05',
+                              1);
+
+--echo === Timestamp form — INTERVAL 0 step → ERROR 1105 ===
+
+# Same 'step cannot be zero' check applies in the timestamp
+# arm (lib.rs:37130-37133).
+--error 1105
+SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
+                              TIMESTAMP '2024-01-05',
+                              INTERVAL 0 DAY);
+
+--echo === SCALAR-EXPRESSION CALL GAP — outside FROM clause ===
+
+# PG accepts SELECT generate_series(1, 5) (scalar form).
+# zeta does NOT — it routes through the FROM-clause set-
+# returning dispatcher only. Outside FROM, the scalar
+# function dispatcher fires unknown-function.
+--error 1105
+SELECT GENERATE_SERIES(1, 5);
+--error 1105
+SELECT GENERATE_SERIES(1, 5) AS x;
+
+--echo === GENERATE_SERIES with WHERE filter ===
+
+SELECT n FROM GENERATE_SERIES(1, 10) AS t(n) WHERE n % 2 = 0 ORDER BY n;
+
+--echo === GENERATE_SERIES with AGGREGATE over generated rows ===
+
+# Sum 1..10 = 55. Pin via scalar aggregate.
+SELECT SUM(n) AS total FROM GENERATE_SERIES(1, 10) AS t(n);
+SELECT COUNT(*) AS cnt FROM GENERATE_SERIES(1, 100) AS t(n);
+
+--echo === GENERATE_SERIES JOINed against a table ===
+
+CREATE TABLE gs_t (id INT, name TEXT);
+INSERT INTO gs_t VALUES (1, 'a'), (2, 'b'), (3, 'c');
+SELECT t.name, gs.n
+  FROM gs_t t
+  JOIN GENERATE_SERIES(1, 3) AS gs(n) ON t.id = gs.n
+ ORDER BY t.id;
+DROP TABLE gs_t;
