@@ -1,0 +1,137 @@
+# Independently authored CREATE/ALTER/DROP EVENT, USE,
+# and TRUNCATE PARTITION clause sentinel smoke for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE/ALTER/DROP EVENT — NONE (checked all *.test
+#     files per PR #357 lesson).
+#   - USE <db> — referenced in
+#     database_schema_basic_extra.test:18 in prose but
+#     never actually invoked as a statement.
+#   - TRUNCATE PARTITION — NOT pinned. The sibling
+#     `ALTER TABLE t TRUNCATE PARTITION p0` IS pinned in
+#     partition_basic_extra.test:170 (errors 1064). The
+#     standalone `TRUNCATE TABLE t PARTITION (p0)` clause
+#     is a DIFFERENT statement form that this slice pins.
+#   - PR #371 / #372 cover other MySQL ops/admin
+#     statements (FLUSH/RESET/HANDLER/SHUTDOWN, KILL,
+#     BACKUP/RESTORE/PURGE). This slice fills the next
+#     three sentinels.
+#
+# This slice pins:
+#   - CREATE EVENT → 1064 "Expected: an object type
+#     after CREATE, found: EVENT" (shape b — variant of
+#     PR #371's shape catalog).
+#   - ALTER EVENT → 1064.
+#   - DROP EVENT → 1064 with a different error message
+#     listing valid DROP targets.
+#   - USE <db> over MySQL wire: SILENT no-op (any db
+#     name accepted, no validation that the database
+#     exists).
+#   - **TRUNCATE TABLE t PARTITION (p0) — REAL BUG**:
+#     the PARTITION clause is silently IGNORED and the
+#     entire table is truncated. zeta has no partition
+#     support so the clause has no meaning, but instead
+#     of erroring (like ALTER TABLE...TRUNCATE PARTITION
+#     does), zeta proceeds to TRUNCATE the WHOLE table.
+#
+# Big-picture finding (BUG-WITNESS for TRUNCATE PARTITION):
+#
+#   The standalone `TRUNCATE TABLE t PARTITION (p0)`
+#   statement form silently truncates ALL ROWS, NOT just
+#   the named partition. Apps porting MySQL partition
+#   pruning scripts will experience SILENT DATA LOSS
+#   beyond what they intended.
+#
+#   Two distinct TRUNCATE-PARTITION forms in MySQL:
+#
+#     (a) `ALTER TABLE t TRUNCATE PARTITION p0` — pinned
+#         in partition_basic_extra:170 as 1064 (errors
+#         cleanly, app sees breakage).
+#
+#     (b) `TRUNCATE TABLE t PARTITION (p0)` — pinned here
+#         as SILENT-TRUNCATE-ALL (NO error, app proceeds
+#         with full table truncated). REAL BUG.
+#
+#   STRIKING — the two forms have OPPOSITE failure
+#   modes. Apps should prefer form (a) for the safer
+#   error-first behavior.
+#
+#   USE <db> over MySQL wire: the mysqlwire shim
+#   absorbs USE statements at the connection-command
+#   level (COM_INIT_DB), not as SQL text. Any db name
+#   is accepted WITHOUT existence validation — AND
+#   DATABASE() then reflects the bogus name back. So:
+#
+#     USE made_up_zzz;          -- silent success
+#     SELECT DATABASE();        -- returns 'made_up_zzz'
+#
+#   Apps probing `DATABASE()` as a sanity check that
+#   their USE succeeded will see the WRONG name and
+#   trust it. Real MySQL would error "Unknown database
+#   'made_up_zzz' (1049)". Zeta's silent reflection is
+#   especially dangerous for routing scripts.
+#
+#   CREATE/ALTER/DROP EVENT cleanly reject with 1064.
+#   zeta has no scheduler today; apps porting MySQL
+#   event-scheduler scripts need to use external
+#   cron/systemd-timers or a job runner like Celery.
+#
+# Adaptation notes:
+#   # zeta-adapt: CREATE/ALTER/DROP EVENT all error 1064.
+#     Use external scheduler for periodic SQL execution.
+#   # zeta-adapt: USE <any-db> is SILENT — zeta is
+#     single-database. Apps doing USE for routing will
+#     silently target the same store.
+#   # zeta-adapt: TRUNCATE TABLE t PARTITION (...) is a
+#     REAL BUG — PARTITION clause silently ignored,
+#     truncates ALL rows. Use ALTER TABLE...TRUNCATE
+#     PARTITION form (which errors 1064) for safer
+#     failure mode.
+
+--echo === CREATE EVENT — 1064 parse-reject ===
+
+--error 1064
+CREATE EVENT e ON SCHEDULE EVERY 1 HOUR DO SELECT 1;
+
+--echo === ALTER EVENT — 1064 ===
+
+--error 1064
+ALTER EVENT e DISABLE;
+--error 1064
+ALTER EVENT e ON SCHEDULE EVERY 2 HOUR;
+
+--echo === DROP EVENT — 1064 with target-list error ===
+
+# Shape varies — DROP knows many targets and lists them
+# in the error. Recording captures the exact list.
+--error 1064
+DROP EVENT e;
+
+--echo === STRIKING: USE <any-db> — silent + REFLECTS bogus name in DATABASE() ===
+
+# Real MySQL would error 1049 "Unknown database <X>".
+# zeta accepts ANY db name AND DATABASE() then reflects
+# it back — apps probing DATABASE() as a sanity check
+# will be fooled.
+USE someotherdb;
+USE definitely_does_not_exist_zzz;
+# DATABASE() returns the BOGUS name, NOT 'zeta'.
+SELECT DATABASE();
+
+--echo === STRIKING BUG: TRUNCATE TABLE t PARTITION clause ignored ===
+
+# Setup: real table with rows.
+CREATE TABLE truncate_partition_bug (id INT);
+INSERT INTO truncate_partition_bug VALUES (1), (2), (3);
+SELECT COUNT(*) FROM truncate_partition_bug                   AS count_before_3;
+# The PARTITION clause is silently ignored. zeta has no
+# partitions, so the only safe behavior would be to error.
+# Instead, the WHOLE TABLE is truncated.
+TRUNCATE TABLE truncate_partition_bug PARTITION (p0);
+SELECT COUNT(*) FROM truncate_partition_bug                   AS count_after_0_BUG;
+
+--echo === Cleanup ===
+
+DROP TABLE truncate_partition_bug;
