@@ -1,0 +1,28 @@
+=== Shape (d) — CLUSTER (3 forms) → "found: CLUSTER" at column 1 ===
+CLUSTER t USING t_idx;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: CLUSTER at Line: 1, Column: 1
+CLUSTER t;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: CLUSTER at Line: 1, Column: 1
+CLUSTER VERBOSE t USING t_idx;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: CLUSTER at Line: 1, Column: 1
+=== ALTER restricted-list — ALTER DEFAULT PRIVILEGES (3 forms) → "found: DEFAULT" at column 7 ===
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO alice;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: DEFAULT at Line: 1, Column: 7
+ALTER DEFAULT PRIVILEGES FOR ROLE bob REVOKE ALL ON TABLES FROM PUBLIC;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: DEFAULT at Line: 1, Column: 7
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: DEFAULT at Line: 1, Column: 7
+=== Shape A — CREATE TEXT SEARCH (4 variants) → "found: TEXT" at column 8 ===
+CREATE TEXT SEARCH DICTIONARY simple_dict (TEMPLATE = simple);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: TEXT at Line: 1, Column: 8
+CREATE TEXT SEARCH CONFIGURATION my_conf (PARSER = "default");
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: TEXT at Line: 1, Column: 8
+CREATE TEXT SEARCH PARSER my_parser (START = prsd_start, GETTOKEN = prsd_nexttoken, END = prsd_end, LEXTYPES = prsd_lextype);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: TEXT at Line: 1, Column: 8
+CREATE TEXT SEARCH TEMPLATE my_template (INIT = simple_init, LEXIZE = simple_lexize);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: TEXT at Line: 1, Column: 8
+=== DROP restricted-list — DROP TEXT SEARCH (2 forms) → "found: TEXT" at column 6 ===
+DROP TEXT SEARCH DICTIONARY simple_dict;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: TEXT at Line: 1, Column: 6
+DROP TEXT SEARCH CONFIGURATION my_conf;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: TEXT at Line: 1, Column: 6
