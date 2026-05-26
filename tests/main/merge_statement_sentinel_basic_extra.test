@@ -22,12 +22,16 @@
 #       — sqlparser PARSES the MERGE statement into its
 #       internal AST, but zeta's statement-dispatcher
 #       has no `Statement::Merge { .. }` match arm and
-#       falls through to a catch-all that LEAKS THE
-#       INTERNAL RUST TYPE NAME `sqlparser::ast::
-#       Statement` into the user-facing error string.
-#       This is a minor info-leak / error-quality bug:
-#       it should say something like "MERGE not
-#       supported" rather than the internal type name.
+#       falls through to convert.rs:432 catch-all.
+#     - This fingerprint is ALREADY FORMALLY classified
+#       as **shape (c)** in PR #371's 4-shape taxonomy
+#       at mysql_maintenance_cmds_sentinel_basic_extra:
+#       79-83. ALREADY pinned across multiple result
+#       files (auth, function_def, kill_backup_purge,
+#       mysql_maintenance_cmds, view). What's NEW here
+#       is MERGE-as-statement specifically falling into
+#       shape (c) — the MERGE syntax is novel, the
+#       rejection shape is not. NOT a new bug witness.
 #
 #   Shape B — sqlparser's own grammar (1 variant):
 #     - `sql parser error: expected UPDATE, DELETE or
@@ -35,26 +39,21 @@
 #       THEN DO NOTHING`. sqlparser knows about MERGE
 #       syntax but only accepts UPDATE / DELETE / INSERT
 #       as action verbs. The PG 15+ `DO NOTHING` action
-#       isn't in sqlparser's grammar, so the error fires
-#       BEFORE zeta's dispatcher even sees the AST.
-#       DIFFERENT error site, DIFFERENT message text,
-#       same 1064 errno.
+#       isn't in sqlparser's grammar (verified at
+#       sqlparser-0.61.0/src/parser/merge.rs:199), so
+#       the error fires BEFORE zeta's dispatcher even
+#       sees the AST. DIFFERENT error site, DIFFERENT
+#       message text, same 1064 errno.
+#     - Fingerprint is genuinely NEW (no priors elsewhere).
 #
-# Big-picture finding (parallel to PR #383 / PR #384 /
-# PR #385 patterns):
+# Big-picture finding (extends PR #371's taxonomy):
 #
 #   This is yet another "parses but no executor arm"
-#   surface, but with a new wrinkle: the catch-all error
-#   message itself is a witness to a SECONDARY bug —
-#   the error formatter leaks `sqlparser::ast::Statement`
-#   (the trait name) into user output. PG would emit
-#   `ERROR: syntax error at or near "MERGE"` (if it
-#   didn't support MERGE), and even MySQL/MariaDB would
-#   say something more user-friendly. The "leaked type
-#   name" output style is a recurring zeta pattern
-#   (parallel to the `Array { element_type: ... }` Debug-
-#   repr leak across multiple slices) — internal Rust
-#   types showing up on the wire.
+#   surface following the shape (c) pattern documented
+#   at mysql_maintenance_cmds_sentinel_basic_extra:79-83.
+#   The DO NOTHING variant extends the taxonomy with a
+#   new sqlparser-internal fingerprint distinct from
+#   the four (a/b/c/d) shapes already classified.
 #
 #   Apps porting PG MERGE queries must rewrite to:
 #     INSERT INTO tgt (cols) VALUES (...) ON CONFLICT
@@ -65,9 +64,8 @@
 # Adaptation notes:
 #   # zeta-adapt: KNOWN GAP — MERGE statement (PG 15+ /
 #     SQL-standard upsert) is unsupported. 5 variants
-#     hit zeta catch-all errno 1064 with the leaked
-#     internal type name `sqlparser::ast::Statement`.
-#     Rewrite as INSERT ... ON CONFLICT for upserts; use
+#     hit shape (c) per the PR #371 taxonomy. Rewrite
+#     as INSERT ... ON CONFLICT for upserts; use
 #     explicit transaction for DELETE-branch logic.
 #   # zeta-adapt: KNOWN GAP — `WHEN NOT MATCHED THEN
 #     DO NOTHING` (PG 15+) is rejected by sqlparser's
@@ -75,12 +73,6 @@
 #     UPDATE, DELETE or INSERT in merge clause". Even
 #     if zeta added a Merge arm, this variant would
 #     still need sqlparser to be upgraded.
-#   # zeta-adapt: KNOWN BUG (catch-all error formatter)
-#     — `unsupported statement: sqlparser::ast::
-#     Statement` leaks the internal Rust trait name.
-#     Should be a user-friendly "MERGE not supported"
-#     style message. Pinned so a fix drops the pin
-#     in lockstep.
 
 CREATE TABLE m_tgt (id INT PRIMARY KEY, n INT);
 INSERT INTO m_tgt VALUES (1, 10), (2, 20);
@@ -123,7 +115,7 @@ MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED THEN UPDATE SET n =
 --echo === Recommended rewrites work — MySQL ON DUPLICATE KEY + ON CONFLICT DO NOTHING ===
 
 # NOTE: `ON CONFLICT (col) DO UPDATE SET ...` is ALSO a
-# known gap (per insert_basic_extra.test:80-86). For an
+# known gap (per insert_basic_extra.test:80-87). For an
 # UPDATE-on-conflict upsert on the MySQL wire, use
 # ON DUPLICATE KEY UPDATE (supported). For ignore-on-
 # conflict, use ON CONFLICT DO NOTHING (supported).
