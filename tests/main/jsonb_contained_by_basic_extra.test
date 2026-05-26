@@ -1,0 +1,111 @@
+# Independently authored JSONB `<@` contained-by operator
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - jsonb_basic_extra.test:111-114 covers `?&`/`?|`
+#     (has-all-keys / has-any-key).
+#   - jsonb_basic_extra.test:122 covers `@>` (contains).
+#   - json_basic.test:128 covers single `?` (key exists).
+#   - `<@` (contained-by, symmetric inverse of @>) —
+#     NONE.
+#   - This slice fills `<@` with object/array/scalar/null/
+#     empty edge cases, plus paired @> rows that prove
+#     the symmetry.
+#
+# This slice pins:
+#   - Object containment: `'{"a":1}'::JSONB <@ '{"a":1,
+#     "b":2}'::JSONB` = TRUE; reverse FALSE.
+#   - Array containment: subset of elements present in
+#     RHS (PG semantics — element-wise, order-independent).
+#   - Scalar self-equality: `'"hello"' <@ '"hello"'` = TRUE.
+#   - Scalar-in-array: `'1' <@ '[1,2,3]'` = TRUE.
+#   - Null-vs-object: `'null' <@ '{"a":1}'` = FALSE
+#     (null is NOT a "key" of the object).
+#   - Empty-container edges: `{} <@ {"a":1}` = TRUE;
+#     `[] <@ [1,2,3]` = TRUE (vacuously contained).
+#   - Symmetry: `a <@ b` ≡ `b @> a`.
+#
+# Big-picture finding:
+#
+#   zeta's `<@` implements full PG-style containment-by:
+#   LHS is "contained in" RHS iff every key/element of
+#   LHS is matched in RHS (recursive for nested objects).
+#
+#   Note — scalar-in-array works (`'1' <@ '[1,2,3]'`
+#   = TRUE) but scalar-vs-scalar requires equality
+#   (`'1' <@ '2'` = FALSE). PG-compatible.
+#
+#   Note — empty containers are vacuously contained
+#   (standard set-theory ∅ ⊆ X). `{} <@ <any-object>`
+#   = TRUE; `[] <@ <any-array>` = TRUE. PG-compatible.
+#   Apps using `<@` for capability checks with an
+#   empty filter still get unexpected TRUE matches on
+#   PG too — worth flagging for callers regardless.
+#
+#   Symmetry with `@>` is exact: `a <@ b` returns the
+#   same Bool as `b @> a`. Pinned with paired rows
+#   below.
+#
+# Adaptation notes:
+#   # zeta-adapt: `<@` (contained-by) works exactly like
+#     PG. `a <@ b` ≡ `b @> a`. Empty container is
+#     vacuously contained; scalar-in-array matches by
+#     value.
+
+--echo === `<@` — object containment ===
+
+SELECT '{"a":1}'::JSONB <@ '{"a":1,"b":2}'::JSONB             AS subset_true;
+SELECT '{"a":1,"b":2}'::JSONB <@ '{"a":1}'::JSONB             AS superset_false;
+SELECT '{"a":1}'::JSONB <@ '{"a":1}'::JSONB                   AS equal_true;
+# Nested object containment.
+SELECT '{"a":{"b":1}}'::JSONB <@ '{"a":{"b":1,"c":2}}'::JSONB AS nested_subset_true;
+
+--echo === `<@` — array containment ===
+
+SELECT '[1,2]'::JSONB <@ '[1,2,3]'::JSONB                     AS arr_subset_true;
+SELECT '[1,2,3]'::JSONB <@ '[1,2]'::JSONB                     AS arr_superset_false;
+# Order-independent: [3,1] is contained in [1,2,3].
+SELECT '[3,1]'::JSONB <@ '[1,2,3]'::JSONB                     AS arr_reordered_true;
+
+--echo === `<@` — scalar self-equality ===
+
+SELECT '"hello"'::JSONB <@ '"hello"'::JSONB                   AS scalar_self_true;
+SELECT '1'::JSONB <@ '1'::JSONB                               AS int_self_true;
+SELECT '1'::JSONB <@ '2'::JSONB                               AS int_unequal_false;
+
+--echo === `<@` — scalar in array ===
+
+SELECT '1'::JSONB <@ '[1,2,3]'::JSONB                         AS scalar_in_arr_true;
+SELECT '"a"'::JSONB <@ '["a","b","c"]'::JSONB                 AS str_in_arr_true;
+SELECT '4'::JSONB <@ '[1,2,3]'::JSONB                         AS scalar_not_in_arr_false;
+
+--echo === `<@` — null behavior (NOT contained in object) ===
+
+# `null::jsonb <@ {"a":1}` is FALSE — `null` is not a
+# "key" of the object; PG-compat.
+SELECT 'null'::JSONB <@ '{"a":1}'::JSONB                      AS null_lhs_false;
+# `null <@ null` is TRUE — self-equality.
+SELECT 'null'::JSONB <@ 'null'::JSONB                         AS null_self_true;
+
+--echo === Empty containers vacuously contained (PG-compat: ∅ ⊆ X) ===
+
+# `{} <@ {"a":1}` = TRUE (empty object is contained in
+# any object). Same on PG — apps using `<@` with empty-
+# filter pattern still need to handle the vacuous-TRUE
+# case explicitly.
+SELECT '{}'::JSONB <@ '{"a":1}'::JSONB                        AS empty_obj_vacuously_true;
+SELECT '[]'::JSONB <@ '[1,2,3]'::JSONB                        AS empty_arr_vacuously_true;
+# Empty <@ Empty also TRUE.
+SELECT '{}'::JSONB <@ '{}'::JSONB                             AS empty_obj_self_true;
+SELECT '[]'::JSONB <@ '[]'::JSONB                             AS empty_arr_self_true;
+
+--echo === Symmetry: a <@ b ≡ b @> a ===
+
+# Paired rows prove the symmetric relationship.
+SELECT '{"a":1}'::JSONB <@ '{"a":1,"b":2}'::JSONB
+     = ('{"a":1,"b":2}'::JSONB @> '{"a":1}'::JSONB)           AS symmetry_object_subset;
+SELECT '[1,2]'::JSONB <@ '[1,2,3]'::JSONB
+     = ('[1,2,3]'::JSONB @> '[1,2]'::JSONB)                   AS symmetry_array_subset;
+SELECT '1'::JSONB <@ '[1,2,3]'::JSONB
+     = ('[1,2,3]'::JSONB @> '1'::JSONB)                       AS symmetry_scalar_in_arr;
