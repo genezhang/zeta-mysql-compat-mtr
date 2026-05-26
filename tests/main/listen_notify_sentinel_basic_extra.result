@@ -1,23 +1,22 @@
-=== LISTEN — accepts channel name, no rows returned ===
+=== MySQL wire path — LISTEN parses and produces no rows ===
 LISTEN cache_invalidate;
 LISTEN job_queue;
 LISTEN "with spaces";
-=== UNLISTEN — accepts channel name ===
+=== MySQL wire path — UNLISTEN parses (named and wildcard) ===
 UNLISTEN cache_invalidate;
 UNLISTEN job_queue;
-=== UNLISTEN * — wildcard "all channels" ===
 UNLISTEN *;
-=== NOTIFY — accepts channel name, no rows ===
+=== MySQL wire path — NOTIFY (bare) parses and produces no rows ===
 NOTIFY cache_invalidate;
-=== NOTIFY with payload string ===
+=== MySQL wire path — NOTIFY with payload string ===
 NOTIFY cache_invalidate, 'cache_key_42';
 NOTIFY cache_invalidate, 'payload with spaces';
 NOTIFY cache_invalidate, '';
-=== Sequence: LISTEN then NOTIFY then UNLISTEN — all silent ===
+=== MySQL wire path — sequence LISTEN→NOTIFY→UNLISTEN all silent ===
 LISTEN test_seq;
 NOTIFY test_seq, 'hello';
 UNLISTEN test_seq;
-=== Subsequent SELECT confirms no rows were generated ===
+=== Sanity — subsequent SELECT shows no rows leaked from above ===
 SELECT 1 AS sanity;
 sanity
 1

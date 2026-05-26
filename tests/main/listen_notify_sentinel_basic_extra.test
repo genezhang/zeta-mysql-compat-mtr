@@ -1,103 +1,115 @@
 # Independently authored LISTEN / UNLISTEN / NOTIFY
-# sentinel smoke for the GPL MTR-format runner. NOT
-# copied or adapted from MySQL's mysql-test/.
+# MySQL-wire-path smoke for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
 #
 # Existing coverage (do NOT duplicate):
-#   - LISTEN / UNLISTEN / NOTIFY — NONE (checked all
-#     *.test files per PR #357 lesson).
+#   - LISTEN / UNLISTEN / NOTIFY — NONE in the compat-mtr
+#     corpus (checked all *.test files per PR #357 lesson).
 #   - sleep_stub_basic_extra, name_const_basic_extra,
-#     unsupported_fn_sentinels_basic_extra cover other
-#     parse-then-no-op style stubs, but NOT these.
+#     unsupported_fn_sentinels_basic_extra cover FN-level
+#     stubs; this is a STATEMENT-level stub for the MySQL
+#     wire path only.
 #
-# This slice pins:
-#   - LISTEN <channel> parses and silently succeeds
-#     (no error, no observable effect).
-#   - UNLISTEN <channel> parses and silently succeeds.
-#   - UNLISTEN * (wildcard) parses and silently succeeds.
+# This slice pins (MYSQL WIRE PATH ONLY):
+#   - LISTEN <channel> parses and silently succeeds.
+#   - UNLISTEN <channel> and UNLISTEN * (wildcard) parse
+#     and silently succeed.
 #   - NOTIFY <channel> parses and silently succeeds.
-#   - NOTIFY <channel>, '<payload>' (with payload) parses
-#     and silently succeeds.
-#   - Statements that produce no rows return no rows
-#     (the runner's MTR-style "echo only" path).
+#   - NOTIFY <channel>, '<payload>' parses and silently
+#     succeeds.
+#   - Statements produce no rows (MTR runner emits only
+#     the echo line for no-row statements).
 #
-# Big-picture finding (PARSE-THEN-NO-OP SENTINEL):
+# CRITICAL framing (corrected from PR #366 review):
+#   This slice pins ONLY what the MTR runner observes
+#   over MySQL wire. The behavior DIFFERS by wire path:
 #
-#   PostgreSQL's LISTEN/NOTIFY pub/sub is silently
-#   no-op'd in zeta. The parser at convert.rs:408-417
-#   recognizes all three forms; the executor at
-#   lib.rs:14581-14583 routes them to
-#   `return Ok(ExecuteResult::Ok)` without doing
-#   anything.
+#   - **PGWIRE clients** (psql, libpq, pg-jdbc):
+#     LISTEN/NOTIFY are FULLY IMPLEMENTED. The pgwire
+#     handler at zeta-pgwire/src/handler.rs:1492-1517
+#     intercepts these statements BEFORE the executor
+#     and calls real handlers (handle_listen,
+#     handle_unlisten, handle_notify). Session-tracked
+#     `listening_channels`, buffered `pending_notifications`,
+#     transactional flush at COMMIT (line 1791),
+#     ROLLBACK-discard (line 1814), wildcard UNLISTEN.
+#     See docs/listen_notify_guide.md for the documented
+#     PG-compatible feature.
 #
-#   This is a REAL PORTABILITY FOOTGUN for apps that
-#   rely on PG's NOTIFY for cache invalidation, job
-#   queues, or change feeds. They'll see "success" on
-#   every NOTIFY call and never receive any events on
-#   subscribed channels. The lack of any error message
-#   makes the silent-no-op pattern especially dangerous —
-#   compare to UNSUPPORTED-FN sentinels which DO error.
+#   - **MYSQL WIRE clients** (mysql, mysqlsh, jdbc-mysql,
+#     and THIS MTR runner): NO interception. zeta-
+#     mysqlwire/src/*.rs has zero handling of these
+#     statements. They route to the executor's catch-all
+#     at lib.rs:14581-14583 which returns
+#     `Ok(ExecuteResult::Ok)` with no I/O. So MySQL-wire
+#     clients SEE silent success but never receive
+#     events.
 #
-#   To replace LISTEN/NOTIFY semantics on zeta, apps
-#   should use the logical-replication path
-#   (pg_recvlogical / Debezium) consuming the CDC log
-#   stream, or roll their own pub/sub on top of a
-#   shared table + polling. See README.md replication
-#   section.
+#   This wire-path divergence is the slice's central
+#   pin. It's NOT a "zeta-doesn't-support-pub/sub"
+#   claim — that would be false.
 #
-#   STRIKING — UNLISTEN '*' (wildcard "unsubscribe from
-#   all") is also accepted silently. PG documents this
-#   as "unlisten all channels"; zeta accepts the syntax
-#   but had nothing to unlisten from in the first place.
+# Big-picture finding (WIRE-PATH-DEPENDENT LIMITATION):
+#   Apps using MySQL wire that try LISTEN/NOTIFY will see
+#   silent success but no events delivered. The lack of
+#   error makes the limitation INVISIBLE to apps relying
+#   on it. Three remediation paths:
+#
+#     1. Use pgwire instead of MySQL wire (the canonical
+#        fix — full LISTEN/NOTIFY works there).
+#     2. Use the CDC/logical-replication path
+#        (pg_recvlogical / Debezium) consuming the log
+#        stream — works for any wire client.
+#     3. Roll a polling-table pattern on a shared table.
+#
+#   STRIKING — there is no way from inside MySQL-wire
+#   SQL to detect that LISTEN/NOTIFY isn't backed by a
+#   real pub/sub layer. Apps need out-of-band knowledge
+#   of the wire path or the docs note in
+#   docs/listen_notify_guide.md.
 #
 # Adaptation notes:
-#   # zeta-adapt: LISTEN / UNLISTEN / NOTIFY are SILENT
-#     no-ops in zeta. Parse-only sentinels — no events
-#     are delivered, no errors raised.
-#   # zeta-adapt: For pub/sub semantics, use the
-#     CDC/replication path (see README) or roll your
-#     own polling-table pattern.
-#   # zeta-adapt: UNLISTEN * is accepted silently too;
-#     don't read success as "all channels unsubscribed".
+#   # zeta-adapt: Over MYSQL WIRE only, LISTEN / UNLISTEN /
+#     NOTIFY are SILENT NO-OPS. Over PGWIRE these
+#     statements are FULLY IMPLEMENTED — choose your
+#     wire path accordingly.
+#   # zeta-adapt: For MySQL-wire pub/sub, use CDC
+#     (pg_recvlogical / Debezium) or a polling-table
+#     pattern; LISTEN/NOTIFY won't deliver events.
+#   # zeta-adapt: See docs/listen_notify_guide.md for
+#     the pgwire-path feature documentation.
 
---echo === LISTEN — accepts channel name, no rows returned ===
+--echo === MySQL wire path — LISTEN parses and produces no rows ===
 
 LISTEN cache_invalidate;
 LISTEN job_queue;
-# Reserved-word-style names work too (quoted).
+# Quoted name with spaces.
 LISTEN "with spaces";
 
---echo === UNLISTEN — accepts channel name ===
+--echo === MySQL wire path — UNLISTEN parses (named and wildcard) ===
 
 UNLISTEN cache_invalidate;
 UNLISTEN job_queue;
-
---echo === UNLISTEN * — wildcard "all channels" ===
-
 UNLISTEN *;
 
---echo === NOTIFY — accepts channel name, no rows ===
+--echo === MySQL wire path — NOTIFY (bare) parses and produces no rows ===
 
 NOTIFY cache_invalidate;
 
---echo === NOTIFY with payload string ===
+--echo === MySQL wire path — NOTIFY with payload string ===
 
 NOTIFY cache_invalidate, 'cache_key_42';
 NOTIFY cache_invalidate, 'payload with spaces';
-# Empty payload.
 NOTIFY cache_invalidate, '';
 
---echo === Sequence: LISTEN then NOTIFY then UNLISTEN — all silent ===
+--echo === MySQL wire path — sequence LISTEN→NOTIFY→UNLISTEN all silent ===
 
-# A real PG client would queue a NOTIFY event for any
-# session that LISTENed to the same channel. In zeta,
-# all three statements silently succeed with no
-# observable effect.
+# Over pgwire this would: subscribe → queue an event →
+# unsubscribe. Over MySQL wire it's three no-ops.
 LISTEN test_seq;
 NOTIFY test_seq, 'hello';
 UNLISTEN test_seq;
 
---echo === Subsequent SELECT confirms no rows were generated ===
+--echo === Sanity — subsequent SELECT shows no rows leaked from above ===
 
-# NOTIFY does not produce a result row; the next SELECT
-# starts clean.
 SELECT 1 AS sanity;
