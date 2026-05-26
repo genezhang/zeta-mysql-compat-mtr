@@ -7,9 +7,11 @@
 #     CREATE AGGREGATE / CREATE COLLATION / CREATE RULE
 #     / CREATE STATISTICS: ZERO prior coverage. Wide-grep
 #     of tests/main/*.test for each returns no hits.
-#   - CREATE TYPE — already pinned in create_domain_basic_
-#     extra (DOMAIN form) and enum_helpers_basic_extra
-#     (ENUM form). Not re-pinned here.
+#   - CREATE DOMAIN — already pinned in create_domain_
+#     basic_extra. Distinct PG keyword from CREATE TYPE.
+#   - CREATE TYPE AS ENUM — already pinned in
+#     enum_helpers_basic_extra (and enum_type_basic_extra).
+#     Not re-pinned here.
 #   - CREATE PROCEDURE — already pinned in function_def_
 #     basic_extra.
 #   - CREATE EVENT — already pinned in event_use_
