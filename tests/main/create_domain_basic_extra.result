@@ -11,13 +11,15 @@ INSERT INTO users_with_dom VALUES (1, 'alice@example.com', 42);
 SELECT id, email, score FROM users_with_dom ORDER BY id;
 id	email	score
 1	alice@example.com	42
-=== CREATE DOMAIN — DEFAULT clause parses ===
+=== CREATE DOMAIN — DEFAULT clause parses (NOT propagated to column) ===
 CREATE DOMAIN dom_with_default AS INTEGER DEFAULT 99;
 CREATE TABLE need_default (id INT, val dom_with_default);
 INSERT INTO need_default VALUES (1, 5);
-SELECT * FROM need_default;
+INSERT INTO need_default (id) VALUES (2);
+SELECT id, val FROM need_default ORDER BY id;
 id	val
 1	5
+2	NULL
 === CREATE DOMAIN — CHECK clause parses (NOT ENFORCED on insert) ===
 CREATE DOMAIN dom_positive_check AS INTEGER CHECK (VALUE > 0);
 CREATE TABLE check_test (id INT, val dom_positive_check);

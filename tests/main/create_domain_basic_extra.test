@@ -22,7 +22,7 @@
 #   - DROP DOMAIN IF EXISTS <name> (existing and unknown).
 #   - DROP DOMAIN <unknown> without IF EXISTS errors.
 #
-# Big-picture finding (THREE STRIKING LIMITATIONS):
+# Big-picture finding (FOUR STRIKING LIMITATIONS):
 #
 #   1. **NOT NULL clause is NOT PARSEABLE.** sqlparser-rs
 #      doesn't accept `CREATE DOMAIN x AS T NOT NULL` or
@@ -45,6 +45,17 @@
 #      in catalog but doesn't reject violating INSERTs.
 #      REAL DIVERGENCE from PG.
 #
+#   2a. **Domain DEFAULT is NOT PROPAGATED to columns.**
+#      Same code path at lib.rs:22789-22793 reads
+#      `domain_def.not_null` but NEVER reads
+#      `domain_def.default_expr`. Column DEFAULT at
+#      lib.rs:22838-22842 reads only `cs.default_expr`
+#      (the column statement's own default). So a
+#      DOMAIN's DEFAULT exists in catalog but doesn't
+#      fire when an INSERT omits the column — the column
+#      stays NULL. Symmetric dead-code partner to #2.
+#      Pinned with an INSERT-with-omitted-column row.
+#
 #   3. **DROP DOMAIN does NOT check for dependent tables.**
 #      Per impl comment at lib.rs:14761-14763: "does not
 #      check for dependent tables. Since domains resolve
@@ -54,10 +65,11 @@
 #      porting from PG migrations that rely on this
 #      safety net will silently lose protection.
 #
-#   These three combine to make zeta's CREATE DOMAIN
+#   These four combine to make zeta's CREATE DOMAIN
 #   currently a TYPE-ALIAS-ONLY feature — strip the
-#   NOT NULL / CHECK enforcement claims and use domains
-#   as documentation/naming for shared base types only.
+#   NOT NULL / CHECK / DEFAULT enforcement claims and
+#   use domains as documentation/naming for shared base
+#   types only.
 #
 #   STRIKING — CHECK and DEFAULT can't be combined in
 #   one CREATE DOMAIN. The parser accepts either CHECK
@@ -66,7 +78,8 @@
 # Adaptation notes:
 #   # zeta-adapt: CREATE DOMAIN is TYPE-ALIAS-ONLY today.
 #     NOT NULL clause won't parse; CHECK parses but isn't
-#     enforced on INSERT; DROP doesn't reject dependents.
+#     enforced on INSERT; DEFAULT parses but doesn't fire
+#     on omitted columns; DROP doesn't reject dependents.
 #   # zeta-adapt: DEFAULT and CHECK can't be combined in
 #     one CREATE DOMAIN — parser rejects.
 #   # zeta-adapt: For real NOT NULL / CHECK enforcement,
@@ -87,12 +100,18 @@ CREATE TABLE users_with_dom (
 INSERT INTO users_with_dom VALUES (1, 'alice@example.com', 42);
 SELECT id, email, score FROM users_with_dom ORDER BY id;
 
---echo === CREATE DOMAIN — DEFAULT clause parses ===
+--echo === CREATE DOMAIN — DEFAULT clause parses (NOT propagated to column) ===
 
 CREATE DOMAIN dom_with_default AS INTEGER DEFAULT 99;
 CREATE TABLE need_default (id INT, val dom_with_default);
+# Explicit value supplied — works.
 INSERT INTO need_default VALUES (1, 5);
-SELECT * FROM need_default;
+# STRIKING: INSERT without `val` does NOT pick up the
+# domain's DEFAULT 99. Column resolves to plain INTEGER
+# (no default), so val becomes NULL. PG would set it to
+# 99 — real divergence.
+INSERT INTO need_default (id) VALUES (2);
+SELECT id, val FROM need_default ORDER BY id;
 
 --echo === CREATE DOMAIN — CHECK clause parses (NOT ENFORCED on insert) ===
 
