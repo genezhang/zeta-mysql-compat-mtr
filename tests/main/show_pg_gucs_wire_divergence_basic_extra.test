@@ -1,0 +1,105 @@
+# Independently authored SHOW PG-GUC wire-divergence
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - show_catchall_emptyshow_basic_extra (PR #374)
+#     pinned the universal SHOW catch-all and 8 MySQL-
+#     style SHOW variants returning empty.
+#   - This slice covers PG-STYLE `SHOW <guc>` variants
+#     where pgwire DOES return real values (handler.rs:
+#     1046-1169) but mysqlwire silently absorbs to empty
+#     — a fifth wire-divergence shape in the slice
+#     corpus (after #366 LISTEN/NOTIFY, #369 SET hlc,
+#     #370 sysvar quirks, #373 USE-bug).
+#
+# This slice pins (MYSQL WIRE PATH ONLY):
+#   - SHOW search_path → silent empty.
+#   - SHOW STATEMENT_TIMEOUT → silent empty.
+#   - SHOW TRANSACTION_ISOLATION → silent empty.
+#   - SHOW SESSION_AUTHORIZATION → silent empty.
+#   - SHOW APPLICATION_NAME → silent empty.
+#   - SHOW client_encoding → silent empty.
+#
+# Big-picture finding (PG-GUC SHOW IS PGWIRE-ONLY):
+#
+#   The pgwire handler at zeta-pgwire/src/handler.rs:
+#   1046-1169 implements PG-style SHOW for a curated
+#   set of session-config parameters:
+#
+#     - SHOW search_path → returns the session search_path
+#     - SHOW STATEMENT_TIMEOUT → real timeout value
+#     - and more session-configurables (lines 1091+)
+#
+#   The mysqlwire shim has NONE of this. ANY `SHOW <X>`
+#   that doesn't match the shim's substring handlers
+#   falls through to the universal catch-all at
+#   shim.rs:2023 (per PR #374) — silent empty.
+#
+#   So apps using PG-style introspection over the MySQL
+#   wire will see "no rows" and may conclude the GUC
+#   doesn't exist. They should:
+#
+#     - Switch to pgwire if PG GUC introspection matters.
+#     - Use `@@` MySQL-style syntax for the few sysvars
+#       that pin via shim's lookup_system_variable (PR #370).
+#     - Use information_schema for cross-wire-portable
+#       introspection.
+#
+#   STRIKING — these PG GUCs DO have real values in
+#   zeta (search_path defaults to "public", statement_
+#   timeout defaults to 0, etc.). The wire-divergence
+#   isn't "feature missing" — it's "feature unreachable
+#   from MySQL wire". Apps that need cross-wire
+#   compatibility shouldn't rely on PG-style SHOW.
+#
+# Adaptation notes:
+#   # zeta-adapt: PG-style SHOW <guc> works ONLY over
+#     pgwire. On MySQL wire, all such SHOWs silently
+#     return empty (universal SHOW catch-all). Use
+#     @@-syntax on MySQL wire instead.
+#   # zeta-adapt: This is the fifth wire-divergence
+#     pattern pinned: PR #366 (LISTEN/NOTIFY),
+#     #369 (SET hlc_watermark), #370 (sysvar quirks),
+#     #373 (USE bug), this slice (SHOW pg-gucs).
+
+--echo === SHOW search_path — silent empty (mysql-wire) ===
+
+# pgwire returns 'public' (or session search_path).
+SHOW search_path;
+
+--echo === SHOW STATEMENT_TIMEOUT — silent empty (mysql-wire) ===
+
+# pgwire returns the real timeout config.
+SHOW STATEMENT_TIMEOUT;
+
+--echo === SHOW TRANSACTION_ISOLATION — silent empty (mysql-wire) ===
+
+# pgwire returns the real isolation level.
+SHOW TRANSACTION_ISOLATION;
+
+--echo === SHOW SESSION_AUTHORIZATION — silent empty ===
+
+SHOW SESSION_AUTHORIZATION;
+
+--echo === SHOW APPLICATION_NAME — silent empty ===
+
+SHOW APPLICATION_NAME;
+
+--echo === SHOW client_encoding — silent empty ===
+
+SHOW client_encoding;
+
+--echo === Cross-link: @@-syntax DOES work on mysql wire for these ===
+
+# These three GUCs DO have @@-form fallbacks via the
+# shim's lookup_system_variable (see PR #370).
+SELECT @@transaction_isolation;
+SELECT @@tx_isolation;
+# search_path / statement_timeout / session_authorization
+# / application_name / client_encoding have NO @@-form
+# mapping either, so they return NULL via the unknown-var
+# fallback (PR #370 finding).
+SELECT @@search_path;
+SELECT @@statement_timeout;
+SELECT @@application_name;
