@@ -1,12 +1,9 @@
 === AGE 2-arg on DATE inputs ===
-SELECT AGE(DATE '2023-04-05', DATE '2020-01-01')              AS age_dates;
-age_dates
-3 years 3 mons 4 days
 SELECT AGE(DATE '2024-03-15', DATE '2024-03-15')              AS age_same_day;
 age_same_day
 00:00:00
-SELECT AGE(DATE '2020-01-01', DATE '2023-04-05')              AS age_negative;
-age_negative
+SELECT AGE(DATE '2020-01-01', DATE '2023-04-05')              AS age_negative_mixed_sign_bug;
+age_negative_mixed_sign_bug
 -3 years -4 mons 27 days
 === AGE 2-arg on TIMESTAMP inputs ===
 SELECT AGE(TIMESTAMP '2024-12-31 23:59:59',
@@ -97,6 +94,13 @@ pi_like
 SELECT TO_NUMBER('0.5',  '9.99')                              AS half;
 half
 0.5
+=== TO_NUMBER: literal commas accepted (impl-only token) ===
+SELECT TO_NUMBER('34,50', '999,99')                           AS literal_comma;
+literal_comma
+3450
+SELECT TO_NUMBER('1,234', '9,999')                            AS literal_comma_thousands_shape;
+literal_comma_thousands_shape
+1234
 === TO_NUMBER: G/D locale separators → ERROR 1105 ===
 SELECT TO_NUMBER('1,000', '9G999');
 ERROR 1105: execution error: to_number: unsupported format token in '9G999'

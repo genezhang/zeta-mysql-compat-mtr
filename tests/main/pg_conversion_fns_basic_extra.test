@@ -75,6 +75,14 @@
 #   # zeta-adapt: AGE(t1, t2) returns INTERVAL; calendar-
 #     aware (years/mons/days decomposition for DATE; adds
 #     HH:MM:SS for TIMESTAMP).
+#   # zeta-adapt: KNOWN DIVERGENCE — negative-direction AGE
+#     returns MIXED-SIGN components (e.g. '-3 years -4 mons
+#     27 days' for 2020-01-01 minus 2023-04-05). Real PG
+#     normalizes via justify_interval to fully-negative
+#     ('-3 years -3 mons -4 days'). zeta's impl (lib.rs:
+#     52499-52511) only borrows when days_diff<0; doesn't
+#     normalize signs. Pinned as bug-witness row
+#     `age_negative_mixed_sign_bug`.
 #   # zeta-adapt: TO_TIMESTAMP(int) is PG-flavor — accepts
 #     Int32/Int64/Float64 but NOT Decimal. Bare 1.5 parses
 #     as Decimal and errors. Use FROM_UNIXTIME for the
@@ -85,12 +93,19 @@
 
 --echo === AGE 2-arg on DATE inputs ===
 
-# Calendar-aware: 2023-04-05 - 2020-01-01 = 3 years, 3 mons, 4 days.
-SELECT AGE(DATE '2023-04-05', DATE '2020-01-01')              AS age_dates;
-# Same-day → zero interval.
+# (function_basic.test:113 already pins AGE(DATE '2023-04-05',
+# DATE '2020-01-01'); not duplicated here.)
+# Same-day → '00:00:00' (NOT a zero-interval string —
+# specific format).
 SELECT AGE(DATE '2024-03-15', DATE '2024-03-15')              AS age_same_day;
-# Negative interval (t1 < t2).
-SELECT AGE(DATE '2020-01-01', DATE '2023-04-05')              AS age_negative;
+# DIVERGENCE: negative interval — zeta returns MIXED-SIGN
+# components ('-3 years -4 mons 27 days') because the impl
+# (lib.rs:52499-52511) borrow logic only fires when
+# days_diff<0, leaving months negative + days positive.
+# Real PG normalizes via justify_interval to fully-negative:
+# '-3 years -3 mons -4 days'. zeta does NOT call
+# justify_interval. Pinned as a known divergence.
+SELECT AGE(DATE '2020-01-01', DATE '2023-04-05')              AS age_negative_mixed_sign_bug;
 
 --echo === AGE 2-arg on TIMESTAMP inputs ===
 
@@ -175,6 +190,15 @@ SELECT TO_NUMBER('+42', 'S99')                                AS positive_sign;
 
 SELECT TO_NUMBER('3.14', '9.99')                              AS pi_like;
 SELECT TO_NUMBER('0.5',  '9.99')                              AS half;
+
+--echo === TO_NUMBER: literal commas accepted (impl-only token) ===
+
+# Impl at lib.rs:46696-46704 explicitly accepts literal
+# commas in the input — the format string contains ','
+# (NOT 'G' which is a locale-separator alias rejected
+# above). Both passes through cleanly.
+SELECT TO_NUMBER('34,50', '999,99')                           AS literal_comma;
+SELECT TO_NUMBER('1,234', '9,999')                            AS literal_comma_thousands_shape;
 
 --echo === TO_NUMBER: G/D locale separators → ERROR 1105 ===
 
