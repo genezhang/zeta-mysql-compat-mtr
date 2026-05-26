@@ -40,5 +40,26 @@ SELECT ENUM_RANGE();
 ERROR 1105: execution error: enum_range() requires exactly 1 argument
 SELECT ENUM_FIRST(NULL::mood_ehb, NULL::mood_ehb);
 ERROR 1105: execution error: enum_first() requires exactly 1 argument
+=== Empty enum: ENUM_FIRST/LAST → NULL, ENUM_RANGE → empty Array ===
+CREATE TYPE empty_ehb AS ENUM ();
+SELECT ENUM_FIRST(NULL::empty_ehb)                            AS empty_first_null;
+empty_first_null
+NULL
+SELECT ENUM_LAST(NULL::empty_ehb)                             AS empty_last_null;
+empty_last_null
+NULL
+SELECT ENUM_FIRST(NULL::empty_ehb) IS NULL                    AS empty_first_pred;
+empty_first_pred
+1
+SELECT ENUM_LAST(NULL::empty_ehb)  IS NULL                    AS empty_last_pred;
+empty_last_pred
+1
+SELECT ENUM_RANGE(NULL::empty_ehb)                            AS empty_range_array;
+empty_range_array
+Array { element_type: Enum { type_name: "empty_ehb", labels: [] }, elements: [] }
+SELECT ENUM_RANGE(NULL::empty_ehb) IS NULL                    AS empty_range_NOT_null;
+empty_range_NOT_null
+0
+DROP TYPE empty_ehb;
 === Cleanup ===
 DROP TYPE mood_ehb;

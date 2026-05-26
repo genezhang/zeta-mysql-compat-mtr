@@ -107,6 +107,23 @@ SELECT ENUM_RANGE();
 --error 1105
 SELECT ENUM_FIRST(NULL::mood_ehb, NULL::mood_ehb);
 
+--echo === Empty enum: ENUM_FIRST/LAST → NULL, ENUM_RANGE → empty Array ===
+
+# An empty enum is parser-accepted (enum_type_basic_extra:116).
+# Asymmetry pinned: ENUM_FIRST/LAST return NULL when labels
+# is empty (lib.rs:55666 / 55677), but ENUM_RANGE returns a
+# NON-NULL empty Array (lib.rs:55679-55694 — map over empty
+# labels yields empty elements, wrapped in Value::Array).
+CREATE TYPE empty_ehb AS ENUM ();
+SELECT ENUM_FIRST(NULL::empty_ehb)                            AS empty_first_null;
+SELECT ENUM_LAST(NULL::empty_ehb)                             AS empty_last_null;
+SELECT ENUM_FIRST(NULL::empty_ehb) IS NULL                    AS empty_first_pred;
+SELECT ENUM_LAST(NULL::empty_ehb)  IS NULL                    AS empty_last_pred;
+# ENUM_RANGE returns a non-NULL Array even for empty labels.
+SELECT ENUM_RANGE(NULL::empty_ehb)                            AS empty_range_array;
+SELECT ENUM_RANGE(NULL::empty_ehb) IS NULL                    AS empty_range_NOT_null;
+DROP TYPE empty_ehb;
+
 --echo === Cleanup ===
 
 DROP TYPE mood_ehb;
