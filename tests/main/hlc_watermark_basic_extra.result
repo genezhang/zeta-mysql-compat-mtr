@@ -1,0 +1,29 @@
+=== SET zeta.hlc_watermark — basic forms silently succeed ===
+SET zeta.hlc_watermark = 0;
+SET zeta.hlc_watermark = 1000;
+SET zeta.hlc_watermark = 1700000000000000;
+=== SET LOCAL — same silent-no-op ===
+SET LOCAL zeta.hlc_watermark = 2000;
+BEGIN;
+SET LOCAL zeta.hlc_watermark = 3000;
+COMMIT;
+=== STRIKING: even way-over-i64::MAX silently succeeds ===
+SET zeta.hlc_watermark = 9223372036854775807;
+SET zeta.hlc_watermark = 9223372036854775808;
+SET zeta.hlc_watermark = 18446744073709551615;
+SET zeta.hlc_watermark = 18446744073709551616;
+=== STRIKING: negative values silently succeed too ===
+SET zeta.hlc_watermark = -1;
+SET zeta.hlc_watermark = -9999;
+=== STRIKING: garbage values silently succeed ===
+SET zeta.hlc_watermark = 'not-a-number';
+SET zeta.hlc_watermark = '';
+=== Transaction context — ROLLBACK doesn't matter (shim absorbs) ===
+BEGIN;
+SET LOCAL zeta.hlc_watermark = 9999;
+ROLLBACK;
+SET zeta.hlc_watermark = 11111;
+=== Cross-link: ZETA_LAST_COMMIT_HLC() read-side still works ===
+SELECT ZETA_LAST_COMMIT_HLC() >= 0                            AS read_side_works;
+read_side_works
+1
