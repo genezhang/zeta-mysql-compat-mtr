@@ -1,0 +1,109 @@
+# Independently authored SHOW empty-result stubs sentinel
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - show_basic_extra.test pins SHOW DATABASES / TABLES /
+#     COLUMNS / CREATE TABLE / TABLES LIKE. Its header
+#     mentions in prose that VARIABLES / STATUS / PROCESSLIST
+#     / GRANTS "all parse and execute without error but
+#     return empty result sets" and explicitly says they are
+#     "NOT pinned positively in the body". This slice closes
+#     that gap.
+#
+# This slice pins:
+#   - SHOW VARIABLES — empty result, no error.
+#   - SHOW STATUS — empty result, no error.
+#   - SHOW PROCESSLIST — empty result, no error.
+#   - SHOW GRANTS — empty result, no error.
+#   - SHOW ENGINES — empty result, no error.
+#   - SHOW WARNINGS — empty result, no error.
+#   - SHOW ERRORS — empty result, no error.
+#   - SHOW CHARSET — empty result, no error.
+#   - SHOW PRIVILEGES — empty result, no error.
+#   - SHOW COLLATION — RETURNS ONE ROW (utf8mb4_general_ci).
+#     OUTLIER: the only SHOW in this group that returns data.
+#
+# Big-picture finding:
+#   zeta's SHOW surface accepts 10 commands that MySQL apps
+#   commonly probe for capability detection, but 9 of them
+#   return empty result sets (no rows). The 10th, SHOW
+#   COLLATION, hardcodes a single row representing the
+#   default UTF-8 collation. This means MySQL apps doing
+#   `SHOW VARIABLES LIKE '%timeout%'` to detect connection-
+#   timeout config will get empty results (no error), and
+#   apps doing `SHOW COLLATION` to detect charset support
+#   get exactly one row.
+#
+#   The sentinel value: if a future implementation lands any
+#   of these (e.g. SHOW VARIABLES starts returning real
+#   server vars), the corresponding row will start returning
+#   rows and break the test. That's intentional — the test
+#   triggers a re-evaluation of whether the new behavior is
+#   the right behavior, AND ensures the .result file gets
+#   updated to capture the new output.
+#
+#   Empty-result detection: the MTR runner format emits an
+#   echo line for the SQL followed by NOTHING when zero rows
+#   are returned (no header, no data). When a row IS
+#   returned, the header line + data line both appear. So
+#   the format reliably distinguishes "empty" from "non-
+#   empty". (Verified: SHOW COLLATION below records the
+#   header + data, while the others record only the echo.)
+#
+# Adaptation notes:
+#   # zeta-adapt: SHOW VARIABLES / STATUS / PROCESSLIST /
+#     GRANTS / ENGINES / WARNINGS / ERRORS / CHARSET /
+#     PRIVILEGES all execute without error but return EMPTY
+#     result sets. Apps doing capability probing with these
+#     get no rows back.
+#   # zeta-adapt: SHOW COLLATION returns ONE row:
+#     utf8mb4_general_ci, charset utf8mb4, id 45, default
+#     yes, compiled yes, sortlen 1.
+
+--echo === SHOW VARIABLES — empty stub ===
+
+SHOW VARIABLES;
+
+--echo === SHOW STATUS — empty stub ===
+
+SHOW STATUS;
+
+--echo === SHOW PROCESSLIST — empty stub ===
+
+SHOW PROCESSLIST;
+
+--echo === SHOW GRANTS — empty stub ===
+
+SHOW GRANTS;
+
+--echo === SHOW ENGINES — empty stub ===
+
+SHOW ENGINES;
+
+--echo === SHOW WARNINGS — empty stub ===
+
+SHOW WARNINGS;
+
+--echo === SHOW ERRORS — empty stub ===
+
+SHOW ERRORS;
+
+--echo === SHOW CHARSET — empty stub ===
+
+SHOW CHARSET;
+
+--echo === SHOW PRIVILEGES — empty stub ===
+
+SHOW PRIVILEGES;
+
+--echo === SHOW COLLATION — OUTLIER, returns one row ===
+
+SHOW COLLATION;
+
+--echo === SHOW WARNINGS pattern variants — also empty ===
+
+# MySQL allows SHOW WARNINGS LIMIT n, SHOW COUNT(*) WARNINGS,
+# etc. Pin the LIMIT variant; the count form may parse
+# differently (skip for now to keep slice focused).
+SHOW WARNINGS LIMIT 10;

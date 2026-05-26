@@ -1,0 +1,24 @@
+=== SHOW VARIABLES — empty stub ===
+SHOW VARIABLES;
+=== SHOW STATUS — empty stub ===
+SHOW STATUS;
+=== SHOW PROCESSLIST — empty stub ===
+SHOW PROCESSLIST;
+=== SHOW GRANTS — empty stub ===
+SHOW GRANTS;
+=== SHOW ENGINES — empty stub ===
+SHOW ENGINES;
+=== SHOW WARNINGS — empty stub ===
+SHOW WARNINGS;
+=== SHOW ERRORS — empty stub ===
+SHOW ERRORS;
+=== SHOW CHARSET — empty stub ===
+SHOW CHARSET;
+=== SHOW PRIVILEGES — empty stub ===
+SHOW PRIVILEGES;
+=== SHOW COLLATION — OUTLIER, returns one row ===
+SHOW COLLATION;
+Collation	Charset	Id	Default	Compiled	Sortlen
+utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
+=== SHOW WARNINGS pattern variants — also empty ===
+SHOW WARNINGS LIMIT 10;
