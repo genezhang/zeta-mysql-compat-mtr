@@ -1,0 +1,184 @@
+# Independently authored PG constraint-bugs sentinel
+# slice for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# This slice pins THREE INDEPENDENT NEW BUGS observed
+# during gap-scanning the constraint-modifier surface:
+#
+# Existing coverage (do NOT duplicate):
+#   - UNIQUE constraint basic: covered at unique_*
+#     and constraint_basic.
+#   - CHECK constraint basic: covered at
+#     constraint_basic_extra.
+#   - DEFAULT clause basic (constant / fn(): covered
+#     at insert_basic_extra and default_*.
+#   - NULLS NOT DISTINCT (PG 15+ UNIQUE modifier):
+#     ZERO prior coverage.
+#   - CHECK with subquery (PG-forbidden but zeta
+#     behavior): ZERO prior coverage.
+#   - DEFAULT with subquery (PG-permitted form):
+#     ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - SILENT-DROP / SILENT-SEMANTIC-DEGRADATION BUG
+#     pattern: pre-existing at PR #391 (INHERITS),
+#     PR #407 (SCHEMA AUTHORIZATION), PR #408 (WITH
+#     ORDINALITY, FK MATCH FULL), PR #415 (SELECT
+#     INTO), PR #418 (TRIGGER modifiers cluster). New
+#     witness here: NULLS NOT DISTINCT modifier.
+#   - VALUE-RENDERING DEBUG-LEAK BUG: pre-existing
+#     at PR #385 (multi-dim Array Debug), the (ROW())
+#     .f1 leak (row_constructor_comparison). New
+#     witness here: InSubquery expr leaked into the
+#     "unsupported expression: ..." error when the
+#     CHECK constraint with subquery is later
+#     triggered by INSERT.
+#   - CORRUPTION BUG (NEW class): when DEFAULT
+#     expression is a parenthesized subquery, the
+#     literal subquery text — NOT its evaluated
+#     result — is stored as the column default value.
+#     SELECT then returns the text rather than the
+#     intended value. This is distinct from silent-
+#     drop because it produces a wrong VALUE (not
+#     just dropped semantics).
+#
+# This slice pins:
+#
+#   BUG 1 — NULLS NOT DISTINCT silent-drop:
+#     The UNIQUE constraint with NULLS NOT DISTINCT
+#     modifier (PG 15+) is silently accepted at
+#     CREATE TABLE but the modifier is dropped. The
+#     constraint behaves as UNIQUE (default: NULLS
+#     ARE distinct). FALSIFIER: insert two NULLs;
+#     PG with NNT would reject the second; zeta
+#     accepts both, proving the NNT was dropped.
+#     The base UNIQUE constraint IS active (insert
+#     two non-NULL duplicates is rejected).
+#
+#   BUG 2 — CHECK with subquery: silent-accept +
+#   DEBUG-LEAK at INSERT:
+#     CREATE TABLE accepts the CHECK constraint with
+#     subquery (PG forbids this at create-time). On
+#     INSERT, the executor errors with the Debug-repr
+#     of the InSubquery AST node leaking into the
+#     error message. Pattern matches PR #385 (multi-
+#     dim Array Debug-leak) and the (ROW()).f1 leak
+#     pinned at row_constructor_comparison.
+#     Note: the error message format includes ALL
+#     fields of the AST node — fragile across
+#     sqlparser version bumps. We match the prefix
+#     "unsupported expression: InSubquery" and the
+#     "Column(\"id\")" inner substring without
+#     pinning every comma; the runner does substring-
+#     comparison on full lines, so we include the
+#     full line and accept inevitable churn.
+#
+#   BUG 3 — DEFAULT with subquery → text corruption:
+#     CREATE TABLE accepts `col INT DEFAULT (SELECT
+#     7)`. INSERT (other columns only, or DEFAULT
+#     VALUES) populates the column with the literal
+#     text "(SELECT 7)" — NOT the evaluated integer
+#     7. This violates the column's INT type and
+#     produces type-broken data that subsequent
+#     reads see as the text. Equivalent in PG: the
+#     subquery would be evaluated and 7 inserted.
+#
+# Big-picture finding:
+#
+#   Three constraint-related modifier paths share a
+#   common shape: sqlparser accepts more grammar
+#   than convert.rs implements, and the unimplemented
+#   parts produce one of three outcomes:
+#
+#   (1) Silent drop with subtly different runtime
+#       semantics (NULLS NOT DISTINCT).
+#   (2) Silent accept + later runtime error with
+#       AST debug-repr leakage (CHECK subquery).
+#   (3) Silent accept + value-level CORRUPTION
+#       (DEFAULT subquery — column ends up storing
+#       the subquery text instead of its result).
+#
+#   Worst-of-three is CORRUPTION (#3): a value-level
+#   data-integrity bug that propagates silently.
+#   Apps porting PG schemas with `DEFAULT
+#   (subquery)` columns will see "(SELECT ...)"
+#   strings in INT/TEXT/etc. columns rather than the
+#   evaluated default. Migrate to a trigger-based
+#   default or compute the value before the INSERT.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL.
+# convert.rs is parser-shared; the CHECK/DEFAULT
+# evaluation paths run in the executor (also wire-
+# shared).
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-DROP BUG — NULLS NOT
+#     DISTINCT modifier on UNIQUE constraint is
+#     silently dropped. Use a partial-unique index
+#     `WHERE col IS NOT NULL` for the NNT semantic.
+#   # zeta-adapt: DEBUG-LEAK BUG — CHECK constraint
+#     with subquery accepts at CREATE but errors at
+#     INSERT with AST Debug-repr in error message.
+#     Move predicate to a trigger.
+#   # zeta-adapt: CORRUPTION BUG — DEFAULT
+#     (subquery) stores the literal subquery text
+#     rather than evaluating. Use a BEFORE INSERT
+#     trigger or compute the default in the app.
+
+--echo === BUG 1 — NULLS NOT DISTINCT silent-drop ===
+
+DROP TABLE IF EXISTS nnd;
+CREATE TABLE nnd (a INT, UNIQUE NULLS NOT DISTINCT (a));
+
+--echo === Insert two NULLs — PG with NNT REJECTS the 2nd; zeta accepts both → NNT silently dropped ===
+
+INSERT INTO nnd VALUES (NULL);
+INSERT INTO nnd VALUES (NULL);
+SELECT * FROM nnd;
+
+--echo === Insert two non-NULL duplicates — base UNIQUE still active (proves constraint exists, just NNT is dropped) ===
+
+INSERT INTO nnd VALUES (42);
+--error 1062
+INSERT INTO nnd VALUES (42);
+
+DROP TABLE nnd;
+
+--echo === BUG 2 — CHECK with subquery: silent-accept + DEBUG-LEAK at INSERT ===
+
+DROP TABLE IF EXISTS ref_chk;
+DROP TABLE IF EXISTS chk_sub;
+CREATE TABLE ref_chk (id INT);
+INSERT INTO ref_chk VALUES (10);
+
+--echo === CREATE TABLE accepts CHECK (id IN (SELECT id FROM ref_chk)) — PG would forbid at create-time ===
+
+CREATE TABLE chk_sub (id INT CHECK (id IN (SELECT id FROM ref_chk)));
+
+--echo === INSERT triggers CHECK; executor errors with "unsupported expression: InSubquery { ... }" Debug-leak ===
+
+--error 1105
+INSERT INTO chk_sub VALUES (999);
+
+DROP TABLE chk_sub;
+DROP TABLE ref_chk;
+
+--echo === BUG 3 — DEFAULT (subquery) → text CORRUPTION ===
+
+# INSERT DEFAULT VALUES is separately pinned at insert_
+# basic_extra (silently no-ops for SERIAL-keyed tables;
+# errors "column not found: id" for INT-keyed tables).
+# This slice focuses on the partial-column INSERT that
+# DOES insert a row but corrupts the subquery-default
+# column's value into the literal subquery text.
+
+DROP TABLE IF EXISTS def_sub;
+CREATE TABLE def_sub (id INT, computed_def INT DEFAULT (SELECT 7));
+
+--echo === INSERT (id) — computed_def should be 7 (PG); zeta stores "(SELECT 7)" text into INT column ===
+
+INSERT INTO def_sub (id) VALUES (1);
+SELECT * FROM def_sub;
+
+DROP TABLE def_sub;

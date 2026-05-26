@@ -1,0 +1,36 @@
+=== BUG 1 — NULLS NOT DISTINCT silent-drop ===
+DROP TABLE IF EXISTS nnd;
+CREATE TABLE nnd (a INT, UNIQUE NULLS NOT DISTINCT (a));
+=== Insert two NULLs — PG with NNT REJECTS the 2nd; zeta accepts both → NNT silently dropped ===
+INSERT INTO nnd VALUES (NULL);
+INSERT INTO nnd VALUES (NULL);
+SELECT * FROM nnd;
+a
+NULL
+NULL
+=== Insert two non-NULL duplicates — base UNIQUE still active (proves constraint exists, just NNT is dropped) ===
+INSERT INTO nnd VALUES (42);
+INSERT INTO nnd VALUES (42);
+ERROR 1062: duplicate key value violates unique constraint "test.public.nnd_a_key": Key already exists in index "test.public.nnd_a_key"
+DROP TABLE nnd;
+=== BUG 2 — CHECK with subquery: silent-accept + DEBUG-LEAK at INSERT ===
+DROP TABLE IF EXISTS ref_chk;
+DROP TABLE IF EXISTS chk_sub;
+CREATE TABLE ref_chk (id INT);
+INSERT INTO ref_chk VALUES (10);
+=== CREATE TABLE accepts CHECK (id IN (SELECT id FROM ref_chk)) — PG would forbid at create-time ===
+CREATE TABLE chk_sub (id INT CHECK (id IN (SELECT id FROM ref_chk)));
+=== INSERT triggers CHECK; executor errors with "unsupported expression: InSubquery { ... }" Debug-leak ===
+INSERT INTO chk_sub VALUES (999);
+ERROR 1105: execution error: unsupported expression: InSubquery { expr: Column("id"), subquery: SelectStmt { distinct: false, distinct_on: [], projections: [SelectItem { expr: Column("id"), alias: None }], from: [Table { name: "ref_chk", alias: None }], where_clause: None, group_by: [], grouping_sets: [], having: None, order_by: [], limit: None, offset: None, limit_with_ties: false, ctes: [], for_update: false }, negated: false }
+DROP TABLE chk_sub;
+DROP TABLE ref_chk;
+=== BUG 3 — DEFAULT (subquery) → text CORRUPTION ===
+DROP TABLE IF EXISTS def_sub;
+CREATE TABLE def_sub (id INT, computed_def INT DEFAULT (SELECT 7));
+=== INSERT (id) — computed_def should be 7 (PG); zeta stores "(SELECT 7)" text into INT column ===
+INSERT INTO def_sub (id) VALUES (1);
+SELECT * FROM def_sub;
+id	computed_def
+1	(SELECT 7)
+DROP TABLE def_sub;
