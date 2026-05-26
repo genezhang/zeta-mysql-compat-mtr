@@ -1,0 +1,133 @@
+# Independently authored pg_catalog views mysql-wire 1146
+# sentinel smoke for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - pg_catalog_basic_extra covers 7 core pg_catalog
+#     views as 1146 sentinels on mysql wire (pg_class,
+#     pg_attribute, pg_index, pg_constraint, pg_type,
+#     pg_proc, pg_namespace).
+#   - comment_on_basic_extra covers pg_catalog.pg_description.
+#   - This slice covers the REMAINING 14 pg_catalog
+#     dispatcher-enabled views (pg_catalog.rs:147-173)
+#     that have NO compat-mtr coverage today.
+#
+# This slice pins (all 1146 'table not found' on mysql wire):
+#
+#   - pg_catalog.pg_settings (GUC introspection)
+#   - pg_catalog.pg_am (access methods)
+#   - pg_catalog.pg_stat_user_tables
+#   - pg_catalog.pg_partitioned_table
+#   - pg_catalog.pg_replication_slots
+#   - pg_catalog.pg_stat_replication
+#   - pg_catalog.pg_publication
+#   - pg_catalog.pg_stat_zeta (zeta-vendor)
+#   - pg_catalog.zeta_partitions (zeta-vendor)
+#   - pg_catalog.pg_stat_activity
+#   - pg_catalog.pg_stat_statements
+#   - pg_catalog.pg_table_size (function-as-view)
+#   - pg_catalog.pg_database_size
+#   - pg_catalog.pg_backup_status
+#
+# Big-picture finding (CATALOG-WIRE-DIVERGENCE):
+#
+#   ALL pg_catalog views are pgwire-ONLY. The pgwire
+#   handler at handler.rs:1327 routes `SELECT ... FROM
+#   pg_catalog.<view>` through pg_catalog::try_handle
+#   which returns a hand-built ExecuteResult. The
+#   mysqlwire shim has NO such routing — these queries
+#   fall through to the executor's table-resolution which
+#   doesn't know about pg_catalog and errors 1146.
+#
+#   So apps doing PG-style catalog introspection (e.g.
+#   `SELECT setting FROM pg_settings WHERE name = 'X'`,
+#   ORMs like Django/Rails reflecting columns via
+#   `pg_attribute`, monitoring tools reading
+#   `pg_stat_activity`) WILL NOT WORK over the MySQL
+#   wire. They must use pgwire.
+#
+#   This is the same shape as PR #375 (PG-style SHOW)
+#   but more extensive — an entire CATALOG namespace is
+#   pgwire-only.
+#
+#   STRIKING — the dispatcher at pg_catalog.rs:177-180
+#   only checks `might_reference_pg_catalog(sql)` which
+#   is a SUBSTRING test. So a query like
+#   `SELECT * FROM my_table_with_pg_settings_in_name`
+#   would incorrectly route to the pg_catalog handler
+#   on pgwire (likely fails with a different error).
+#   On mysql wire this issue doesn't arise because the
+#   dispatcher isn't called at all. Not pinned here
+#   (would require pgwire harness) but worth noting.
+#
+#   Bare-name variants (without `pg_catalog.` prefix)
+#   ALSO error 1146 because the executor doesn't know
+#   about pg_catalog views.
+#
+#   information_schema is similarly pgwire-only on most
+#   views, but some have mysql-wire fallbacks via the
+#   shim — see info_schema_basic_extra and
+#   info_schema_stubs_basic_extra for distinct coverage.
+#
+# Adaptation notes:
+#   # zeta-adapt: pg_catalog views are PGWIRE-ONLY.
+#     ALL of them error 1146 on mysql wire. Apps doing
+#     PG-style introspection (ORMs, monitoring tools)
+#     MUST use pgwire.
+#   # zeta-adapt: This includes zeta-vendor views
+#     (pg_stat_zeta, zeta_partitions) too — they're
+#     registered under the pg_catalog dispatcher.
+#   # zeta-adapt: information_schema is partially
+#     covered on mysql wire — see info_schema_basic_extra.
+
+--echo === Standard PG catalog views — all 1146 on mysql wire ===
+
+--error 1146
+SELECT * FROM pg_catalog.pg_settings LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_am LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_stat_user_tables LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_partitioned_table LIMIT 1;
+
+--echo === Replication catalog views — all 1146 on mysql wire ===
+
+--error 1146
+SELECT * FROM pg_catalog.pg_replication_slots LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_stat_replication LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_publication LIMIT 1;
+
+--echo === Activity / statistics views — all 1146 on mysql wire ===
+
+--error 1146
+SELECT * FROM pg_catalog.pg_stat_activity LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_stat_statements LIMIT 1;
+
+--echo === ZETA-vendor catalog views — also pgwire-only ===
+
+--error 1146
+SELECT * FROM pg_catalog.pg_stat_zeta LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.zeta_partitions LIMIT 1;
+
+--echo === Size / status function-views — 1146 on mysql wire ===
+
+--error 1146
+SELECT * FROM pg_catalog.pg_table_size LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_database_size LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_backup_status LIMIT 1;
+
+--echo === Bare-name (no pg_catalog. prefix) — also 1146 ===
+
+# Confirms there's no mysql-wire alias to the catalog
+# views; the prefix doesn't matter.
+--error 1146
+SELECT * FROM pg_settings LIMIT 1;
+--error 1146
+SELECT * FROM pg_stat_activity LIMIT 1;
