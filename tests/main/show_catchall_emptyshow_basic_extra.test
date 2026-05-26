@@ -1,0 +1,154 @@
+# Independently authored SHOW catch-all (EmptyShow
+# fallback) smoke for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - show_basic_extra covers SHOW DATABASES, SHOW
+#     TABLES, SHOW FULL TABLES, SHOW COLUMNS, SHOW
+#     CREATE TABLE, SHOW INDEX, SHOW TABLES LIKE.
+#   - show_empty_stubs_basic_extra covers SHOW ERRORS,
+#     SHOW CHARSET, SHOW PRIVILEGES.
+#   - charset_collation_basic_extra covers SHOW
+#     COLLATION (specifically).
+#   - This slice covers the REMAINING SHOW variants
+#     that the mysqlwire shim catch-alls to EmptyShow
+#     at shim.rs:2023.
+#
+# This slice pins:
+#   - SHOW EVENTS — silent empty (zeta has no scheduler;
+#     PR #373 pinned the CREATE/ALTER/DROP EVENT 1064
+#     reject — the SHOW path is the asymmetric silent
+#     companion).
+#   - SHOW MASTER STATUS — silent empty (no MySQL
+#     binlog; zeta uses log-store + pgoutput).
+#   - SHOW SLAVE STATUS — silent empty.
+#   - SHOW BINARY LOGS — silent empty.
+#   - SHOW FUNCTION STATUS — silent empty.
+#   - SHOW PROCEDURE STATUS — silent empty.
+#   - SHOW TRIGGERS — silent empty (zeta supports
+#     CREATE TRIGGER per CLAUDE.md, but the SHOW path
+#     doesn't actually enumerate them).
+#   - SHOW PLUGINS — silent empty (no plugin
+#     architecture).
+#   - SHOW KEYS FROM <table> alias for SHOW INDEX —
+#     silent empty when the table doesn't exist (no
+#     1146 error since the catch-all swallows).
+#   - SHOW FIELDS FROM <table> alias for SHOW COLUMNS —
+#     same silent empty when table doesn't exist.
+#
+# Big-picture finding (SHOW EMPTY-ROW PATHS):
+#
+#   The mysqlwire shim at shim.rs:1904-2023 intercepts
+#   ANY query starting with "show " via substring
+#   matching. Three distinct paths lead to empty rows:
+#
+#   1. **"status" substring match at line 1905-1906**:
+#      `if q_lower.contains("variables") || q_lower.
+#      contains("status")` returns EmptyShow at line 1906.
+#      Catches SHOW MASTER STATUS, SHOW SLAVE STATUS,
+#      SHOW FUNCTION STATUS, SHOW PROCEDURE STATUS —
+#      because all four contain the substring "status".
+#      Observable behavior is empty rows, same as the
+#      catch-all.
+#
+#   2. **Per-handler "table not found → empty"** at
+#      lines 1958/1970/1983: SHOW KEYS / SHOW FIELDS /
+#      SHOW COLUMNS on a nonexistent table reach a
+#      per-handler EmptyShow fallback (NOT the universal
+#      catch-all). Real MySQL would error 1146.
+#
+#   3. **Universal catch-all at line 2023**: `return
+#      Some(MySqlResult::EmptyShow)` after all specific
+#      handlers fall through. Catches SHOW EVENTS, SHOW
+#      TRIGGERS, SHOW PLUGINS, and ANY garbage like
+#      SHOW XYZZY / SHOW MADE_UP_THING.
+#
+#   The PRACTICAL upshot is the same: apps cannot probe
+#   for "does this SHOW form exist" via 1064 vs empty —
+#   everything is empty. This is a significant
+#   DIVERGENCE from PG-style errors-on-unknown and from
+#   MySQL-style 1064-on-unknown. The PATH that produces
+#   the empty differs across rows below; the observable
+#   empty-row result is identical.
+#
+#   STRIKING — even garbage SHOW commands SUCCEED. Apps
+#   doing `SHOW FAKE_VARIABLE` will see empty results,
+#   thinking the variable doesn't exist. They should
+#   probe via the explicit `SHOW VARIABLES LIKE 'X'`
+#   form (or @@-syntax) to distinguish "no such variable"
+#   from "variable exists but unset".
+#
+#   STRIKING — SHOW KEYS / SHOW FIELDS on a nonexistent
+#   table also returns EmptyShow silently. Real MySQL
+#   would error 1146. Apps probing for table existence
+#   via SHOW KEYS / SHOW FIELDS should switch to
+#   `information_schema.tables` instead.
+#
+#   For features that DO exist in zeta but lack SHOW
+#   support (TRIGGERS), the catch-all silently produces
+#   empty results — an asymmetric gap (CREATE works but
+#   SHOW doesn't enumerate). Apps relying on
+#   `SHOW TRIGGERS` for introspection should use
+#   `pg_catalog.pg_trigger` or `information_schema.
+#   triggers` instead.
+#
+# Adaptation notes:
+#   # zeta-adapt: The mysqlwire shim's SHOW catch-all
+#     returns empty rows for ANY unrecognized SHOW
+#     variant — NO 1064 error like real MySQL. Apps
+#     can't probe for "does this SHOW form exist".
+#   # zeta-adapt: SHOW TRIGGERS / SHOW EVENTS /
+#     SHOW PLUGINS / SHOW MASTER STATUS / SHOW BINARY
+#     LOGS / etc all return empty. Use information_
+#     schema or pg_catalog for real introspection.
+#   # zeta-adapt: SHOW KEYS / SHOW FIELDS on nonexistent
+#     table → empty (no 1146). Use INFORMATION_SCHEMA
+#     for existence probes.
+
+--echo === SHOW EVENTS — silent empty (CREATE/ALTER/DROP EVENT errors 1064 per PR #373) ===
+
+SHOW EVENTS;
+
+--echo === SHOW MASTER STATUS / SHOW SLAVE STATUS / SHOW BINARY LOGS — silent empty ===
+
+SHOW MASTER STATUS;
+SHOW SLAVE STATUS;
+SHOW BINARY LOGS;
+
+--echo === SHOW FUNCTION STATUS / SHOW PROCEDURE STATUS — silent empty ===
+
+SHOW FUNCTION STATUS;
+SHOW PROCEDURE STATUS;
+
+--echo === SHOW TRIGGERS — silent empty even though CREATE TRIGGER works ===
+
+# Asymmetric gap: zeta supports CREATE TRIGGER but
+# SHOW TRIGGERS doesn't enumerate them.
+SHOW TRIGGERS;
+
+--echo === SHOW PLUGINS — silent empty (no plugin architecture) ===
+
+SHOW PLUGINS;
+
+--echo === STRIKING: garbage SHOW also returns empty (no 1064 error) ===
+
+# Real MySQL would error on these unknown SHOW forms.
+# zeta's catch-all swallows them silently.
+SHOW MADE_UP_THING;
+SHOW XYZZY;
+SHOW SOMETHING_NONSENSE;
+
+--echo === SHOW KEYS / SHOW FIELDS on nonexistent table — empty (no 1146) ===
+
+# Real MySQL: ERROR 1146 'no such table'. zeta: silent empty.
+SHOW KEYS FROM definitely_does_not_exist;
+SHOW FIELDS FROM also_does_not_exist;
+
+# NOTE: The asymmetric gap (CREATE TRIGGER works but
+# SHOW TRIGGERS returns empty) can't easily be pinned
+# in MTR-format because the trigger-function body uses
+# `$$` dollar-quotes containing semicolons, which the
+# MTR runner splits on. Trigger creation/enumeration is
+# covered in other tests; the SHOW TRIGGERS empty path
+# is sufficiently pinned by the standalone `SHOW
+# TRIGGERS;` row above.
