@@ -1,0 +1,28 @@
+DROP TABLE IF EXISTS hpp;
+CREATE TABLE hpp (v INT, c TEXT);
+INSERT INTO hpp VALUES (1,'a'),(2,'b'),(3,'a'),(4,'b'),(5,'a');
+=== rank(3) WITHIN GROUP (ORDER BY v) → "unknown function: rank" ===
+SELECT rank(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+ERROR 1105: execution error: unknown function: rank
+=== dense_rank(3) WITHIN GROUP (ORDER BY v) → "unknown function: dense_rank" ===
+SELECT dense_rank(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+ERROR 1105: execution error: unknown function: dense_rank
+=== cume_dist(3) WITHIN GROUP (ORDER BY v) → "unknown function: cume_dist" ===
+SELECT cume_dist(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+ERROR 1105: execution error: unknown function: cume_dist
+=== percent_rank(3) WITHIN GROUP (ORDER BY v) → "unknown function: percent_rank" ===
+SELECT percent_rank(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+ERROR 1105: execution error: unknown function: percent_rank
+=== SUPPORT FALSIFIER — percentile_disc(0.5) WITHIN GROUP works (WITHIN GROUP plumbing exists) ===
+SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY v) AS p50 FROM hpp;
+p50
+3
+=== SUPPORT FALSIFIER — rank() OVER works (window-fn form, same name, diff dispatch) ===
+SELECT v, rank() OVER (ORDER BY v) AS r FROM hpp ORDER BY v;
+v	r
+1	1
+2	2
+3	3
+4	4
+5	5
+DROP TABLE hpp;
