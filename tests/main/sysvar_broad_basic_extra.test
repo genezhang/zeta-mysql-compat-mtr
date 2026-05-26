@@ -1,0 +1,206 @@
+# Independently authored @@system_variable broad-surface
+# smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - variable_basic_extra covers @@autocommit, @@version
+#     basic forms, scope prefixes (@@SESSION/@@GLOBAL),
+#     and the @@var-AS-alias known gap. This slice covers
+#     the BROADER hardcoded system-variable surface in
+#     the mysqlwire shim — character sets, protocol info,
+#     limits, ssl, socket, license, and the unknown-var
+#     fallback.
+#   - hlc_watermark_basic_extra (PR #369) covers the SET
+#     side of @@-style GUC handling on MySQL wire.
+#
+# This slice pins:
+#   - Identity strings: @@version, @@version_comment,
+#     @@version_compile_os, @@version_compile_machine.
+#   - Charset/collation: @@character_set_client /
+#     character_set_connection / character_set_results /
+#     character_set_server / character_set_database /
+#     character_set_system / character_set_filesystem
+#     all = 'utf8mb4'.
+#   - @@collation_connection / @@collation_server /
+#     @@collation_database all = 'utf8mb4_general_ci'.
+#   - Protocol/connection: @@protocol_version = 10,
+#     @@hostname = 'localhost'.
+#   - Limits: @@max_allowed_packet = 16777216,
+#     @@max_connections = 151, @@wait_timeout = 28800.
+#   - Empty-string safe defaults for client-compat:
+#     @@socket = '', @@ssl_version = '', @@ssl_cipher = ''.
+#   - @@time_zone = 'UTC', @@system_time_zone = 'UTC'.
+#   - @@license = 'Proprietary'.
+#   - @@sql_mode = '' (empty).
+#   - @@tx_isolation / @@transaction_isolation =
+#     'REPEATABLE-READ'.
+#   - @@lc_time_names = 'en_US' (read).
+#   - @@unknown_var → NULL silent (no error — divergence
+#     from real MySQL).
+#
+# Big-picture finding (HARDCODED VARIABLE SURFACE):
+#
+#   The mysqlwire shim at shim.rs:1681-1755 hardcodes a
+#   curated set of common MySQL system variables to
+#   responses chosen for CLIENT COMPATIBILITY rather than
+#   accurate engine state. Notable design choices:
+#
+#   1. **@@socket returns empty string, not NULL** — per
+#      the impl comment at shim.rs:1732-1741, both the
+#      sync `mysql` crate and `mysql_async` are
+#      compatible with empty-string ("no socket
+#      configured"), but the sync crate would PANIC on
+#      NULL via `from_value::<String>`. The empty-string
+#      choice is INTENTIONAL safety.
+#
+#   2. **@@ssl_* returns empty strings** — same safety
+#      reasoning (typed-string clients).
+#
+#   3. **@@version_compile_os = 'linux'**, **machine =
+#      'x86_64'** — hardcoded, not actually detected.
+#      Apps inspecting these for portability decisions
+#      will get wrong answers on other platforms.
+#
+#   4. **Unknown @@var returns NULL silently** — per impl
+#      comment at shim.rs:1748-1753: "real MySQL would
+#      error, but for compat we return NULL". This
+#      catches typos silently. Apps probing for capability
+#      via @@-checks should pin specific names they expect.
+#
+#   STRIKING — @@lc_time_names returns 'en_US' even after
+#   a SET that changes it. Per impl comment at
+#   shim.rs:1707-1712: "zeta only implements en_US...
+#   SET to non-en_US values is accepted by the inline SET
+#   handler (stored in session_vars as a generic
+#   name=value, no validation), but reads always return
+#   the en_US claim here". This is a write-vs-read
+#   divergence within the shim itself — the SET path
+#   (PR #369 finding) stores anything, the READ path
+#   ignores session_vars for known variables and returns
+#   the hardcoded value. Apps doing
+#   SET lc_time_names = 'fr_FR'; SELECT @@lc_time_names;
+#   will see 'en_US', not 'fr_FR'.
+#
+#   STRIKING — most numerics return as REAL numbers (not
+#   strings) per the impl Note at shim.rs:1717. E.g.,
+#   @@protocol_version returns Int(10), not Str("10").
+#
+#   STRIKING — @@max_allowed_packet returns 67108864
+#   (64 MiB), NOT the shim's hardcoded 16 MiB
+#   (shim.rs:1719 = `16 * 1024 * 1024`). The mysql_async
+#   CLIENT (which the MTR runner uses) intercepts this
+#   query and returns its negotiated packet-size config
+#   (default 64 MiB) without round-tripping. So apps
+#   probing @@max_allowed_packet over mysql_async see
+#   the CLIENT'S value, not the server's. Other MySQL
+#   clients (mysql-cli, jdbc-mysql) may see the shim's
+#   16 MiB value — wire-client-DIVERGENT, separate from
+#   the pgwire-vs-mysqlwire wire-divergence pattern.
+#
+# Adaptation notes:
+#   # zeta-adapt: Unknown @@vars return NULL silently —
+#     opposite of MySQL which errors. Pin specific names
+#     you depend on.
+#   # zeta-adapt: @@socket and @@ssl_* return EMPTY
+#     STRING (not NULL) for client-compat with sync
+#     `mysql` crate's typed-string decoder.
+#   # zeta-adapt: @@version_compile_os/machine are
+#     hardcoded ('linux'/'x86_64') — not portable.
+#   # zeta-adapt: SET lc_time_names is shim-absorbed; the
+#     @@-read still returns 'en_US' regardless.
+
+--echo === Identity strings ===
+
+SELECT @@version;
+SELECT @@version_comment;
+SELECT @@version_compile_os;
+SELECT @@version_compile_machine;
+SELECT @@license;
+
+--echo === Charset family — all 'utf8mb4' ===
+
+SELECT @@character_set_client;
+SELECT @@character_set_connection;
+SELECT @@character_set_results;
+SELECT @@character_set_server;
+SELECT @@character_set_database;
+SELECT @@character_set_system;
+SELECT @@character_set_filesystem;
+
+--echo === Collation family — all 'utf8mb4_general_ci' ===
+
+SELECT @@collation_connection;
+SELECT @@collation_server;
+SELECT @@collation_database;
+
+--echo === Protocol / connection / hostname ===
+
+SELECT @@protocol_version;
+SELECT @@hostname;
+
+--echo === Limits — return as numeric (not string) ===
+
+SELECT @@max_allowed_packet;
+SELECT @@max_connections;
+SELECT @@wait_timeout;
+SELECT @@interactive_timeout;
+SELECT @@connect_timeout;
+SELECT @@net_buffer_length;
+SELECT @@net_read_timeout;
+SELECT @@net_write_timeout;
+SELECT @@group_concat_max_len;
+SELECT @@lower_case_table_names;
+SELECT @@max_execution_time;
+
+--echo === STRIKING: socket/ssl return EMPTY STRING (NOT NULL) ===
+
+# Empty-string default is INTENTIONAL safety for the sync
+# `mysql` crate which would panic on NULL via
+# from_value::<String>. See shim.rs:1732-1741.
+SELECT @@socket;
+SELECT @@ssl_version;
+SELECT @@ssl_cipher;
+SELECT @@ssl_ca;
+SELECT @@ssl_cert;
+SELECT @@ssl_key;
+
+--echo === Time zone — both = 'UTC' ===
+
+SELECT @@time_zone;
+SELECT @@system_time_zone;
+
+--echo === Isolation / sql_mode / engine ===
+
+SELECT @@tx_isolation;
+SELECT @@transaction_isolation;
+SELECT @@sql_mode;
+SELECT @@default_storage_engine;
+SELECT @@storage_engine;
+SELECT @@innodb_version;
+
+--echo === @@lc_time_names — hardcoded 'en_US' ===
+
+SELECT @@lc_time_names;
+
+--echo === STRIKING: SET lc_time_names absorbed, @@-read STILL 'en_US' ===
+
+# SET path stores in session_vars (no validation, per
+# PR #369 mysqlwire-shim SET catch-all); READ path
+# ignores session_vars for known variables and returns
+# the hardcoded value.
+SET lc_time_names = 'fr_FR';
+SELECT @@lc_time_names;
+
+--echo === STRIKING: unknown @@var → NULL silent (not MySQL error) ===
+
+SELECT @@nonexistent_var;
+SELECT @@made_up_variable;
+SELECT @@some_other_garbage;
+# STRIKING: `SELECT @@var IS NULL` is shim-absorbed
+# WHOLESALE — the shim matches "select @@" prefix and
+# treats everything after as one variable lookup
+# ("nonexistent_var is null as unknown_is_null"). Result
+# is the NULL from the unknown-variable fallback, not a
+# Bool. The `IS NULL` predicate is NOT actually
+# evaluated.
+SELECT @@nonexistent_var IS NULL                              AS unknown_is_null;
