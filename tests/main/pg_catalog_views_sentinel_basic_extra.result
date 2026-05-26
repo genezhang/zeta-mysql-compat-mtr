@@ -29,8 +29,22 @@ SELECT * FROM pg_catalog.pg_table_size LIMIT 1;
 ERROR 1146: table not found: pg_catalog.pg_table_size
 SELECT * FROM pg_catalog.pg_database_size LIMIT 1;
 ERROR 1146: table not found: pg_catalog.pg_database_size
+SELECT * FROM pg_catalog.pg_size_pretty LIMIT 1;
+ERROR 1146: table not found: pg_catalog.pg_size_pretty
 SELECT * FROM pg_catalog.pg_backup_status LIMIT 1;
 ERROR 1146: table not found: pg_catalog.pg_backup_status
+=== Additional function-like dispatcher entries — 1146 on mysql wire ===
+SELECT * FROM pg_catalog.pg_stat_statements_reset LIMIT 1;
+ERROR 1146: table not found: pg_catalog.pg_stat_statements_reset
+SELECT * FROM pg_catalog.pg_index_advisor LIMIT 1;
+ERROR 1146: table not found: pg_catalog.pg_index_advisor
+SELECT * FROM pg_catalog.pg_auto_tune LIMIT 1;
+ERROR 1146: table not found: pg_catalog.pg_auto_tune
+=== Additional ZETA-vendor entries — 1146 on mysql wire ===
+SELECT * FROM pg_catalog.zeta_split_partition LIMIT 1;
+ERROR 1146: table not found: pg_catalog.zeta_split_partition
+SELECT * FROM pg_catalog.zeta_merge_partitions LIMIT 1;
+ERROR 1146: table not found: pg_catalog.zeta_merge_partitions
 === Bare-name (no pg_catalog. prefix) — also 1146 ===
 SELECT * FROM pg_settings LIMIT 1;
 ERROR 1146: table not found: test.public.pg_settings

@@ -3,14 +3,23 @@
 # copied or adapted from MySQL's mysql-test/.
 #
 # Existing coverage (do NOT duplicate):
-#   - pg_catalog_basic_extra covers 7 core pg_catalog
-#     views as 1146 sentinels on mysql wire (pg_class,
+#   - pg_catalog_basic_extra covers 7 pg_catalog views
+#     as 1146 sentinels on mysql wire: pg_class,
 #     pg_attribute, pg_index, pg_constraint, pg_type,
-#     pg_proc, pg_namespace).
-#   - comment_on_basic_extra covers pg_catalog.pg_description.
-#   - This slice covers the REMAINING 14 pg_catalog
-#     dispatcher-enabled views (pg_catalog.rs:147-173)
-#     that have NO compat-mtr coverage today.
+#     pg_proc, pg_namespace. NOTE: pg_constraint and
+#     pg_proc are NOT in the dispatcher list at
+#     pg_catalog.rs:144-173 — they're 1146 on BOTH
+#     wires because they're outright unsupported, not
+#     because of pgwire-only routing. The other 5
+#     (pg_class, pg_attribute, pg_index, pg_type,
+#     pg_namespace) ARE in the dispatcher.
+#   - comment_on_basic_extra covers pg_description (also
+#     in the dispatcher).
+#   - current_schema_citext_basic_extra (PR #359) covers
+#     CURRENT_SCHEMA which is in the dispatcher too
+#     (returns 'public' through a different mechanism).
+#   - This slice covers the REMAINING dispatcher entries
+#     uncovered today.
 #
 # This slice pins (all 1146 'table not found' on mysql wire):
 #
@@ -121,7 +130,31 @@ SELECT * FROM pg_catalog.pg_table_size LIMIT 1;
 --error 1146
 SELECT * FROM pg_catalog.pg_database_size LIMIT 1;
 --error 1146
+SELECT * FROM pg_catalog.pg_size_pretty LIMIT 1;
+--error 1146
 SELECT * FROM pg_catalog.pg_backup_status LIMIT 1;
+
+--echo === Additional function-like dispatcher entries — 1146 on mysql wire ===
+
+# pg_stat_statements_reset, pg_index_advisor, pg_auto_tune
+# are registered in the dispatcher (lines 171-173) but
+# are function-style (mutate / advise) rather than
+# table-style. Still error 1146 on table-style SELECT.
+--error 1146
+SELECT * FROM pg_catalog.pg_stat_statements_reset LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_index_advisor LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.pg_auto_tune LIMIT 1;
+
+--echo === Additional ZETA-vendor entries — 1146 on mysql wire ===
+
+# zeta_split_partition / zeta_merge_partitions are also
+# in the dispatcher (lines 163-164).
+--error 1146
+SELECT * FROM pg_catalog.zeta_split_partition LIMIT 1;
+--error 1146
+SELECT * FROM pg_catalog.zeta_merge_partitions LIMIT 1;
 
 --echo === Bare-name (no pg_catalog. prefix) — also 1146 ===
 
