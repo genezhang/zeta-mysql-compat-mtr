@@ -56,13 +56,16 @@
 #       code that uses length(lseg) get the cast error,
 #       not "unknown function" — confusing diagnostic.
 #
-#   `<->` distance operator — inner cast fires first:
+#   `<->` distance operator — exec-time inner-cast
+#   reject (1105):
 #     - `'(1,1)'::POINT <-> '(4,5)'::POINT` → hits the
 #       INNER cast first ("unsupported CAST target
-#       type: POINT"). sqlparser parses `<->` as a
-#       custom binary operator; zeta evaluates args
-#       before op-dispatch. Same eval-order as PR #387
-#       INET `<<`.
+#       type: POINT"). sqlparser parses `<->` as the
+#       first-class `LtDashGt` token (maps to BinOp::
+#       L2Distance at zeta-parser/src/convert.rs:4728-
+#       4790) so parse SUCCEEDS; the exec-time arg
+#       evaluation hits the cast error. Same errno-1105
+#       parse-OK-exec-reject pattern as PR #387 INET `<<`.
 #
 #   `@` containment operator — DIFFERENT shape, op-
 #   level reject:
@@ -82,9 +85,11 @@
 #
 #   PG geometric types are entirely absent from zeta:
 #   cast 1105, DDL 1064, dedicated functions 1105, and
-#   operators split across "unsupported binary operator"
-#   (op-level reject for `@`) vs inner-cast (arg-eval
-#   first for `<->`/`&&`).
+#   operators split by errno into 1064 parse-reject
+#   (`@` unrecognized at the binary-op arm) vs 1105
+#   exec-reject (`<->`/`&&` parse OK because sqlparser
+#   has dedicated tokens for them, then inner cast
+#   fires).
 #
 #   The `length(LSEG)` shadowing is the most subtle:
 #   a real-function-name lookup succeeds, then the inner
@@ -105,9 +110,10 @@
 #     resolves to MySQL's `length(text)` function, then
 #     errors at inner cast — giving a cast-error
 #     diagnostic instead of "unknown function".
-#   # zeta-adapt: OP-LEVEL vs ARG-EVAL split — `@` errors
-#     "unsupported binary operator" (op-level reject);
-#     `<->` and `&&` error at inner cast (arg-eval first).
+#   # zeta-adapt: ERRNO split — `@` errors 1064 "unsupported
+#     binary operator" (parse-reject at binary-op arm);
+#     `<->` and `&&` parse OK (first-class sqlparser tokens)
+#     and error 1105 at exec-time inner cast.
 #   # zeta-adapt: Substitute storage is two NUMERIC
 #     columns + app-side math, or JSONB/TEXT for complex
 #     shapes.
@@ -159,8 +165,9 @@ SELECT length('((0,0),(1,1))'::LSEG);
 
 --echo === Geometric operators — TWO eval-order sites ===
 
-# `<->` — inner cast fires first (sqlparser parses as
-# custom binary op; arg-eval before op-dispatch).
+# `<->` — exec-time inner-cast reject (1105). sqlparser
+# parses `<->` as first-class LtDashGt → BinOp::L2Distance
+# (convert.rs:4728+), so parse SUCCEEDS; cast fails at exec.
 --error 1105
 SELECT '(1,1)'::POINT <-> '(4,5)'::POINT;
 
