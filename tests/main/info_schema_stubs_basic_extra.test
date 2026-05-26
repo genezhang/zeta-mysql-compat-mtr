@@ -1,0 +1,151 @@
+# Independently authored information_schema STUB TABLES
+# sentinel smoke for the GPL MTR-format runner. NOT copied
+# or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - info_schema_basic_extra.test covers the WELL-POPULATED
+#     info_schema views: tables, columns, schemata, statistics,
+#     views, table_constraints, key_column_usage, referential_
+#     constraints. Those have real per-user-object data.
+#   - pg_catalog_basic_extra.test:55-56 already pins
+#     `SELECT engine, support FROM information_schema.engines`
+#     → InnoDB DEFAULT. Do NOT repeat that exact pin.
+#   - charset_collation_basic_extra:80 pins SHOW COLLATION
+#     which returns the same utf8mb4_general_ci row that
+#     information_schema.collations does (different wire
+#     surface, same data — acceptable cross-surface overlap).
+#
+# This slice pins:
+#   - HARDCODED single-row stubs:
+#     * information_schema.engines (1 row: InnoDB DEFAULT)
+#     * information_schema.character_sets (1 row: utf8mb4)
+#     * information_schema.collations (1 row: utf8mb4_general_ci)
+#   - EMPTY stubs (always zero rows):
+#     * information_schema.parameters
+#     * information_schema.triggers
+#     * information_schema.user_privileges
+#     * information_schema.processlist
+#     * information_schema.global_variables
+#     * information_schema.session_variables
+#   - CONTEXT-DEPENDENT (NOT a pure stub):
+#     * information_schema.routines IS POPULATED from
+#       `catalog().list_functions()` (shim.rs:1603-1618).
+#       Empty when no SQL functions exist; one row per
+#       CREATE FUNCTION. Pinned via CREATE/DROP round-trip
+#       below to demonstrate the populate→drain behavior.
+#   - PROJECTION-SHAPE GAP — FIVE rejected classes, each
+#     with a distinct error message at errno 1235:
+#       * DISTINCT in projection
+#       * function call / paren-detect (COUNT(*), UPPER(col))
+#       * empty projection element (trailing comma)
+#       * multi-token projection element (col + 1 with spaces)
+#       * qualified star (t.*)
+#     Plus a NON-1235 sibling: `col+1` (NO spaces) is
+#     whitespace-split into a SINGLE token, passes the
+#     interceptor, then errors as 1054 "Unknown column
+#     'col+1'" because the catalog has no such column name.
+#
+# Big-picture finding:
+#   zeta's information_schema surface has THREE TIERS:
+#     1. Populated views (tables/columns/etc) — driven from
+#        the real catalog.
+#     2. Hardcoded single-row stubs (engines/character_sets/
+#        collations).
+#     3. Empty stubs (parameters/triggers/...).
+#   Plus ONE context-dependent table (routines).
+#
+#   The MySQL wire shim's info_schema interceptor uses a
+#   string-level parser (shim.rs:5843+) that splits the
+#   projection on "," and rejects FIVE element classes with
+#   distinct errno-1235 messages. The whitespace-sensitive
+#   multi-token rule has a FRAGILE BOUNDARY: `col + 1` (with
+#   spaces) fires the 1235 rejection, but `col+1` (no
+#   spaces) is one token, passes through, and errors 1054
+#   later as an unknown column. Pinning both surfaces locks
+#   this two-tier error behavior.
+#
+# Adaptation notes:
+#   # zeta-adapt: information_schema.engines/character_sets/
+#     collations are STUBBED with one row each. Don't rely
+#     on row count or non-stub values.
+#   # zeta-adapt: information_schema.parameters/triggers/
+#     user_privileges/processlist/global_variables/
+#     session_variables are EMPTY. Apps doing
+#     `SELECT count(*) > 0 FROM ...` will fail to compile
+#     (count(*) hits the 1235 projection-gap).
+#   # zeta-adapt: information_schema.routines is empty by
+#     default but POPULATED when SQL functions exist
+#     (one row per function via catalog().list_functions()).
+#     DATA_TYPE column quirk: shows 'trigger' for SQL
+#     functions, not the actual return type.
+#   # zeta-adapt: NO aggregate / function call / multi-
+#     token expression / DISTINCT / qualified-star allowed
+#     in the projection. Use `SELECT col1, col2 FROM ...`
+#     then aggregate client-side, or query pg_catalog
+#     tables which don't have this limitation.
+
+--echo === HARDCODED SINGLE-ROW STUBS ===
+
+# information_schema.engines — InnoDB DEFAULT with transaction
+# support flags.
+SELECT * FROM information_schema.engines LIMIT 5;
+# information_schema.character_sets — utf8mb4 only.
+SELECT * FROM information_schema.character_sets LIMIT 5;
+# information_schema.collations — utf8mb4_general_ci only.
+SELECT * FROM information_schema.collations LIMIT 5;
+
+--echo === EMPTY STUBS — always zero rows ===
+
+SELECT * FROM information_schema.parameters LIMIT 5;
+SELECT * FROM information_schema.triggers LIMIT 5;
+SELECT * FROM information_schema.user_privileges LIMIT 5;
+SELECT * FROM information_schema.processlist LIMIT 5;
+SELECT * FROM information_schema.global_variables LIMIT 5;
+SELECT * FROM information_schema.session_variables LIMIT 5;
+
+--echo === CONTEXT-DEPENDENT: information_schema.routines populated by CREATE FUNCTION ===
+
+# Baseline: empty before any function exists.
+SELECT * FROM information_schema.routines LIMIT 5;
+# Create a SQL function. DATA_TYPE column quirk: shows
+# 'trigger' (not the actual INT return type) — pinned via
+# the row recording.
+CREATE FUNCTION info_schema_stub_fn(x INT) RETURNS INT
+  AS $$ SELECT x + 1 $$ LANGUAGE SQL;
+SELECT * FROM information_schema.routines LIMIT 5;
+# Drop returns to baseline-empty.
+DROP FUNCTION info_schema_stub_fn;
+SELECT * FROM information_schema.routines LIMIT 5;
+
+--echo === PROJECTION-SHAPE GAP: errno 1235 — FIVE rejected classes ===
+
+# Class 1: DISTINCT in projection.
+--error 1235
+SELECT DISTINCT ENGINE FROM information_schema.engines;
+# Class 2: function-call / paren-detect (aggregate).
+--error 1235
+SELECT count(*) FROM information_schema.engines;
+# Class 2 also covers non-aggregate function calls.
+--error 1235
+SELECT UPPER(ENGINE) FROM information_schema.engines;
+# Class 3: empty projection element (trailing comma).
+--error 1235
+SELECT ENGINE, FROM information_schema.engines;
+# Class 4: multi-token projection element (whitespace-split
+# yields >1 token).
+--error 1235
+SELECT MAXLEN + 1 FROM information_schema.character_sets;
+# Class 5: qualified star.
+--error 1235
+SELECT t.* FROM information_schema.engines t;
+
+--echo === FRAGILE BOUNDARY: no-whitespace expression bypasses 1235, errors 1054 ===
+
+# `col+1` (no spaces) is ONE token from split_whitespace, so
+# the interceptor's multi-token rule misses it. The element
+# is passed through as a column name; the catalog has no
+# column named `maxlen+1`, so the error fires later as 1054
+# "Unknown column" instead of 1235. Pinned to lock the
+# whitespace-sensitive boundary.
+--error 1054
+SELECT MAXLEN+1 FROM information_schema.character_sets;
