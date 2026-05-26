@@ -1,0 +1,214 @@
+# Independently authored PG cursor-family + transaction-
+# abort sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - DECLARE CURSOR / FETCH FROM / MOVE / CLOSE
+#     statement family: ZERO prior coverage. Wide-grep
+#     of tests/main/*.test for `DECLARE.*CURSOR` /
+#     `FETCH FROM` / `MOVE.*IN` / `CLOSE ALL` returns
+#     no hits. (The prior FETCH hits in limit_offset_
+#     basic_extra are `FETCH N ROWS` from LIMIT/OFFSET,
+#     a different statement-level surface.)
+#   - "current transaction is aborted, commands ignored
+#     until end of transaction block" 1105 fingerprint:
+#     ZERO prior coverage. Wide-grep returns no hits
+#     in tests/main/*.result. Genuinely new fingerprint.
+#
+# Pre-existing rejection shapes from prior taxonomies:
+#   - Shape (c) — "unsupported statement: sqlparser::
+#     ast::Statement" — see PR #371 mysql_maintenance_
+#     cmds_sentinel_basic_extra:79-83.
+#   - Shape (d) — "Expected: an SQL statement, found:
+#     <KW>" — see PR #371 mysql_maintenance_cmds_
+#     sentinel_basic_extra:84-86.
+#
+# This slice pins:
+#
+#   Shape (c) — DECLARE CURSOR / FETCH / CLOSE
+#   (sqlparser parses, zeta catch-all dispatcher):
+#     - DECLARE c CURSOR FOR <SELECT>
+#     - DECLARE c SCROLL CURSOR FOR <SELECT>
+#     - DECLARE c NO SCROLL CURSOR FOR <SELECT>
+#     - DECLARE c BINARY CURSOR FOR <SELECT>
+#     - DECLARE c CURSOR WITH HOLD FOR <SELECT>
+#     - DECLARE c CURSOR WITHOUT HOLD FOR <SELECT>
+#     - FETCH NEXT/PRIOR/2/ALL/FIRST/ABSOLUTE 2 FROM c
+#     - CLOSE c / CLOSE ALL
+#
+#   Shape (d) — MOVE (sqlparser doesn't recognize keyword):
+#     - MOVE NEXT IN c, MOVE FORWARD 2 IN c, MOVE ALL
+#       IN c — "Expected: an SQL statement, found: MOVE
+#       at Line: 1, Column: 1". Adds MOVE to the shape
+#       (d) keyword bucket alongside HANDLER/SHUTDOWN/
+#       IMPORT (from PR #371 and PR #391).
+#
+#   NEW FINGERPRINT — transaction-abort cascade +
+#   PG-compat BUG (SAVEPOINT escape doesn't work):
+#     - After ANY statement errors inside a BEGIN block,
+#       all subsequent statements fail with errno 1105
+#       "current transaction is aborted, commands
+#       ignored until end of transaction block" until
+#       COMMIT/ROLLBACK resets state. Cascade itself
+#       is standard PG-style behavior.
+#     - GENUINELY NEW fingerprint — by-fingerprint
+#       wide-grep returns zero priors.
+#     - BUG (MYSQL-WIRE-ONLY) — `ROLLBACK TO SAVEPOINT
+#       sp` gets absorbed by the cascade on the MySQL
+#       wire, contrary to PG ("you can roll back to a
+#       savepoint even after the transaction has been
+#       aborted"). zeta-mysqlwire/src/shim.rs:6840-6848
+#       has an aborted-txn guard that fires for any
+#       statement not matched by parse_mysql_txn_command,
+#       which explicitly does NOT recognize ROLLBACK TO
+#       SAVEPOINT (see assertion at shim.rs:8234).
+#       In contrast, zeta-pgwire/src/handler.rs:1620-
+#       1656 + 1870-1886 routes ALL txn commands
+#       through handle_txn_command BEFORE the abort
+#       guard, and the RollbackToSavepoint arm clears
+#       `aborted = false` on success (line 1876) —
+#       PG-compliant. So this is a MYSQL-WIRE-ONLY
+#       bug; PG-wire (psql) users see correct behavior.
+#       MySQL-wire apps porting from PG with the
+#       canonical SAVEPOINT recovery pattern have NO
+#       in-transaction recovery path — must full-
+#       rollback and retry.
+#
+# Big-picture finding:
+#
+#   PG cursor family is essentially absent from zeta:
+#   sqlparser parses DECLARE CURSOR / FETCH / CLOSE
+#   into AST but zeta has no dispatcher arm (Shape (c)
+#   catch-all). MOVE doesn't even reach sqlparser's
+#   statement-list (Shape (d)).
+#
+#   The transaction-abort cascade is mostly PG-compat
+#   — but on the MySQL wire the canonical PG recovery
+#   path (ROLLBACK TO SAVEPOINT) is BROKEN: mysqlwire's
+#   shim absorbs ROLLBACK TO sp into the cascade.
+#   pgwire handles it correctly (clears the abort
+#   flag). MySQL-wire apps porting PG code that wraps
+#   risky statements in SAVEPOINT … ROLLBACK TO sp for
+#   error recovery have NO in-transaction recovery
+#   path — must full-rollback and retry. PG-wire users
+#   get the correct PG-compatible behavior.
+#
+#   For apps needing cursor-like iteration, rewrite to:
+#     - LIMIT/OFFSET pagination (supported)
+#     - Application-side cursor (fetch all rows, paginate
+#       client-side)
+#     - PG keyset pagination (WHERE id > last_id ORDER
+#       BY id LIMIT n) — fully supported
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — PG cursor family (DECLARE
+#     CURSOR, FETCH, MOVE, CLOSE) all error 1064. No
+#     substitute — rewrite to LIMIT/OFFSET or keyset
+#     pagination.
+#   # zeta-adapt: TRANSACTION-ABORT CASCADE — any error
+#     inside a BEGIN block causes all subsequent stmts
+#     to error 1105 "current transaction is aborted"
+#     until COMMIT/ROLLBACK. Cascade matches PG.
+#   # zeta-adapt: KNOWN BUG (MYSQL-WIRE-ONLY) —
+#     `ROLLBACK TO SAVEPOINT sp` does NOT escape the
+#     cascade on the MySQL wire (mysqlwire shim
+#     absorbs it). pgwire implements PG-compliant
+#     escape. MySQL-wire apps must full-rollback and
+#     retry; PG-wire (psql) users are fine.
+
+CREATE TABLE cur_t (id INT PRIMARY KEY, n INT);
+INSERT INTO cur_t VALUES (1, 10), (2, 20), (3, 30);
+
+--echo === Shape (c) — DECLARE CURSOR variants (six forms) ===
+
+--error 1064
+DECLARE c1 CURSOR FOR SELECT id, n FROM cur_t ORDER BY id;
+--error 1064
+DECLARE c2 SCROLL CURSOR FOR SELECT id FROM cur_t;
+--error 1064
+DECLARE c3 NO SCROLL CURSOR FOR SELECT id FROM cur_t;
+--error 1064
+DECLARE c4 BINARY CURSOR FOR SELECT id FROM cur_t;
+--error 1064
+DECLARE c5 CURSOR WITH HOLD FOR SELECT id FROM cur_t;
+--error 1064
+DECLARE c6 CURSOR WITHOUT HOLD FOR SELECT id FROM cur_t;
+
+--echo === Shape (c) — FETCH FROM cursor (multiple direction/count forms) ===
+
+--error 1064
+FETCH NEXT FROM c;
+--error 1064
+FETCH 2 FROM c;
+--error 1064
+FETCH PRIOR FROM c;
+--error 1064
+FETCH ALL FROM c;
+--error 1064
+FETCH FIRST FROM c;
+--error 1064
+FETCH ABSOLUTE 2 FROM c;
+
+--echo === Shape (d) — MOVE (sqlparser doesn't recognize keyword — adds to taxonomy bucket) ===
+
+# DIFFERENT shape from FETCH — sqlparser doesn't have a
+# MOVE statement-arm at all. Shape (d) per PR #371
+# taxonomy, alongside HANDLER/SHUTDOWN/IMPORT.
+--error 1064
+MOVE NEXT IN c;
+--error 1064
+MOVE FORWARD 2 IN c;
+--error 1064
+MOVE ALL IN c;
+
+--echo === Shape (c) — CLOSE cursor (and CLOSE ALL) ===
+
+--error 1064
+CLOSE c;
+--error 1064
+CLOSE ALL;
+
+--echo === NEW FINGERPRINT — transaction-abort cascade ===
+
+# After ANY error inside BEGIN, all subsequent statements
+# fail with "current transaction is aborted" until
+# COMMIT/ROLLBACK resets state. Genuinely new fingerprint.
+BEGIN;
+--error 1064
+DECLARE c CURSOR FOR SELECT id FROM cur_t;
+# Subsequent ordinary SELECT now errors with cascade
+# message (would normally work outside an aborted txn).
+--error 1105
+SELECT 1;
+--error 1105
+SELECT id FROM cur_t WHERE id = 1;
+# COMMIT resets the cascade.
+COMMIT;
+# Confirm cascade is gone — same SELECT works now.
+SELECT 1 AS after_commit;
+SELECT id FROM cur_t WHERE id = 1;
+
+--echo === MYSQL-WIRE BUG — SAVEPOINT escape FAILS (ROLLBACK TO sp absorbed by cascade) ===
+
+# PG docs: "you can roll back to a savepoint even after
+# the transaction has been aborted" — pgwire honors this
+# (handler.rs:1620+1870 clears aborted on success), but
+# mysqlwire's aborted-txn guard (shim.rs:6840) fires
+# BEFORE ROLLBACK TO sp is dispatched, absorbing it
+# into the cascade. MYSQL-WIRE-ONLY bug.
+BEGIN;
+SAVEPOINT sp;
+--error 1064
+DECLARE c CURSOR FOR SELECT id FROM cur_t;
+--error 1105
+SELECT 1;
+# THIS WOULD WORK IN PG — escapes the cascade. In zeta,
+# the ROLLBACK TO itself errors with the cascade message.
+--error 1105
+ROLLBACK TO SAVEPOINT sp;
+# Cascade STILL holds — no recovery possible.
+--error 1105
+SELECT 1 AS after_rollback_to_sp;
+COMMIT;
+
+DROP TABLE cur_t;

@@ -1,0 +1,68 @@
+CREATE TABLE cur_t (id INT PRIMARY KEY, n INT);
+INSERT INTO cur_t VALUES (1, 10), (2, 20), (3, 30);
+=== Shape (c) — DECLARE CURSOR variants (six forms) ===
+DECLARE c1 CURSOR FOR SELECT id, n FROM cur_t ORDER BY id;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DECLARE c2 SCROLL CURSOR FOR SELECT id FROM cur_t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DECLARE c3 NO SCROLL CURSOR FOR SELECT id FROM cur_t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DECLARE c4 BINARY CURSOR FOR SELECT id FROM cur_t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DECLARE c5 CURSOR WITH HOLD FOR SELECT id FROM cur_t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DECLARE c6 CURSOR WITHOUT HOLD FOR SELECT id FROM cur_t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== Shape (c) — FETCH FROM cursor (multiple direction/count forms) ===
+FETCH NEXT FROM c;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+FETCH 2 FROM c;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+FETCH PRIOR FROM c;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+FETCH ALL FROM c;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+FETCH FIRST FROM c;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+FETCH ABSOLUTE 2 FROM c;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== Shape (d) — MOVE (sqlparser doesn't recognize keyword — adds to taxonomy bucket) ===
+MOVE NEXT IN c;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: MOVE at Line: 1, Column: 1
+MOVE FORWARD 2 IN c;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: MOVE at Line: 1, Column: 1
+MOVE ALL IN c;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: MOVE at Line: 1, Column: 1
+=== Shape (c) — CLOSE cursor (and CLOSE ALL) ===
+CLOSE c;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CLOSE ALL;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== NEW FINGERPRINT — transaction-abort cascade ===
+BEGIN;
+DECLARE c CURSOR FOR SELECT id FROM cur_t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+SELECT 1;
+ERROR 1105: current transaction is aborted, commands ignored until end of transaction block
+SELECT id FROM cur_t WHERE id = 1;
+ERROR 1105: current transaction is aborted, commands ignored until end of transaction block
+COMMIT;
+SELECT 1 AS after_commit;
+after_commit
+1
+SELECT id FROM cur_t WHERE id = 1;
+id
+1
+=== MYSQL-WIRE BUG — SAVEPOINT escape FAILS (ROLLBACK TO sp absorbed by cascade) ===
+BEGIN;
+SAVEPOINT sp;
+DECLARE c CURSOR FOR SELECT id FROM cur_t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+SELECT 1;
+ERROR 1105: current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK TO SAVEPOINT sp;
+ERROR 1105: current transaction is aborted, commands ignored until end of transaction block
+SELECT 1 AS after_rollback_to_sp;
+ERROR 1105: current transaction is aborted, commands ignored until end of transaction block
+COMMIT;
+DROP TABLE cur_t;
