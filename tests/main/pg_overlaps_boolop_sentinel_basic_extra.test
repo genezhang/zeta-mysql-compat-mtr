@@ -1,0 +1,126 @@
+# Independently authored PG OVERLAPS date/timestamp
+# boolean operator sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - JSON_OVERLAPS(json, json) function: already
+#     pinned at json_overlaps_basic_extra (PR #314).
+#     That is a DIFFERENT entity from the SQL-
+#     standard `(d1, d2) OVERLAPS (d3, d4)` BOOLEAN
+#     operator on date/time ranges. The function-form
+#     does set-membership on JSON values; the
+#     operator-form tests temporal-range overlap.
+#   - PG OVERLAPS operator: ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "unsupported binary operator: <KW>" — NEW
+#     fingerprint at this slice. sqlparser parses the
+#     OVERLAPS keyword as a binary operator on tuples;
+#     zeta's planner has no execution arm for it.
+#     Search at planner for `unsupported binary
+#     operator` reveals one call-site at expression
+#     translation rejecting unknown sp::BinaryOperator
+#     variants. OVERLAPS falls through to that arm.
+#   - "unknown function: <NAME>" — pre-existing at
+#     many slices (e.g., pg_ordinality_match_reflection
+#     PR #408 with to_regclass/regtype/...). Used here
+#     for the FUNCTION-style OVERLAPS(...) call which
+#     is not legal SQL but worth pinning to show the
+#     error path differs from the operator path.
+#
+# This slice pins:
+#
+#   (DATE 'a', DATE 'b') OVERLAPS (DATE 'c', DATE 'd')
+#   — 2 forms (overlapping vs disjoint):
+#     - Both wires return "unsupported binary operator:
+#       OVERLAPS" at execution.
+#     - DATE pair, TIMESTAMP pair, and PG-extension
+#       (DATE, INTERVAL) form ALL fail with the same
+#       fingerprint. The binary-operator arm rejects
+#       OVERLAPS regardless of operand type.
+#
+#   OVERLAPS(d, d, d) — 3-arg function-style:
+#     - This is NOT a legal SQL form (OVERLAPS is an
+#       operator, not a function). Both wires give
+#       "unknown function: OVERLAPS". Distinct error
+#       shape from the operator form — pinning both
+#       documents that there is no fallback or alias
+#       path that turns the function-form into the
+#       operator-form.
+#
+# Big-picture finding:
+#
+#   PG SQL-standard date-range OVERLAPS operator is
+#   entirely unreachable on zeta. Apps porting PG
+#   queries that compute calendar / booking / shift
+#   overlap via `(start1, end1) OVERLAPS (start2,
+#   end2)` must rewrite to an explicit boolean:
+#
+#     start1 < end2 AND start2 < end1
+#
+#   (the half-open-interval form, which is how PG
+#   defines OVERLAPS semantically). For tuples with
+#   INTERVAL (length) the second element of the pair,
+#   compute the end-time first then apply the boolean.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# "unsupported binary operator: OVERLAPS" fingerprint
+# at execution. The operator reaches the planner via
+# the same expression-translation path on both wires,
+# so no wire-specific OVERLAPS handling.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — PG OVERLAPS boolean
+#     operator on (date, date), (timestamp, timestamp),
+#     and (date, interval) pairs all fail with
+#     "unsupported binary operator: OVERLAPS".
+#     Rewrite as `start1 < end2 AND start2 < end1`.
+#   # zeta-adapt: NOT VALID SQL — function-form
+#     OVERLAPS(a, b, c) gives "unknown function:
+#     OVERLAPS" on both wires (this form is invalid
+#     in standard SQL too; pinning to confirm no
+#     accidental function-alias path exists).
+
+--echo === (DATE, DATE) OVERLAPS (DATE, DATE) — overlapping range → "unsupported binary operator: OVERLAPS" ===
+
+# sqlparser parses OVERLAPS as a sp::BinaryOperator
+# on tuple operands; zeta's expression translator has
+# no arm for it and falls through to the catch-all
+# "unsupported binary operator: <KW>" reject.
+--error 1064
+SELECT (DATE '2024-01-01', DATE '2024-03-01') OVERLAPS (DATE '2024-02-15', DATE '2024-04-01') AS yes_overlap;
+
+--echo === (DATE, DATE) OVERLAPS (DATE, DATE) — disjoint range → same fingerprint ===
+
+# Disjoint case has the same parser/planner path —
+# the operator never gets to evaluate, so disjoint
+# vs overlapping make no difference at the reject.
+--error 1064
+SELECT (DATE '2024-01-01', DATE '2024-02-01') OVERLAPS (DATE '2024-03-01', DATE '2024-04-01') AS no_overlap;
+
+--echo === (TIMESTAMP, TIMESTAMP) OVERLAPS — sub-day precision → same fingerprint ===
+
+--error 1064
+SELECT (TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-01-01 12:00:00') OVERLAPS (TIMESTAMP '2024-01-01 06:00:00', TIMESTAMP '2024-01-01 18:00:00') AS ts_yes;
+
+--echo === (DATE, INTERVAL) OVERLAPS — PG-extension length form → same fingerprint ===
+
+# PG accepts (start, length) as a shorthand for
+# (start, start + length). Reject is at the operator
+# level, not the operand types, so this fails
+# identically.
+--error 1064
+SELECT (DATE '2024-01-01', INTERVAL '30 days') OVERLAPS (DATE '2024-01-15', INTERVAL '30 days') AS interval_form;
+
+--echo === OVERLAPS(a, b, c) — function-style (NOT valid SQL) → "unknown function: OVERLAPS" ===
+
+# OVERLAPS is an operator in standard SQL; a function-
+# call form is not legal. Pinning to confirm that no
+# accidental function-alias path exists that would
+# turn this into the boolean operator. Distinct error
+# shape (1105 / unknown function, vs 1064 / unsupported
+# binary operator).
+--error 1105
+SELECT OVERLAPS(DATE '2024-01-01', DATE '2024-03-01', DATE '2024-02-15');
