@@ -1,0 +1,122 @@
+# Independently authored PG transaction-management
+# admin-function sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - GET_LOCK / RELEASE_LOCK family: pinned at
+#     pg_advisory_lock_basic_extra (mysql wire stubs
+#     for the named-mutex equivalents).
+#   - PG advisory_lock_basic_extra: pinned. Those are
+#     a DIFFERENT family from the txn-management
+#     admin fns covered here.
+#   - txid_current / pg_current_xact_id /
+#     pg_terminate_backend / pg_cancel_backend /
+#     pg_blocking_pids / pg_xact_status /
+#     pg_backend_pid / txid_status /
+#     pg_my_temp_schema: ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "execution error: unknown function: <name>" —
+#     pre-existing fingerprint at many slices (e.g.,
+#     pg_ordinality_match_reflection PR #408 for
+#     to_regclass/regtype/regproc, pg_hypothetical_
+#     within_group PR #412 for rank/dense_rank).
+#     Reused for all 9 admin fns probed here.
+#
+# This slice pins:
+#
+#   Transaction-ID fns (PG snapshot-mgmt API):
+#     - txid_current() — pre-PG13 name
+#     - pg_current_xact_id() — PG13+ rename
+#     - pg_xact_status(xid) — status of a given txid
+#     - txid_status('xid') — pre-PG13 string-arg form
+#     All four: "unknown function: <name>".
+#
+#   Backend/session-mgmt fns (PG cluster admin):
+#     - pg_backend_pid() — current backend's PID
+#     - pg_terminate_backend(pid) — SIGTERM a backend
+#     - pg_cancel_backend(pid) — SIGINT a backend's
+#       current query
+#     - pg_blocking_pids(pid) — array of pids blocking
+#       a given pid
+#     All four: "unknown function: <name>". The
+#     SECURITY-relevant fns (terminate/cancel) cannot
+#     be invoked — silent absence means no admin
+#     control surface, AND no abuse surface.
+#
+#   Schema-namespace fn:
+#     - pg_my_temp_schema() — OID of session's temp
+#       schema (PG returns 0 if none allocated yet).
+#       "unknown function: pg_my_temp_schema".
+#
+# Big-picture finding:
+#
+#   PG transaction-management and backend-session
+#   admin function families are entirely unreachable
+#   on zeta. Apps porting PG observability /
+#   monitoring tools that:
+#     - Snapshot the current xid to correlate with
+#       WAL records / CDC: use zeta's CDC stream
+#       (logical replication) directly which already
+#       embeds commit timestamps.
+#     - Cancel/terminate runaway queries: use the
+#       database-level connection close from the
+#       client side; zeta has no SQL-level admin
+#       surface to terminate other backends.
+#     - Compute blocker chains for lock contention
+#       diagnosis: not available; use pg_stat_*-style
+#       observability via OS-level tools.
+#
+#   SECURITY-POSITIVE: silent absence of
+#   pg_terminate_backend / pg_cancel_backend means
+#   no SQL-level admin surface exists for these
+#   privileged operations. Authentication-bypass via
+#   SQL injection cannot escalate to backend-kill.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# "unknown function: <name>" fingerprint on every fn.
+# Function lookup is at executor function-dispatch,
+# wire-independent.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — entire txid_* /
+#     pg_current_xact_id / pg_xact_status family.
+#     Apps using PG snapshot-management API for
+#     observability should consume CDC stream
+#     (commit timestamps embedded) instead.
+#   # zeta-adapt: KNOWN GAP (security-positive) — no
+#     pg_backend_pid / pg_terminate_backend /
+#     pg_cancel_backend / pg_blocking_pids. No SQL-
+#     level surface to inspect or kill other backends.
+#   # zeta-adapt: KNOWN GAP — pg_my_temp_schema not
+#     available. Use information_schema for
+#     introspection of temp tables if needed.
+
+--echo === Transaction-ID fns (snapshot-mgmt API) ===
+
+--error 1105
+SELECT txid_current();
+--error 1105
+SELECT pg_current_xact_id();
+--error 1105
+SELECT pg_xact_status(1);
+--error 1105
+SELECT txid_status('1');
+
+--echo === Backend/session-mgmt fns (cluster admin) ===
+
+--error 1105
+SELECT pg_backend_pid();
+--error 1105
+SELECT pg_terminate_backend(123);
+--error 1105
+SELECT pg_cancel_backend(123);
+--error 1105
+SELECT pg_blocking_pids(123);
+
+--echo === Schema-namespace fn ===
+
+--error 1105
+SELECT pg_my_temp_schema();
