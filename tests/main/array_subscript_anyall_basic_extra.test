@@ -1,0 +1,152 @@
+# Independently authored PG array subscript / slice /
+# multi-dim / comparison-ANY/ALL / ARRAY(subquery) smoke
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - array_type_basic_extra covers ARRAY[...] constructor,
+#     ARRAY_LENGTH, @>/<@/&& operators, || concat,
+#     ARRAY_APPEND, ARRAY_CAT, ARRAY_REMOVE,
+#     ARRAY_POSITION, ARRAY_REPLACE, ARRAY_UPPER/LOWER,
+#     UNNEST-in-FROM. ARRAY(SELECT ...) is mentioned in
+#     PROSE (## comments at line 57/146) as a substitute
+#     pattern but the SQL is NOT pinned. This slice pins it.
+#   - string_to_array_split_part_basic_extra covers
+#     STRING_TO_ARRAY ↔ array conversion.
+#   - similar_to_like_any_sentinel_basic_extra (PR #384)
+#     covers LIKE ANY / LIKE ALL — DISTINCT shape from
+#     this slice's `= ANY` / `> ALL` comparison-operator
+#     forms (which work, while LIKE ANY/ALL don't).
+#
+# This slice pins (FIVE distinct behaviors — recording-
+# surfaced):
+#
+#   Supported (work end-to-end):
+#     - `(ARRAY[10, 20, 30])[2]` — 1-based subscript;
+#       OOB index returns NULL (PG-compatible).
+#     - `5 = ANY(ARRAY[1, 5, 10])` — comparison-form ANY.
+#     - `10 > ALL(ARRAY[1, 2, 3])` — comparison-form ALL.
+#     - `99 <> ALL(ARRAY[1, 2, 3])` — works.
+#
+#   Parse-rejected (1064) — TWO distinct error strings:
+#     - `(arr)[i:j]` slice → "unsupported compound field
+#       access: [2:3]". Same `[...]` syntax-family as
+#       working subscript, DIFFERENT parser arm.
+#     - `ARRAY(SELECT ...)` subquery form → "subquery
+#       function arguments not supported" (parser hits
+#       this BEFORE recognising it as the ARRAY-subquery
+#       form). This is what the array_type_basic_extra
+#       prose at line 57/146 SUGGESTS as the substitute
+#       pattern, but it doesn't actually parse.
+#
+#   Execution-rejected (1105):
+#     - ARRAY_DIMS, ARRAY_NDIMS, ARRAY_FILL → "unknown
+#       function" — completeness gap relative to the
+#       supported ARRAY_UPPER / ARRAY_LOWER pair.
+#
+#   BUG — multi-dim ARRAY[[...],[...]]:
+#     - `ARRAY[[1, 2], [3, 4]]` PARSES and EXECUTES but
+#       the wire encoder emits zeta's INTERNAL Rust Debug
+#       representation:
+#         Array { element_type: Array(Int64), elements:
+#         [Array { element_type: Int64, elements:
+#         [Int64(1), Int64(2)] }, ...] }
+#       PG would format `{{1,2},{3,4}}`. This is a real
+#       rendering bug — internal types leaking through
+#       the wire. Pinned so a future fix can drop the
+#       pin in lockstep.
+#
+# Big-picture finding (parallel to PR #383 RANGE and
+# PR #384 LIKE ANY/ALL):
+#
+#   This is the THIRD slice in a row showing the same
+#   pattern: a SQL-standard or PG-extension surface
+#   parses but the executor only has a partial implem.
+#   Here the partial split is INSIDE the `[...]` syntax
+#   family — subscript works, slice doesn't, with two
+#   different parser error sites for the things that
+#   DON'T work (one in expression-dispatch, one in
+#   subquery-arg parsing).
+#
+#   Apps porting PG queries:
+#     - `arr[i]` subscript works as-is.
+#     - `arr[i:j]` slice MUST be rewritten — UNNEST
+#       with ORDINALITY + WHERE.
+#     - `ARRAY(SELECT ...)` MUST be rewritten — array_agg
+#       or UNNEST-with-WITH-ORDINALITY pattern documented
+#       in array_type_basic_extra:146.
+#     - Multi-dim arrays render as internal Debug; avoid
+#       them on the MySQL wire entirely.
+#     - = ANY(ARRAY[...]) / > ALL(ARRAY[...]) work as PG
+#       expects (separate path from LIKE ANY / LIKE ALL
+#       which don't — see PR #384).
+#
+# Adaptation notes:
+#   # zeta-adapt: PG array `[i]` subscript supported, OOB
+#     index → NULL. `[i:j]` slice parse-rejects 1064.
+#   # zeta-adapt: `= ANY(ARRAY[...])` / `> ALL(ARRAY[...])`
+#     / `<> ALL(ARRAY[...])` — comparison-op ANY/ALL
+#     forms supported (in contrast to LIKE ANY/ALL).
+#   # zeta-adapt: KNOWN GAP — `ARRAY(SELECT ...)`
+#     subquery-form constructor parse-rejects 1064. Use
+#     array_agg(col) or the UNNEST-with-WITH-ORDINALITY
+#     pattern instead.
+#   # zeta-adapt: KNOWN GAP — ARRAY_DIMS / ARRAY_NDIMS /
+#     ARRAY_FILL are unknown functions (1105). The
+#     ARRAY_UPPER / ARRAY_LOWER pair IS supported.
+#   # zeta-adapt: KNOWN BUG — multi-dim ARRAY[[...],[...]]
+#     constructor renders zeta-internal Rust Debug repr
+#     over the MySQL wire instead of PG's `{{...},{...}}`.
+
+--echo === `arr[i]` subscript (supported, OOB → NULL) ===
+
+SELECT (ARRAY[10, 20, 30])[2]                                AS subscript_second;
+SELECT (ARRAY[10, 20, 30])[1]                                AS subscript_first;
+# OOB returns NULL (PG-compatible).
+SELECT (ARRAY[10, 20, 30])[5]                                AS subscript_oob;
+
+--echo === `arr[i:j]` slice — PARSE REJECTED (1064) ===
+
+--error 1064
+SELECT (ARRAY[10, 20, 30, 40])[2:3];
+--error 1064
+SELECT (ARRAY[10, 20, 30, 40])[1:2];
+
+--echo === `= ANY(ARRAY[...])` comparison-form (supported) ===
+
+SELECT 5 = ANY(ARRAY[1, 5, 10])                              AS eq_any_match;
+SELECT 99 = ANY(ARRAY[1, 5, 10])                             AS eq_any_no_match;
+SELECT 'b' = ANY(ARRAY['a', 'b', 'c'])                       AS eq_any_str;
+
+--echo === `> ALL(ARRAY[...])` / `<> ALL(...)` (supported) ===
+
+SELECT 10 > ALL(ARRAY[1, 2, 3])                              AS gt_all_true;
+SELECT 5 > ALL(ARRAY[1, 5, 10])                              AS gt_all_false;
+SELECT 99 <> ALL(ARRAY[1, 2, 3])                             AS ne_all_true;
+
+--echo === BUG: multi-dim ARRAY[[...],[...]] leaks Rust Debug repr ===
+
+# Parses and executes but the wire encoder emits zeta's
+# internal Rust `Array { element_type: ..., elements: ... }`
+# Debug repr instead of PG's `{{1,2},{3,4}}`. Pinned so a
+# fix drops the pin lockstep.
+SELECT ARRAY[[1, 2], [3, 4]]                                 AS multidim_bug;
+
+--echo === `ARRAY(SELECT ...)` subquery-form — PARSE REJECTED (1064) ===
+
+# Distinct error string from slice-rejection above —
+# parser hits "subquery function arguments not supported"
+# BEFORE recognising the ARRAY-subquery form.
+--error 1064
+SELECT ARRAY(SELECT i FROM generate_series(1, 3) g(i));
+
+--echo === ARRAY_DIMS / ARRAY_NDIMS / ARRAY_FILL — unknown function (1105) ===
+
+# Completeness gap — ARRAY_UPPER / ARRAY_LOWER ARE
+# supported (per array_type_basic_extra:140-143).
+--error 1105
+SELECT ARRAY_DIMS(ARRAY[1, 2, 3]);
+--error 1105
+SELECT ARRAY_NDIMS(ARRAY[1, 2, 3]);
+--error 1105
+SELECT ARRAY_FILL(0, ARRAY[3]);

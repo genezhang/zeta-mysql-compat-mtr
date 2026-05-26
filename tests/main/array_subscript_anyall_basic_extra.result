@@ -1,0 +1,49 @@
+=== `arr[i]` subscript (supported, OOB → NULL) ===
+SELECT (ARRAY[10, 20, 30])[2]                                AS subscript_second;
+subscript_second
+20
+SELECT (ARRAY[10, 20, 30])[1]                                AS subscript_first;
+subscript_first
+10
+SELECT (ARRAY[10, 20, 30])[5]                                AS subscript_oob;
+subscript_oob
+NULL
+=== `arr[i:j]` slice — PARSE REJECTED (1064) ===
+SELECT (ARRAY[10, 20, 30, 40])[2:3];
+ERROR 1064: SQL parse error: unsupported compound field access: [2:3]
+SELECT (ARRAY[10, 20, 30, 40])[1:2];
+ERROR 1064: SQL parse error: unsupported compound field access: [1:2]
+=== `= ANY(ARRAY[...])` comparison-form (supported) ===
+SELECT 5 = ANY(ARRAY[1, 5, 10])                              AS eq_any_match;
+eq_any_match
+1
+SELECT 99 = ANY(ARRAY[1, 5, 10])                             AS eq_any_no_match;
+eq_any_no_match
+0
+SELECT 'b' = ANY(ARRAY['a', 'b', 'c'])                       AS eq_any_str;
+eq_any_str
+1
+=== `> ALL(ARRAY[...])` / `<> ALL(...)` (supported) ===
+SELECT 10 > ALL(ARRAY[1, 2, 3])                              AS gt_all_true;
+gt_all_true
+1
+SELECT 5 > ALL(ARRAY[1, 5, 10])                              AS gt_all_false;
+gt_all_false
+0
+SELECT 99 <> ALL(ARRAY[1, 2, 3])                             AS ne_all_true;
+ne_all_true
+1
+=== BUG: multi-dim ARRAY[[...],[...]] leaks Rust Debug repr ===
+SELECT ARRAY[[1, 2], [3, 4]]                                 AS multidim_bug;
+multidim_bug
+Array { element_type: Array(Int64), elements: [Array { element_type: Int64, elements: [Int64(1), Int64(2)] }, Array { element_type: Int64, elements: [Int64(3), Int64(4)] }] }
+=== `ARRAY(SELECT ...)` subquery-form — PARSE REJECTED (1064) ===
+SELECT ARRAY(SELECT i FROM generate_series(1, 3) g(i));
+ERROR 1064: SQL parse error: subquery function arguments not supported
+=== ARRAY_DIMS / ARRAY_NDIMS / ARRAY_FILL — unknown function (1105) ===
+SELECT ARRAY_DIMS(ARRAY[1, 2, 3]);
+ERROR 1105: execution error: unknown function: ARRAY_DIMS
+SELECT ARRAY_NDIMS(ARRAY[1, 2, 3]);
+ERROR 1105: execution error: unknown function: ARRAY_NDIMS
+SELECT ARRAY_FILL(0, ARRAY[3]);
+ERROR 1105: execution error: unknown function: ARRAY_FILL
