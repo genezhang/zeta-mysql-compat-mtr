@@ -1,0 +1,35 @@
+=== CREATE POLICY (5 forms) — Shape (c) catch-all from PR #371 ===
+CREATE POLICY p ON t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE POLICY p ON t FOR SELECT USING (true);
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE POLICY p ON t FOR INSERT WITH CHECK (true);
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE POLICY p ON t AS PERMISSIVE FOR ALL TO PUBLIC USING (true);
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE POLICY p ON t AS RESTRICTIVE FOR ALL USING (true);
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== ALTER POLICY / DROP POLICY — same Shape (c), new statement witnesses ===
+ALTER POLICY p ON t RENAME TO p2;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+DROP POLICY p ON t;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== ALTER TABLE ENABLE / DISABLE ROW LEVEL SECURITY — DOCUMENTED INTENTIONAL no-op ===
+CREATE TABLE rls_t (id INT PRIMARY KEY, owner TEXT);
+INSERT INTO rls_t VALUES (1, 'alice'), (2, 'bob');
+ALTER TABLE rls_t ENABLE ROW LEVEL SECURITY;
+SELECT id, owner FROM rls_t ORDER BY id;
+id	owner
+1	alice
+2	bob
+ALTER TABLE rls_t DISABLE ROW LEVEL SECURITY;
+SELECT id, owner FROM rls_t ORDER BY id;
+id	owner
+1	alice
+2	bob
+=== ALTER TABLE FORCE / NO FORCE ROW LEVEL SECURITY — "unsupported ALTER TABLE operation" ===
+ALTER TABLE rls_t FORCE ROW LEVEL SECURITY;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: FORCE ROW LEVEL SECURITY
+ALTER TABLE rls_t NO FORCE ROW LEVEL SECURITY;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: NO FORCE ROW LEVEL SECURITY
+DROP TABLE rls_t;

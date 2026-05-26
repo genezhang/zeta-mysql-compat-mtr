@@ -1,0 +1,180 @@
+# Independently authored PG Row-Level Security
+# (RLS) sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE POLICY / ALTER POLICY / DROP POLICY:
+#     ZERO prior (grep'd ALL .test files).
+#   - ALTER TABLE ENABLE / DISABLE / FORCE / NO FORCE
+#     ROW LEVEL SECURITY: ZERO prior.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "unsupported statement: sqlparser::ast::Statement"
+#     — Shape (c) catch-all from PR #371 taxonomy.
+#     Same fingerprint applies to CREATE/ALTER/DROP
+#     POLICY (all three POLICY DDL forms hit zeta's
+#     statement-level catch-all that emits the Debug
+#     repr of the unmatched sqlparser AST variant).
+#   - "unsupported ALTER TABLE operation: <OP>" —
+#     pre-existing fingerprint (alter_table_basic_
+#     extra:103-106 AUTO_INCREMENT / RENAME CONSTRAINT;
+#     fk_alter_basic_extra:104 DROP FOREIGN KEY;
+#     primary_key_edges_basic_extra:60 DROP PRIMARY
+#     KEY). Same fingerprint applies to FORCE / NO
+#     FORCE ROW LEVEL SECURITY — zeta's convert_one_
+#     alter_op() falls into the `other` arm which
+#     emits this message.
+#   - DOCUMENTED INTENTIONAL pg_dump compat no-op —
+#     pinned at pg_maint_session_ownership_sentinel
+#     (PR #396) for ALTER DATABASE. Pattern: zeta
+#     accepts the statement silently with no side-
+#     effect. ENABLE / DISABLE ROW LEVEL SECURITY
+#     join this category — zeta-parser/src/convert.rs
+#     lines 803, 998-1006 explicitly mark them as
+#     "pg_dump compatibility ... ignore".
+#
+# This slice pins:
+#
+#   CREATE POLICY (5 forms) — all error with Shape (c)
+#   catch-all from PR #371:
+#     - CREATE POLICY p ON t;
+#     - CREATE POLICY p ON t FOR SELECT USING (true);
+#     - CREATE POLICY p ON t FOR INSERT WITH CHECK
+#       (true);
+#     - CREATE POLICY p ON t AS PERMISSIVE FOR ALL
+#       TO PUBLIC USING (true);
+#     - CREATE POLICY p ON t AS RESTRICTIVE FOR ALL
+#       USING (true);
+#
+#   ALTER POLICY / DROP POLICY — same Shape (c) catch-
+#   all. NEW statement-name witnesses for the family.
+#
+#   ALTER TABLE ENABLE / DISABLE ROW LEVEL SECURITY —
+#   DOCUMENTED INTENTIONAL pg_dump compat no-op
+#   (silent success). Probed via state-validation
+#   roundtrip: after ENABLE+DISABLE, INSERT and SELECT
+#   succeed unchanged (no RLS enforcement). This is
+#   NOT a bug — convert.rs:998-1006 explicitly drops
+#   these ops to allow pg_dump output to replay
+#   cleanly. SECURITY-RELEVANT: apps depending on
+#   ENABLE ROW LEVEL SECURITY for actual RLS get NO
+#   row-level enforcement.
+#
+#   ALTER TABLE FORCE / NO FORCE ROW LEVEL SECURITY —
+#   ERROR 1064 "unsupported ALTER TABLE operation:
+#   FORCE ROW LEVEL SECURITY" / "NO FORCE ROW LEVEL
+#   SECURITY". Distinct from ENABLE/DISABLE because
+#   FORCE/NO FORCE land in convert.rs's `other` arm
+#   (not the noop set).
+#
+# Big-picture finding:
+#
+#   PG Row-Level Security is COMPLETELY ABSENT on
+#   zeta as a security mechanism. The DDL surface
+#   has a deceptive shape:
+#     - CREATE POLICY → loud error (Shape (c)).
+#     - ALTER TABLE ENABLE ROW LEVEL SECURITY →
+#       SILENT SUCCESS (pg_dump compat no-op).
+#
+#   An app porter who runs ENABLE first (no error)
+#   and then CREATE POLICY (error) gets a confusing
+#   signal. Worse: pg_dump-restore output runs the
+#   ENABLE statement, sees no error, and the DBA
+#   may assume RLS is active. There is NO row-level
+#   enforcement.
+#
+#   Apps porting PG RLS must:
+#     - Replace RLS with application-level row
+#       filtering (WHERE clauses derived from
+#       session user/tenant).
+#     - Or use view-based access control.
+#     - NEVER rely on ENABLE ROW LEVEL SECURITY
+#       silent success as evidence RLS is active.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# shapes:
+#   - CREATE POLICY hits Shape (c) on both wires.
+#   - ENABLE/DISABLE silently succeeds on both wires
+#     (the no-op is at zeta-parser/convert.rs, BEFORE
+#     either wire's executor sees the AST).
+#   - FORCE/NO FORCE errors identically on both wires.
+#   Per [[feedback_wire_path_divergence_check]]
+#   symmetric rule: silent-no-op confirmed as
+#   DOCUMENTED INTENTIONAL via convert.rs comments
+#   (lines 803, 998), not a wire-specific bug.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CREATE / ALTER / DROP
+#     POLICY all hit Shape (c) catch-all (parser
+#     accepts, zeta has no policy DDL handler).
+#     No RLS enforcement possible.
+#   # zeta-adapt: DOCUMENTED INTENTIONAL no-op —
+#     ALTER TABLE ENABLE / DISABLE ROW LEVEL SECURITY
+#     silently succeeds (pg_dump compat per zeta-
+#     parser/convert.rs:998-1006). DOES NOT enable
+#     RLS. SECURITY HAZARD: apps assuming the no-
+#     error response means RLS is active get NO
+#     enforcement. Replace with app-side row
+#     filtering or view-based access control.
+#   # zeta-adapt: KNOWN GAP — ALTER TABLE FORCE /
+#     NO FORCE ROW LEVEL SECURITY error with
+#     "unsupported ALTER TABLE operation" (distinct
+#     from the ENABLE/DISABLE no-op).
+
+--echo === CREATE POLICY (5 forms) — Shape (c) catch-all from PR #371 ===
+
+# All five forms hit the same zeta statement-level
+# catch-all that emits Debug repr of the unmatched
+# sqlparser AST variant. Same fingerprint already
+# pinned for other shape-(c) variants per PR #371.
+--error 1064
+CREATE POLICY p ON t;
+--error 1064
+CREATE POLICY p ON t FOR SELECT USING (true);
+--error 1064
+CREATE POLICY p ON t FOR INSERT WITH CHECK (true);
+--error 1064
+CREATE POLICY p ON t AS PERMISSIVE FOR ALL TO PUBLIC USING (true);
+--error 1064
+CREATE POLICY p ON t AS RESTRICTIVE FOR ALL USING (true);
+
+--echo === ALTER POLICY / DROP POLICY — same Shape (c), new statement witnesses ===
+
+--error 1064
+ALTER POLICY p ON t RENAME TO p2;
+--error 1064
+DROP POLICY p ON t;
+
+--echo === ALTER TABLE ENABLE / DISABLE ROW LEVEL SECURITY — DOCUMENTED INTENTIONAL no-op ===
+
+# zeta-parser/src/convert.rs lines 803 + 998-1006
+# explicitly mark these as "pg_dump compatibility
+# ... ignore". Silent success. Probed via state-
+# validation roundtrip below to FALSIFY actual RLS
+# enforcement.
+
+CREATE TABLE rls_t (id INT PRIMARY KEY, owner TEXT);
+INSERT INTO rls_t VALUES (1, 'alice'), (2, 'bob');
+ALTER TABLE rls_t ENABLE ROW LEVEL SECURITY;
+# If RLS were active and no policy existed, the
+# table would block all SELECTs. The fact that
+# this returns rows proves NO enforcement.
+SELECT id, owner FROM rls_t ORDER BY id;
+ALTER TABLE rls_t DISABLE ROW LEVEL SECURITY;
+SELECT id, owner FROM rls_t ORDER BY id;
+
+--echo === ALTER TABLE FORCE / NO FORCE ROW LEVEL SECURITY — "unsupported ALTER TABLE operation" ===
+
+# FORCE / NO FORCE land in convert.rs's `other`
+# catch-all arm (not the noop set), so the error
+# message names the operation explicitly. Pre-
+# existing fingerprint (alter_table_basic_extra:
+# 103-106 AUTO_INCREMENT / RENAME CONSTRAINT).
+--error 1064
+ALTER TABLE rls_t FORCE ROW LEVEL SECURITY;
+--error 1064
+ALTER TABLE rls_t NO FORCE ROW LEVEL SECURITY;
+
+DROP TABLE rls_t;
