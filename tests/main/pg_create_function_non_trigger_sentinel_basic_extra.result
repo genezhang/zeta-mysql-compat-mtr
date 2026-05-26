@@ -1,0 +1,9 @@
+=== SHAPE B — RETURNS TABLE(...) → silent CREATE; SELECT errors "unknown set-returning function: <NAME>" ===
+DROP FUNCTION IF EXISTS srf;
+CREATE FUNCTION srf() RETURNS TABLE(id INT) LANGUAGE SQL AS 'SELECT 1';
+SELECT * FROM srf();
+ERROR 1105: plan error: unknown set-returning function: SRF
+=== SHAPE C — RETURNS SETOF int → sqlparser parse-reject "Expected: end of statement, found: int" ===
+DROP FUNCTION IF EXISTS setof_fn;
+CREATE FUNCTION setof_fn() RETURNS SETOF int LANGUAGE SQL AS 'SELECT 1';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: int at Line: 1, Column: 42
