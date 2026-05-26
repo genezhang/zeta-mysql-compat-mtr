@@ -1,0 +1,130 @@
+# Independently authored PG-specific DDL sentinel slice
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE OPERATOR / CREATE CAST / CREATE LANGUAGE /
+#     CREATE AGGREGATE / CREATE COLLATION / CREATE RULE
+#     / CREATE STATISTICS: ZERO prior coverage. Wide-grep
+#     of tests/main/*.test for each returns no hits.
+#   - CREATE TYPE — already pinned in create_domain_basic_
+#     extra (DOMAIN form) and enum_helpers_basic_extra
+#     (ENUM form). Not re-pinned here.
+#   - CREATE PROCEDURE — already pinned in function_def_
+#     basic_extra.
+#   - CREATE EVENT — already pinned in event_use_
+#     partition_sentinel_basic_extra (PR #373).
+#
+# This slice pins (THREE rejection shapes — Shape A is
+# pre-existing per by-fingerprint dedup, Shapes B and C
+# are genuinely new):
+#
+#   Shape A — sqlparser doesn't recognize the keyword
+#   as a CREATE-object-type (1064 "Expected: an object
+#   type after CREATE, found: <KEYWORD>"):
+#     - PRE-EXISTING fingerprint: 3 prior result files
+#       (event_use_partition_sentinel:3 with EVENT,
+#       index_options_basic_extra:102 with FULLTEXT,
+#       view_options_basic_extra:100 with RECURSIVE).
+#       Wide-grep returns those 3 + this slice.
+#     - NEW surface (the rejected keyword tokens):
+#       CAST, LANGUAGE, TRUSTED LANGUAGE, AGGREGATE,
+#       COLLATION, RULE, STATISTICS. All hit the same
+#       error site at column 8 (right after `CREATE `).
+#
+#   Shape B — `CREATE OR REPLACE LANGUAGE` 1064 with
+#   restricted-object-type list:
+#     - "Expected: [EXTERNAL] TABLE or [MATERIALIZED]
+#       VIEW or FUNCTION after CREATE OR REPLACE,
+#       found: LANGUAGE at Line: 1, Column: 19"
+#     - GENUINELY NEW fingerprint — by-fingerprint
+#       wide-grep returns zero priors. The CREATE OR
+#       REPLACE path has a MORE-RESTRICTED set of valid
+#       object types than the plain CREATE path
+#       (only TABLE, VIEW, FUNCTION).
+#
+#   Shape C — `CREATE OPERATOR` partial-grammar 1064:
+#     - "Expected: (, found: = at Line: 1, Column: 19"
+#     - sqlparser HAS a CREATE OPERATOR keyword arm
+#       (got past `CREATE OPERATOR ===`), but doesn't
+#       know the `(LEFTARG = INT, RIGHTARG = INT,
+#       PROCEDURE = int4eq)` definition-list syntax.
+#       Fails INSIDE the definition body, distinct
+#       site from Shape A.
+#     - GENUINELY NEW fingerprint.
+#
+# Big-picture finding:
+#
+#   PG-specific DDL has THREE rejection sites depending
+#   on whether sqlparser knows the keyword at all
+#   (Shape A — most variants), knows it but only in a
+#   restricted context (Shape B — LANGUAGE under OR
+#   REPLACE), or knows it with a partial grammar arm
+#   (Shape C — OPERATOR has the keyword but not the
+#   definition body).
+#
+#   Apps porting PG migration scripts that include
+#   these DDLs must drop them entirely — there is no
+#   substitute for CREATE OPERATOR / CAST / LANGUAGE
+#   / AGGREGATE / COLLATION / RULE / STATISTICS in
+#   zeta. (CREATE TYPE works for DOMAIN/ENUM forms
+#   only, per create_domain_basic_extra and
+#   enum_helpers_basic_extra.)
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CREATE CAST, CREATE
+#     LANGUAGE (and CREATE TRUSTED LANGUAGE), CREATE
+#     AGGREGATE, CREATE COLLATION, CREATE RULE, CREATE
+#     STATISTICS all fail at the sqlparser CREATE-
+#     dispatcher (Shape A — "Expected: an object type
+#     after CREATE, found: <KEYWORD>").
+#   # zeta-adapt: KNOWN GAP — CREATE OR REPLACE
+#     LANGUAGE fails with the MORE-RESTRICTED message
+#     (Shape B — only TABLE/VIEW/FUNCTION valid for
+#     OR REPLACE in sqlparser).
+#   # zeta-adapt: KNOWN GAP — CREATE OPERATOR has a
+#     sqlparser keyword arm but the definition-list
+#     body `(LEFTARG = ..., ...)` is not parsed
+#     (Shape C — fails INSIDE the parens).
+#   # zeta-adapt: No substitute exists for any of these
+#     — drop from migration scripts.
+
+--echo === Shape A — "Expected: an object type after CREATE" (PG-DDL keyword unknown) ===
+
+--error 1064
+CREATE CAST (INT AS TEXT) WITH INOUT;
+--error 1064
+CREATE CAST (TEXT AS INT) WITH FUNCTION int4in(cstring) AS IMPLICIT;
+--error 1064
+CREATE LANGUAGE plpgsql;
+--error 1064
+CREATE TRUSTED LANGUAGE plperl;
+--error 1064
+CREATE AGGREGATE myavg (BIGINT) (SFUNC = int8_avg_accum, STYPE = INTERNAL, FINALFUNC = int8_avg);
+--error 1064
+CREATE COLLATION french (LOCALE = 'fr_FR');
+--error 1064
+CREATE COLLATION german FROM "de_DE";
+--error 1064
+CREATE RULE my_rule AS ON UPDATE TO t1 DO INSTEAD NOTHING;
+--error 1064
+CREATE STATISTICS s1 ON a, b FROM t;
+--error 1064
+CREATE STATISTICS s2 (dependencies) ON a, b FROM t;
+
+--echo === Shape B — CREATE OR REPLACE LANGUAGE (more-restricted object types) ===
+
+# DIFFERENT message — sqlparser's CREATE OR REPLACE
+# path lists only TABLE/VIEW/FUNCTION as valid object
+# types, LANGUAGE not accepted there.
+--error 1064
+CREATE OR REPLACE LANGUAGE plpgsql;
+
+--echo === Shape C — CREATE OPERATOR partial-grammar (keyword known, body not) ===
+
+# sqlparser HAS a CREATE OPERATOR keyword arm — gets
+# past `CREATE OPERATOR ===` and starts parsing the
+# definition body, then fails inside. DIFFERENT site
+# from Shape A.
+--error 1064
+CREATE OPERATOR === (LEFTARG = INT, RIGHTARG = INT, PROCEDURE = int4eq);

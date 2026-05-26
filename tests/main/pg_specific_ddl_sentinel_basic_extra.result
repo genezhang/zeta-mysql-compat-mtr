@@ -1,0 +1,27 @@
+=== Shape A — "Expected: an object type after CREATE" (PG-DDL keyword unknown) ===
+CREATE CAST (INT AS TEXT) WITH INOUT;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: CAST at Line: 1, Column: 8
+CREATE CAST (TEXT AS INT) WITH FUNCTION int4in(cstring) AS IMPLICIT;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: CAST at Line: 1, Column: 8
+CREATE LANGUAGE plpgsql;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: LANGUAGE at Line: 1, Column: 8
+CREATE TRUSTED LANGUAGE plperl;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: TRUSTED at Line: 1, Column: 8
+CREATE AGGREGATE myavg (BIGINT) (SFUNC = int8_avg_accum, STYPE = INTERNAL, FINALFUNC = int8_avg);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: AGGREGATE at Line: 1, Column: 8
+CREATE COLLATION french (LOCALE = 'fr_FR');
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: COLLATION at Line: 1, Column: 8
+CREATE COLLATION german FROM "de_DE";
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: COLLATION at Line: 1, Column: 8
+CREATE RULE my_rule AS ON UPDATE TO t1 DO INSTEAD NOTHING;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: RULE at Line: 1, Column: 8
+CREATE STATISTICS s1 ON a, b FROM t;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: STATISTICS at Line: 1, Column: 8
+CREATE STATISTICS s2 (dependencies) ON a, b FROM t;
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: STATISTICS at Line: 1, Column: 8
+=== Shape B — CREATE OR REPLACE LANGUAGE (more-restricted object types) ===
+CREATE OR REPLACE LANGUAGE plpgsql;
+ERROR 1064: SQL parse error: sql parser error: Expected: [EXTERNAL] TABLE or [MATERIALIZED] VIEW or FUNCTION after CREATE OR REPLACE, found: LANGUAGE at Line: 1, Column: 19
+=== Shape C — CREATE OPERATOR partial-grammar (keyword known, body not) ===
+CREATE OPERATOR === (LEFTARG = INT, RIGHTARG = INT, PROCEDURE = int4eq);
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: = at Line: 1, Column: 19
