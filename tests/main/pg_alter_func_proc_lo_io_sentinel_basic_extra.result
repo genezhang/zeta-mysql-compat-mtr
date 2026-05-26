@@ -1,0 +1,33 @@
+=== ALTER FUNCTION (9 forms) — ALTER restricted-list "found: FUNCTION" at col 7 ===
+ALTER FUNCTION foo() RENAME TO bar;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo(int) OWNER TO bob;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo() SET search_path = public;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo() IMMUTABLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo() STABLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo() VOLATILE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo() STRICT;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo() SECURITY DEFINER;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+ALTER FUNCTION foo() RESET search_path;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: FUNCTION at Line: 1, Column: 7
+=== ALTER PROCEDURE (3 forms) — ALTER restricted-list "found: PROCEDURE" at col 7 ===
+ALTER PROCEDURE proc1() RENAME TO new_proc;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: PROCEDURE at Line: 1, Column: 7
+ALTER PROCEDURE proc1() OWNER TO bob;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: PROCEDURE at Line: 1, Column: 7
+ALTER PROCEDURE proc1() SECURITY INVOKER;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: PROCEDURE at Line: 1, Column: 7
+=== lo_import / lo_export — unknown function (joins PR #391 lo_* bucket) ===
+SELECT lo_import('/tmp/file.bin');
+ERROR 1105: execution error: unknown function: lo_import
+SELECT lo_import('/tmp/file.bin', 12345);
+ERROR 1105: execution error: unknown function: lo_import
+SELECT lo_export(12345, '/tmp/out.bin');
+ERROR 1105: execution error: unknown function: lo_export
