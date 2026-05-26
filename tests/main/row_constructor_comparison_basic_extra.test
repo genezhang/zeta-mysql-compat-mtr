@@ -1,0 +1,179 @@
+# Independently authored ROW() / row-comparison /
+# composite-row sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - subquery_basic:141-144 ALREADY pins `(c1, c2) IN
+#     ((v1, v2), ...)` as SUPPORTED — tuple-in-list with
+#     literal-tuple RHS works via parse-rewrite. That is
+#     a DIFFERENT path from this slice: that form gets
+#     rewritten BEFORE the expression dispatcher sees
+#     the `(c, c)` tuple. Anywhere ELSE the parenthesized
+#     `(x, y)` shows up as an expression, the dispatcher
+#     rejects it. This slice pins where the rewrite
+#     doesn't apply.
+#   - PG ROW() explicit constructor, ROW comparison, row
+#     IS NULL, whole-row reference, row field access:
+#     ZERO prior coverage. Wide-grep of tests/main/*.test
+#     for `\bROW\s*\(` returns only PROSE/window-frame
+#     hits (window_frame_basic_extra `CURRENT ROW`,
+#     values_list_basic_extra `VALUES ROW(...)` prose).
+#
+# This slice pins (FOUR rejection shapes + ONE supported
+# + an evaluation-order witness + a NEW Debug-leak BUG):
+#
+#   Shape A — `ROW(...)` constructor → 1105 "unknown
+#   function: ROW":
+#     - sqlparser routes `ROW(...)` through the regular
+#       function-call AST node (no special Expr::Row
+#       arm in zeta's dispatcher), and `ROW` is not
+#       a registered function name. Falls through to
+#       eval_function catch-all.
+#     - Hits: bare `ROW(1, 2)`, `ROW(a, b) FROM table`,
+#       `ROW = ROW`, `ROW > ROW`, `ROW IS NULL`,
+#       `(ROW(...))[1]` subscript.
+#
+#   Shape B — parenthesized tuple `(x, y)` → 1064
+#   "unsupported expression: (x, y)":
+#     - sqlparser parses `(1, 2)` as an Expr::Tuple
+#       (not a parenthesised single expr), zeta's
+#       expression dispatcher has no Tuple arm, falls
+#       through to the catch-all "unsupported expression"
+#       which RENDERS the literal tuple SQL fragment.
+#     - Hits: `(1, 2) = (1, 2)`, `(1, 2) < (2, 0)`,
+#       `(a, b) IN (ROW(...))`.
+#     - EVALUATION-ORDER WITNESS: in `(a, b) IN
+#       (ROW(...))` the LHS-tuple parse-rejection fires
+#       BEFORE the RHS ROW() function-lookup miss —
+#       message is "unsupported expression: (a, b)",
+#       NOT "unknown function: ROW".
+#
+#   Shape C — `SELECT tbl FROM tbl` whole-row reference
+#   → 1054 "column not found: tbl":
+#     - PG would expand `tbl` to a whole-row composite
+#       reference. Zeta treats it as a column-name
+#       lookup, fails. (DIFFERENT errno 1054 from the
+#       1064/1105 shapes above — sqlparser parses it
+#       as a column reference, executor fails name-
+#       resolution.)
+#
+#   Shape D — `SELECT tbl.*` → SUPPORTED:
+#     - Standard SQL `.*` wildcard works. (Not really
+#       a row feature per se, but contrasts with Shape
+#       C — apps that want a whole-row reference can
+#       use `tbl.*` to enumerate columns.)
+#
+#   Shape E — DEBUG-LEAK BUG: `(ROW(...)).f1` field
+#   access → 1054 with INTERNAL RUST AST EMBEDDED:
+#     - "column not found: Function { name: \"ROW\",
+#       args: [Literal(Integer(10)), Literal(Integer(20))],
+#       distinct: false, filter: None, within_group:
+#       None, agg_order_by: None }.f1"
+#     - The error formatter embeds the full
+#       sqlparser::ast::Function Debug-printed value
+#       into the column-not-found message. NEW LEAK
+#       fingerprint — wide-grep of tests/main/*.result
+#       for `column not found: Function` returns zero
+#       priors (different from the PR #385/#386 leaks
+#       which were Array { ... } and sqlparser::ast::
+#       Statement respectively).
+#     - This is the THIRD instance of the recurring
+#       "internal Rust types embedded in user-facing
+#       errors" pattern (parallel to mysqlwire shim.rs
+#       Debug-repr leak pinned in PR #385, and parser
+#       catch-all type-name leak pinned in PR #386 via
+#       shape (c) taxonomy).
+#
+# Big-picture finding:
+#
+#   PG's row / composite-row surface is essentially
+#   absent from zeta beyond the narrow `(c1, c2) IN
+#   ((...), ...)` parse-rewrite path. The most common
+#   PG row idioms — explicit `ROW(...)` construction,
+#   row comparison `(a, b) > (c, d)`, whole-row
+#   reference `t`, field access on a composite — all
+#   fail, with FOUR distinct rejection messages.
+#
+#   Apps porting PG code that uses ROW() / tuple
+#   comparison must rewrite to:
+#     - Column-list IN with literals (the supported form)
+#     - Conjunctions: `a = c AND b = d` for equality;
+#       `(a, b) < (c, d)` → `a < c OR (a = c AND b < d)`
+#       for lex inequality
+#     - `tbl.*` for whole-row enumeration (Shape D)
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — `ROW(...)` explicit
+#     constructor errors 1105 "unknown function: ROW"
+#     (sqlparser routes it as Function, zeta has no
+#     ROW arm). All downstream uses (ROW = ROW, ROW IS
+#     NULL, ROW > ROW, (ROW(...))[1]) fail the same way.
+#   # zeta-adapt: KNOWN GAP — parenthesized-tuple
+#     comparison `(1, 2) = (1, 2)` errors 1064
+#     "unsupported expression: (1, 2)". The supported
+#     tuple-in-list form `(c1, c2) IN ((v1, v2), ...)`
+#     uses a parse-rewrite (subquery_basic:141-144);
+#     anywhere else the tuple shows up as an Expr it
+#     rejects.
+#   # zeta-adapt: KNOWN GAP — `SELECT tbl FROM tbl`
+#     whole-row reference treated as column-name
+#     lookup, errors 1054 "column not found". Use
+#     `tbl.*` (Shape D) to enumerate columns.
+#   # zeta-adapt: KNOWN BUG — `(ROW(...)).f1` field
+#     access leaks the entire sqlparser::ast::Function
+#     Debug-printed AST node into the column-not-found
+#     error message. Third instance of the recurring
+#     internal-Rust-types-in-error-messages pattern.
+
+CREATE TABLE rc (id INT PRIMARY KEY, a INT, b INT);
+INSERT INTO rc VALUES (1, 10, 20), (2, 30, 40);
+
+--echo === Shape A — `ROW(...)` constructor → 1105 unknown function: ROW ===
+
+--error 1105
+SELECT ROW(1, 2);
+--error 1105
+SELECT ROW(a, b) FROM rc WHERE id = 1;
+--error 1105
+SELECT ROW(1, 2) = ROW(1, 2);
+--error 1105
+SELECT ROW(1, 2) > ROW(0, 9);
+--error 1105
+SELECT ROW(1, NULL) IS NULL;
+
+--echo === Shape B — parenthesized tuple `(x, y)` → 1064 unsupported expression ===
+
+--error 1064
+SELECT (1, 2) = (1, 2);
+--error 1064
+SELECT (1, 2) < (2, 0);
+
+--echo === Shape B — EVALUATION-ORDER WITNESS: tuple LHS fires before ROW lookup ===
+
+# `(a, b) IN (ROW(...))` — LHS tuple parse-rejection
+# fires FIRST, before RHS ROW() function-lookup. Message
+# is "unsupported expression: (a, b)", NOT "unknown
+# function: ROW".
+--error 1064
+SELECT (a, b) IN (ROW(10, 20), ROW(30, 40)) FROM rc WHERE id = 1;
+
+--echo === Shape C — `SELECT tbl FROM tbl` whole-row ref → 1054 column not found ===
+
+--error 1054
+SELECT rc FROM rc WHERE id = 1;
+
+--echo === Shape D — `SELECT tbl.*` SUPPORTED (column enumeration) ===
+
+SELECT rc.* FROM rc WHERE id = 1;
+
+--echo === Shape E — DEBUG-LEAK BUG: `(ROW(...)).f1` leaks sqlparser::ast::Function ===
+
+# Error message embeds full Debug-printed Function AST
+# node — `column not found: Function { name: "ROW",
+# args: [...], distinct: false, filter: None,
+# within_group: None, agg_order_by: None }.f1`.
+# THIRD instance of internal-Rust-types-on-wire pattern.
+--error 1054
+SELECT (ROW(10, 20)).f1;
+
+DROP TABLE rc;

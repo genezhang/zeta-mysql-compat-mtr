@@ -1,0 +1,32 @@
+CREATE TABLE rc (id INT PRIMARY KEY, a INT, b INT);
+INSERT INTO rc VALUES (1, 10, 20), (2, 30, 40);
+=== Shape A — `ROW(...)` constructor → 1105 unknown function: ROW ===
+SELECT ROW(1, 2);
+ERROR 1105: execution error: unknown function: ROW
+SELECT ROW(a, b) FROM rc WHERE id = 1;
+ERROR 1105: execution error: unknown function: ROW
+SELECT ROW(1, 2) = ROW(1, 2);
+ERROR 1105: execution error: unknown function: ROW
+SELECT ROW(1, 2) > ROW(0, 9);
+ERROR 1105: execution error: unknown function: ROW
+SELECT ROW(1, NULL) IS NULL;
+ERROR 1105: execution error: unknown function: ROW
+=== Shape B — parenthesized tuple `(x, y)` → 1064 unsupported expression ===
+SELECT (1, 2) = (1, 2);
+ERROR 1064: SQL parse error: unsupported expression: (1, 2)
+SELECT (1, 2) < (2, 0);
+ERROR 1064: SQL parse error: unsupported expression: (1, 2)
+=== Shape B — EVALUATION-ORDER WITNESS: tuple LHS fires before ROW lookup ===
+SELECT (a, b) IN (ROW(10, 20), ROW(30, 40)) FROM rc WHERE id = 1;
+ERROR 1064: SQL parse error: unsupported expression: (a, b)
+=== Shape C — `SELECT tbl FROM tbl` whole-row ref → 1054 column not found ===
+SELECT rc FROM rc WHERE id = 1;
+ERROR 1054: column not found: rc
+=== Shape D — `SELECT tbl.*` SUPPORTED (column enumeration) ===
+SELECT rc.* FROM rc WHERE id = 1;
+id	a	b
+1	10	20
+=== Shape E — DEBUG-LEAK BUG: `(ROW(...)).f1` leaks sqlparser::ast::Function ===
+SELECT (ROW(10, 20)).f1;
+ERROR 1054: column not found: Function { name: "ROW", args: [Literal(Integer(10)), Literal(Integer(20))], distinct: false, filter: None, within_group: None, agg_order_by: None }.f1
+DROP TABLE rc;
