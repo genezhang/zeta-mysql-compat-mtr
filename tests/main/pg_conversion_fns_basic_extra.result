@@ -1,0 +1,124 @@
+=== AGE 2-arg on DATE inputs ===
+SELECT AGE(DATE '2024-03-15', DATE '2024-03-15')              AS age_same_day;
+age_same_day
+00:00:00
+SELECT AGE(DATE '2020-01-01', DATE '2023-04-05')              AS age_negative_mixed_sign_bug;
+age_negative_mixed_sign_bug
+-3 years -4 mons 27 days
+=== AGE 2-arg on TIMESTAMP inputs ===
+SELECT AGE(TIMESTAMP '2024-12-31 23:59:59',
+           TIMESTAMP '2024-01-01 00:00:00')                   AS age_full_year_minus_1s;
+age_full_year_minus_1s
+11 mons 30 days 23:59:59
+SELECT AGE(TIMESTAMP '2024-06-15 12:00:00.500000',
+           TIMESTAMP '2024-06-15 12:00:00.000000')            AS age_half_second;
+age_half_second
+00:00:00.500000
+=== AGE 1-arg = AGE(now(), t) — structural pin only ===
+SELECT AGE(DATE '2020-01-01') IS NOT NULL                     AS age_1arg_returns_value;
+age_1arg_returns_value
+1
+=== AGE: wrong-type arg → ERROR 1105 ===
+SELECT AGE(42, 100);
+ERROR 1105: execution error: AGE requires timestamp or date
+SELECT AGE('hello', 'world');
+ERROR 1105: execution error: AGE requires timestamp or date
+SELECT AGE(DATE '2024-01-01', 42);
+ERROR 1105: execution error: AGE requires timestamp or date
+=== AGE: NULL propagation + arity ===
+SELECT AGE(NULL, DATE '2020-01-01')                           AS null_t1;
+null_t1
+NULL
+SELECT AGE(DATE '2020-01-01', NULL)                           AS null_t2;
+null_t2
+NULL
+SELECT AGE(NULL) IS NULL                                      AS null_1arg_pred;
+null_1arg_pred
+1
+SELECT AGE();
+ERROR 1105: execution error: AGE requires 1-2 arguments
+SELECT AGE(DATE '2024-01-01', DATE '2024-01-02', DATE '2024-01-03');
+ERROR 1105: execution error: AGE requires 1-2 arguments
+=== TO_TIMESTAMP: Int → Timestamp (epoch seconds) ===
+SELECT TO_TIMESTAMP(1700000000)                               AS ts_2023_11_14;
+ts_2023_11_14
+2023-11-14 22:13:20
+SELECT TO_TIMESTAMP(0)                                        AS ts_unix_epoch;
+ts_unix_epoch
+1970-01-01 00:00:00
+SELECT TO_TIMESTAMP(-86400)                                   AS ts_pre_epoch;
+ts_pre_epoch
+1969-12-31 00:00:00
+SELECT TO_TIMESTAMP(1700000000) = FROM_UNIXTIME(1700000000)   AS to_ts_eq_from_unix;
+to_ts_eq_from_unix
+1
+=== TO_TIMESTAMP: Float64 preserves fractional microseconds ===
+SELECT TO_TIMESTAMP(CAST(1700000000.5 AS DOUBLE PRECISION))   AS ts_with_microsec;
+ts_with_microsec
+2023-11-14 22:13:20.500000
+=== STRIKING: bare-decimal literal → ERROR 1105 ===
+SELECT TO_TIMESTAMP(1700000000.5);
+ERROR 1105: execution error: TO_TIMESTAMP requires a numeric argument
+=== TO_TIMESTAMP: NULL + arity ===
+SELECT TO_TIMESTAMP(NULL)                                     AS null_propagates;
+null_propagates
+NULL
+SELECT TO_TIMESTAMP(NULL) IS NULL                             AS null_pred;
+null_pred
+1
+SELECT TO_TIMESTAMP();
+ERROR 1105: execution error: TO_TIMESTAMP requires 1 argument
+SELECT TO_TIMESTAMP(1, 2);
+ERROR 1105: execution error: TO_TIMESTAMP requires 1 argument
+=== TO_NUMBER: basic digit parse with '99' format ===
+SELECT TO_NUMBER('42', '99')                                  AS basic;
+basic
+42
+SELECT TO_NUMBER('1', '9')                                    AS single_digit;
+single_digit
+1
+SELECT TO_NUMBER('100', '999')                                AS three_digits;
+three_digits
+100
+=== TO_NUMBER: leading-sign with 'S99' format ===
+SELECT TO_NUMBER('-42', 'S99')                                AS negative;
+negative
+-42
+SELECT TO_NUMBER('+42', 'S99')                                AS positive_sign;
+positive_sign
+42
+=== TO_NUMBER: decimal-point with '9.99' format ===
+SELECT TO_NUMBER('3.14', '9.99')                              AS pi_like;
+pi_like
+3.14
+SELECT TO_NUMBER('0.5',  '9.99')                              AS half;
+half
+0.5
+=== TO_NUMBER: literal commas accepted (impl-only token) ===
+SELECT TO_NUMBER('34,50', '999,99')                           AS literal_comma;
+literal_comma
+3450
+SELECT TO_NUMBER('1,234', '9,999')                            AS literal_comma_thousands_shape;
+literal_comma_thousands_shape
+1234
+=== TO_NUMBER: G/D locale separators → ERROR 1105 ===
+SELECT TO_NUMBER('1,000', '9G999');
+ERROR 1105: execution error: to_number: unsupported format token in '9G999'
+SELECT TO_NUMBER('3,14',  '9D99');
+ERROR 1105: execution error: to_number: unsupported format token in '9D99'
+=== TO_NUMBER: NULL prop + arity ===
+SELECT TO_NUMBER(NULL, '99')                                  AS null_input;
+null_input
+NULL
+SELECT TO_NUMBER('42', NULL)                                  AS null_format;
+null_format
+NULL
+SELECT TO_NUMBER(NULL, '99') IS NULL                          AS null_input_pred;
+null_input_pred
+1
+SELECT TO_NUMBER();
+ERROR 1105: execution error: TO_NUMBER requires (text, format)
+SELECT TO_NUMBER('42');
+ERROR 1105: execution error: TO_NUMBER requires (text, format)
+SELECT TO_NUMBER('42', '99', '0');
+ERROR 1105: execution error: TO_NUMBER requires (text, format)
