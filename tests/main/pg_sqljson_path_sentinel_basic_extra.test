@@ -1,0 +1,237 @@
+# Independently authored PG SQL/JSON path family
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - IS JSON (predicate): ZERO prior coverage.
+#   - JSON_EXISTS: ZERO prior coverage.
+#   - JSON_QUERY: ZERO prior coverage.
+#   - JSON_VALUE (MySQL 2-arg form): ALREADY pinned at
+#     json_value_basic_extra.test (full coverage:
+#     scalar extract, missing-key NULL, type-mismatch
+#     NULL, arity/non-JSON errors). NOT re-pinned here.
+#   - JSON_VALUE PG-style RETURNING <type> clause:
+#     ZERO prior coverage — pinned here as SUPPORTED
+#     (parses and converts to target type).
+#   - JSON_VALUE PG-style DEFAULT ... ON ERROR/EMPTY:
+#     ZERO prior coverage.
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: ), found: <KW>" inside a function
+#     argument list — pre-existing fingerprint (cast_
+#     basic_extra and many others). Same shape applies
+#     here because sqlparser parses JSON_VALUE/QUERY/
+#     EXISTS as plain function calls; the PG-spec
+#     modifiers (DEFAULT, EMPTY, WITH WRAPPER, FALSE
+#     ON ERROR, etc.) appear after the path-string
+#     argument and inside the parens, so the parser
+#     sees them as unexpected tokens where it expected
+#     `)` or `,`.
+#   - "execution error: unknown function: <FN>" —
+#     pre-existing pattern (agg_func_basic_extra:89
+#     BIT_XOR; array_subscript_anyall_basic_extra:23-27
+#     ARRAY_DIMS/NDIMS/FILL; bytea_blob_basic_extra:
+#     81-91 ENCODE/DECODE/GET_BYTE; datatype_basic_
+#     extra:71 UNNEST). Same fingerprint applies to
+#     JSON_EXISTS / JSON_QUERY which parse cleanly as
+#     unknown function calls.
+#
+# This slice pins NEW fingerprints:
+#
+#   IS JSON / IS NOT JSON / IS JSON OBJECT / ARRAY /
+#   SCALAR / VALUE / WITH UNIQUE KEYS — all reject with:
+#     "Expected: [NOT] NULL | TRUE | FALSE | DISTINCT
+#      | [form] NORMALIZED FROM after IS, found: JSON
+#      at Line: 1, Column: <N>"
+#     This is the sqlparser IS-predicate arm's
+#     enumeration of accepted RHS tokens. JSON is not
+#     in the list — IS JSON family entirely unreachable.
+#
+#   JSON_EXISTS('doc', '$.path') — pre-existing shape
+#     (unknown function 1105). NEW witness for this fn.
+#
+#   JSON_QUERY('doc', '$.path') — pre-existing shape
+#     (unknown function 1105). NEW witness for this fn.
+#
+#   JSON_VALUE('doc', '$.path' RETURNING <type>) —
+#     PARSES, but the RETURNING type is ACCEPT-AND-IGNORE.
+#     zeta's planner pins JSON_VALUE's result type to
+#     Text unconditionally (zeta-planner/src/resolve.rs:
+#     "json_value" => DataType::Text), so RETURNING
+#     INTEGER / RETURNING TEXT render identically and
+#     no coercion or range-check happens.
+#     Falsifier probes (added after initial review):
+#       - RETURNING INTEGER || '_suffix' succeeds with
+#         '42_suffix' — real PG would reject int||text.
+#       - RETURNING INTEGER against a STRING value '"hi"'
+#         returns 'hi' as text instead of erroring or
+#         coercing — no input-syntax check happened.
+#       - RETURNING INTEGER against 3.7 returns 3.7 not
+#         3 or 4 — no truncation/cast happened.
+#
+#   JSON_VALUE('doc', '$.path' DEFAULT 'x' ON ERROR) —
+#     pre-existing shape "Expected: ), found: DEFAULT"
+#     fires here, NEW witness for JSON_VALUE.
+#
+#   JSON_EXISTS('doc', '$.path' FALSE ON ERROR) —
+#     pre-existing shape "Expected: ), found: FALSE"
+#     fires here, NEW witness for JSON_EXISTS modifier.
+#
+#   JSON_QUERY('doc', '$' WITH WRAPPER) — pre-existing
+#     shape "Expected: ), found: WITH" fires here.
+#
+#   JSON_QUERY('doc', '$' EMPTY ARRAY ON ERROR) —
+#     pre-existing shape "Expected: ), found: EMPTY"
+#     fires here.
+#
+# Big-picture finding:
+#
+#   PG SQL/JSON path family (SQL:2016 / SQL:2023) is
+#   substantially unreachable on zeta:
+#     - IS JSON predicate family: parser-level rejection.
+#       Cannot express type-checking on JSON columns.
+#     - JSON_EXISTS / JSON_QUERY: parsed as unknown
+#       function — executor has no implementation.
+#     - JSON_VALUE: 2-arg MySQL form works (pinned
+#       elsewhere). PG-style RETURNING clause PARSES
+#       but is ACCEPT-AND-IGNORE — result type is always
+#       Text. PG-style ON ERROR / ON EMPTY / DEFAULT
+#       modifiers all parser-reject.
+#
+#   Apps porting PG SQL/JSON code must rewrite:
+#     - IS JSON →  JSONB validity check via JSON_VALID
+#       (if available) or app-side parsing.
+#     - JSON_EXISTS → JSONB path existence via @? or
+#       jsonb_exists family (if supported).
+#     - JSON_QUERY → JSONB extract via -> / #> / @>
+#       operators or jsonb_extract_path.
+#     - JSON_VALUE — keep the call but drop ON ERROR /
+#       ON EMPTY clauses; RETURNING clause parses but is
+#       a no-op, so wrap with CAST(... AS <type>) if real
+#       typed conversion is required.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# rejection shapes / executor errors. No wire-specific
+# intercept for the SQL/JSON path family on either
+# side. (Per [[feedback_wire_path_divergence_check]]
+# — must check both wires before claiming engine-wide.)
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — IS JSON predicate
+#     family (IS [NOT] JSON [OBJECT|ARRAY|SCALAR|VALUE]
+#     [WITH UNIQUE KEYS]) all parse-reject at IS arm.
+#     Use JSON_VALID or app-side validation.
+#   # zeta-adapt: KNOWN GAP — JSON_EXISTS and JSON_QUERY
+#     are unknown functions (executor error 1105).
+#     Use @? / @@ / -> / #> on JSONB columns instead.
+#   # zeta-adapt: ACCEPT-AND-IGNORE — JSON_VALUE PG-style
+#     with RETURNING <type> clause parses but does NOT
+#     coerce; the result is always Text. Wrap with CAST
+#     if real typed conversion is required.
+#   # zeta-adapt: KNOWN GAP — JSON_VALUE PG-style with
+#     DEFAULT 'x' ON ERROR / ON EMPTY clauses parse-
+#     reject. JSON_VALUE returns NULL on missing-key /
+#     type-mismatch by default (per json_value_basic_
+#     extra), so most ON EMPTY use cases are handled by
+#     a COALESCE wrapper.
+#   # zeta-adapt: KNOWN GAP — JSON_QUERY WITH WRAPPER
+#     / EMPTY ARRAY ON ERROR / EMPTY OBJECT ON ERROR
+#     all parse-reject (the JSON_QUERY function itself
+#     is unknown; the modifiers fail earlier at parser).
+#   # zeta-adapt: KNOWN GAP — JSON_EXISTS [TRUE|FALSE|
+#     UNKNOWN] ON ERROR parse-rejects on the modifier
+#     keyword.
+
+--echo === IS JSON family (7 forms) → all reject at IS arm with "after IS, found: JSON" ===
+
+# sqlparser's IS-predicate arm enumerates accepted RHS
+# tokens (NULL, TRUE, FALSE, DISTINCT, NORMALIZED FROM)
+# — JSON is not in the list, so IS JSON / IS JSON
+# OBJECT / IS JSON ARRAY / IS JSON SCALAR / IS JSON
+# VALUE / IS JSON WITH UNIQUE KEYS / IS NOT JSON all
+# fail at the IS arm.
+
+--error 1064
+SELECT '{}' IS JSON;
+--error 1064
+SELECT '{}' IS NOT JSON;
+--error 1064
+SELECT '{}' IS JSON OBJECT;
+--error 1064
+SELECT '[]' IS JSON ARRAY;
+--error 1064
+SELECT '1' IS JSON SCALAR;
+--error 1064
+SELECT 'x' IS JSON VALUE;
+--error 1064
+SELECT '{}' IS JSON WITH UNIQUE KEYS;
+
+--echo === JSON_EXISTS / JSON_QUERY — unknown function (1105 execution error) ===
+
+# Bare 2-arg forms parse cleanly as function calls;
+# executor reports unknown function. Pre-existing
+# shape (agg_func BIT_XOR, array ARRAY_DIMS, bytea
+# ENCODE/DECODE, datatype UNNEST) — new function-name
+# witnesses for JSON_EXISTS / JSON_QUERY.
+--error 1105
+SELECT JSON_EXISTS('{"a":1}', '$.a');
+--error 1105
+SELECT JSON_QUERY('{"a":1}', '$.a');
+
+--echo === JSON_VALUE PG-style RETURNING <type> — PARSES but ACCEPT-AND-IGNORE ===
+
+# zeta's JSON_VALUE accepts the PG RETURNING clause at
+# the parser, but the planner pins the result type to
+# Text unconditionally (zeta-planner/src/resolve.rs:
+# "json_value" => DataType::Text). So the RETURNING
+# clause is a no-op — no coercion, no truncation, no
+# range/syntax check.
+#
+# Baseline shapes (would render identically whether
+# typed or accept-and-ignore — not falsifiable alone):
+SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) AS r_int;
+SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING TEXT) AS r_text;
+
+--echo --- Falsifier probes for the accept-and-ignore claim ---
+
+# Probe 1: RETURNING INTEGER || '_suffix' — succeeds
+# producing '42_suffix'. Real PG would reject int||text
+# at the operator. zeta tolerates it because the result
+# is actually Text, so || is text||text.
+SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) || '_suffix' AS concat_after_int;
+
+# Probe 2: RETURNING INTEGER against the STRING value
+# '"hi"' returns 'hi' as text — no coercion attempt,
+# no "invalid input syntax for type integer" error.
+SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING INTEGER) AS hi_as_int;
+
+# Probe 3: RETURNING INTEGER against 3.7 returns 3.7
+# verbatim — no truncation to 3, no round to 4, no
+# "out of range / non-integer" error.
+SELECT JSON_VALUE('{"a":3.7}', '$.a' RETURNING INTEGER) AS float_as_int;
+
+--echo === JSON_VALUE PG-style DEFAULT 'x' ON ERROR — parse-reject at DEFAULT ===
+
+# Pre-existing shape "Expected: ), found: DEFAULT" —
+# sqlparser doesn't recognize the JSON-spec modifier
+# inside the function-call paren list.
+--error 1064
+SELECT JSON_VALUE('bad', '$.a' DEFAULT 'd' ON ERROR);
+--error 1064
+SELECT JSON_VALUE('{}', '$.a' DEFAULT 'd' ON EMPTY);
+--error 1064
+SELECT JSON_VALUE('bad', '$.a' RETURNING INTEGER DEFAULT 0 ON ERROR);
+
+--echo === JSON_EXISTS ON ERROR / JSON_QUERY WITH WRAPPER — parse-reject ===
+
+# Same parser-arm shape; different modifier keyword,
+# different column. Even though JSON_EXISTS / JSON_QUERY
+# would be unknown functions at exec time, the parser
+# rejects them first at the modifier-keyword position.
+--error 1064
+SELECT JSON_EXISTS('{"a":1}', '$.a' FALSE ON ERROR);
+--error 1064
+SELECT JSON_QUERY('[1,2]', '$' WITH WRAPPER);
+--error 1064
+SELECT JSON_QUERY('bad', '$' EMPTY ARRAY ON ERROR);

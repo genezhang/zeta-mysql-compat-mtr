@@ -1,0 +1,51 @@
+=== IS JSON family (7 forms) → all reject at IS arm with "after IS, found: JSON" ===
+SELECT '{}' IS JSON;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: JSON at Line: 1, Column: 16
+SELECT '{}' IS NOT JSON;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: JSON at Line: 1, Column: 20
+SELECT '{}' IS JSON OBJECT;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: JSON at Line: 1, Column: 16
+SELECT '[]' IS JSON ARRAY;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: JSON at Line: 1, Column: 16
+SELECT '1' IS JSON SCALAR;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: JSON at Line: 1, Column: 15
+SELECT 'x' IS JSON VALUE;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: JSON at Line: 1, Column: 15
+SELECT '{}' IS JSON WITH UNIQUE KEYS;
+ERROR 1064: SQL parse error: sql parser error: Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: JSON at Line: 1, Column: 16
+=== JSON_EXISTS / JSON_QUERY — unknown function (1105 execution error) ===
+SELECT JSON_EXISTS('{"a":1}', '$.a');
+ERROR 1105: execution error: unknown function: JSON_EXISTS
+SELECT JSON_QUERY('{"a":1}', '$.a');
+ERROR 1105: execution error: unknown function: JSON_QUERY
+=== JSON_VALUE PG-style RETURNING <type> — PARSES but ACCEPT-AND-IGNORE ===
+SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) AS r_int;
+r_int
+42
+SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING TEXT) AS r_text;
+r_text
+hi
+--- Falsifier probes for the accept-and-ignore claim ---
+SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) || '_suffix' AS concat_after_int;
+concat_after_int
+42_suffix
+SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING INTEGER) AS hi_as_int;
+hi_as_int
+hi
+SELECT JSON_VALUE('{"a":3.7}', '$.a' RETURNING INTEGER) AS float_as_int;
+float_as_int
+3.7
+=== JSON_VALUE PG-style DEFAULT 'x' ON ERROR — parse-reject at DEFAULT ===
+SELECT JSON_VALUE('bad', '$.a' DEFAULT 'd' ON ERROR);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: DEFAULT at Line: 1, Column: 32
+SELECT JSON_VALUE('{}', '$.a' DEFAULT 'd' ON EMPTY);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: DEFAULT at Line: 1, Column: 31
+SELECT JSON_VALUE('bad', '$.a' RETURNING INTEGER DEFAULT 0 ON ERROR);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: DEFAULT at Line: 1, Column: 50
+=== JSON_EXISTS ON ERROR / JSON_QUERY WITH WRAPPER — parse-reject ===
+SELECT JSON_EXISTS('{"a":1}', '$.a' FALSE ON ERROR);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: FALSE at Line: 1, Column: 37
+SELECT JSON_QUERY('[1,2]', '$' WITH WRAPPER);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: WITH at Line: 1, Column: 32
+SELECT JSON_QUERY('bad', '$' EMPTY ARRAY ON ERROR);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EMPTY at Line: 1, Column: 30
