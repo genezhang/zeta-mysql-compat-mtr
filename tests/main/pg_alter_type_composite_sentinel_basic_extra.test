@@ -1,0 +1,169 @@
+# Independently authored PG ALTER TYPE PG-variants
+# + composite CREATE TYPE sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE TYPE x AS ENUM (...): SUPPORTED, pinned
+#     at enum_type_basic_extra.
+#   - ALTER TYPE x ADD VALUE 'v': SUPPORTED, pinned
+#     at enum_type_basic_extra.
+#   - ALTER TYPE x ADD VALUE 'v' BEFORE/AFTER 'y':
+#     SUPPORTED, pinned at pg_fdw_inherits_sentinel
+#     (PR #391).
+#   - ALTER TYPE x RENAME VALUE 'a' TO 'b' (PG 10+
+#     enum-value rename): ZERO prior coverage.
+#   - ALTER TYPE x RENAME TO new_name (type rename):
+#     ZERO prior coverage.
+#   - ALTER TYPE x OWNER TO / SET SCHEMA: ZERO prior.
+#   - CREATE TYPE x AS (attr TYPE, ...) (composite
+#     type — NOT enum): ZERO prior coverage.
+#   - ALTER TYPE x ADD/DROP/ALTER/RENAME ATTRIBUTE
+#     (composite-type field manipulation): ZERO prior.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "unsupported ALTER TYPE variant for '<name>'"
+#     — NEW reject from zeta's convert.rs for ALTER
+#     TYPE variants that sqlparser recognizes but
+#     zeta doesn't implement. NEW fingerprint at
+#     this slice (no prior witness in tests/).
+#   - "Expected: {RENAME TO | { RENAME | ADD } VALUE},
+#     found: <X>" — sqlparser's ALTER TYPE grammar
+#     recognizes only 3 ops. NEW fingerprint here.
+#   - "unsupported CREATE TYPE variant for '<name>'"
+#     — NEW reject from zeta's convert.rs for the
+#     composite-type form `CREATE TYPE x AS (...)`.
+#     Only the ENUM form is implemented.
+#
+# This slice pins:
+#
+#   SHAPE A — "unsupported ALTER TYPE variant for
+#   '<name>'" (sqlparser-AST recognized, convert.rs
+#   rejects):
+#     - ALTER TYPE x RENAME VALUE 'a' TO 'b' (PG 10+
+#       enum-value rename).
+#     - ALTER TYPE x RENAME TO new_name (type rename).
+#
+#   SHAPE B — sqlparser ALTER TYPE grammar gap
+#   "Expected: {RENAME TO | { RENAME | ADD } VALUE},
+#   found: <X>":
+#     - OWNER TO admin
+#     - SET SCHEMA s
+#     - ADD ATTRIBUTE (composite)
+#     - DROP ATTRIBUTE (composite)
+#     - ALTER ATTRIBUTE (composite)
+#     - RENAME ATTRIBUTE (composite)
+#     All 6 hit the same fingerprint at col 17-19
+#     (depends on type-name length).
+#
+#   SHAPE C — "unsupported CREATE TYPE variant for
+#   '<name>'" — NEW fingerprint for CREATE TYPE
+#   composite-AS form:
+#     - CREATE TYPE addr AS (street TEXT, city TEXT)
+#     The composite-type form (zeta-parser/src/
+#     convert.rs's CreateType arm only matches the
+#     ENUM variant; composite-AS falls into the catch-
+#     all reject).
+#
+#   SHAPE D (SUPPORT pin) — DROP TYPE CASCADE /
+#   RESTRICT:
+#     - DROP TYPE x CASCADE — parses, executor calls
+#       DropType (errors if type doesn't exist).
+#     - DROP TYPE x RESTRICT — same.
+#     - DROP TYPE IF EXISTS x CASCADE — silent
+#       success on missing.
+#
+# Big-picture finding:
+#
+#   zeta's TYPE family supports only the ENUM half of
+#   PG's CREATE TYPE family. Composite types (the
+#   common pg_dump output `CREATE TYPE addr AS
+#   (street TEXT, city TEXT)`) and ALL composite-
+#   attribute manipulation are unreachable. Apps
+#   migrating PG schemas with composite types must
+#   rewrite to JSONB columns or normalize into
+#   separate tables.
+#
+#   ALTER TYPE supports only ADD VALUE; the PG 10+
+#   RENAME VALUE form is rejected even though
+#   sqlparser parses it. Apps that rely on the
+#   "fix typo in enum value" pattern (a common
+#   migration pattern for enum vocabularies) must
+#   instead: (a) add the new value, (b) update all
+#   referencing rows, (c) ... live with the old value
+#   in pg_catalog.pg_enum forever (zeta has no
+#   DROP/DEPRECATE VALUE either).
+#
+#   Type-level metadata management (OWNER TO,
+#   SET SCHEMA) all parse-reject at sqlparser. pg_
+#   dump output that includes these will fail.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL
+# fingerprints. sqlparser grammar and convert.rs
+# rejection both shared between wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — ALTER TYPE RENAME VALUE
+#     (PG 10+ enum-value rename) errors "unsupported
+#     ALTER TYPE variant". Use ADD VALUE for new
+#     vocabulary; can't rename existing.
+#   # zeta-adapt: KNOWN GAP — ALTER TYPE RENAME TO
+#     same fingerprint.
+#   # zeta-adapt: KNOWN GAP — ALTER TYPE OWNER TO /
+#     SET SCHEMA / ADD/DROP/ALTER/RENAME ATTRIBUTE
+#     all parse-reject at sqlparser.
+#   # zeta-adapt: KNOWN GAP — CREATE TYPE x AS
+#     (composite-attrs) — only ENUM form supported.
+#     Migrate composite types to JSONB or normalize
+#     into separate tables.
+
+DROP TYPE IF EXISTS color;
+DROP TYPE IF EXISTS color2;
+DROP TYPE IF EXISTS addr;
+CREATE TYPE color AS ENUM ('red', 'green', 'blue');
+
+--echo === SHAPE A — "unsupported ALTER TYPE variant" (sqlparser-recognized, convert.rs rejects) ===
+
+--error 1064
+ALTER TYPE color RENAME VALUE 'red' TO 'crimson';
+--error 1064
+ALTER TYPE color RENAME TO color2;
+
+--echo === SHAPE B — sqlparser ALTER TYPE grammar gap (only 3 ops recognized) ===
+
+--error 1064
+ALTER TYPE color OWNER TO admin_user;
+--error 1064
+ALTER TYPE color SET SCHEMA public;
+--error 1064
+ALTER TYPE color ADD ATTRIBUTE foo TEXT;
+--error 1064
+ALTER TYPE color DROP ATTRIBUTE foo;
+--error 1064
+ALTER TYPE color ALTER ATTRIBUTE foo TYPE VARCHAR(50);
+--error 1064
+ALTER TYPE color RENAME ATTRIBUTE foo TO bar;
+
+--echo === SHAPE C — "unsupported CREATE TYPE variant" — composite-AS form rejected ===
+
+--error 1064
+CREATE TYPE addr AS (street TEXT, city TEXT);
+
+--echo === SHAPE D (SUPPORT pin) — DROP TYPE CASCADE / RESTRICT / IF EXISTS work ===
+
+# CASCADE and RESTRICT both parse + reach executor;
+# DropType then validates existence. We use a fresh
+# enum to verify the happy path.
+DROP TYPE IF EXISTS doomed_t;
+CREATE TYPE doomed_t AS ENUM ('a', 'b');
+DROP TYPE doomed_t CASCADE;
+
+DROP TYPE IF EXISTS doomed_t2;
+CREATE TYPE doomed_t2 AS ENUM ('x', 'y');
+DROP TYPE doomed_t2 RESTRICT;
+
+# IF EXISTS suppresses the missing-type error.
+DROP TYPE IF EXISTS nonexistent_type CASCADE;
+
+DROP TYPE color;
