@@ -7,8 +7,19 @@
 #   - WITH ORDINALITY: ZERO prior (grep'd ALL
 #     .test files).
 #   - FK MATCH PARTIAL: ZERO prior.
-#   - FK MATCH FULL: ZERO prior (low-coverage hits
-#     were prose-only).
+#   - FK MATCH FULL: prior executable coverage at
+#     fk_alter_basic_extra.test:148-155 pins
+#     SINGLE-COLUMN FK acceptance ("parses, silent
+#     no-op"). This slice adds the genuinely novel
+#     contribution: a COMPOSITE partial-NULL
+#     FALSIFIER (one of two referenced columns
+#     NULL) that pins SIMPLE-semantics behavior
+#     and proves silent semantic DEGRADATION, not
+#     just silent acceptance. The single-column
+#     prior cannot distinguish FULL from SIMPLE
+#     because single-column NULL behaves the same
+#     under both modes; the composite partial-NULL
+#     row is the only probe that separates them.
 #   - to_regclass / to_regtype / to_regproc /
 #     to_regoperator: ZERO prior.
 #   - pg_get_viewdef / pg_get_functiondef /
