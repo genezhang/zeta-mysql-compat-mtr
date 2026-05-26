@@ -118,10 +118,14 @@ SELECT '{"a":1}'::JSONB - NULL                                AS minus_null_key_
 
 --echo === IS NOT DISTINCT FROM — null-safe equality bridges ===
 
-# SQL-NULL-safe equality. Note: NOT defined for JSONB null
-# scalar in the usual way — it returns FALSE when comparing
-# SQL NULL to JSONB 'null' because they're DIFFERENT TYPES
-# at the SQL level (SQL NULL has no JSONB type).
+# SQL-NULL-safe equality. The canonical rule: IS NOT
+# DISTINCT FROM treats two SQL NULLs as equal (collapse
+# rule) and otherwise behaves like `=` (which would NULL-
+# prop). When exactly ONE side is SQL NULL, the values
+# ARE distinct → FALSE. So `NULL::JSONB IS NOT DISTINCT
+# FROM 'null'::JSONB` = FALSE (one side is SQL NULL, the
+# other isn't). Both sides being SQL NULL → TRUE; both
+# sides being JSONB 'null' → TRUE (real `=` eval).
 SELECT NULL::JSONB IS NOT DISTINCT FROM NULL::JSONB           AS isnd_sql_null_pair_true;
 SELECT 'null'::JSONB IS NOT DISTINCT FROM 'null'::JSONB       AS isnd_jsonb_null_pair_true;
 SELECT NULL::JSONB IS NOT DISTINCT FROM 'null'::JSONB         AS isnd_mixed_false;
