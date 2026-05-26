@@ -1,0 +1,150 @@
+=== Identity strings ===
+SELECT @@version;
+@@version
+8.0.36-zeta
+SELECT @@version_comment;
+@@version_comment
+Zeta DATABASE (MySQL Compatible)
+SELECT @@version_compile_os;
+@@version_compile_os
+linux
+SELECT @@version_compile_machine;
+@@version_compile_machine
+x86_64
+SELECT @@license;
+@@license
+Proprietary
+=== Charset family — all 'utf8mb4' ===
+SELECT @@character_set_client;
+@@character_set_client
+utf8mb4
+SELECT @@character_set_connection;
+@@character_set_connection
+utf8mb4
+SELECT @@character_set_results;
+@@character_set_results
+utf8mb4
+SELECT @@character_set_server;
+@@character_set_server
+utf8mb4
+SELECT @@character_set_database;
+@@character_set_database
+utf8mb4
+SELECT @@character_set_system;
+@@character_set_system
+utf8mb4
+SELECT @@character_set_filesystem;
+@@character_set_filesystem
+utf8mb4
+=== Collation family — all 'utf8mb4_general_ci' ===
+SELECT @@collation_connection;
+@@collation_connection
+utf8mb4_general_ci
+SELECT @@collation_server;
+@@collation_server
+utf8mb4_general_ci
+SELECT @@collation_database;
+@@collation_database
+utf8mb4_general_ci
+=== Protocol / connection / hostname ===
+SELECT @@protocol_version;
+@@protocol_version
+10
+SELECT @@hostname;
+@@hostname
+localhost
+=== Limits — return as numeric (not string) ===
+SELECT @@max_allowed_packet;
+@@max_allowed_packet
+67108864
+SELECT @@max_connections;
+@@max_connections
+151
+SELECT @@wait_timeout;
+@@wait_timeout
+28800
+SELECT @@interactive_timeout;
+@@interactive_timeout
+28800
+SELECT @@connect_timeout;
+@@connect_timeout
+10
+SELECT @@net_buffer_length;
+@@net_buffer_length
+16384
+SELECT @@net_read_timeout;
+@@net_read_timeout
+30
+SELECT @@net_write_timeout;
+@@net_write_timeout
+60
+SELECT @@group_concat_max_len;
+@@group_concat_max_len
+1024
+SELECT @@lower_case_table_names;
+@@lower_case_table_names
+0
+SELECT @@max_execution_time;
+@@max_execution_time
+0
+=== STRIKING: socket/ssl return EMPTY STRING (NOT NULL) ===
+SELECT @@socket;
+@@socket
+
+SELECT @@ssl_version;
+@@ssl_version
+
+SELECT @@ssl_cipher;
+@@ssl_cipher
+
+SELECT @@ssl_ca;
+@@ssl_ca
+
+SELECT @@ssl_cert;
+@@ssl_cert
+
+SELECT @@ssl_key;
+@@ssl_key
+
+=== Time zone — both = 'UTC' ===
+SELECT @@time_zone;
+@@time_zone
+UTC
+SELECT @@system_time_zone;
+@@system_time_zone
+UTC
+=== sql_mode / engine (isolation vars already in txn_isolation_basic_extra) ===
+SELECT @@sql_mode;
+@@sql_mode
+
+SELECT @@default_storage_engine;
+@@default_storage_engine
+InnoDB
+SELECT @@storage_engine;
+@@storage_engine
+InnoDB
+SELECT @@innodb_version;
+@@innodb_version
+8.0.36
+=== @@lc_time_names — hardcoded 'en_US' ===
+SELECT @@lc_time_names;
+@@lc_time_names
+en_US
+=== STRIKING: SET lc_time_names absorbed, @@-read STILL 'en_US' ===
+SET lc_time_names = 'fr_FR';
+SELECT @@lc_time_names;
+@@lc_time_names
+en_US
+=== STRIKING: unknown @@var → NULL silent (not MySQL error) ===
+SELECT @@nonexistent_var;
+@@nonexistent_var
+NULL
+SELECT @@made_up_variable;
+@@made_up_variable
+NULL
+SELECT @@some_other_garbage;
+@@some_other_garbage
+NULL
+SELECT @@nonexistent_var IS NULL                              AS unknown_is_null;
+@@nonexistent_var is null                              as unknown_is_null
+NULL
