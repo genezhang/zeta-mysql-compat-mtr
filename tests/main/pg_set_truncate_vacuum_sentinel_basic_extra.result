@@ -1,0 +1,37 @@
+=== MYSQL-WIRE-ONLY silent — SET TIME ZONE (5 forms) via shim.rs:2048 prefix intercept ===
+SET TIME ZONE 'UTC';
+SET TIME ZONE 'America/Los_Angeles';
+SET TIME ZONE INTERVAL '+05:30' HOUR TO MINUTE;
+SET TIME ZONE LOCAL;
+SET TIME ZONE DEFAULT;
+=== MYSQL-WIRE-ONLY silent — SET CONSTRAINTS (3 forms; PG wire would error at parser) ===
+SET CONSTRAINTS ALL DEFERRED;
+SET CONSTRAINTS ALL IMMEDIATE;
+SET CONSTRAINTS my_fk DEFERRED;
+=== MYSQL-WIRE-ONLY silent — SET SESSION AUTHORIZATION (SECURITY-RELEVANT silent no-op) ===
+SET SESSION AUTHORIZATION 'alice';
+SET SESSION AUTHORIZATION DEFAULT;
+=== PARSE-REJECTED — RESET TIME ZONE / RESET SESSION AUTHORIZATION (no RESET intercept) ===
+RESET TIME ZONE;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ZONE at Line: 1, Column: 12
+RESET SESSION AUTHORIZATION;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: AUTHORIZATION at Line: 1, Column: 15
+=== SUPPORTED — TRUNCATE CONTINUE IDENTITY (RESTART pinned elsewhere) ===
+CREATE TABLE t_cont (id SERIAL PRIMARY KEY, n INT);
+INSERT INTO t_cont (n) VALUES (10), (20), (30);
+SELECT id, n FROM t_cont ORDER BY id;
+id	n
+1	10
+2	20
+3	30
+TRUNCATE t_cont CONTINUE IDENTITY;
+INSERT INTO t_cont (n) VALUES (40);
+SELECT id, n FROM t_cont;
+id	n
+4	40
+=== PARSE-REJECTED — VACUUM FREEZE / VACUUM FULL FREEZE bare-table forms ===
+VACUUM FREEZE t_cont;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: t_cont at Line: 1, Column: 15
+VACUUM FULL FREEZE t_cont;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: t_cont at Line: 1, Column: 20
+DROP TABLE t_cont;
