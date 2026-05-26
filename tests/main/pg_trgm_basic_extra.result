@@ -31,6 +31,13 @@ disjoint_0
 SELECT SIMILARITY('foobar', 'foobaz')                         AS foobar_foobaz_5_9;
 foobar_foobaz_5_9
 0.5555555555555556
+=== Headline finding pinned: 1-char inputs share NO trigrams ===
+SELECT SIMILARITY('a', 'b')                                   AS one_char_disjoint_0;
+one_char_disjoint_0
+0
+SELECT SIMILARITY('x', 'y')                                   AS one_char_disjoint_xy;
+one_char_disjoint_xy
+0
 === SIMILARITY — symmetric (Jaccard is set-symmetric) ===
 SELECT SIMILARITY('apple', 'apply') = SIMILARITY('apply', 'apple') AS symmetric;
 symmetric

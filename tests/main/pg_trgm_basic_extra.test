@@ -6,8 +6,9 @@
 #   - SIMILARITY — NONE (zero compat-mtr coverage).
 #   - WORD_SIMILARITY — NONE.
 #   - SHOW_TRGM — NONE.
-#   - regexp_family_basic_extra and like_regexp_edges cover
-#     fuzzy-ish string matching but NOT trigram similarity.
+#   - regexp_family_basic_extra and
+#     like_regexp_edges_basic_extra cover fuzzy-ish string
+#     matching but NOT trigram similarity.
 #
 # This slice pins:
 #   - SHOW_TRGM(text) extracts pg_trgm-compatible trigrams:
@@ -103,6 +104,15 @@ SELECT SIMILARITY('cat', 'dog')                               AS disjoint_0;
 # 'bar','ar '/'baz','az '. Total union = 9, intersection = 5
 # → 5/9 ≈ 0.555.
 SELECT SIMILARITY('foobar', 'foobaz')                         AS foobar_foobaz_5_9;
+
+--echo === Headline finding pinned: 1-char inputs share NO trigrams ===
+
+# 'a' → trigrams {'  a', ' a '}; 'b' → trigrams {'  b',
+# ' b '}. Trailing pad is exactly ONE space, so no window
+# lands on pure '   '. Jaccard = 0/4 = 0.
+SELECT SIMILARITY('a', 'b')                                   AS one_char_disjoint_0;
+# Symmetric — and same all-disjoint case.
+SELECT SIMILARITY('x', 'y')                                   AS one_char_disjoint_xy;
 
 --echo === SIMILARITY — symmetric (Jaccard is set-symmetric) ===
 
