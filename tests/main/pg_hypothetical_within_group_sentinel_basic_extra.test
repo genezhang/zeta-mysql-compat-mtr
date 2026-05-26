@@ -1,0 +1,156 @@
+# Independently authored PG hypothetical-set ordered
+# aggregate sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - PERCENTILE_CONT / PERCENTILE_DISC with WITHIN
+#     GROUP (inverse distribution form): SUPPORTED —
+#     pinned at statistical_aggs_basic_extra. Those
+#     are a DIFFERENT category from the hypothetical-
+#     set family (rank/dense_rank/cume_dist/
+#     percent_rank with arg + WITHIN GROUP).
+#   - rank() / dense_rank() / cume_dist() /
+#     percent_rank() as WINDOW functions (with OVER
+#     clause): SUPPORTED — pinned at window_func_*.
+#   - The hypothetical-set ordered-aggregate forms
+#     `rank(arg) WITHIN GROUP (ORDER BY col)` etc.:
+#     ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "execution error: unknown function: <name>" —
+#     pre-existing fingerprint at many slices (e.g.,
+#     pg_ordinality_match_reflection PR #408 for
+#     to_regclass/regtype/regproc, JSON_QUERY at
+#     PR #401). Reused here because the hypothetical-
+#     set function names are NOT registered with the
+#     ordered-set-aggregate dispatch even though the
+#     WITHIN GROUP plumbing exists for inverse-
+#     distribution functions (percentile_cont/disc).
+#
+# This slice pins:
+#
+#   rank(<arg>) WITHIN GROUP (ORDER BY col):
+#     - Both wires return "unknown function: rank" at
+#       executor function-lookup. Despite WITHIN GROUP
+#       plumbing existing in the plan node
+#       (zeta-planner/src/plan.rs:391-392
+#       within_group: Option<Box<Expr>>) and being
+#       wired through resolve.rs (line 685+ comment
+#       "percentile_cont(0.5) WITHIN GROUP..."), the
+#       hypothetical-set fn names are NOT registered.
+#
+#   dense_rank(<arg>) WITHIN GROUP (ORDER BY col):
+#     - Same shape; "unknown function: dense_rank".
+#
+#   cume_dist(<arg>) WITHIN GROUP (ORDER BY col):
+#     - Same shape; "unknown function: cume_dist".
+#
+#   percent_rank(<arg>) WITHIN GROUP (ORDER BY col):
+#     - Same shape; "unknown function: percent_rank".
+#
+#   SUPPORT FALSIFIER PROBES (run after the gap pins
+#   to prove the WITHIN GROUP plumbing itself works
+#   for OTHER fn names — so the gap is in fn-dispatch
+#   for hypothetical-set names, not in the WITHIN
+#   GROUP clause itself):
+#     - percentile_disc(0.5) WITHIN GROUP (ORDER BY v)
+#       → returns the 50th-percentile value. Works.
+#     - rank() OVER (ORDER BY v) — the WINDOW-fn form
+#       of rank. Works. So `rank` exists, just not as
+#       a hypothetical-set ordered aggregate.
+#
+# Big-picture finding:
+#
+#   PG's hypothetical-set ordered-aggregate family
+#   (rank/dense_rank/cume_dist/percent_rank with a
+#   hypothetical-value arg + WITHIN GROUP ORDER BY)
+#   is entirely unreachable on zeta. The WITHIN GROUP
+#   clause is wired in the planner — proven by the
+#   percentile_disc(0.5) WITHIN GROUP probe — but the
+#   four hypothetical-set fn names are not registered
+#   for the ordered-set-aggregate dispatch.
+#
+#   This is DIFFERENT from `rank() OVER (...)` which
+#   works — that is the window-function form. The two
+#   share names but live in different dispatch tables.
+#
+#   Apps porting PG analytics that compute
+#   "what would the rank/cume_dist/percent_rank of
+#   value X be if it were inserted into this sorted
+#   column?" via the hypothetical-set form must
+#   rewrite to a UNION ALL + window-fn pattern:
+#
+#     SELECT rank() OVER (ORDER BY v) FROM (
+#       SELECT v FROM tab UNION ALL SELECT <X>
+#     ) u WHERE v = <X> LIMIT 1;
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# "unknown function: <name>" fingerprint. The fn
+# lookup is at executor function-dispatch, which is
+# wire-independent.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — rank(arg) / dense_rank(arg)
+#     / cume_dist(arg) / percent_rank(arg) WITHIN
+#     GROUP (ORDER BY col) all error "unknown function:
+#     <name>" at executor. The WITHIN GROUP clause
+#     itself works (proven by percentile_disc probe);
+#     the four hypothetical-set names are missing from
+#     the ordered-set-aggregate dispatch.
+#   # zeta-adapt: SUPPORTED — percentile_disc(p) WITHIN
+#     GROUP (ORDER BY col) and percentile_cont(p)
+#     WITHIN GROUP (ORDER BY col) (the inverse-
+#     distribution sibling family).
+#   # zeta-adapt: SUPPORTED — rank() / dense_rank() /
+#     cume_dist() / percent_rank() with OVER (...) —
+#     the window-function form (same names, different
+#     dispatch table).
+
+DROP TABLE IF EXISTS hpp;
+CREATE TABLE hpp (v INT, c TEXT);
+INSERT INTO hpp VALUES (1,'a'),(2,'b'),(3,'a'),(4,'b'),(5,'a');
+
+--echo === rank(3) WITHIN GROUP (ORDER BY v) → "unknown function: rank" ===
+
+# Hypothetical-set form: "what would the rank of value
+# 3 be if it were inserted into the sorted column v?"
+# PG answer: 3 (it would tie at position 3). zeta:
+# fn lookup fails — name not registered for ordered-
+# set-aggregate dispatch.
+--error 1105
+SELECT rank(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+
+--echo === dense_rank(3) WITHIN GROUP (ORDER BY v) → "unknown function: dense_rank" ===
+
+--error 1105
+SELECT dense_rank(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+
+--echo === cume_dist(3) WITHIN GROUP (ORDER BY v) → "unknown function: cume_dist" ===
+
+--error 1105
+SELECT cume_dist(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+
+--echo === percent_rank(3) WITHIN GROUP (ORDER BY v) → "unknown function: percent_rank" ===
+
+--error 1105
+SELECT percent_rank(3) WITHIN GROUP (ORDER BY v) AS r FROM hpp;
+
+--echo === SUPPORT FALSIFIER — percentile_disc(0.5) WITHIN GROUP works (WITHIN GROUP plumbing exists) ===
+
+# Proves that the gap is in fn-name dispatch, NOT in
+# WITHIN GROUP parsing/execution. If WITHIN GROUP
+# itself were broken, this would also fail.
+SELECT percentile_disc(0.5) WITHIN GROUP (ORDER BY v) AS p50 FROM hpp;
+
+--echo === SUPPORT FALSIFIER — rank() OVER works (window-fn form, same name, diff dispatch) ===
+
+# Proves the name `rank` exists in the engine, just
+# not as an ordered-set-aggregate. Window-fn dispatch
+# and ordered-set-aggregate dispatch are separate
+# tables in PG; zeta only implements the window-fn
+# half for rank/dense_rank/cume_dist/percent_rank.
+SELECT v, rank() OVER (ORDER BY v) AS r FROM hpp ORDER BY v;
+
+DROP TABLE hpp;
