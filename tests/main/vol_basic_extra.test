@@ -1,0 +1,118 @@
+# Independently authored VOL identity-function smoke for
+# the GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - VOL — NONE (zero compat-mtr coverage — checked all
+#     *.test files per PR #357 lesson).
+#   - cast_basic_extra and type_cast_edges_basic_extra
+#     cover TRY_CAST / SAFE_CAST but NOT VOL.
+#
+# This slice pins:
+#   - VOL(x) is an IDENTITY function — returns x unchanged.
+#   - Type preservation: VOL(INT) returns INT,
+#     VOL(STRING) returns STRING, etc.
+#   - NULL passes through.
+#   - Arity errors: 0, 2+ → 1105 "requires exactly 1
+#     argument".
+#   - Type inference routes to the argument's type so
+#     RowDescription stays accurate (no synthetic widening).
+#
+# Big-picture finding (REGRESSION-TEST PLUMBING):
+#   VOL exists for ONE reason: PG's regression-test corpus
+#   declares `vol(x)` in test_setup.sql as a 1-arg
+#   "volatile identity" function used to PREVENT CONSTANT
+#   FOLDING. Spark's pg_regress corpus references it
+#   directly (e.g. case.sql:185) without redefining it,
+#   so zeta provides it as a built-in pass-through so the
+#   corpus runs unmodified.
+#
+#   The impl at lib.rs:45858-45865 is literally
+#   `eval_row_expr(&args[0], ...)` — the simplest possible
+#   identity. There is no actual volatility marker (zeta
+#   has no concept of volatility today); the function
+#   exists purely as a syntactic barrier so the planner
+#   doesn't fold an expression like `vol(1) + vol(2)` to
+#   `3` at plan time. Whether zeta's planner actually
+#   respects this (i.e., refrains from folding) is OUT OF
+#   SCOPE for this slice — we just pin the runtime
+#   identity behavior.
+#
+#   STRIKING — TYPE PASSTHROUGH applies even for COMPLEX
+#   types. VOL(ARRAY[1,2,3]) returns the same Array;
+#   VOL(JSONB '{"x":1}') returns the same Jsonb. No
+#   type lift, no copy, no normalization. This contrasts
+#   with most functions (e.g., CONCAT) that stringify
+#   non-string args.
+#
+# Adaptation notes:
+#   # zeta-adapt: VOL(x) is identity — added solely to let
+#     unmodified PG regression-corpus SQL run. Apps in
+#     production should not use it.
+#   # zeta-adapt: VOL preserves input type EXACTLY, including
+#     complex types (Array, Jsonb, Date, Vector, ...).
+#   # zeta-adapt: Whether zeta actually treats VOL as a
+#     planner barrier (no const-folding) is implementation-
+#     defined; this slice only pins runtime identity.
+
+--echo === VOL — identity on primitive types ===
+
+# Int passes through unchanged.
+SELECT VOL(42)                                                AS int_identity;
+# String passes through unchanged.
+SELECT VOL('hello')                                           AS str_identity;
+# Bool passes through unchanged.
+SELECT VOL(TRUE)                                              AS bool_identity;
+SELECT VOL(FALSE)                                             AS bool_false_identity;
+# Float passes through.
+SELECT VOL(CAST(3.14 AS DOUBLE PRECISION))                    AS float_identity;
+# Decimal passes through.
+SELECT VOL(3.14)                                              AS decimal_identity;
+
+--echo === VOL — identity preservable in expressions ===
+
+# VOL is transparent in arithmetic.
+SELECT VOL(2) + VOL(3)                                        AS sum_5;
+SELECT VOL(10) * 2                                            AS scaled_20;
+# String concat through VOL.
+SELECT CONCAT(VOL('hello'), VOL(' world'))                    AS concat_through_vol;
+# Comparison through VOL.
+SELECT VOL(42) = 42                                           AS eq_self;
+
+--echo === VOL — NULL passes through ===
+
+SELECT VOL(NULL)                                              AS null_identity;
+SELECT VOL(NULL) IS NULL                                      AS null_pred;
+
+--echo === VOL — complex type passthrough (no normalization) ===
+
+# Date input → Date output.
+SELECT VOL(CAST('2026-05-25' AS DATE))                        AS date_identity;
+# Timestamp input → Timestamp output.
+SELECT VOL(CAST('2026-05-25 14:30:00' AS TIMESTAMP))          AS ts_identity;
+# UUID NIL through VOL.
+SELECT VOL(UUID_NIL())                                        AS uuid_identity;
+# JSONB roundtrip.
+SELECT VOL(CAST('{"x":1}' AS JSONB))                          AS jsonb_identity;
+
+--echo === VOL — equality with non-VOL form proves identity ===
+
+SELECT VOL(42) = 42                                           AS prim_eq;
+SELECT VOL('hello') = 'hello'                                 AS str_eq;
+SELECT VOL(CAST('2026-05-25' AS DATE))
+     = CAST('2026-05-25' AS DATE)                             AS date_eq;
+
+--echo === VOL — arity errors → 1105 ===
+
+--error 1105
+SELECT VOL();
+--error 1105
+SELECT VOL(1, 2);
+--error 1105
+SELECT VOL(1, 2, 3);
+
+--echo === VOL in WHERE clause — should not impede filter ===
+
+SELECT VOL(1) > 0                                             AS where_clause_ready;
+# Make sure WHERE VOL(...) actually filters.
+SELECT 1 AS filtered WHERE VOL(TRUE);

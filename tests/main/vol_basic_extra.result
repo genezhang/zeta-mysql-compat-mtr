@@ -1,0 +1,77 @@
+=== VOL — identity on primitive types ===
+SELECT VOL(42)                                                AS int_identity;
+int_identity
+42
+SELECT VOL('hello')                                           AS str_identity;
+str_identity
+hello
+SELECT VOL(TRUE)                                              AS bool_identity;
+bool_identity
+1
+SELECT VOL(FALSE)                                             AS bool_false_identity;
+bool_false_identity
+0
+SELECT VOL(CAST(3.14 AS DOUBLE PRECISION))                    AS float_identity;
+float_identity
+3.14
+SELECT VOL(3.14)                                              AS decimal_identity;
+decimal_identity
+3.14
+=== VOL — identity preservable in expressions ===
+SELECT VOL(2) + VOL(3)                                        AS sum_5;
+sum_5
+5
+SELECT VOL(10) * 2                                            AS scaled_20;
+scaled_20
+20
+SELECT CONCAT(VOL('hello'), VOL(' world'))                    AS concat_through_vol;
+concat_through_vol
+hello world
+SELECT VOL(42) = 42                                           AS eq_self;
+eq_self
+1
+=== VOL — NULL passes through ===
+SELECT VOL(NULL)                                              AS null_identity;
+null_identity
+NULL
+SELECT VOL(NULL) IS NULL                                      AS null_pred;
+null_pred
+1
+=== VOL — complex type passthrough (no normalization) ===
+SELECT VOL(CAST('2026-05-25' AS DATE))                        AS date_identity;
+date_identity
+2026-05-25
+SELECT VOL(CAST('2026-05-25 14:30:00' AS TIMESTAMP))          AS ts_identity;
+ts_identity
+2026-05-25 14:30:00
+SELECT VOL(UUID_NIL())                                        AS uuid_identity;
+uuid_identity
+00000000-0000-0000-0000-000000000000
+SELECT VOL(CAST('{"x":1}' AS JSONB))                          AS jsonb_identity;
+jsonb_identity
+{"x":1}
+=== VOL — equality with non-VOL form proves identity ===
+SELECT VOL(42) = 42                                           AS prim_eq;
+prim_eq
+1
+SELECT VOL('hello') = 'hello'                                 AS str_eq;
+str_eq
+1
+SELECT VOL(CAST('2026-05-25' AS DATE))
+     = CAST('2026-05-25' AS DATE)                             AS date_eq;
+date_eq
+1
+=== VOL — arity errors → 1105 ===
+SELECT VOL();
+ERROR 1105: execution error: vol() requires exactly 1 argument
+SELECT VOL(1, 2);
+ERROR 1105: execution error: vol() requires exactly 1 argument
+SELECT VOL(1, 2, 3);
+ERROR 1105: execution error: vol() requires exactly 1 argument
+=== VOL in WHERE clause — should not impede filter ===
+SELECT VOL(1) > 0                                             AS where_clause_ready;
+where_clause_ready
+1
+SELECT 1 AS filtered WHERE VOL(TRUE);
+filtered
+1
