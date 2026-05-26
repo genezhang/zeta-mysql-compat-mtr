@@ -1,0 +1,34 @@
+=== ::INET / ::CIDR / ::MACADDR / ::MACADDR8 — 1105 ===
+SELECT '192.168.1.1'::INET;
+ERROR 1105: execution error: unsupported CAST target type: INET
+SELECT '::1'::INET;
+ERROR 1105: execution error: unsupported CAST target type: INET
+SELECT '192.168.1.0/24'::CIDR;
+ERROR 1105: execution error: unsupported CAST target type: CIDR
+SELECT '08:00:2b:01:02:03'::MACADDR;
+ERROR 1105: execution error: unsupported CAST target type: MACADDR
+SELECT '08:00:2b:01:02:03:04:05'::MACADDR8;
+ERROR 1105: execution error: unsupported CAST target type: MACADDR8
+=== CREATE TABLE with INET / CIDR / MACADDR column — 1064 (different shape than cast) ===
+CREATE TABLE n_inet (id INT PRIMARY KEY, addr INET);
+ERROR 1064: SQL parse error: unsupported data type: inet
+CREATE TABLE n_cidr (id INT PRIMARY KEY, net CIDR);
+ERROR 1064: SQL parse error: unsupported data type: cidr
+CREATE TABLE n_mac (id INT PRIMARY KEY, mac MACADDR);
+ERROR 1064: SQL parse error: unsupported data type: macaddr
+=== Network functions — 1105 "unknown function" (function lookup fires BEFORE inner cast) ===
+SELECT host('192.168.1.5/24'::INET);
+ERROR 1105: execution error: unknown function: host
+SELECT masklen('192.168.1.0/24'::CIDR);
+ERROR 1105: execution error: unknown function: masklen
+SELECT network('192.168.1.5/24'::INET);
+ERROR 1105: execution error: unknown function: network
+SELECT broadcast('192.168.1.0/24'::CIDR);
+ERROR 1105: execution error: unknown function: broadcast
+SELECT abbrev('10.0.0.0/8'::CIDR);
+ERROR 1105: execution error: unknown function: abbrev
+=== Network operators — 1105 "unsupported CAST target" (INNER cast fires BEFORE operator) ===
+SELECT '192.168.1.5'::INET << '192.168.1.0/24'::CIDR;
+ERROR 1105: execution error: unsupported CAST target type: INET
+SELECT '192.168.1.0/24'::CIDR >> '192.168.1.5'::INET;
+ERROR 1105: execution error: unsupported CAST target type: CIDR
