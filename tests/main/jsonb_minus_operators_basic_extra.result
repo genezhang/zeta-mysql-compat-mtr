@@ -1,0 +1,65 @@
+=== JSONB - 'key' — empty-object edge (single-key form covered in jsonb_basic_extra:126) ===
+SELECT '{"a":1}'::JSONB - 'a'                                 AS remove_last_key_empty;
+remove_last_key_empty
+{}
+=== JSONB - int — array element removal by index ===
+SELECT '[1,2,3,4]'::JSONB - 0                                 AS remove_first;
+remove_first
+[2,3,4]
+SELECT '[1,2,3,4]'::JSONB - 1                                 AS remove_second;
+remove_second
+[1,3,4]
+SELECT '[1,2,3,4]'::JSONB - 3                                 AS remove_last_by_idx;
+remove_last_by_idx
+[1,2,3]
+=== STRIKING: negative array index works (Python-style) ===
+SELECT '[1,2,3,4]'::JSONB - -1                                AS neg_one_remove_last;
+neg_one_remove_last
+[1,2,3]
+SELECT '[1,2,3,4]'::JSONB - -2                                AS neg_two_remove_third;
+neg_two_remove_third
+[1,2,4]
+=== Out-of-range index — silent no-op (input unchanged) ===
+SELECT '[1,2,3,4]'::JSONB - 100                               AS out_of_range_unchanged;
+out_of_range_unchanged
+[1,2,3,4]
+SELECT '[1,2,3,4]'::JSONB - -100                              AS neg_out_of_range_unchanged;
+neg_out_of_range_unchanged
+[1,2,3,4]
+=== Missing key — silent no-op ===
+SELECT '{"a":1}'::JSONB - 'no_such_key'                       AS missing_key_unchanged;
+missing_key_unchanged
+{"a":1}
+=== Empty containers — silent no-op ===
+SELECT '[]'::JSONB - 0                                        AS empty_arr_unchanged;
+empty_arr_unchanged
+[]
+SELECT '{}'::JSONB - 'key'                                    AS empty_obj_unchanged;
+empty_obj_unchanged
+{}
+=== STRIKING: type-mismatch silently returns input unchanged ===
+SELECT '1'::JSONB - 'key'                                     AS scalar_int_minus_key;
+scalar_int_minus_key
+1
+SELECT '"hello"'::JSONB - 'key'                               AS scalar_str_minus_key;
+scalar_str_minus_key
+"hello"
+SELECT 'true'::JSONB - 'key'                                  AS scalar_bool_minus_key;
+scalar_bool_minus_key
+true
+SELECT 'null'::JSONB - 'key'                                  AS scalar_null_minus_key;
+scalar_null_minus_key
+null
+SELECT '[1,2,3]'::JSONB - 'key'                               AS arr_minus_str;
+arr_minus_str
+[1,2,3]
+SELECT '{"a":1}'::JSONB - 0                                   AS obj_minus_int;
+obj_minus_int
+{"a":1}
+=== STRIKING: #- path-removal — UNSUPPORTED at parse ===
+SELECT '{"a":{"b":1,"c":2}}'::JSONB #- '{a,b}' AS r;
+ERROR 1064: SQL parse error: unsupported binary operator: #-
+SELECT '{"a":{"b":1}}'::JSONB #- ARRAY['a','b'] AS r;
+ERROR 1064: SQL parse error: unsupported binary operator: #-
+SELECT '[1,2,3,4]'::JSONB #- '{1}' AS r;
+ERROR 1064: SQL parse error: unsupported binary operator: #-

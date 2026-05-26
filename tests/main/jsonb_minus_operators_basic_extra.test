@@ -1,0 +1,138 @@
+# Independently authored JSONB `-` (key/index removal)
+# and `#-` (path removal) operators smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - jsonb_basic_extra.test:126 pins single-key form
+#     `data - 'b'` (delete-key, supported).
+#   - jsonb_basic_extra.test:154 pins ARRAY[...] form as
+#     a KNOWN-GAP (errno 1105 — "arithmetic op requires
+#     numbers", planner misroutes). My initial
+#     description claim that it was "covered" was wrong
+#     per PR #378 review.
+#   - This slice covers the remaining `-` forms NOT in
+#     jsonb_basic_extra: int-index (positive and
+#     negative), out-of-range, missing-key/empty
+#     no-ops, type-mismatch silent no-ops, AND the
+#     `#-` path-removal operator which is UNSUPPORTED
+#     at parse level.
+#   - json_remove_basic_extra and json_modify_extras_basic_extra
+#     cover JSON_REMOVE function (different surface).
+#
+# This slice pins:
+#   - `jsonb - 'key'` removes the key from an object.
+#   - `jsonb - int` removes element at that array index
+#     (PG semantics — Python-style negative indices).
+#   - Out-of-range / missing-key / empty inputs → silent
+#     no-op (input unchanged).
+#   - Type-mismatch combinations also silent no-op (e.g.
+#     scalar `1` minus 'key' returns 1, array minus
+#     string returns the array).
+#   - `jsonb #- path` errors 1064 "unsupported binary
+#     operator: #-" (parse-level reject — no path-removal
+#     operator in zeta today).
+#
+# Big-picture finding (PERMISSIVE no-op semantics):
+#
+#   The `-` operator on JSONB is EXTREMELY PERMISSIVE
+#   about type mismatches. Real PG distinguishes:
+#
+#     - jsonb - text         → object key removal
+#     - jsonb - integer      → array element removal
+#     - jsonb - text[]       → multi-key removal
+#
+#   PG errors on type combinations that don't fit (e.g.
+#   `'1'::jsonb - 'key'` errors "cannot delete from scalar").
+#   zeta accepts ANY type combination and SILENTLY
+#   returns the input unchanged if the operation doesn't
+#   apply. Apps porting PG code that relies on type-error
+#   feedback will silently miss real bugs.
+#
+#   Recorded silent-no-op cases:
+#     - scalar `'1'::JSONB - 'key'`     → `1`
+#     - array  `'[1,2]'::JSONB - 'key'` → `[1,2]`
+#     - missing key removal             → unchanged
+#     - out-of-range int index          → unchanged
+#     - empty `[]` minus 0              → `[]`
+#     - empty `{}` minus 'key'          → `{}`
+#
+#   STRIKING — `'[1,2,3,4]'::JSONB - -1` returns
+#   `[1,2,3]` (Python-style negative indexing from end).
+#   Matches PG documented behavior. Apps using negative
+#   indices for "remove last element" patterns work
+#   identically.
+#
+#   STRIKING — `#-` (path-removal) is UNSUPPORTED at
+#   parse level. Errors 1064 "unsupported binary
+#   operator: #-". Apps porting PG code that uses
+#   `jsonb #- '{a,b}'` must rewrite using
+#   `JSONB_SET(doc, '$.a', JSONB_REMOVE(...))` or a
+#   different approach. Confirmed at zeta-parser level —
+#   the parser tokenizes `#-` but the binary-op
+#   dispatcher rejects it.
+#
+# Adaptation notes:
+#   # zeta-adapt: JSONB `-` is EXTREMELY permissive —
+#     type-mismatch combinations silently return input
+#     unchanged instead of erroring like PG.
+#   # zeta-adapt: JSONB `-` accepts negative array
+#     indices (Python-style from end).
+#   # zeta-adapt: JSONB `#-` (path removal) is
+#     UNSUPPORTED. Rewrite using JSONB_SET +
+#     JSONB_REMOVE or JSON_REMOVE function.
+
+--echo === JSONB - 'key' — empty-object edge (single-key form covered in jsonb_basic_extra:126) ===
+
+# `data - 'b'` is already pinned in
+# jsonb_basic_extra:126. This row adds the empty-object
+# edge case (remove last key → '{}').
+SELECT '{"a":1}'::JSONB - 'a'                                 AS remove_last_key_empty;
+
+--echo === JSONB - int — array element removal by index ===
+
+SELECT '[1,2,3,4]'::JSONB - 0                                 AS remove_first;
+SELECT '[1,2,3,4]'::JSONB - 1                                 AS remove_second;
+SELECT '[1,2,3,4]'::JSONB - 3                                 AS remove_last_by_idx;
+
+--echo === STRIKING: negative array index works (Python-style) ===
+
+SELECT '[1,2,3,4]'::JSONB - -1                                AS neg_one_remove_last;
+SELECT '[1,2,3,4]'::JSONB - -2                                AS neg_two_remove_third;
+
+--echo === Out-of-range index — silent no-op (input unchanged) ===
+
+SELECT '[1,2,3,4]'::JSONB - 100                               AS out_of_range_unchanged;
+SELECT '[1,2,3,4]'::JSONB - -100                              AS neg_out_of_range_unchanged;
+
+--echo === Missing key — silent no-op ===
+
+SELECT '{"a":1}'::JSONB - 'no_such_key'                       AS missing_key_unchanged;
+
+--echo === Empty containers — silent no-op ===
+
+SELECT '[]'::JSONB - 0                                        AS empty_arr_unchanged;
+SELECT '{}'::JSONB - 'key'                                    AS empty_obj_unchanged;
+
+--echo === STRIKING: type-mismatch silently returns input unchanged ===
+
+# PG would error "cannot delete from scalar" / "cannot
+# delete from array". zeta silently accepts.
+SELECT '1'::JSONB - 'key'                                     AS scalar_int_minus_key;
+SELECT '"hello"'::JSONB - 'key'                               AS scalar_str_minus_key;
+SELECT 'true'::JSONB - 'key'                                  AS scalar_bool_minus_key;
+SELECT 'null'::JSONB - 'key'                                  AS scalar_null_minus_key;
+SELECT '[1,2,3]'::JSONB - 'key'                               AS arr_minus_str;
+SELECT '{"a":1}'::JSONB - 0                                   AS obj_minus_int;
+
+--echo === STRIKING: #- path-removal — UNSUPPORTED at parse ===
+
+# PG: `'{"a":{"b":1}}'::jsonb #- '{a,b}'` returns
+# `{"a":{}}`. zeta: 1064 "unsupported binary operator: #-".
+# Apps must rewrite using JSON_REMOVE or JSONB_SET.
+--error 1064
+SELECT '{"a":{"b":1,"c":2}}'::JSONB #- '{a,b}' AS r;
+--error 1064
+SELECT '{"a":{"b":1}}'::JSONB #- ARRAY['a','b'] AS r;
+--error 1064
+SELECT '[1,2,3,4]'::JSONB #- '{1}' AS r;
