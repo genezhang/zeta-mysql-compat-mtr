@@ -1,0 +1,41 @@
+=== Shape A — `::TYPE` cast (1105) for all 7 geometric types ===
+SELECT '(1, 2)'::POINT;
+ERROR 1105: execution error: unsupported CAST target type: POINT
+SELECT '{1, 1, 0}'::LINE;
+ERROR 1105: execution error: unsupported CAST target type: LINE
+SELECT '((0,0),(3,4))'::LSEG;
+ERROR 1105: execution error: unsupported CAST target type: LSEG
+SELECT '((0,0),(1,1))'::BOX;
+ERROR 1105: execution error: unsupported CAST target type: BOX
+SELECT '((0,0),(1,0),(1,1),(0,1))'::PATH;
+ERROR 1105: execution error: unsupported CAST target type: PATH
+SELECT '((0,0),(1,0),(1,1),(0,1))'::POLYGON;
+ERROR 1105: execution error: unsupported CAST target type: POLYGON
+SELECT '<(0,0),5>'::CIRCLE;
+ERROR 1105: execution error: unsupported CAST target type: CIRCLE
+=== Shape B — DDL column type (1064) ===
+CREATE TABLE g_point (id INT PRIMARY KEY, p POINT);
+ERROR 1064: SQL parse error: unsupported data type: point
+CREATE TABLE g_box (id INT PRIMARY KEY, b BOX);
+ERROR 1064: SQL parse error: unsupported data type: box
+CREATE TABLE g_polygon (id INT PRIMARY KEY, p POLYGON);
+ERROR 1064: SQL parse error: unsupported data type: polygon
+=== Shape D — geometric functions (1105 unknown function) ===
+SELECT point(1, 2);
+ERROR 1105: execution error: unknown function: point
+SELECT area('((0,0),(3,3))'::BOX);
+ERROR 1105: execution error: unknown function: area
+SELECT distance('(0,0)'::POINT, '(3,4)'::POINT);
+ERROR 1105: execution error: unknown function: distance
+SELECT center('<(0,0),5>'::CIRCLE);
+ERROR 1105: execution error: unknown function: center
+=== SHADOWING QUIRK — `length(LSEG)` resolves to string length(), inner cast fires ===
+SELECT length('((0,0),(1,1))'::LSEG);
+ERROR 1105: execution error: unsupported CAST target type: LSEG
+=== Geometric operators — TWO eval-order sites ===
+SELECT '(1,1)'::POINT <-> '(4,5)'::POINT;
+ERROR 1105: execution error: unsupported CAST target type: POINT
+SELECT '(2,2)'::POINT @ '((0,0),(5,5))'::BOX;
+ERROR 1064: SQL parse error: unsupported binary operator: @
+SELECT '((0,0),(2,2))'::BOX && '((1,1),(3,3))'::BOX;
+ERROR 1105: execution error: unsupported CAST target type: BOX

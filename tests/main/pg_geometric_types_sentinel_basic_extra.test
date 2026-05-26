@@ -1,0 +1,175 @@
+# Independently authored PG geometric types sentinel
+# slice for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - PG geometric types (POINT, LINE, LSEG, BOX, PATH,
+#     POLYGON, CIRCLE) — cast, DDL, functions, ops:
+#     ZERO prior coverage. Wide-grep of tests/main/
+#     *.test for `::POINT` / `::CIRCLE` / `\bPOLYGON\b`
+#     / etc. returns no hits.
+#
+# Pre-existing shape patterns acknowledged (all the
+# rejection shapes here are well-pinned by prior
+# slices; this slice's novelty is the geometric SURFACE
+# applied to them):
+#   - Shape A — "unsupported CAST target type: <TYPE>"
+#     (1105) — see PR #387 INET/CIDR + PR #389 XML.
+#   - Shape B — "unsupported data type: <type>" (1064,
+#     lowercase) — same case-divergence as PR #387.
+#   - Shape D — "unknown function: <name>" (1105,
+#     lowercase) — heavy reuse across function-arm gap
+#     PRs.
+#   - "unsupported binary operator: <X>" (1064) — see
+#     range_operators_basic_extra (&<, &>), range_type_
+#     basic_extra (-|-), bit_op_extra (^), bitwise (XOR),
+#     jsonb_minus_operators (#-).
+#   - Inner-cast-fires-first eval-order quirk — see
+#     PR #387 evaluation-order witness.
+#
+# This slice pins:
+#
+#   Shape A (cast 1105) — all 7 geometric types:
+#     POINT, LINE, LSEG, BOX, PATH, POLYGON, CIRCLE.
+#
+#   Shape B (DDL 1064) — POINT/BOX/POLYGON column types
+#   (3 representative variants; LINE/LSEG/PATH/CIRCLE
+#   follow the same shape).
+#
+#   Shape D (function unknown 1105) — point(), area(),
+#   distance(), center().
+#
+#   QUIRK — `length(LSEG)` SHADOWING with string-length:
+#     - PG has `length(lseg) -> double precision`
+#       (geometric — total length of line segment).
+#     - MySQL/zeta has `length(text) -> integer`
+#       (string char count).
+#     - zeta's function table HAS `length` registered
+#       (as the string function), so the function-name
+#       lookup SUCCEEDS — then arg evaluation kicks in,
+#       and the inner `'((0,0),(1,1))'::LSEG` cast
+#       fails with "unsupported CAST target type: LSEG".
+#     - DIFFERENT from area/distance/center which give
+#       "unknown function" — `length` shows the inner-
+#       cast eval-order path INSTEAD because the
+#       function is registered. Apps porting PG geo
+#       code that uses length(lseg) get the cast error,
+#       not "unknown function" — confusing diagnostic.
+#
+#   `<->` distance operator — inner cast fires first:
+#     - `'(1,1)'::POINT <-> '(4,5)'::POINT` → hits the
+#       INNER cast first ("unsupported CAST target
+#       type: POINT"). sqlparser parses `<->` as a
+#       custom binary operator; zeta evaluates args
+#       before op-dispatch. Same eval-order as PR #387
+#       INET `<<`.
+#
+#   `@` containment operator — DIFFERENT shape, op-
+#   level reject:
+#     - `'(2,2)'::POINT @ '((0,0),(5,5))'::BOX` →
+#       "unsupported binary operator: @". The `@`
+#       token is rejected at convert.rs binary-op
+#       arm BEFORE arg evaluation. DIFFERENT site
+#       from `<->`. Adds @ to the "unsupported
+#       binary operator" bucket.
+#
+#   `&&` overlap operator — inner cast fires first:
+#     - `BOX && BOX` → inner cast error ("unsupported
+#       CAST target type: BOX"). sqlparser knows `&&`
+#       per range-overlap, dispatches to args first.
+#
+# Big-picture finding:
+#
+#   PG geometric types are entirely absent from zeta:
+#   cast 1105, DDL 1064, dedicated functions 1105, and
+#   operators split across "unsupported binary operator"
+#   (op-level reject for `@`) vs inner-cast (arg-eval
+#   first for `<->`/`&&`).
+#
+#   The `length(LSEG)` shadowing is the most subtle:
+#   a real-function-name lookup succeeds, then the inner
+#   cast fails — giving a CAST error instead of an
+#   "unknown function" error for the same conceptual
+#   "no geometric support" condition.
+#
+#   Apps porting PG GIS-style code that uses POINT/BOX/
+#   etc. must rewrite to two-NUMERIC-columns + app-side
+#   geometric math, or use PostGIS-equivalent stored in
+#   JSONB or TEXT.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — PG geometric types (POINT,
+#     LINE, LSEG, BOX, PATH, POLYGON, CIRCLE) all
+#     unsupported across cast, DDL, functions, operators.
+#   # zeta-adapt: SHADOWING QUIRK — `length(geometric)`
+#     resolves to MySQL's `length(text)` function, then
+#     errors at inner cast — giving a cast-error
+#     diagnostic instead of "unknown function".
+#   # zeta-adapt: OP-LEVEL vs ARG-EVAL split — `@` errors
+#     "unsupported binary operator" (op-level reject);
+#     `<->` and `&&` error at inner cast (arg-eval first).
+#   # zeta-adapt: Substitute storage is two NUMERIC
+#     columns + app-side math, or JSONB/TEXT for complex
+#     shapes.
+
+--echo === Shape A — `::TYPE` cast (1105) for all 7 geometric types ===
+
+--error 1105
+SELECT '(1, 2)'::POINT;
+--error 1105
+SELECT '{1, 1, 0}'::LINE;
+--error 1105
+SELECT '((0,0),(3,4))'::LSEG;
+--error 1105
+SELECT '((0,0),(1,1))'::BOX;
+--error 1105
+SELECT '((0,0),(1,0),(1,1),(0,1))'::PATH;
+--error 1105
+SELECT '((0,0),(1,0),(1,1),(0,1))'::POLYGON;
+--error 1105
+SELECT '<(0,0),5>'::CIRCLE;
+
+--echo === Shape B — DDL column type (1064) ===
+
+--error 1064
+CREATE TABLE g_point (id INT PRIMARY KEY, p POINT);
+--error 1064
+CREATE TABLE g_box (id INT PRIMARY KEY, b BOX);
+--error 1064
+CREATE TABLE g_polygon (id INT PRIMARY KEY, p POLYGON);
+
+--echo === Shape D — geometric functions (1105 unknown function) ===
+
+--error 1105
+SELECT point(1, 2);
+--error 1105
+SELECT area('((0,0),(3,3))'::BOX);
+--error 1105
+SELECT distance('(0,0)'::POINT, '(3,4)'::POINT);
+--error 1105
+SELECT center('<(0,0),5>'::CIRCLE);
+
+--echo === SHADOWING QUIRK — `length(LSEG)` resolves to string length(), inner cast fires ===
+
+# length IS a registered function (string char count) —
+# so function-lookup succeeds, then inner ::LSEG cast
+# fails. DIFFERENT diagnostic from area/distance/center.
+--error 1105
+SELECT length('((0,0),(1,1))'::LSEG);
+
+--echo === Geometric operators — TWO eval-order sites ===
+
+# `<->` — inner cast fires first (sqlparser parses as
+# custom binary op; arg-eval before op-dispatch).
+--error 1105
+SELECT '(1,1)'::POINT <-> '(4,5)'::POINT;
+
+# `@` — op-level reject ("unsupported binary operator:
+# @"). DIFFERENT — op rejected before arg evaluation.
+--error 1064
+SELECT '(2,2)'::POINT @ '((0,0),(5,5))'::BOX;
+
+# `&&` — inner cast fires first (sqlparser knows &&
+# per range-overlap, dispatches to args first).
+--error 1105
+SELECT '((0,0),(2,2))'::BOX && '((1,1),(3,3))'::BOX;
