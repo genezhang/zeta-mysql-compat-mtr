@@ -1,0 +1,186 @@
+=== INITCAP basic ===
+SELECT INITCAP('hello world')                                 AS two_words;
+two_words
+Hello World
+SELECT INITCAP('HELLO WORLD')                                 AS all_caps_normalized;
+all_caps_normalized
+Hello World
+SELECT INITCAP('hello')                                       AS single_word;
+single_word
+Hello
+SELECT INITCAP('')                                            AS empty_string;
+empty_string
+
+=== INITCAP word boundary = non-alphanumeric ===
+SELECT INITCAP('O''CONNOR')                                   AS apostrophe_boundary;
+apostrophe_boundary
+O'Connor
+SELECT INITCAP('abc123def')                                   AS digit_inside_one_word;
+digit_inside_one_word
+Abc123def
+SELECT INITCAP('hello---world')                               AS dash_separators;
+dash_separators
+Hello---World
+SELECT INITCAP('a b  c')                                      AS multi_space;
+multi_space
+A B  C
+SELECT INITCAP('hello, world! how are you?')                  AS sentence;
+sentence
+Hello, World! How Are You?
+=== INITCAP UTF-8 multibyte ===
+SELECT INITCAP('CAFÉ MENU')                                   AS utf8_uppercased;
+utf8_uppercased
+Café Menu
+SELECT INITCAP('café menu')                                   AS utf8_lowercased;
+utf8_lowercased
+Café Menu
+=== INITCAP NULL + arity + non-string coerce ===
+SELECT INITCAP(NULL)                                          AS null_propagates;
+null_propagates
+NULL
+SELECT INITCAP(NULL) IS NULL                                  AS null_predicate;
+null_predicate
+1
+SELECT INITCAP(42)                                            AS int_coerce;
+int_coerce
+42
+SELECT INITCAP(TRUE)                                          AS bool_coerce;
+bool_coerce
+True
+SELECT INITCAP();
+ERROR 1105: execution error: INITCAP requires 1 argument
+SELECT INITCAP('a', 'b');
+ERROR 1105: execution error: INITCAP requires 1 argument
+=== TRANSLATE basic (1:1 char map) ===
+SELECT TRANSLATE('abc',     'abc', 'xyz')                     AS abc_to_xyz;
+abc_to_xyz
+xyz
+SELECT TRANSLATE('hello',   'el',  'ip')                      AS partial_map;
+partial_map
+hippo
+SELECT TRANSLATE('hello',   'aeiou', 'aeiou')                 AS noop_identity;
+noop_identity
+hello
+SELECT TRANSLATE('hello',   'xyz', 'abc')                     AS no_match_passthrough;
+no_match_passthrough
+hello
+=== TRANSLATE delete semantics — shorter `to` strips ===
+SELECT TRANSLATE('phone: 555-1234', '0123456789', '')         AS strip_digits;
+strip_digits
+phone: -
+SELECT TRANSLATE('hello!world?', '!?', '')                    AS strip_punctuation;
+strip_punctuation
+helloworld
+SELECT TRANSLATE('hello', 'el', 'i')                          AS shorter_to_partial_delete;
+shorter_to_partial_delete
+hio
+=== TRANSLATE NULL + arity ===
+SELECT TRANSLATE(NULL,  'a', 'b')                             AS null_s;
+null_s
+NULL
+SELECT TRANSLATE('abc', NULL, 'b')                            AS null_from;
+null_from
+NULL
+SELECT TRANSLATE('abc', 'a',  NULL)                           AS null_to;
+null_to
+NULL
+SELECT TRANSLATE(NULL,  'a', 'b') IS NULL                     AS null_s_pred;
+null_s_pred
+1
+SELECT TRANSLATE('abc', 'a');
+ERROR 1105: execution error: TRANSLATE requires 3 arguments
+SELECT TRANSLATE('abc');
+ERROR 1105: execution error: TRANSLATE requires 3 arguments
+SELECT TRANSLATE();
+ERROR 1105: execution error: TRANSLATE requires 3 arguments
+SELECT TRANSLATE('abc', 'a', 'b', 'c');
+ERROR 1105: execution error: TRANSLATE requires 3 arguments
+=== TRANSLATE vs REPLACE — DIFFERENT semantics ===
+SELECT REPLACE('hello',   'l', 'XY')                          AS replace_doubles;
+replace_doubles
+heXYXYo
+SELECT TRANSLATE('hello', 'l', 'XY')                          AS translate_singles;
+translate_singles
+heXXo
+SELECT REPLACE('hello',   'l', 'XY') = TRANSLATE('hello', 'l', 'XY')
+                                                              AS divergence_eq_is_false;
+divergence_eq_is_false
+0
+=== OCTET_LENGTH ≡ LENGTHB (same impl arm) ===
+SELECT OCTET_LENGTH('hello')                                  AS ol_ascii;
+ol_ascii
+5
+SELECT LENGTHB('hello')                                       AS lb_ascii;
+lb_ascii
+5
+SELECT OCTET_LENGTH('hello') = LENGTHB('hello')               AS ol_eq_lb_ascii;
+ol_eq_lb_ascii
+1
+SELECT OCTET_LENGTH('café')                                   AS ol_utf8;
+ol_utf8
+5
+SELECT LENGTHB('café')                                        AS lb_utf8;
+lb_utf8
+5
+SELECT OCTET_LENGTH('café') = LENGTHB('café')                 AS ol_eq_lb_utf8;
+ol_eq_lb_utf8
+1
+SELECT OCTET_LENGTH('café') = 5                               AS bytes_is_5;
+bytes_is_5
+1
+SELECT CHAR_LENGTH('café')                                    AS char_count;
+char_count
+4
+SELECT CHAR_LENGTH('café') <> OCTET_LENGTH('café')            AS char_diff_from_bytes;
+char_diff_from_bytes
+1
+=== BIT_LENGTH = OCTET_LENGTH × 8 ===
+SELECT BIT_LENGTH('hello')                                    AS bl_ascii;
+bl_ascii
+40
+SELECT BIT_LENGTH('hello') = OCTET_LENGTH('hello') * 8        AS bl_eq_ol8_ascii;
+bl_eq_ol8_ascii
+1
+SELECT BIT_LENGTH('café')                                     AS bl_utf8;
+bl_utf8
+40
+SELECT BIT_LENGTH('café') = OCTET_LENGTH('café') * 8          AS bl_eq_ol8_utf8;
+bl_eq_ol8_utf8
+1
+SELECT OCTET_LENGTH('')                                       AS empty_ol;
+empty_ol
+0
+SELECT BIT_LENGTH('')                                         AS empty_bl;
+empty_bl
+0
+=== OCTET_LENGTH / LENGTHB / BIT_LENGTH — NULL + arity ===
+SELECT OCTET_LENGTH(NULL)                                     AS ol_null;
+ol_null
+NULL
+SELECT LENGTHB(NULL)                                          AS lb_null;
+lb_null
+NULL
+SELECT BIT_LENGTH(NULL)                                       AS bl_null;
+bl_null
+NULL
+SELECT OCTET_LENGTH(NULL) IS NULL                             AS ol_null_pred;
+ol_null_pred
+1
+SELECT OCTET_LENGTH();
+ERROR 1105: execution error: OCTET_LENGTH requires 1 argument
+SELECT LENGTHB();
+ERROR 1105: execution error: LENGTHB requires 1 argument
+SELECT BIT_LENGTH();
+ERROR 1105: execution error: BIT_LENGTH requires 1 argument
+SELECT OCTET_LENGTH('a', 'b');
+ERROR 1105: execution error: OCTET_LENGTH requires 1 argument
+=== OCTET_LENGTH on non-string types (catch-all) ===
+SELECT OCTET_LENGTH(42)                                       AS ol_int_is_2;
+ol_int_is_2
+2
+SELECT OCTET_LENGTH(TRUE)                                     AS ol_true_is_4;
+ol_true_is_4
+4
+SELECT OCTET_LENGTH(DATE '2024-03-15')                        AS ol_date_is_10;
+ol_date_is_10
+10

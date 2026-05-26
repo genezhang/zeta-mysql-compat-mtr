@@ -1,0 +1,198 @@
+# Independently authored INITCAP / TRANSLATE / OCTET_LENGTH-
+# family smoke for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - INITCAP — NONE (zero compat-mtr coverage; PG-flavor).
+#   - TRANSLATE — NONE (zero compat-mtr coverage; PG-flavor).
+#   - OCTET_LENGTH — header mentions in bytea_blob_basic_extra
+#     and string_func_basic; no dedicated pin matrix.
+#   - LENGTHB — NONE (zero compat-mtr coverage; Oracle alias).
+#   - BIT_LENGTH — bitwise_basic_extra.test:100 pins
+#     BIT_LENGTH(5)/BIT_LENGTH(10) for INT arg only (the
+#     known-divergence "TEXT length × 8" pin). No String
+#     arm coverage.
+#
+# This slice pins:
+#   - INITCAP: capitalize first letter of each word; word
+#     boundary is non-alphanumeric. Per-word lowercasing of
+#     remaining chars. NULL → NULL.
+#   - TRANSLATE(s, from, to): char-by-char replacement; chars
+#     in `from` with no matching position in `to` are DELETED
+#     (when `to` is shorter than `from`). Any NULL arg → NULL.
+#   - OCTET_LENGTH ≡ LENGTHB (same impl arm) — byte length.
+#   - BIT_LENGTH = OCTET_LENGTH × 8 (via saturating_mul).
+#   - UTF-8 multibyte byte-vs-char count difference.
+#   - Non-string args coerce via value_to_sql_string (catch-all).
+#   - Arity errors.
+#
+# Big-picture finding:
+#   INITCAP and TRANSLATE are PG-style string functions that
+#   zeta supports but no MySQL app would use them by those
+#   names (MySQL has neither). Pinning them documents that
+#   the engine surface IS broader than the MySQL surface, and
+#   provides a contract for tooling that translates PG SQL.
+#
+#   The OCTET_LENGTH/LENGTHB/BIT_LENGTH triple share ONE impl
+#   arm (lib.rs:46146). LENGTHB is an Oracle alias; using it
+#   in a MySQL app is fine in zeta because all three pipe
+#   through identical byte-counting logic.
+#
+#   TRANSLATE "delete-when-no-mapping" semantics differ from
+#   REPLACE — REPLACE substitutes one string for another (no
+#   per-char remapping). TRANSLATE on the same input gives a
+#   DIFFERENT result. Pinned via a side-by-side comparison.
+#
+# Adaptation notes:
+#   # zeta-adapt: INITCAP word boundary = !is_alphanumeric.
+#     `O'CONNOR` becomes `O'Connor` (apostrophe is a
+#     boundary). Numbers are alphanumeric so `abc123def`
+#     becomes `Abc123def` (single word).
+#   # zeta-adapt: TRANSLATE shorter `to` deletes — useful for
+#     character stripping (e.g. removing digits).
+#   # zeta-adapt: OCTET_LENGTH / LENGTHB / BIT_LENGTH are the
+#     ONLY way to count BYTES of a UTF-8 string. LENGTH on
+#     String type also returns bytes in zeta (verified via
+#     impl), so OCTET_LENGTH ≡ LENGTH for String shape. The
+#     distinction matters only at the type-shape boundary
+#     (Bytes vs String).
+
+--echo === INITCAP basic ===
+
+SELECT INITCAP('hello world')                                 AS two_words;
+SELECT INITCAP('HELLO WORLD')                                 AS all_caps_normalized;
+SELECT INITCAP('hello')                                       AS single_word;
+SELECT INITCAP('')                                            AS empty_string;
+
+--echo === INITCAP word boundary = non-alphanumeric ===
+
+# Apostrophe is a boundary — `O'CONNOR` becomes `O'Connor`.
+SELECT INITCAP('O''CONNOR')                                   AS apostrophe_boundary;
+# Numbers ARE alphanumeric — `abc123def` is ONE word.
+SELECT INITCAP('abc123def')                                   AS digit_inside_one_word;
+# Multiple consecutive separators preserved.
+SELECT INITCAP('hello---world')                               AS dash_separators;
+# Tab and other whitespace as boundaries.
+SELECT INITCAP('a b  c')                                      AS multi_space;
+# Mixed punctuation.
+SELECT INITCAP('hello, world! how are you?')                  AS sentence;
+
+--echo === INITCAP UTF-8 multibyte ===
+
+# `café` — first letter uppercased, rest lowercased.
+SELECT INITCAP('CAFÉ MENU')                                   AS utf8_uppercased;
+SELECT INITCAP('café menu')                                   AS utf8_lowercased;
+
+--echo === INITCAP NULL + arity + non-string coerce ===
+
+SELECT INITCAP(NULL)                                          AS null_propagates;
+SELECT INITCAP(NULL) IS NULL                                  AS null_predicate;
+# Non-string coerced via value_to_sql_string then INITCAPped.
+SELECT INITCAP(42)                                            AS int_coerce;
+SELECT INITCAP(TRUE)                                          AS bool_coerce;
+--error 1105
+SELECT INITCAP();
+--error 1105
+SELECT INITCAP('a', 'b');
+
+--echo === TRANSLATE basic (1:1 char map) ===
+
+# Standard PG TRANSLATE: replace per-char position.
+SELECT TRANSLATE('abc',     'abc', 'xyz')                     AS abc_to_xyz;
+SELECT TRANSLATE('hello',   'el',  'ip')                      AS partial_map;
+# No-op when from and to are identical.
+SELECT TRANSLATE('hello',   'aeiou', 'aeiou')                 AS noop_identity;
+# Char not in `from` passes through unchanged.
+SELECT TRANSLATE('hello',   'xyz', 'abc')                     AS no_match_passthrough;
+
+--echo === TRANSLATE delete semantics — shorter `to` strips ===
+
+# Chars in `from` past the length of `to` are DELETED. Useful
+# for stripping digits / punctuation.
+SELECT TRANSLATE('phone: 555-1234', '0123456789', '')         AS strip_digits;
+SELECT TRANSLATE('hello!world?', '!?', '')                    AS strip_punctuation;
+# Partial: 'el' map; if to='i', then 'e'→'i', 'l' deleted.
+SELECT TRANSLATE('hello', 'el', 'i')                          AS shorter_to_partial_delete;
+
+--echo === TRANSLATE NULL + arity ===
+
+# ANY null arg → NULL.
+SELECT TRANSLATE(NULL,  'a', 'b')                             AS null_s;
+SELECT TRANSLATE('abc', NULL, 'b')                            AS null_from;
+SELECT TRANSLATE('abc', 'a',  NULL)                           AS null_to;
+SELECT TRANSLATE(NULL,  'a', 'b') IS NULL                     AS null_s_pred;
+--error 1105
+SELECT TRANSLATE('abc', 'a');
+--error 1105
+SELECT TRANSLATE('abc');
+--error 1105
+SELECT TRANSLATE();
+--error 1105
+SELECT TRANSLATE('abc', 'a', 'b', 'c');
+
+--echo === TRANSLATE vs REPLACE — DIFFERENT semantics ===
+
+# REPLACE substitutes one whole string for another; TRANSLATE
+# does per-character mapping. Pin the divergence on a case
+# where both produce different output.
+# REPLACE('ace', 'ce', 'xy') → 'axy' (single substring sub).
+# TRANSLATE('ace', 'ce', 'xy') → 'axy' (c→x, e→y).
+# These happen to agree above. To force divergence:
+# REPLACE('abcabc', 'abc', '12') → '1212' (whole substring).
+# TRANSLATE('abcabc', 'abc', '12') → '1212' but using char
+# map (a→1, b→2, c→deleted) → '1212' also! Need a case
+# where the order/repetition matters.
+# REPLACE('hello', 'l', 'XY') → 'heXYXYo' (each 'l' → 'XY').
+# TRANSLATE('hello', 'l', 'XY') → 'heXXo' (each 'l' → 'X';
+# extra 'Y' in `to` ignored). DIFFERENT result.
+SELECT REPLACE('hello',   'l', 'XY')                          AS replace_doubles;
+SELECT TRANSLATE('hello', 'l', 'XY')                          AS translate_singles;
+SELECT REPLACE('hello',   'l', 'XY') = TRANSLATE('hello', 'l', 'XY')
+                                                              AS divergence_eq_is_false;
+
+--echo === OCTET_LENGTH ≡ LENGTHB (same impl arm) ===
+
+SELECT OCTET_LENGTH('hello')                                  AS ol_ascii;
+SELECT LENGTHB('hello')                                       AS lb_ascii;
+SELECT OCTET_LENGTH('hello') = LENGTHB('hello')               AS ol_eq_lb_ascii;
+# UTF-8 multibyte — both report bytes.
+SELECT OCTET_LENGTH('café')                                   AS ol_utf8;
+SELECT LENGTHB('café')                                        AS lb_utf8;
+SELECT OCTET_LENGTH('café') = LENGTHB('café')                 AS ol_eq_lb_utf8;
+SELECT OCTET_LENGTH('café') = 5                               AS bytes_is_5;
+# CHAR_LENGTH gives the char count (4) — different from
+# OCTET_LENGTH (5 bytes).
+SELECT CHAR_LENGTH('café')                                    AS char_count;
+SELECT CHAR_LENGTH('café') <> OCTET_LENGTH('café')            AS char_diff_from_bytes;
+
+--echo === BIT_LENGTH = OCTET_LENGTH × 8 ===
+
+SELECT BIT_LENGTH('hello')                                    AS bl_ascii;
+SELECT BIT_LENGTH('hello') = OCTET_LENGTH('hello') * 8        AS bl_eq_ol8_ascii;
+SELECT BIT_LENGTH('café')                                     AS bl_utf8;
+SELECT BIT_LENGTH('café') = OCTET_LENGTH('café') * 8          AS bl_eq_ol8_utf8;
+# Empty string — 0 bytes, 0 bits.
+SELECT OCTET_LENGTH('')                                       AS empty_ol;
+SELECT BIT_LENGTH('')                                         AS empty_bl;
+
+--echo === OCTET_LENGTH / LENGTHB / BIT_LENGTH — NULL + arity ===
+
+SELECT OCTET_LENGTH(NULL)                                     AS ol_null;
+SELECT LENGTHB(NULL)                                          AS lb_null;
+SELECT BIT_LENGTH(NULL)                                       AS bl_null;
+SELECT OCTET_LENGTH(NULL) IS NULL                             AS ol_null_pred;
+--error 1105
+SELECT OCTET_LENGTH();
+--error 1105
+SELECT LENGTHB();
+--error 1105
+SELECT BIT_LENGTH();
+--error 1105
+SELECT OCTET_LENGTH('a', 'b');
+
+--echo === OCTET_LENGTH on non-string types (catch-all) ===
+
+# Int / Bool / DATE coerce via value_to_sql_string, then bytes.
+SELECT OCTET_LENGTH(42)                                       AS ol_int_is_2;
+SELECT OCTET_LENGTH(TRUE)                                     AS ol_true_is_4;
+SELECT OCTET_LENGTH(DATE '2024-03-15')                        AS ol_date_is_10;
