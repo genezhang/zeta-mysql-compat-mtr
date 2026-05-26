@@ -53,12 +53,21 @@
 #   JSON_QUERY('doc', '$.path') — pre-existing shape
 #     (unknown function 1105). NEW witness for this fn.
 #
-#   JSON_VALUE('doc', '$.path' RETURNING INTEGER) —
-#     SUPPORTED. zeta's JSON_VALUE accepts the PG
-#     RETURNING clause and converts to the target type.
-#     Probed with INTEGER and TEXT targets to ensure
-#     type-conversion is the actual behavior, not just
-#     accept-and-ignore.
+#   JSON_VALUE('doc', '$.path' RETURNING <type>) —
+#     PARSES, but the RETURNING type is ACCEPT-AND-IGNORE.
+#     zeta's planner pins JSON_VALUE's result type to
+#     Text unconditionally (zeta-planner/src/resolve.rs:
+#     "json_value" => DataType::Text), so RETURNING
+#     INTEGER / RETURNING TEXT render identically and
+#     no coercion or range-check happens.
+#     Falsifier probes (added after initial review):
+#       - RETURNING INTEGER || '_suffix' succeeds with
+#         '42_suffix' — real PG would reject int||text.
+#       - RETURNING INTEGER against a STRING value '"hi"'
+#         returns 'hi' as text instead of erroring or
+#         coercing — no input-syntax check happened.
+#       - RETURNING INTEGER against 3.7 returns 3.7 not
+#         3 or 4 — no truncation/cast happened.
 #
 #   JSON_VALUE('doc', '$.path' DEFAULT 'x' ON ERROR) —
 #     pre-existing shape "Expected: ), found: DEFAULT"
@@ -84,10 +93,10 @@
 #     - JSON_EXISTS / JSON_QUERY: parsed as unknown
 #       function — executor has no implementation.
 #     - JSON_VALUE: 2-arg MySQL form works (pinned
-#       elsewhere). PG-style RETURNING clause works as
-#       a partial PG-compat layer (zeta accepts it).
-#       PG-style ON ERROR / ON EMPTY / DEFAULT modifiers
-#       all parser-reject.
+#       elsewhere). PG-style RETURNING clause PARSES
+#       but is ACCEPT-AND-IGNORE — result type is always
+#       Text. PG-style ON ERROR / ON EMPTY / DEFAULT
+#       modifiers all parser-reject.
 #
 #   Apps porting PG SQL/JSON code must rewrite:
 #     - IS JSON →  JSONB validity check via JSON_VALID
@@ -96,8 +105,10 @@
 #       jsonb_exists family (if supported).
 #     - JSON_QUERY → JSONB extract via -> / #> / @>
 #       operators or jsonb_extract_path.
-#     - JSON_VALUE — keep the call but drop ON ERROR
-#       / ON EMPTY clauses; RETURNING clause works as-is.
+#     - JSON_VALUE — keep the call but drop ON ERROR /
+#       ON EMPTY clauses; RETURNING clause parses but is
+#       a no-op, so wrap with CAST(... AS <type>) if real
+#       typed conversion is required.
 #
 # Wire divergence check: probed both wires (pgwire
 # port 13501 and mysqlwire port 3307) — identical
@@ -114,8 +125,10 @@
 #   # zeta-adapt: KNOWN GAP — JSON_EXISTS and JSON_QUERY
 #     are unknown functions (executor error 1105).
 #     Use @? / @@ / -> / #> on JSONB columns instead.
-#   # zeta-adapt: SUPPORTED — JSON_VALUE PG-style with
-#     RETURNING <type> clause (INTEGER/TEXT confirmed).
+#   # zeta-adapt: ACCEPT-AND-IGNORE — JSON_VALUE PG-style
+#     with RETURNING <type> clause parses but does NOT
+#     coerce; the result is always Text. Wrap with CAST
+#     if real typed conversion is required.
 #   # zeta-adapt: KNOWN GAP — JSON_VALUE PG-style with
 #     DEFAULT 'x' ON ERROR / ON EMPTY clauses parse-
 #     reject. JSON_VALUE returns NULL on missing-key /
@@ -166,15 +179,37 @@ SELECT JSON_EXISTS('{"a":1}', '$.a');
 --error 1105
 SELECT JSON_QUERY('{"a":1}', '$.a');
 
---echo === JSON_VALUE PG-style RETURNING <type> — SUPPORTED (partial PG compat layer) ===
+--echo === JSON_VALUE PG-style RETURNING <type> — PARSES but ACCEPT-AND-IGNORE ===
 
-# zeta's JSON_VALUE accepts the PG RETURNING clause
-# and converts to the target type. Probed with TWO
-# distinct target types (INTEGER, TEXT) to FALSIFY
-# "accept-and-ignore" — both produce typed-conversion
-# output, not raw JSON.
+# zeta's JSON_VALUE accepts the PG RETURNING clause at
+# the parser, but the planner pins the result type to
+# Text unconditionally (zeta-planner/src/resolve.rs:
+# "json_value" => DataType::Text). So the RETURNING
+# clause is a no-op — no coercion, no truncation, no
+# range/syntax check.
+#
+# Baseline shapes (would render identically whether
+# typed or accept-and-ignore — not falsifiable alone):
 SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) AS r_int;
 SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING TEXT) AS r_text;
+
+--echo --- Falsifier probes for the accept-and-ignore claim ---
+
+# Probe 1: RETURNING INTEGER || '_suffix' — succeeds
+# producing '42_suffix'. Real PG would reject int||text
+# at the operator. zeta tolerates it because the result
+# is actually Text, so || is text||text.
+SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) || '_suffix' AS concat_after_int;
+
+# Probe 2: RETURNING INTEGER against the STRING value
+# '"hi"' returns 'hi' as text — no coercion attempt,
+# no "invalid input syntax for type integer" error.
+SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING INTEGER) AS hi_as_int;
+
+# Probe 3: RETURNING INTEGER against 3.7 returns 3.7
+# verbatim — no truncation to 3, no round to 4, no
+# "out of range / non-integer" error.
+SELECT JSON_VALUE('{"a":3.7}', '$.a' RETURNING INTEGER) AS float_as_int;
 
 --echo === JSON_VALUE PG-style DEFAULT 'x' ON ERROR — parse-reject at DEFAULT ===
 

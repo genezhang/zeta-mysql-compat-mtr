@@ -18,13 +18,23 @@ SELECT JSON_EXISTS('{"a":1}', '$.a');
 ERROR 1105: execution error: unknown function: JSON_EXISTS
 SELECT JSON_QUERY('{"a":1}', '$.a');
 ERROR 1105: execution error: unknown function: JSON_QUERY
-=== JSON_VALUE PG-style RETURNING <type> — SUPPORTED (partial PG compat layer) ===
+=== JSON_VALUE PG-style RETURNING <type> — PARSES but ACCEPT-AND-IGNORE ===
 SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) AS r_int;
 r_int
 42
 SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING TEXT) AS r_text;
 r_text
 hi
+--- Falsifier probes for the accept-and-ignore claim ---
+SELECT JSON_VALUE('{"a":42}', '$.a' RETURNING INTEGER) || '_suffix' AS concat_after_int;
+concat_after_int
+42_suffix
+SELECT JSON_VALUE('{"a":"hi"}', '$.a' RETURNING INTEGER) AS hi_as_int;
+hi_as_int
+hi
+SELECT JSON_VALUE('{"a":3.7}', '$.a' RETURNING INTEGER) AS float_as_int;
+float_as_int
+3.7
 === JSON_VALUE PG-style DEFAULT 'x' ON ERROR — parse-reject at DEFAULT ===
 SELECT JSON_VALUE('bad', '$.a' DEFAULT 'd' ON ERROR);
 ERROR 1064: SQL parse error: sql parser error: Expected: ), found: DEFAULT at Line: 1, Column: 32
