@@ -1,0 +1,38 @@
+=== Shape A — `::MONEY` cast (1105) ===
+SELECT '$12.34'::MONEY;
+ERROR 1105: execution error: unsupported CAST target type: MONEY
+SELECT '$1,000.50'::MONEY;
+ERROR 1105: execution error: unsupported CAST target type: MONEY
+SELECT 12.34::MONEY;
+ERROR 1105: execution error: unsupported CAST target type: MONEY
+=== Shape B — `MONEY` DDL column (1064, lowercase) ===
+CREATE TABLE m_t (id INT PRIMARY KEY, price MONEY);
+ERROR 1064: SQL parse error: unsupported data type: money
+=== Shape A — `::BIT(N)` / `::BIT VARYING(N)` / `::VARBIT(N)` cast (1105, parametric form preserved) ===
+SELECT '10110'::BIT(5);
+ERROR 1105: execution error: unsupported CAST target type: BIT(5)
+SELECT '10110'::BIT VARYING(8);
+ERROR 1105: execution error: unsupported CAST target type: BIT VARYING(8)
+SELECT '10110'::VARBIT(8);
+ERROR 1105: execution error: unsupported CAST target type: VARBIT(8)
+=== Shape B — BIT/VARBIT DDL column (1064, parametric form preserved) ===
+CREATE TABLE b_fixed (id INT PRIMARY KEY, flags BIT(8));
+ERROR 1064: SQL parse error: unsupported data type: BIT(8)
+CREATE TABLE b_var (id INT PRIMARY KEY, flags BIT VARYING(16));
+ERROR 1064: SQL parse error: unsupported data type: BIT VARYING(16)
+CREATE TABLE b_varbit (id INT PRIMARY KEY, flags VARBIT(16));
+ERROR 1064: SQL parse error: unsupported data type: VARBIT(16)
+=== 4TH INTERNAL-LEAK FINGERPRINT — `B'...'` bit-string literal ===
+SELECT B'10110';
+ERROR 1064: SQL parse error: unsupported value: SingleQuotedByteStringLiteral("10110")
+SELECT B'10110' || B'001';
+ERROR 1064: SQL parse error: unsupported value: SingleQuotedByteStringLiteral("10110")
+SELECT B'10110' & B'01100';
+ERROR 1064: SQL parse error: unsupported value: SingleQuotedByteStringLiteral("10110")
+SELECT BIT_LENGTH(B'10110');
+ERROR 1064: SQL parse error: unsupported value: SingleQuotedByteStringLiteral("10110")
+=== MONEY arithmetic — inner cast fires first (Shape A) ===
+SELECT '$10'::MONEY + '$5'::MONEY;
+ERROR 1105: execution error: unsupported CAST target type: MONEY
+SELECT '$10'::MONEY * 2;
+ERROR 1105: execution error: unsupported CAST target type: MONEY

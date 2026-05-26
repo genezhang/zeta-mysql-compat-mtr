@@ -1,0 +1,158 @@
+# Independently authored MONEY + BIT/VARBIT sentinel
+# slice for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - MONEY type, BIT(N), BIT VARYING(N), VARBIT(N),
+#     B'...' bit-string literals: ZERO prior coverage.
+#     Wide-grep of tests/main/*.test for `::MONEY`,
+#     `\bMONEY\b`, `\bBIT\s*\(`, `\bVARBIT\b`,
+#     `\bBIT VARYING\b`, `B'[01]+'` returns no hits.
+#
+# Pre-existing shape patterns acknowledged:
+#   - Shape A — "unsupported CAST target type:"
+#     (PR #387/#389/#393).
+#   - Shape B — "unsupported data type:" (PR #387/#389/#393).
+#   - Internal-Rust-types-leaked-on-wire pattern —
+#     witnessed in PR #385 (`Array { element_type:
+#     ... }`), PR #386 (`sqlparser::ast::Statement`),
+#     PR #388 (`Function { name: ..., args: ... }`).
+#     This slice adds a FOURTH instance.
+#
+# This slice pins:
+#
+#   Shape A — `::MONEY` / `::BIT(N)` / `::BIT VARYING(N)`
+#   / `::VARBIT(N)` cast (1105):
+#     - "unsupported CAST target type: MONEY" /
+#       "BIT(5)" / "BIT VARYING(8)" / "VARBIT(8)".
+#     - The parametric form is PRESERVED in the error
+#       (e.g. "BIT(5)" not just "BIT") — small detail
+#       distinguishing from PR #387 INET/CIDR (which
+#       are non-parametric).
+#
+#   Shape B — DDL column type (1064):
+#     - "unsupported data type: money" (lowercase) /
+#       "BIT(8)" (case preserved with parens) /
+#       "BIT VARYING(16)" / "VARBIT(16)".
+#     - Case-divergence inconsistent: bare MONEY
+#       lowercases, parametric BIT(8) preserves case.
+#       Per PR #387 INET (lowercase always) — the
+#       lowercasing happens for the non-parametric
+#       data-type matcher arm; parametric variants
+#       skip the lowercasing.
+#
+#   FOURTH INTERNAL-LEAK FINGERPRINT — `B'...'` bit-
+#   string literal:
+#     - "unsupported value: SingleQuotedByteString
+#       Literal(\"10110\")" (1064).
+#     - sqlparser parses `B'10110'` as
+#       `Value::SingleQuotedByteStringLiteral`; zeta's
+#       value-converter doesn't have an arm and falls
+#       through to a catch-all that LEAKS the sqlparser
+#       AST variant NAME `SingleQuotedByteStringLiteral`
+#       into the user-facing error string.
+#     - GENUINELY NEW fingerprint — by-fingerprint
+#       wide-grep returns zero priors for "unsupported
+#       value: SingleQuotedByteStringLiteral".
+#     - This is the FOURTH instance of the recurring
+#       internal-Rust-types-on-wire pattern:
+#         1. mysqlwire Array Debug-repr (PR #385)
+#         2. parser catch-all sqlparser::ast::Statement
+#            (PR #386 shape (c))
+#         3. column-not-found Function {...} (PR #388)
+#         4. unsupported value: SingleQuotedByteString
+#            Literal (this slice)
+#     - All four are different code sites with the
+#       same recurring pattern: a Rust-Debug formatter
+#       embeds an internal AST variant name into a
+#       user-facing error message.
+#
+#   ALL bit operator/function rows fire the same
+#   leak: `B'...' || B'...'`, `B'...' & B'...'`,
+#   BIT_LENGTH(B'...'), etc. — sqlparser parses the
+#   `B'...'` literal into Value::SingleQuotedByteString
+#   Literal BEFORE the operator/function is even
+#   considered, so the leak fires first.
+#
+# Big-picture finding:
+#
+#   MONEY and BIT/VARBIT are entirely absent from zeta:
+#   cast 1105, DDL 1064. Plus zeta has no arm for
+#   sqlparser's bit-string-literal Value variant, so
+#   ANY use of `B'10101'` literal syntax leaks the
+#   sqlparser AST variant name.
+#
+#   Apps porting PG code must rewrite:
+#     - MONEY → NUMERIC(precision, scale) for currency
+#     - BIT(N) → small INTEGER (for flag bitmasks) or
+#       BYTEA (for binary blobs)
+#     - BIT VARYING(N) / VARBIT(N) → BYTEA
+#     - B'10101' literal → integer constant or BYTEA
+#       hex literal
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — MONEY type unsupported
+#     (cast 1105, DDL 1064). Use NUMERIC instead.
+#   # zeta-adapt: KNOWN GAP — BIT(N), BIT VARYING(N),
+#     VARBIT(N) all unsupported. Use INTEGER (bitmask)
+#     or BYTEA (binary).
+#   # zeta-adapt: KNOWN BUG (4th instance of internal-
+#     Rust-types-on-wire pattern) — `B'...'` bit-string
+#     literals leak sqlparser's `SingleQuotedByteString
+#     Literal` AST variant name into the error string.
+
+--echo === Shape A — `::MONEY` cast (1105) ===
+
+--error 1105
+SELECT '$12.34'::MONEY;
+--error 1105
+SELECT '$1,000.50'::MONEY;
+--error 1105
+SELECT 12.34::MONEY;
+
+--echo === Shape B — `MONEY` DDL column (1064, lowercase) ===
+
+--error 1064
+CREATE TABLE m_t (id INT PRIMARY KEY, price MONEY);
+
+--echo === Shape A — `::BIT(N)` / `::BIT VARYING(N)` / `::VARBIT(N)` cast (1105, parametric form preserved) ===
+
+--error 1105
+SELECT '10110'::BIT(5);
+--error 1105
+SELECT '10110'::BIT VARYING(8);
+--error 1105
+SELECT '10110'::VARBIT(8);
+
+--echo === Shape B — BIT/VARBIT DDL column (1064, parametric form preserved) ===
+
+--error 1064
+CREATE TABLE b_fixed (id INT PRIMARY KEY, flags BIT(8));
+--error 1064
+CREATE TABLE b_var (id INT PRIMARY KEY, flags BIT VARYING(16));
+--error 1064
+CREATE TABLE b_varbit (id INT PRIMARY KEY, flags VARBIT(16));
+
+--echo === 4TH INTERNAL-LEAK FINGERPRINT — `B'...'` bit-string literal ===
+
+# zeta's value-converter has no arm for sqlparser's
+# Value::SingleQuotedByteStringLiteral; the catch-all
+# leaks the AST variant name. Fires for bare literal:
+--error 1064
+SELECT B'10110';
+
+# Also fires for ANY use inside an operator/function
+# (literal evaluated first):
+--error 1064
+SELECT B'10110' || B'001';
+--error 1064
+SELECT B'10110' & B'01100';
+--error 1064
+SELECT BIT_LENGTH(B'10110');
+
+--echo === MONEY arithmetic — inner cast fires first (Shape A) ===
+
+--error 1105
+SELECT '$10'::MONEY + '$5'::MONEY;
+--error 1105
+SELECT '$10'::MONEY * 2;
