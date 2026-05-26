@@ -1,0 +1,6 @@
+=== SHOW ERRORS — empty stub (MySQL: Level/Code/Message; zeta empty) ===
+SHOW ERRORS;
+=== SHOW CHARSET — empty stub ===
+SHOW CHARSET;
+=== SHOW PRIVILEGES — empty stub ===
+SHOW PRIVILEGES;

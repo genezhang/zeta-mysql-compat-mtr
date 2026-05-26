@@ -1,0 +1,63 @@
+# Independently authored SHOW empty-result stubs sentinel
+# smoke for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - variable_basic_extra.test:107-133 already pins SHOW
+#     VARIABLES / VARIABLES LIKE / STATUS / WARNINGS /
+#     ENGINES / PROCESSLIST. Same `--echo === KNOWN
+#     DIVERGENCE ===` + empty-result framing.
+#   - charset_collation_basic_extra.test:78-80 pins SHOW
+#     COLLATION (and :116-118 for SHOW COLLATION LIKE).
+#   - variable_basic_extra.test:85-87 also pins SHOW
+#     COLLATION via a second framing.
+#   - auth_basic_extra.test:74-80 pins SHOW GRANTS and
+#     SHOW GRANTS FOR 'u'@'h'.
+#   - show_basic_extra.test pins SHOW DATABASES / TABLES /
+#     COLUMNS / CREATE TABLE / TABLES LIKE.
+#
+# After full duplicate audit, only THREE empty-stub SHOWs
+# remain uncovered:
+#   - SHOW ERRORS
+#   - SHOW CHARSET (the CHARSET-only variant, not COLLATION)
+#   - SHOW PRIVILEGES
+# This slice pins exactly those three. Initial draft of this
+# slice over-claimed coverage gaps; narrowed after review
+# pointed out the duplicates.
+#
+# Big-picture finding:
+#   zeta's MySQL shim has TWO classes of empty-result SHOW
+#   dispatch:
+#     - SHOW WARNINGS routes to MySqlResult::Warnings
+#       (3-column shape).
+#     - SHOW VARIABLES/STATUS/ERRORS/CHARSET/PRIVILEGES route
+#       to MySqlResult::EmptyShow (2-column shape:
+#       Variable_name, Value). SHOW ERRORS technically has
+#       the wrong shape (MySQL gives Level/Code/Message),
+#       but the empty rendering masks this.
+#   The MTR format only emits the header line when there's
+#   at least one row — so this shape-divergence is invisible
+#   in the recorded .result. Pinning these documents the
+#   no-error parse path; a future fix that wires real data
+#   would also need to fix the column shape.
+#
+# Adaptation notes:
+#   # zeta-adapt: SHOW ERRORS, SHOW CHARSET, SHOW PRIVILEGES
+#     all execute without error but return EMPTY result sets.
+#   # zeta-adapt: If you need actual server-state introspection,
+#     query information_schema / pg_catalog directly — those
+#     surfaces are at least partially populated.
+
+--echo === SHOW ERRORS — empty stub (MySQL: Level/Code/Message; zeta empty) ===
+
+SHOW ERRORS;
+
+--echo === SHOW CHARSET — empty stub ===
+
+# Distinct from charset_collation_basic_extra.test (which
+# covers SHOW COLLATION, NOT SHOW CHARSET).
+SHOW CHARSET;
+
+--echo === SHOW PRIVILEGES — empty stub ===
+
+SHOW PRIVILEGES;
