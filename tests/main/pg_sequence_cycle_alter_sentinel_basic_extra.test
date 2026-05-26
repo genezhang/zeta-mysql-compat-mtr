@@ -1,0 +1,187 @@
+# Independently authored PG SEQUENCE descending-CYCLE
+# + ALTER SEQUENCE gap sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE SEQUENCE INCREMENT / MINVALUE / MAXVALUE
+#     / START WITH: covered at sequence_basic_extra
+#     (SUPPORTED).
+#   - ASCENDING CREATE SEQUENCE ... CYCLE: pinned at
+#     sequence_basic_extra as KNOWN GAP (silent-drop;
+#     errors at MAXVALUE+1 instead of wrapping).
+#   - NEXTVAL / CURRVAL / SETVAL: covered.
+#   - ALTER SEQUENCE: ZERO prior coverage (was
+#     observed during probing as universal parse-
+#     reject).
+#   - DESCENDING SEQUENCE CYCLE behavior: ZERO prior
+#     coverage. Distinct witness from ascending
+#     because the silent-drop violates declared
+#     MINVALUE (returns values BELOW the declared
+#     range — corruption-class, not just silent-drop).
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - SILENT-DROP CYCLE: pinned at sequence_basic_
+#     extra for ascending. This slice adds the
+#     DESCENDING witness which is more dangerous —
+#     ascending errors at MAX+1 (data not corrupted,
+#     just unavailable); descending silently emits
+#     values BELOW MINVALUE (data IS corrupted with
+#     out-of-range values).
+#   - "Expected: one of VIEW or TYPE or TABLE or
+#     INDEX or ROLE or POLICY or CONNECTOR or
+#     ICEBERG or SCHEMA or USER or OPERATOR, found:
+#     SEQUENCE" — NEW fingerprint for the entire
+#     ALTER SEQUENCE family. sqlparser's ALTER
+#     grammar (the top-level "ALTER <kind>" pick-
+#     list) does NOT include SEQUENCE.
+#
+# This slice pins:
+#
+#   BUG — Descending CYCLE silent-drop + MINVALUE
+#   breach:
+#     - CREATE SEQUENCE INCREMENT -1 MINVALUE 1
+#       MAXVALUE 3 START 3 CYCLE
+#     - NEXTVAL sequence: 3, 2, 1, 0 (4th call)
+#     - PG expected: 3, 2, 1, 3 (wraps to MAXVALUE
+#       on cycle).
+#     - zeta: silently decrements past MINVALUE,
+#       emitting 0 which is OUTSIDE the declared
+#       [1, 3] range. The CYCLE keyword is dropped
+#       AND the MINVALUE bound is violated.
+#     - DOUBLE FAULT: CYCLE silently dropped AND
+#       the resulting decrement violates MINVALUE
+#       (which IS supposed to be enforced even
+#       without CYCLE — descending past MINVALUE
+#       should error like ascending past MAXVALUE
+#       does).
+#
+#   COMPREHENSIVE GAP — ALTER SEQUENCE family (12+
+#   forms, all parse-reject with same fingerprint):
+#     - RESTART [WITH n]
+#     - INCREMENT n
+#     - MINVALUE / MAXVALUE n
+#     - CACHE n
+#     - CYCLE / NO CYCLE
+#     - OWNED BY tbl.col (pg_dump's serial-link form)
+#     - OWNED BY NONE
+#     - OWNER TO admin
+#     - SET SCHEMA s
+#     - RENAME TO new_name
+#     All hit "Expected: one of VIEW or TYPE or ...,
+#     found: SEQUENCE at col 7" — sqlparser's ALTER
+#     pick-list excludes SEQUENCE. Means apps cannot
+#     adjust sequence parameters post-creation
+#     (must DROP + CREATE to change anything).
+#     CRITICAL for pg_dump: every SERIAL column
+#     produces `ALTER SEQUENCE foo OWNED BY tbl.col`
+#     to link the sequence to the column — this
+#     line fails on every pg_dump-generated schema.
+#
+#   SUPPORT PIN — CACHE option on CREATE SEQUENCE:
+#     - CREATE SEQUENCE ... CACHE 100 accepts.
+#     - CACHE is a perf hint (preallocate N values
+#       per session); no behavioral falsifier
+#       possible without measuring concurrent
+#       behavior. Pinned only to confirm CREATE
+#       accepts the option.
+#
+# Big-picture finding:
+#
+#   zeta's SEQUENCE implementation has known
+#   ASCENDING CYCLE drop (sequence_basic_extra).
+#   This slice extends to TWO worse failure modes:
+#   (1) DESCENDING CYCLE silently violates MINVALUE,
+#       producing values OUTSIDE the declared range
+#       — data-integrity corruption, not just
+#       silent-drop.
+#   (2) ALTER SEQUENCE is COMPLETELY unsupported.
+#       Apps cannot adjust sequence parameters
+#       post-creation. pg_dump output is broken
+#       (the ALTER SEQUENCE foo OWNED BY tbl.col
+#       line in every pg_dump for SERIAL columns
+#       errors).
+#
+#   Apps porting PG sequences should:
+#     - Avoid CYCLE — use trigger-based wrap logic
+#       or accept reaching the bound.
+#     - Bake all sequence parameters into the initial
+#       CREATE; treat sequences as immutable.
+#     - Strip ALTER SEQUENCE lines from pg_dump
+#       output before loading.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL
+# behavior on every probe. Sequence semantics are
+# at the executor (wire-shared); ALTER reject is at
+# sqlparser (wire-shared).
+#
+# Adaptation notes:
+#   # zeta-adapt: BUG (silent-drop + MINVALUE
+#     violation) — descending CREATE SEQUENCE ...
+#     CYCLE silently produces values below MINVALUE.
+#     Avoid CYCLE; use a trigger to reset NEXTVAL
+#     manually.
+#   # zeta-adapt: KNOWN GAP — entire ALTER SEQUENCE
+#     family parse-rejected. pg_dump output requires
+#     stripping ALTER SEQUENCE lines.
+#   # zeta-adapt: SUPPORTED — CREATE SEQUENCE
+#     INCREMENT / MINVALUE / MAXVALUE / START /
+#     CACHE / negative INCREMENT (descending non-
+#     CYCLE).
+
+--echo === BUG — DESCENDING CYCLE silent-drop + MINVALUE breach ===
+
+DROP SEQUENCE IF EXISTS s_dc;
+CREATE SEQUENCE s_dc INCREMENT -1 START 3 MINVALUE 1 MAXVALUE 3 CYCLE;
+
+--echo === First 3 NEXTVAL: 3, 2, 1 (within [1, 3]) ===
+
+SELECT NEXTVAL('s_dc');
+SELECT NEXTVAL('s_dc');
+SELECT NEXTVAL('s_dc');
+
+--echo === 4th NEXTVAL: PG would wrap to MAXVALUE (3); zeta returns 0 (BELOW MINVALUE 1) ===
+
+SELECT NEXTVAL('s_dc');
+
+DROP SEQUENCE s_dc;
+
+--echo === COMPREHENSIVE GAP — ALTER SEQUENCE family (all 12+ forms parse-reject) ===
+
+DROP SEQUENCE IF EXISTS sa;
+CREATE SEQUENCE sa START 1;
+
+--error 1064
+ALTER SEQUENCE sa RESTART;
+--error 1064
+ALTER SEQUENCE sa RESTART WITH 100;
+--error 1064
+ALTER SEQUENCE sa INCREMENT 5;
+--error 1064
+ALTER SEQUENCE sa MINVALUE 1 MAXVALUE 1000;
+--error 1064
+ALTER SEQUENCE sa CACHE 50;
+--error 1064
+ALTER SEQUENCE sa CYCLE;
+--error 1064
+ALTER SEQUENCE sa NO CYCLE;
+--error 1064
+ALTER SEQUENCE sa OWNED BY some_table.id;
+--error 1064
+ALTER SEQUENCE sa OWNED BY NONE;
+--error 1064
+ALTER SEQUENCE sa OWNER TO admin;
+--error 1064
+ALTER SEQUENCE sa SET SCHEMA s;
+--error 1064
+ALTER SEQUENCE sa RENAME TO sb;
+
+DROP SEQUENCE sa;
+
+--echo === SUPPORT PIN — CACHE option on CREATE SEQUENCE accepts ===
+
+DROP SEQUENCE IF EXISTS s_cache;
+CREATE SEQUENCE s_cache CACHE 100;
+SELECT NEXTVAL('s_cache');
+DROP SEQUENCE s_cache;

@@ -1,0 +1,53 @@
+=== BUG — DESCENDING CYCLE silent-drop + MINVALUE breach ===
+DROP SEQUENCE IF EXISTS s_dc;
+CREATE SEQUENCE s_dc INCREMENT -1 START 3 MINVALUE 1 MAXVALUE 3 CYCLE;
+=== First 3 NEXTVAL: 3, 2, 1 (within [1, 3]) ===
+SELECT NEXTVAL('s_dc');
+NEXTVAL
+3
+SELECT NEXTVAL('s_dc');
+NEXTVAL
+2
+SELECT NEXTVAL('s_dc');
+NEXTVAL
+1
+=== 4th NEXTVAL: PG would wrap to MAXVALUE (3); zeta returns 0 (BELOW MINVALUE 1) ===
+SELECT NEXTVAL('s_dc');
+NEXTVAL
+0
+DROP SEQUENCE s_dc;
+=== COMPREHENSIVE GAP — ALTER SEQUENCE family (all 12+ forms parse-reject) ===
+DROP SEQUENCE IF EXISTS sa;
+CREATE SEQUENCE sa START 1;
+ALTER SEQUENCE sa RESTART;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa RESTART WITH 100;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa INCREMENT 5;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa MINVALUE 1 MAXVALUE 1000;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa CACHE 50;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa CYCLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa NO CYCLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa OWNED BY some_table.id;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa OWNED BY NONE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa OWNER TO admin;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa SET SCHEMA s;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ALTER SEQUENCE sa RENAME TO sb;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+DROP SEQUENCE sa;
+=== SUPPORT PIN — CACHE option on CREATE SEQUENCE accepts ===
+DROP SEQUENCE IF EXISTS s_cache;
+CREATE SEQUENCE s_cache CACHE 100;
+SELECT NEXTVAL('s_cache');
+NEXTVAL
+1
+DROP SEQUENCE s_cache;
