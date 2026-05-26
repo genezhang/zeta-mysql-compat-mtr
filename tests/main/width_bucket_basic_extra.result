@@ -1,0 +1,117 @@
+=== WIDTH_BUCKET: basic ascending range ===
+SELECT WIDTH_BUCKET(25, 0, 100, 10)                           AS basic;
+basic
+3
+SELECT WIDTH_BUCKET(0, 0, 100, 10)                            AS at_low_bucket_1;
+at_low_bucket_1
+1
+SELECT WIDTH_BUCKET(CAST(99.99 AS DOUBLE PRECISION), 0, 100, 10) AS just_below_high;
+just_below_high
+10
+SELECT WIDTH_BUCKET(50, 0, 100, 10)                           AS mid_range;
+mid_range
+6
+=== WIDTH_BUCKET: underflow / overflow sentinels ===
+SELECT WIDTH_BUCKET(-5, 0, 100, 10)                           AS underflow_0;
+underflow_0
+0
+SELECT WIDTH_BUCKET(100, 0, 100, 10)                          AS at_high_overflow_11;
+at_high_overflow_11
+11
+SELECT WIDTH_BUCKET(200, 0, 100, 10)                          AS over_high_overflow_11;
+over_high_overflow_11
+11
+=== WIDTH_BUCKET: descending range (low > high) ===
+SELECT WIDTH_BUCKET(75, 100, 0, 10)                           AS desc_bucket_3;
+desc_bucket_3
+3
+SELECT WIDTH_BUCKET(100, 100, 0, 10)                          AS desc_at_low_bucket_1;
+desc_at_low_bucket_1
+1
+SELECT WIDTH_BUCKET(200, 100, 0, 10)                          AS desc_above_low_underflow_0;
+desc_above_low_underflow_0
+0
+SELECT WIDTH_BUCKET(0, 100, 0, 10)                            AS desc_at_high_overflow_11;
+desc_at_high_overflow_11
+11
+SELECT WIDTH_BUCKET(-5, 100, 0, 10)                           AS desc_below_high_overflow_11;
+desc_below_high_overflow_11
+11
+=== WIDTH_BUCKET: NULL prop on ANY arg ===
+SELECT WIDTH_BUCKET(NULL, 0, 100, 10)                         AS null_operand;
+null_operand
+NULL
+SELECT WIDTH_BUCKET(50, NULL, 100, 10)                        AS null_low;
+null_low
+NULL
+SELECT WIDTH_BUCKET(50, 0, NULL, 10)                          AS null_high;
+null_high
+NULL
+SELECT WIDTH_BUCKET(50, 0, 100, NULL)                         AS null_count;
+null_count
+NULL
+SELECT WIDTH_BUCKET(NULL, 0, 100, 10) IS NULL                 AS null_pred;
+null_pred
+1
+=== WIDTH_BUCKET: invalid-input edges → NULL (NOT error) ===
+SELECT WIDTH_BUCKET(50, 0, 100, 0)                            AS count_zero_null;
+count_zero_null
+NULL
+SELECT WIDTH_BUCKET(50, 0, 100, -5)                           AS count_neg_null;
+count_neg_null
+NULL
+SELECT WIDTH_BUCKET(50, 100, 100, 10)                         AS lo_eq_hi_null;
+lo_eq_hi_null
+NULL
+SELECT WIDTH_BUCKET(CAST('NaN' AS DOUBLE PRECISION), 0, 100, 10)
+                                                              AS nan_operand_null;
+nan_operand_null
+NULL
+SELECT WIDTH_BUCKET(50, CAST('NaN' AS DOUBLE PRECISION), 100, 10)
+                                                              AS nan_low_null;
+nan_low_null
+NULL
+SELECT WIDTH_BUCKET(50, 0, CAST('NaN' AS DOUBLE PRECISION), 10)
+                                                              AS nan_high_null;
+nan_high_null
+NULL
+SELECT WIDTH_BUCKET(50, CAST('-Infinity' AS DOUBLE PRECISION), 100, 10)
+                                                              AS neg_inf_low_null;
+neg_inf_low_null
+NULL
+SELECT WIDTH_BUCKET(50, 0, CAST('Infinity' AS DOUBLE PRECISION), 10)
+                                                              AS inf_high_null;
+inf_high_null
+NULL
+=== WIDTH_BUCKET: operand ±Infinity allowed (clamps to under/overflow) ===
+SELECT WIDTH_BUCKET(CAST('Infinity' AS DOUBLE PRECISION), 0, 100, 10)
+                                                              AS inf_op_overflow;
+inf_op_overflow
+11
+SELECT WIDTH_BUCKET(CAST('-Infinity' AS DOUBLE PRECISION), 0, 100, 10)
+                                                              AS neg_inf_op_underflow;
+neg_inf_op_underflow
+0
+=== WIDTH_BUCKET: arity errors → 1105 ===
+SELECT WIDTH_BUCKET();
+ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+SELECT WIDTH_BUCKET(50);
+ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+SELECT WIDTH_BUCKET(50, 0, 100);
+ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+SELECT WIDTH_BUCKET(50, 0, 100, 10, 99);
+ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+=== WIDTH_BUCKET: works with table column data ===
+CREATE TABLE wb_data (id INT, val DOUBLE PRECISION);
+INSERT INTO wb_data VALUES
+  (1, 5), (2, 25), (3, 50), (4, 75), (5, 99), (6, 100);
+SELECT id, WIDTH_BUCKET(val, 0, 100, 4) AS bucket
+  FROM wb_data ORDER BY id;
+id	bucket
+1	1
+2	2
+3	3
+4	4
+5	4
+6	5
+DROP TABLE wb_data;

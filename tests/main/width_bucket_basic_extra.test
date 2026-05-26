@@ -1,0 +1,159 @@
+# Independently authored WIDTH_BUCKET smoke for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - WIDTH_BUCKET — NONE (zero compat-mtr coverage).
+#     PG/SQL-standard equiwidth bucketing function.
+#
+# This slice pins:
+#   - WIDTH_BUCKET(operand, low, high, count) returns the
+#     1-based bucket number for operand within [low, high)
+#     divided into `count` equiwidth buckets.
+#   - UNDERFLOW (operand < low) → 0.
+#   - OVERFLOW (operand >= high) → count + 1.
+#   - In-range operand → 1..count.
+#   - At-low boundary: lo → bucket 1.
+#   - At-high boundary: hi → count + 1 (overflow, NOT count).
+#   - DESCENDING range (low > high) — mirrored bucketing.
+#   - count <= 0 → NULL.
+#   - low == high → NULL.
+#   - Any NULL arg → NULL.
+#   - NaN in any of operand/low/high → NULL.
+#   - low/high non-finite → NULL; operand ±Infinity allowed
+#     (clamps to underflow/overflow).
+#   - Arity (not 4) → 1105.
+#
+# Big-picture finding:
+#   WIDTH_BUCKET in zeta returns Int64 (PG returns Int4).
+#   The impl uses f64.floor + cast to i64, so very-large
+#   operands at the boundary may have minor float rounding
+#   differences. Out-of-range buckets follow PG convention:
+#     - operand < low → bucket 0 (underflow sentinel)
+#     - operand >= high → bucket count+1 (overflow sentinel)
+#   This is asymmetric: the at-low value falls IN (bucket 1),
+#   but at-high falls OUT (overflow). The interval is
+#   half-open [low, high).
+#
+#   Descending ranges (low > high) are supported via the
+#   mirrored arm at lib.rs:49398-49404. The interval is
+#   (high, low] (mirror of ascending's [low, high)). So:
+#     - operand strictly > low → 0 (underflow)
+#     - operand at-low (== low) → bucket 1 (IN)
+#     - operand <= high → count+1 (overflow)
+#     - in-range → mirrored bucket math
+#   Both ascending and descending: AT-LOW falls IN, AT-HIGH
+#   falls OUT. The half-openness mirrors consistently.
+#
+#   ALL invalid-input cases (NaN, non-finite bounds, zero/
+#   negative count, low==high) return NULL — NEVER an error.
+#   Only arity (≠4) errors.
+#
+# Adaptation notes:
+#   # zeta-adapt: WIDTH_BUCKET 4-arg signature is
+#     (operand, low, high, count). Returns Int64.
+#   # zeta-adapt: All edge cases (NaN, non-finite bounds,
+#     count<=0, low==high) return NULL — NOT error.
+#   # zeta-adapt: Range is half-open [low, high) for
+#     ascending. operand exactly at high lands in overflow
+#     bucket (count+1).
+#   # zeta-adapt: Descending range (low > high) supported
+#     with mirrored semantics.
+#   # zeta-adapt: Arity error → 1105.
+
+--echo === WIDTH_BUCKET: basic ascending range ===
+
+# 10 buckets over [0, 100): operand 25 → bucket 3.
+SELECT WIDTH_BUCKET(25, 0, 100, 10)                           AS basic;
+# operand 0 → bucket 1 (at-low boundary lands IN).
+SELECT WIDTH_BUCKET(0, 0, 100, 10)                            AS at_low_bucket_1;
+# operand 99.99 → bucket 10 (last in-range).
+SELECT WIDTH_BUCKET(CAST(99.99 AS DOUBLE PRECISION), 0, 100, 10) AS just_below_high;
+# operand 50 → bucket 6 (exactly mid).
+SELECT WIDTH_BUCKET(50, 0, 100, 10)                           AS mid_range;
+
+--echo === WIDTH_BUCKET: underflow / overflow sentinels ===
+
+# operand < low → 0 (underflow).
+SELECT WIDTH_BUCKET(-5, 0, 100, 10)                           AS underflow_0;
+# operand >= high → count + 1 (overflow). At-high is OUT.
+SELECT WIDTH_BUCKET(100, 0, 100, 10)                          AS at_high_overflow_11;
+SELECT WIDTH_BUCKET(200, 0, 100, 10)                          AS over_high_overflow_11;
+
+--echo === WIDTH_BUCKET: descending range (low > high) ===
+
+# Descending semantics from lib.rs:49398-49404. Interval is
+# (hi, lo] for descending (mirror of ascending's [lo, hi)).
+# 10 buckets descending from 100 to 0: operand 75 → bucket 3.
+SELECT WIDTH_BUCKET(75, 100, 0, 10)                           AS desc_bucket_3;
+# Descending at-LOW (100) lands IN bucket 1 (mirror of
+# ascending at-low → bucket 1). Trace: op>lo is FALSE (100
+# not strictly > 100), op<=hi is FALSE, fallthrough math
+# gives ((100-100)/100 * 10).floor()+1 = 1.
+SELECT WIDTH_BUCKET(100, 100, 0, 10)                          AS desc_at_low_bucket_1;
+# Descending strictly ABOVE low (200 > 100) → underflow (0).
+SELECT WIDTH_BUCKET(200, 100, 0, 10)                          AS desc_above_low_underflow_0;
+# Descending at-HIGH (0) lands in overflow (count+1) — mirror
+# of ascending at-high → overflow.
+SELECT WIDTH_BUCKET(0, 100, 0, 10)                            AS desc_at_high_overflow_11;
+SELECT WIDTH_BUCKET(-5, 100, 0, 10)                           AS desc_below_high_overflow_11;
+
+--echo === WIDTH_BUCKET: NULL prop on ANY arg ===
+
+SELECT WIDTH_BUCKET(NULL, 0, 100, 10)                         AS null_operand;
+SELECT WIDTH_BUCKET(50, NULL, 100, 10)                        AS null_low;
+SELECT WIDTH_BUCKET(50, 0, NULL, 10)                          AS null_high;
+SELECT WIDTH_BUCKET(50, 0, 100, NULL)                         AS null_count;
+SELECT WIDTH_BUCKET(NULL, 0, 100, 10) IS NULL                 AS null_pred;
+
+--echo === WIDTH_BUCKET: invalid-input edges → NULL (NOT error) ===
+
+# count <= 0 → NULL.
+SELECT WIDTH_BUCKET(50, 0, 100, 0)                            AS count_zero_null;
+SELECT WIDTH_BUCKET(50, 0, 100, -5)                           AS count_neg_null;
+# low == high → NULL.
+SELECT WIDTH_BUCKET(50, 100, 100, 10)                         AS lo_eq_hi_null;
+# NaN operand → NULL.
+SELECT WIDTH_BUCKET(CAST('NaN' AS DOUBLE PRECISION), 0, 100, 10)
+                                                              AS nan_operand_null;
+# NaN low → NULL.
+SELECT WIDTH_BUCKET(50, CAST('NaN' AS DOUBLE PRECISION), 100, 10)
+                                                              AS nan_low_null;
+# NaN high → NULL.
+SELECT WIDTH_BUCKET(50, 0, CAST('NaN' AS DOUBLE PRECISION), 10)
+                                                              AS nan_high_null;
+# Non-finite low → NULL.
+SELECT WIDTH_BUCKET(50, CAST('-Infinity' AS DOUBLE PRECISION), 100, 10)
+                                                              AS neg_inf_low_null;
+# Non-finite high → NULL.
+SELECT WIDTH_BUCKET(50, 0, CAST('Infinity' AS DOUBLE PRECISION), 10)
+                                                              AS inf_high_null;
+
+--echo === WIDTH_BUCKET: operand ±Infinity allowed (clamps to under/overflow) ===
+
+# +Infinity operand with ascending range → overflow.
+SELECT WIDTH_BUCKET(CAST('Infinity' AS DOUBLE PRECISION), 0, 100, 10)
+                                                              AS inf_op_overflow;
+# -Infinity operand with ascending range → underflow.
+SELECT WIDTH_BUCKET(CAST('-Infinity' AS DOUBLE PRECISION), 0, 100, 10)
+                                                              AS neg_inf_op_underflow;
+
+--echo === WIDTH_BUCKET: arity errors → 1105 ===
+
+--error 1105
+SELECT WIDTH_BUCKET();
+--error 1105
+SELECT WIDTH_BUCKET(50);
+--error 1105
+SELECT WIDTH_BUCKET(50, 0, 100);
+--error 1105
+SELECT WIDTH_BUCKET(50, 0, 100, 10, 99);
+
+--echo === WIDTH_BUCKET: works with table column data ===
+
+CREATE TABLE wb_data (id INT, val DOUBLE PRECISION);
+INSERT INTO wb_data VALUES
+  (1, 5), (2, 25), (3, 50), (4, 75), (5, 99), (6, 100);
+SELECT id, WIDTH_BUCKET(val, 0, 100, 4) AS bucket
+  FROM wb_data ORDER BY id;
+DROP TABLE wb_data;
