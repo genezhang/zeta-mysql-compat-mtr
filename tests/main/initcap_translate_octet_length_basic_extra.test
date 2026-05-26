@@ -5,26 +5,33 @@
 # Existing coverage (do NOT duplicate):
 #   - INITCAP — NONE (zero compat-mtr coverage; PG-flavor).
 #   - TRANSLATE — NONE (zero compat-mtr coverage; PG-flavor).
-#   - OCTET_LENGTH — header mentions in bytea_blob_basic_extra
-#     and string_func_basic; no dedicated pin matrix.
+#   - OCTET_LENGTH — string_func_extra.test:90-95 pins
+#     OCTET_LENGTH('abc')/('héllo'); string_compare_basic_
+#     extra.test:96-99 pins OCTET_LENGTH('abc')/('é'). The
+#     basic ASCII + UTF-8 byte-count rows are already pinned.
+#   - BIT_LENGTH — bitwise_basic_extra.test:100 pins INT
+#     arg (known-divergence "TEXT length × 8"); string_
+#     func_extra.test:90-95 pins BIT_LENGTH('abc')/('héllo');
+#     string_compare_basic_extra.test:96-99 pins BIT_LENGTH('é').
 #   - LENGTHB — NONE (zero compat-mtr coverage; Oracle alias).
-#   - BIT_LENGTH — bitwise_basic_extra.test:100 pins
-#     BIT_LENGTH(5)/BIT_LENGTH(10) for INT arg only (the
-#     known-divergence "TEXT length × 8" pin). No String
-#     arm coverage.
 #
-# This slice pins:
+# This slice pins (net-new — duplicate rows DROPPED):
 #   - INITCAP: capitalize first letter of each word; word
 #     boundary is non-alphanumeric. Per-word lowercasing of
 #     remaining chars. NULL → NULL.
 #   - TRANSLATE(s, from, to): char-by-char replacement; chars
 #     in `from` with no matching position in `to` are DELETED
 #     (when `to` is shorter than `from`). Any NULL arg → NULL.
-#   - OCTET_LENGTH ≡ LENGTHB (same impl arm) — byte length.
-#   - BIT_LENGTH = OCTET_LENGTH × 8 (via saturating_mul).
-#   - UTF-8 multibyte byte-vs-char count difference.
-#   - Non-string args coerce via value_to_sql_string (catch-all).
-#   - Arity errors.
+#   - LENGTHB ≡ OCTET_LENGTH IDENTITY (Oracle alias on the
+#     same impl arm at lib.rs:46146; no existing slice pins
+#     this equivalence).
+#   - BIT_LENGTH = OCTET_LENGTH × 8 IDENTITY pin (existing
+#     slices show the bytes/bits values separately but not
+#     the algebraic relationship).
+#   - OCTET_LENGTH non-string coerce — Int/Bool/DATE via
+#     value_to_sql_string catch-all (uncovered).
+#   - LENGTHB arity + NULL prop (separate from OCTET_LENGTH
+#     coverage since LENGTHB itself is uncovered).
 #
 # Big-picture finding:
 #   INITCAP and TRANSLATE are PG-style string functions that
@@ -51,11 +58,12 @@
 #   # zeta-adapt: TRANSLATE shorter `to` deletes — useful for
 #     character stripping (e.g. removing digits).
 #   # zeta-adapt: OCTET_LENGTH / LENGTHB / BIT_LENGTH are the
-#     ONLY way to count BYTES of a UTF-8 string. LENGTH on
-#     String type also returns bytes in zeta (verified via
-#     impl), so OCTET_LENGTH ≡ LENGTH for String shape. The
-#     distinction matters only at the type-shape boundary
-#     (Bytes vs String).
+#     ONLY way to count BYTES of a UTF-8 string. zeta's
+#     LENGTH counts CHARS (impl is `s.chars().count()` at
+#     lib.rs:46130), divergent from MySQL where LENGTH counts
+#     BYTES. Existing slice string_func_basic.result:73 pins
+#     this. So in zeta: LENGTH ≡ CHAR_LENGTH (chars),
+#     OCTET_LENGTH ≡ LENGTHB (bytes).
 
 --echo === INITCAP basic ===
 
@@ -132,67 +140,49 @@ SELECT TRANSLATE('abc', 'a', 'b', 'c');
 
 --echo === TRANSLATE vs REPLACE — DIFFERENT semantics ===
 
-# REPLACE substitutes one whole string for another; TRANSLATE
-# does per-character mapping. Pin the divergence on a case
-# where both produce different output.
-# REPLACE('ace', 'ce', 'xy') → 'axy' (single substring sub).
-# TRANSLATE('ace', 'ce', 'xy') → 'axy' (c→x, e→y).
-# These happen to agree above. To force divergence:
-# REPLACE('abcabc', 'abc', '12') → '1212' (whole substring).
-# TRANSLATE('abcabc', 'abc', '12') → '1212' but using char
-# map (a→1, b→2, c→deleted) → '1212' also! Need a case
-# where the order/repetition matters.
-# REPLACE('hello', 'l', 'XY') → 'heXYXYo' (each 'l' → 'XY').
-# TRANSLATE('hello', 'l', 'XY') → 'heXXo' (each 'l' → 'X';
-# extra 'Y' in `to` ignored). DIFFERENT result.
+# REPLACE substitutes one whole substring for another;
+# TRANSLATE does per-character mapping with positional
+# `from`→`to`. Pinned on `('hello', 'l', 'XY')` where the
+# divergence shows: REPLACE doubles each 'l' to 'XY' (the
+# whole 'XY' string substitutes for each 'l'), while
+# TRANSLATE only maps the first char of `to` (l→X) and
+# ignores the extra 'Y' since `from` has only one char.
 SELECT REPLACE('hello',   'l', 'XY')                          AS replace_doubles;
 SELECT TRANSLATE('hello', 'l', 'XY')                          AS translate_singles;
 SELECT REPLACE('hello',   'l', 'XY') = TRANSLATE('hello', 'l', 'XY')
                                                               AS divergence_eq_is_false;
 
---echo === OCTET_LENGTH ≡ LENGTHB (same impl arm) ===
+--echo === LENGTHB ≡ OCTET_LENGTH IDENTITY (Oracle alias, same impl arm) ===
 
-SELECT OCTET_LENGTH('hello')                                  AS ol_ascii;
-SELECT LENGTHB('hello')                                       AS lb_ascii;
+# Net-new: pin the alias equivalence. Basic ASCII/UTF-8 byte
+# values are already covered by string_func_extra.test:90-95
+# and string_compare_basic_extra.test:96-99 — do NOT repeat.
+# Here pin only that LENGTHB is literally the same function.
 SELECT OCTET_LENGTH('hello') = LENGTHB('hello')               AS ol_eq_lb_ascii;
-# UTF-8 multibyte — both report bytes.
-SELECT OCTET_LENGTH('café')                                   AS ol_utf8;
-SELECT LENGTHB('café')                                        AS lb_utf8;
-SELECT OCTET_LENGTH('café') = LENGTHB('café')                 AS ol_eq_lb_utf8;
-SELECT OCTET_LENGTH('café') = 5                               AS bytes_is_5;
-# CHAR_LENGTH gives the char count (4) — different from
-# OCTET_LENGTH (5 bytes).
-SELECT CHAR_LENGTH('café')                                    AS char_count;
-SELECT CHAR_LENGTH('café') <> OCTET_LENGTH('café')            AS char_diff_from_bytes;
+SELECT OCTET_LENGTH('café')  = LENGTHB('café')                AS ol_eq_lb_utf8;
+SELECT OCTET_LENGTH('')      = LENGTHB('')                    AS ol_eq_lb_empty;
 
---echo === BIT_LENGTH = OCTET_LENGTH × 8 ===
+--echo === BIT_LENGTH = OCTET_LENGTH × 8 ALGEBRAIC IDENTITY ===
 
-SELECT BIT_LENGTH('hello')                                    AS bl_ascii;
+# Net-new: pin the algebraic relationship (existing slices
+# show bytes/bits separately but not the multiplier identity).
 SELECT BIT_LENGTH('hello') = OCTET_LENGTH('hello') * 8        AS bl_eq_ol8_ascii;
-SELECT BIT_LENGTH('café')                                     AS bl_utf8;
-SELECT BIT_LENGTH('café') = OCTET_LENGTH('café') * 8          AS bl_eq_ol8_utf8;
-# Empty string — 0 bytes, 0 bits.
-SELECT OCTET_LENGTH('')                                       AS empty_ol;
-SELECT BIT_LENGTH('')                                         AS empty_bl;
+SELECT BIT_LENGTH('café')  = OCTET_LENGTH('café')  * 8        AS bl_eq_ol8_utf8;
+SELECT BIT_LENGTH('')      = OCTET_LENGTH('')      * 8        AS bl_eq_ol8_empty;
 
---echo === OCTET_LENGTH / LENGTHB / BIT_LENGTH — NULL + arity ===
+--echo === LENGTHB — NULL prop + arity (uncovered alias) ===
 
-SELECT OCTET_LENGTH(NULL)                                     AS ol_null;
 SELECT LENGTHB(NULL)                                          AS lb_null;
-SELECT BIT_LENGTH(NULL)                                       AS bl_null;
-SELECT OCTET_LENGTH(NULL) IS NULL                             AS ol_null_pred;
---error 1105
-SELECT OCTET_LENGTH();
+SELECT LENGTHB(NULL) IS NULL                                  AS lb_null_pred;
 --error 1105
 SELECT LENGTHB();
 --error 1105
-SELECT BIT_LENGTH();
---error 1105
-SELECT OCTET_LENGTH('a', 'b');
+SELECT LENGTHB('a', 'b');
 
---echo === OCTET_LENGTH on non-string types (catch-all) ===
+--echo === OCTET_LENGTH on non-string types (catch-all coerce) ===
 
 # Int / Bool / DATE coerce via value_to_sql_string, then bytes.
+# Uncovered arm in existing slices.
 SELECT OCTET_LENGTH(42)                                       AS ol_int_is_2;
 SELECT OCTET_LENGTH(TRUE)                                     AS ol_true_is_4;
 SELECT OCTET_LENGTH(DATE '2024-03-15')                        AS ol_date_is_10;

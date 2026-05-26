@@ -106,75 +106,38 @@ SELECT REPLACE('hello',   'l', 'XY') = TRANSLATE('hello', 'l', 'XY')
                                                               AS divergence_eq_is_false;
 divergence_eq_is_false
 0
-=== OCTET_LENGTH ≡ LENGTHB (same impl arm) ===
-SELECT OCTET_LENGTH('hello')                                  AS ol_ascii;
-ol_ascii
-5
-SELECT LENGTHB('hello')                                       AS lb_ascii;
-lb_ascii
-5
+=== LENGTHB ≡ OCTET_LENGTH IDENTITY (Oracle alias, same impl arm) ===
 SELECT OCTET_LENGTH('hello') = LENGTHB('hello')               AS ol_eq_lb_ascii;
 ol_eq_lb_ascii
 1
-SELECT OCTET_LENGTH('café')                                   AS ol_utf8;
-ol_utf8
-5
-SELECT LENGTHB('café')                                        AS lb_utf8;
-lb_utf8
-5
-SELECT OCTET_LENGTH('café') = LENGTHB('café')                 AS ol_eq_lb_utf8;
+SELECT OCTET_LENGTH('café')  = LENGTHB('café')                AS ol_eq_lb_utf8;
 ol_eq_lb_utf8
 1
-SELECT OCTET_LENGTH('café') = 5                               AS bytes_is_5;
-bytes_is_5
+SELECT OCTET_LENGTH('')      = LENGTHB('')                    AS ol_eq_lb_empty;
+ol_eq_lb_empty
 1
-SELECT CHAR_LENGTH('café')                                    AS char_count;
-char_count
-4
-SELECT CHAR_LENGTH('café') <> OCTET_LENGTH('café')            AS char_diff_from_bytes;
-char_diff_from_bytes
-1
-=== BIT_LENGTH = OCTET_LENGTH × 8 ===
-SELECT BIT_LENGTH('hello')                                    AS bl_ascii;
-bl_ascii
-40
+=== BIT_LENGTH = OCTET_LENGTH × 8 ALGEBRAIC IDENTITY ===
 SELECT BIT_LENGTH('hello') = OCTET_LENGTH('hello') * 8        AS bl_eq_ol8_ascii;
 bl_eq_ol8_ascii
 1
-SELECT BIT_LENGTH('café')                                     AS bl_utf8;
-bl_utf8
-40
-SELECT BIT_LENGTH('café') = OCTET_LENGTH('café') * 8          AS bl_eq_ol8_utf8;
+SELECT BIT_LENGTH('café')  = OCTET_LENGTH('café')  * 8        AS bl_eq_ol8_utf8;
 bl_eq_ol8_utf8
 1
-SELECT OCTET_LENGTH('')                                       AS empty_ol;
-empty_ol
-0
-SELECT BIT_LENGTH('')                                         AS empty_bl;
-empty_bl
-0
-=== OCTET_LENGTH / LENGTHB / BIT_LENGTH — NULL + arity ===
-SELECT OCTET_LENGTH(NULL)                                     AS ol_null;
-ol_null
-NULL
+SELECT BIT_LENGTH('')      = OCTET_LENGTH('')      * 8        AS bl_eq_ol8_empty;
+bl_eq_ol8_empty
+1
+=== LENGTHB — NULL prop + arity (uncovered alias) ===
 SELECT LENGTHB(NULL)                                          AS lb_null;
 lb_null
 NULL
-SELECT BIT_LENGTH(NULL)                                       AS bl_null;
-bl_null
-NULL
-SELECT OCTET_LENGTH(NULL) IS NULL                             AS ol_null_pred;
-ol_null_pred
+SELECT LENGTHB(NULL) IS NULL                                  AS lb_null_pred;
+lb_null_pred
 1
-SELECT OCTET_LENGTH();
-ERROR 1105: execution error: OCTET_LENGTH requires 1 argument
 SELECT LENGTHB();
 ERROR 1105: execution error: LENGTHB requires 1 argument
-SELECT BIT_LENGTH();
-ERROR 1105: execution error: BIT_LENGTH requires 1 argument
-SELECT OCTET_LENGTH('a', 'b');
-ERROR 1105: execution error: OCTET_LENGTH requires 1 argument
-=== OCTET_LENGTH on non-string types (catch-all) ===
+SELECT LENGTHB('a', 'b');
+ERROR 1105: execution error: LENGTHB requires 1 argument
+=== OCTET_LENGTH on non-string types (catch-all coerce) ===
 SELECT OCTET_LENGTH(42)                                       AS ol_int_is_2;
 ol_int_is_2
 2
