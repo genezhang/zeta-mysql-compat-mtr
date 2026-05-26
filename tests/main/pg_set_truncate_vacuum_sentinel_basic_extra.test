@@ -1,126 +1,132 @@
 # Independently authored SET TIME ZONE / SET CONSTRAINTS
-# / SET SESSION AUTHORIZATION / TRUNCATE CONTINUE+RESTART
+# / SET SESSION AUTHORIZATION / TRUNCATE CONTINUE
 # IDENTITY / VACUUM FREEZE sentinel slice for the GPL
 # MTR-format runner. NOT copied or adapted from MySQL's
 # mysql-test/.
 #
 # Existing coverage (do NOT duplicate):
-#   - SET TIME ZONE, SET CONSTRAINTS, SET SESSION
-#     AUTHORIZATION: ZERO prior coverage.
+#   - SET TIME ZONE / SET CONSTRAINTS / SET SESSION
+#     AUTHORIZATION (statement-level): ZERO prior
+#     coverage.
 #   - RESET TIME ZONE / RESET SESSION AUTHORIZATION:
 #     ZERO prior coverage.
-#   - TRUNCATE ... CONTINUE / RESTART IDENTITY: ZERO
-#     prior coverage. (delete_basic_extra + delete_
-#     options_basic_extra cover TRUNCATE CASCADE,
-#     not CONTINUE/RESTART IDENTITY.)
-#   - VACUUM FREEZE / VACUUM (options...) form: ZERO
-#     prior coverage. (vacuum_analyze_basic_extra
-#     covers bare VACUUM and VACUUM ANALYZE only.)
-#
-# Pre-existing shape patterns acknowledged:
-#   - Generic SET-as-no-op compat shim — documented at
-#     zeta-parser/src/ast.rs:117 "SET variable = value
-#     (accepted as no-op for client compatibility)".
-#     ALL SET variants route through this handler.
-#   - "Expected: end of statement, found: <KW>" — well-
-#     established sqlparser pattern; multiple priors.
+#   - TRUNCATE CONTINUE IDENTITY: ZERO prior coverage.
+#   - TRUNCATE RESTART IDENTITY: ALREADY pinned at
+#     delete_basic_extra.test:78-85 and delete_options_
+#     basic_extra.test:79-86. NOT re-pinned here
+#     (caught by PR #399 round-1 review).
+#   - TRUNCATE CASCADE: ALREADY pinned at delete_
+#     options_basic_extra.test:88-94 ("silently
+#     accepted"). NOT re-pinned here.
+#   - VACUUM FREEZE (bare table form): ZERO prior.
+#   - VACUUM (paren-option) form: ALREADY pinned at
+#     vacuum_analyze_basic_extra.test:74-77 (with
+#     VERBOSE option, identical fingerprint at col 8).
+#     NOT re-pinned here.
 #
 # This slice pins:
 #
-#   INTENTIONAL COMPAT NO-OP — SET TIME ZONE (5 forms):
-#     - 'UTC' / 'America/Los_Angeles' / INTERVAL form /
-#       LOCAL / DEFAULT
-#     - All silently succeed via zeta-parser/src/ast.rs:
-#       117 generic SET no-op. NOT a bug — apps porting
-#       PG code that does SET TIME ZONE for session-tz
-#       management will see no-error but no actual TZ
-#       change. (Combined with TIMESTAMPTZ silent TZ-
-#       truncation per PR #398, apps need to do all
-#       TZ math application-side.)
-#
-#   INTENTIONAL COMPAT NO-OP — SET CONSTRAINTS (3 forms):
-#     - SET CONSTRAINTS ALL DEFERRED / IMMEDIATE / by
-#       name DEFERRED — all silent success via same
-#       generic SET no-op path. Apps that rely on
-#       deferred constraint checking will silently get
-#       eager checking instead. (Zeta has no deferred-
-#       constraint surface.)
-#
-#   INTENTIONAL COMPAT NO-OP — SET SESSION AUTHORIZATION:
-#     - 'alice' / DEFAULT — silent success via same path.
-#     - But RESET SESSION AUTHORIZATION ERRORS — see
-#       below. The RESET form is NOT in the generic
-#       compat-shim.
+#   MYSQL-WIRE-ONLY SILENT-SUCCESS — SET TIME ZONE /
+#   SET CONSTRAINTS / SET SESSION AUTHORIZATION:
+#     - zeta-mysqlwire/src/shim.rs:2048-2080 has a
+#       `q_lower.strip_prefix("set ")` catch-all that
+#       returns `Some(MySqlResult::Ok)` for ANY
+#       statement starting with `SET `. The statement
+#       NEVER reaches the parser.
+#     - DIFFERENT on PG wire: pgwire doesn't have this
+#       intercept, so SET routes through zeta-parser,
+#       which has a `Set` AST node handled at zeta-
+#       parser/src/convert.rs:209 (generic no-op for
+#       `SET variable = value`). BUT for SET
+#       CONSTRAINTS specifically: sqlparser routes it
+#       through `Set::SingleAssignment` which demands
+#       `=` / `TO`, so parser rejects with "Expected:
+#       equals sign or TO, found: ALL at Column: 17".
+#       So PG-wire users see PARSE ERROR for SET
+#       CONSTRAINTS; MySQL-wire users see silent
+#       success. WIRE DIVERGENCE.
+#     - SET TIME ZONE and SET SESSION AUTHORIZATION
+#       also silently succeed on mysqlwire via the
+#       same prefix-intercept; pgwire-side behavior
+#       differs per-form (SET TIME ZONE may reach
+#       the generic no-op handler; SET SESSION
+#       AUTHORIZATION may have its own path).
+#     - SECURITY-RELEVANT: silent SET SESSION
+#       AUTHORIZATION means apps that "drop privileges"
+#       via that statement on MySQL wire get NO
+#       privilege change — a privilege-escalation
+#       hazard for code that assumes the role-switch
+#       worked.
 #
 #   PARSE-REJECTED — RESET TIME ZONE / RESET SESSION
 #   AUTHORIZATION:
-#     - "Expected: end of statement, found: ZONE at col
-#       12" — sqlparser parses RESET as a statement-
-#       terminator-eligible single-token thing; the
-#       trailing ZONE / AUTHORIZATION isn't accepted.
-#     - Asymmetric with SET (which succeeds silently).
-#       The SET no-op shim doesn't cover RESET.
+#     - "Expected: end of statement, found: ZONE at
+#       col 12" / "found: AUTHORIZATION at col 15".
+#     - mysqlwire does NOT have a corresponding `reset
+#       ` prefix-intercept, so these reach the parser
+#       and error. ASYMMETRIC with SET (which has the
+#       intercept).
 #
-#   SUPPORTED — TRUNCATE ... CONTINUE IDENTITY /
-#   RESTART IDENTITY (3 forms):
-#     - TRUNCATE t CONTINUE IDENTITY: subsequent
-#       INSERT continues from highest prior id+1 (in
-#       probe, after rows 1/2/3 truncated CONTINUE,
-#       next INSERT gets id=4).
-#     - TRUNCATE t RESTART IDENTITY: subsequent INSERT
-#       restarts from 1.
-#     - TRUNCATE TABLE t CONTINUE IDENTITY CASCADE:
-#       silent success — CASCADE clause accepted but
-#       no cascading to dependent tables verified
-#       (no FK-bearing tables in test).
-#     - Both behaviors verified end-to-end against
-#       SERIAL column.
+#   SUPPORTED — TRUNCATE CONTINUE IDENTITY:
+#     - Behavior verified via SERIAL probe: after
+#       TRUNCATE CONTINUE IDENTITY, subsequent INSERT
+#       continues from prior max+1 (probe: rows 1/2/3,
+#       TRUNCATE CONTINUE, next INSERT → id=4).
+#     - Distinct from RESTART IDENTITY (already pinned
+#       at delete_basic_extra:78-85 and delete_options:
+#       79-86) which resets to 1.
 #
-#   PARSE-REJECTED — VACUUM FREEZE variants (3 forms):
+#   PARSE-REJECTED — VACUUM FREEZE bare-table form
+#   (2 net-new forms; paren-option form already pinned):
 #     - VACUUM FREEZE t / VACUUM FULL FREEZE t →
 #       "Expected: end of statement, found: t_cont"
-#       — the FREEZE option doesn't accept a table
-#       name after it. Bare `VACUUM` and `VACUUM
-#       ANALYZE` work (per vacuum_analyze_basic_extra),
-#       but FREEZE variants are unsupported.
-#     - VACUUM (FREEZE, ANALYZE) t → "Expected: end
-#       of statement, found: (" — the PG paren-
-#       option form isn't recognized at all.
+#       at col 15 / 20. The FREEZE option doesn't
+#       accept a table name after it. Bare VACUUM and
+#       VACUUM ANALYZE work (vacuum_analyze_basic_
+#       extra) but FREEZE variants don't.
 #
 # Big-picture finding:
 #
-#   Session-management SET statements are deliberate
-#   compat no-ops — apps relying on the side-effects
-#   (TZ change, deferred constraints, role switch)
-#   will silently get the wrong behavior. Combined
-#   with TIMESTAMPTZ silent-truncation (PR #398) this
-#   means apps must NEVER rely on zeta-side time-zone
-#   handling.
+#   The MySQL wire's SET-prefix intercept (shim.rs:
+#   2048-2080) absorbs ALL `SET ...` statements
+#   silently — including ones the parser would reject
+#   (SET CONSTRAINTS) and security-relevant ones (SET
+#   SESSION AUTHORIZATION). This is a wire-divergence
+#   pattern joining the running list (PR #366 LISTEN/
+#   NOTIFY, PR #385 mysqlwire Array Debug, PR #392
+#   ROLLBACK TO SAVEPOINT). RESET asymmetric — no
+#   prefix-intercept, statements reach parser and
+#   error.
 #
-#   TRUNCATE CONTINUE/RESTART IDENTITY are genuinely
-#   supported — a positive finding.
+#   TRUNCATE CONTINUE IDENTITY is supported (genuine
+#   PG semantic).
 #
-#   VACUUM FREEZE and paren-option forms are unreachable
-#   beyond bare VACUUM / VACUUM ANALYZE.
+#   Apps porting PG operational/maintenance scripts
+#   should NEVER rely on SET CONSTRAINTS / SET TIME
+#   ZONE / SET SESSION AUTHORIZATION side effects on
+#   the MySQL wire — they silently no-op. Especially
+#   SET SESSION AUTHORIZATION for privilege handling
+#   — this is a SILENT SECURITY GAP.
 #
 # Adaptation notes:
-#   # zeta-adapt: INTENTIONAL COMPAT NO-OP — SET TIME
-#     ZONE / SET CONSTRAINTS / SET SESSION
-#     AUTHORIZATION all silent-success via generic SET
-#     handler (ast.rs:117). NO side effect — handle
-#     session TZ / deferred constraints / role switch
-#     application-side.
+#   # zeta-adapt: MYSQL-WIRE-ONLY silent no-op — SET
+#     TIME ZONE / SET CONSTRAINTS / SET SESSION
+#     AUTHORIZATION all silently succeed via mysqlwire
+#     shim.rs:2048-2080 prefix-intercept. PG wire
+#     behavior differs (per-form: TIME ZONE may
+#     no-op, CONSTRAINTS errors at parser). NEVER
+#     rely on side effects.
 #   # zeta-adapt: KNOWN GAP — RESET TIME ZONE / RESET
-#     SESSION AUTHORIZATION error 1064 at parse time
-#     (RESET shim doesn't cover the X TIME ZONE / X
-#     AUTHORIZATION targets).
+#     SESSION AUTHORIZATION error 1064 at parse on
+#     both wires (no RESET prefix-intercept).
 #   # zeta-adapt: SUPPORTED — TRUNCATE CONTINUE IDENTITY
-#     and TRUNCATE RESTART IDENTITY behave per PG
-#     semantics (verified by SERIAL probe).
-#   # zeta-adapt: KNOWN GAP — VACUUM FREEZE (any form)
-#     and VACUUM (paren options) error 1064.
+#     behaves per PG (sequence continues, not resets).
+#     RESTART IDENTITY pinned elsewhere.
+#   # zeta-adapt: KNOWN GAP — VACUUM FREEZE / VACUUM
+#     FULL FREEZE error 1064 at parse. Bare VACUUM /
+#     VACUUM ANALYZE work (vacuum_analyze_basic_extra).
 
---echo === INTENTIONAL COMPAT NO-OP — SET TIME ZONE (5 forms) via ast.rs:117 generic SET ===
+--echo === MYSQL-WIRE-ONLY silent — SET TIME ZONE (5 forms) via shim.rs:2048 prefix intercept ===
 
 SET TIME ZONE 'UTC';
 SET TIME ZONE 'America/Los_Angeles';
@@ -128,57 +134,43 @@ SET TIME ZONE INTERVAL '+05:30' HOUR TO MINUTE;
 SET TIME ZONE LOCAL;
 SET TIME ZONE DEFAULT;
 
---echo === INTENTIONAL COMPAT NO-OP — SET CONSTRAINTS (3 forms) same path ===
+--echo === MYSQL-WIRE-ONLY silent — SET CONSTRAINTS (3 forms; PG wire would error at parser) ===
 
 SET CONSTRAINTS ALL DEFERRED;
 SET CONSTRAINTS ALL IMMEDIATE;
 SET CONSTRAINTS my_fk DEFERRED;
 
---echo === INTENTIONAL COMPAT NO-OP — SET SESSION AUTHORIZATION (2 forms) same path ===
+--echo === MYSQL-WIRE-ONLY silent — SET SESSION AUTHORIZATION (SECURITY-RELEVANT silent no-op) ===
 
 SET SESSION AUTHORIZATION 'alice';
 SET SESSION AUTHORIZATION DEFAULT;
 
---echo === PARSE-REJECTED — RESET TIME ZONE / RESET SESSION AUTHORIZATION (asymmetric with SET) ===
+--echo === PARSE-REJECTED — RESET TIME ZONE / RESET SESSION AUTHORIZATION (no RESET intercept) ===
 
-# The RESET shim doesn't cover these trailing-keyword forms.
 --error 1064
 RESET TIME ZONE;
 --error 1064
 RESET SESSION AUTHORIZATION;
 
---echo === SUPPORTED — TRUNCATE ... CONTINUE / RESTART IDENTITY (PG sequence-reset semantics) ===
+--echo === SUPPORTED — TRUNCATE CONTINUE IDENTITY (RESTART pinned elsewhere) ===
 
 CREATE TABLE t_cont (id SERIAL PRIMARY KEY, n INT);
 INSERT INTO t_cont (n) VALUES (10), (20), (30);
 SELECT id, n FROM t_cont ORDER BY id;
-
-# CONTINUE IDENTITY: subsequent INSERT keeps sequence position.
+# CONTINUE IDENTITY: subsequent INSERT keeps sequence.
 TRUNCATE t_cont CONTINUE IDENTITY;
 INSERT INTO t_cont (n) VALUES (40);
 # Expect id=4 (sequence continued from prior max+1).
 SELECT id, n FROM t_cont;
 
-# RESTART IDENTITY: subsequent INSERT restarts at 1.
-TRUNCATE t_cont RESTART IDENTITY;
-INSERT INTO t_cont (n) VALUES (50);
-# Expect id=1 (sequence reset).
-SELECT id, n FROM t_cont;
+--echo === PARSE-REJECTED — VACUUM FREEZE / VACUUM FULL FREEZE bare-table forms ===
 
-# CASCADE option silently accepted (no FK-bearing tables
-# in scope to verify cascading semantics).
-TRUNCATE TABLE t_cont CONTINUE IDENTITY CASCADE;
-
---echo === PARSE-REJECTED — VACUUM FREEZE variants (3 forms) ===
-
-# Bare `VACUUM` / `VACUUM ANALYZE` ARE supported per
-# vacuum_analyze_basic_extra. FREEZE option is NOT.
+# Paren-option form (VACUUM (FREEZE, ANALYZE) t) is
+# already pinned at vacuum_analyze_basic_extra:74-77
+# with identical fingerprint — not re-pinned here.
 --error 1064
 VACUUM FREEZE t_cont;
 --error 1064
 VACUUM FULL FREEZE t_cont;
-# Paren-option form unrecognized at col 8 (no `(`).
---error 1064
-VACUUM (FREEZE, ANALYZE) t_cont;
 
 DROP TABLE t_cont;
