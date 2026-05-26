@@ -1,0 +1,122 @@
+# Independently authored PG COPY ... TO/FROM PROGRAM
+# silent-no-op sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - COPY t TO '<file>' (file-path form): silent
+#     no-op pinned at copy_basic_extra. The PROGRAM
+#     form is a DISTINCT statement variant — PG's
+#     COPY PROGRAM is a server-side process pipe
+#     (gated to superuser in PG because it runs
+#     arbitrary shell commands).
+#   - COPY ... TO/FROM PROGRAM: ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - DOCUMENTED INTENTIONAL no-op: zeta-parser/src/
+#     convert.rs:425 classifies sp::Statement::Copy
+#     as ZetaStatement::NoOp ("COPY is handled at the
+#     pgwire layer, not the parser"). This catches
+#     ALL COPY variants the parser sees, including
+#     COPY PROGRAM (which is NOT handled at the
+#     pgwire COPY-mode protocol — pgwire only handles
+#     COPY FROM STDIN / COPY TO STDOUT in-protocol).
+#     The PROGRAM form thus silently no-ops at parse
+#     conversion. Pattern matches TABLESPACE (PR #407)
+#     and ENABLE ROW LEVEL SECURITY (PR #404) — all
+#     are documented-intentional silent no-ops.
+#
+# This slice pins:
+#
+#   COPY <t> TO PROGRAM '<cmd>' — silent no-op:
+#     - Returns 0 affected rows. The shell command is
+#       NEVER invoked (verified out-of-band via a
+#       canary file: `COPY t TO PROGRAM 'rm -f /tmp/X'`
+#       leaves X intact). No file is produced.
+#     - SECURITY-RELEVANT: silent no-op means apps
+#       relying on COPY PROGRAM for ETL get silent
+#       data loss, BUT also that this surface cannot
+#       be abused to invoke arbitrary shell commands
+#       on the zeta server (PG-style remote code
+#       execution via COPY PROGRAM is not possible).
+#
+#   COPY <t> FROM PROGRAM '<cmd>' — silent no-op:
+#     - Returns 0 affected rows. The shell command is
+#       NEVER invoked; no rows are inserted from its
+#       stdout. Falsifier probe at end: SELECT * FROM
+#       cp shows unchanged contents.
+#
+# Falsifier probes (run AFTER the no-ops to prove the
+# command-side-effect never happened):
+#
+#   - INSERT a sentinel row PRE-probe, COPY FROM
+#     PROGRAM with a printf that would INSERT a new
+#     row IF the command ran, then SELECT * to show
+#     the new row is NOT present.
+#   - The SELECT-after invariant is the ENTIRE
+#     mechanical evidence that FROM PROGRAM is a
+#     no-op: if the printf had been piped into the
+#     table, id=99 would appear.
+#
+# Big-picture finding:
+#
+#   PG COPY ... TO PROGRAM / FROM PROGRAM (server-side
+#   process pipe) is a silent no-op on both wires.
+#   Pattern matches the prior DOCUMENTED INTENTIONAL
+#   no-op catalog:
+#     - TABLESPACE (PR #407)
+#     - ENABLE ROW LEVEL SECURITY (PR #404)
+#     - GRANT / REVOKE / COMMENT (convert.rs:420-427)
+#     - ALTER INDEX SET/RESET (convert.rs:425)
+#   Source: zeta-parser/src/convert.rs:425.
+#
+#   Apps porting PG ETL pipelines that use COPY
+#   PROGRAM for streaming compress/decompress or
+#   process-piping (a common pg_dump output pattern:
+#   `COPY t TO PROGRAM 'gzip > t.csv.gz'`) must
+#   rewrite as out-of-process: dump via SQL client
+#   then pipe externally.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# silent-no-op behavior (both return OK, no rows
+# affected, no file produced). The NoOp conversion
+# is at parser-level and is wire-independent.
+#
+# Adaptation notes:
+#   # zeta-adapt: DOCUMENTED INTENTIONAL — COPY ... TO
+#     PROGRAM '<cmd>' / COPY ... FROM PROGRAM '<cmd>'
+#     silent-no-op at convert.rs:425. Shell command
+#     never executes. Apps requiring process-pipe ETL
+#     must move the pipe to the client side.
+#   # zeta-adapt: SECURITY-POSITIVE — the silent no-op
+#     means COPY PROGRAM cannot be abused for remote
+#     code execution against the zeta server.
+
+DROP TABLE IF EXISTS cp;
+CREATE TABLE cp (id INT, v TEXT);
+INSERT INTO cp VALUES (1, 'alpha'), (2, 'beta');
+
+--echo === COPY <t> TO PROGRAM '<cmd>' — silent no-op (no error, no file produced) ===
+
+# Out-of-band verified: `COPY cp TO PROGRAM 'rm -f
+# /tmp/zeta_copy_sec_canary.txt'` leaves the canary
+# file intact. The command never invokes. Here we
+# pin just the SQL-level no-error/no-rows-affected.
+COPY cp TO PROGRAM 'cat > /tmp/zeta_copy_program_noop_should_not_exist.txt';
+
+--echo === COPY <t> FROM PROGRAM '<cmd>' — silent no-op (no rows inserted) ===
+
+# A printf that WOULD inject `(99, "from-program")`
+# if the command ran. The falsifier-SELECT below
+# shows id=99 is absent.
+COPY cp FROM PROGRAM 'printf "99\tfrom-program\n"';
+
+--echo === FALSIFIER — SELECT shows table contents unchanged (FROM PROGRAM did not insert id=99) ===
+
+# This is the entire mechanical evidence that the
+# FROM PROGRAM command never ran. If it had, the row
+# (99, 'from-program') would appear in the result.
+SELECT * FROM cp ORDER BY id;
+
+DROP TABLE cp;
