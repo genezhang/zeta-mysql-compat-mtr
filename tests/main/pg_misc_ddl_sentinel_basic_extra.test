@@ -1,0 +1,137 @@
+# Independently authored PG misc DDL sentinel slice
+# (CLUSTER + ALTER DEFAULT PRIVILEGES + CREATE/DROP
+# TEXT SEARCH) for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CLUSTER statement (PG physical-reorder-by-index):
+#     ZERO prior coverage.
+#   - ALTER DEFAULT PRIVILEGES: ZERO prior coverage.
+#   - CREATE TEXT SEARCH (DICTIONARY/CONFIGURATION/
+#     PARSER/TEMPLATE): ZERO prior coverage.
+#   - DROP TEXT SEARCH (DICTIONARY/CONFIGURATION):
+#     ZERO prior coverage.
+#
+# Pre-existing rejection shape patterns (this slice
+# applies them to NEW keyword surfaces; all rejection
+# fingerprints are pre-existing):
+#
+#   - Shape (d) — "Expected: an SQL statement, found:
+#     <KW>" — PR #371 mysql_maintenance_cmds_sentinel_
+#     basic_extra:84-86 (HANDLER, SHUTDOWN). Also PR
+#     #391 (IMPORT) and PR #392 (MOVE).
+#   - Shape A — "Expected: an object type after CREATE,
+#     found: <KW>" — PR #390 enumeration.
+#   - "Expected: one of VIEW or TYPE or TABLE or INDEX
+#     or ROLE or POLICY or CONNECTOR or ICEBERG or
+#     SCHEMA or USER or OPERATOR, found: <KW>" —
+#     sqlparser's restricted ALTER object-type list.
+#     Pre-existing at event_use_partition_sentinel:6,8
+#     (with EVENT) and sequence_basic_extra:116.
+#   - "Expected: CONNECTOR, DATABASE, EXTENSION,
+#     FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE,
+#     ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE,
+#     TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER
+#     after DROP, found: <KW>" — sqlparser's
+#     restricted DROP object-type list. Pre-existing
+#     at event_use_partition_sentinel:11 and temp_
+#     table_basic_extra:91.
+#
+# This slice pins (per-keyword surface application —
+# all four shape patterns are pre-existing):
+#
+#   Shape (d) — CLUSTER (3 forms):
+#     - `CLUSTER t USING t_idx`
+#     - `CLUSTER t` (bare reform)
+#     - `CLUSTER VERBOSE t USING t_idx`
+#     - Adds CLUSTER to the (d) bucket alongside
+#       HANDLER/SHUTDOWN/IMPORT/MOVE. Same column-1
+#       site as the other (d) keywords.
+#
+#   "ALTER restricted-list" — ALTER DEFAULT PRIVILEGES
+#   (3 forms):
+#     - `IN SCHEMA public GRANT SELECT ON TABLES TO ...`
+#     - `FOR ROLE bob REVOKE ALL ON TABLES FROM PUBLIC`
+#     - `IN SCHEMA public GRANT EXECUTE ON FUNCTIONS ...`
+#     - All hit at column 7 (right after `ALTER `).
+#       sqlparser's ALTER dispatcher doesn't recognize
+#       DEFAULT as an object-type token.
+#
+#   Shape A — CREATE TEXT SEARCH (4 variants):
+#     - DICTIONARY / CONFIGURATION / PARSER / TEMPLATE
+#     - All hit "Expected: an object type after CREATE,
+#       found: TEXT" at column 8 — sqlparser's CREATE
+#       dispatcher doesn't recognize TEXT (followed by
+#       SEARCH) as a known object-type prefix.
+#
+#   "DROP restricted-list" — DROP TEXT SEARCH (2 forms):
+#     - DICTIONARY / CONFIGURATION.
+#     - Both hit "Expected: ... after DROP, found:
+#       TEXT" at column 6.
+#
+# Big-picture finding:
+#
+#   All four PG-extension DDL groups in this slice
+#   (CLUSTER, ALTER DEFAULT PRIVILEGES, CREATE TEXT
+#   SEARCH, DROP TEXT SEARCH) hit pre-existing
+#   rejection shapes — there are no new mechanisms,
+#   just new keyword surfaces being added to the four
+#   established taxonomies (shape (d), shape A, ALTER
+#   restricted-list, DROP restricted-list).
+#
+#   Apps porting PG maintenance/privilege/text-search
+#   DDL must drop these statements entirely — no
+#   substitute exists for any of them.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CLUSTER (any form)
+#     errors 1064 at sqlparser's statement-dispatcher
+#     (shape d). PG physical-reorder-by-index has no
+#     equivalent — apps using CLUSTER for performance
+#     should drop it and rely on zeta's storage layout.
+#   # zeta-adapt: KNOWN GAP — ALTER DEFAULT PRIVILEGES
+#     errors 1064 at sqlparser's ALTER restricted-list
+#     ("Expected: one of VIEW or TYPE or ... found:
+#     DEFAULT"). The default-privileges concept doesn't
+#     exist in zeta.
+#   # zeta-adapt: KNOWN GAP — CREATE / DROP TEXT
+#     SEARCH (DICTIONARY / CONFIGURATION / PARSER /
+#     TEMPLATE) all unsupported. zeta has a dedicated
+#     FTS index type (per project README) — use that
+#     instead.
+
+--echo === Shape (d) — CLUSTER (3 forms) → "found: CLUSTER" at column 1 ===
+
+--error 1064
+CLUSTER t USING t_idx;
+--error 1064
+CLUSTER t;
+--error 1064
+CLUSTER VERBOSE t USING t_idx;
+
+--echo === ALTER restricted-list — ALTER DEFAULT PRIVILEGES (3 forms) → "found: DEFAULT" at column 7 ===
+
+--error 1064
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO alice;
+--error 1064
+ALTER DEFAULT PRIVILEGES FOR ROLE bob REVOKE ALL ON TABLES FROM PUBLIC;
+--error 1064
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+
+--echo === Shape A — CREATE TEXT SEARCH (4 variants) → "found: TEXT" at column 8 ===
+
+--error 1064
+CREATE TEXT SEARCH DICTIONARY simple_dict (TEMPLATE = simple);
+--error 1064
+CREATE TEXT SEARCH CONFIGURATION my_conf (PARSER = "default");
+--error 1064
+CREATE TEXT SEARCH PARSER my_parser (START = prsd_start, GETTOKEN = prsd_nexttoken, END = prsd_end, LEXTYPES = prsd_lextype);
+--error 1064
+CREATE TEXT SEARCH TEMPLATE my_template (INIT = simple_init, LEXIZE = simple_lexize);
+
+--echo === DROP restricted-list — DROP TEXT SEARCH (2 forms) → "found: TEXT" at column 6 ===
+
+--error 1064
+DROP TEXT SEARCH DICTIONARY simple_dict;
+--error 1064
+DROP TEXT SEARCH CONFIGURATION my_conf;
