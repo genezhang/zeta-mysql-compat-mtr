@@ -1,0 +1,212 @@
+# Independently authored PG ALTER TABLE specific-
+# operations sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - ALTER TABLE ADD/DROP/RENAME COLUMN, ADD/DROP
+#     CONSTRAINT, RENAME TO: covered at
+#     alter_table_basic_extra.
+#   - ENABLE/DISABLE ROW LEVEL SECURITY: covered at
+#     pg_rls_sentinel (PR #404) — DOCUMENTED
+#     INTENTIONAL no-op.
+#   - ALTER DEFAULT PRIVILEGES: covered at
+#     pg_misc_ddl_sentinel.
+#   - ALL of: OWNER TO / ENABLE TRIGGER / DISABLE
+#     TRIGGER / REPLICA IDENTITY / FORCE ROW LEVEL
+#     SECURITY / NO FORCE RLS / VALIDATE CONSTRAINT
+#     / OF type / NOT OF / INHERIT parent /
+#     NO INHERIT parent / CLUSTER ON / SET WITHOUT
+#     CLUSTER / SET LOGGED / SET UNLOGGED / SET
+#     SCHEMA / ALTER COLUMN SET STATISTICS / ALTER
+#     COLUMN SET STORAGE: ZERO prior coverage.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - DOCUMENTED INTENTIONAL no-op at convert.rs:998
+#     "pg_dump compatibility: OWNER TO, SET, ENABLE/
+#     DISABLE — ignore." Pattern matches TABLESPACE
+#     (PR #407), ENABLE RLS (PR #404), GRANT/REVOKE/
+#     COMMENT (convert.rs:420-427), COPY PROGRAM
+#     (PR #413). Source identifies these as pg_dump
+#     output that must not error.
+#   - "unsupported ALTER TABLE operation: <op>" —
+#     NEW catch-all reject at convert.rs (different
+#     from the sqlparser-grammar reject). sqlparser
+#     parses the op into the AltarTableOperation
+#     AST variant, but convert.rs lacks an arm and
+#     falls through to the catch-all reject.
+#   - "Expected: ADD, RENAME, PARTITION, SWAP, DROP,
+#     REPLICA IDENTITY, SET, or SET TBLPROPERTIES
+#     after ALTER TABLE, found: <KW>" — sqlparser
+#     grammar's top-level ALTER TABLE allows only
+#     those 7 ops. Pre-existing fingerprint at many
+#     slices.
+#   - "Expected: (, found: <KW>" after `SET` —
+#     sqlparser's SET arm expects parens
+#     `SET (option = value)`. Pre-existing.
+#   - "Expected: SET/DROP NOT NULL, SET DEFAULT,
+#     SET DATA TYPE, or ADD GENERATED after ALTER
+#     COLUMN, found: <KW>" — sqlparser's ALTER
+#     COLUMN sub-grammar allows only those 4 ops.
+#
+# This slice pins:
+#
+#   SHAPE A — DOCUMENTED INTENTIONAL no-op (pg_dump
+#   compat at convert.rs:998):
+#     - OWNER TO <user> / OWNER TO CURRENT_USER —
+#       silently succeeds; table unchanged.
+#     - ENABLE TRIGGER USER / ENABLE TRIGGER ALL —
+#       silently succeeds. (NOT a security guarantee:
+#       triggers are NOT enabled or disabled — the
+#       trigger system itself is independent of this.)
+#
+#   SHAPE B — "unsupported ALTER TABLE operation:
+#   <op>" (convert.rs catch-all):
+#     - FORCE ROW LEVEL SECURITY / NO FORCE RLS —
+#       parses but convert.rs has no arm; sqlparser
+#       knows the keywords.
+#     - REPLICA IDENTITY DEFAULT / FULL / NOTHING /
+#       USING INDEX <name> — parses but no impl.
+#       Critical for PG logical-replication users:
+#       REPLICA IDENTITY FULL is required to emit
+#       full-row before-images in WAL for tables
+#       without PK; zeta CDC doesn't depend on this
+#       attribute (different mechanism).
+#     - VALIDATE CONSTRAINT <name> — parses but no
+#       impl. Apps using ADD CONSTRAINT NOT VALID +
+#       later VALIDATE CONSTRAINT pattern (which
+#       avoids long table-lock during validation)
+#       cannot complete the validate step.
+#
+#   SHAPE C — sqlparser ALTER TABLE grammar gap:
+#     - OF <type> / NOT OF — typed-table inheritance,
+#       not in sqlparser grammar.
+#     - INHERIT <parent> / NO INHERIT <parent> —
+#       parent-table inheritance changes, not in
+#       sqlparser grammar.
+#     - CLUSTER ON <idx> — cluster-by-index hint,
+#       not in sqlparser grammar.
+#
+#   SHAPE D — sqlparser SET arm expects parens:
+#     - SET LOGGED / SET UNLOGGED — table-strictness
+#       toggle, only SET (option = value) form
+#       recognized.
+#     - SET SCHEMA <s> — namespace move.
+#     - SET WITHOUT CLUSTER — clear cluster hint.
+#
+#   SHAPE E — sqlparser ALTER COLUMN sub-grammar gap:
+#     - SET STATISTICS <n> — per-column stats target.
+#     - SET STORAGE PLAIN / EXTERNAL / EXTENDED /
+#       MAIN — per-column TOAST storage policy. Used
+#       heavily by pg_dump for column-level overrides.
+#
+# Big-picture finding:
+#
+#   zeta's ALTER TABLE supports the column-mutating
+#   ops (ADD/DROP/RENAME COLUMN, ADD/DROP CONSTRAINT)
+#   and a few SET TBLPROPERTIES forms. The PG-
+#   specific ops fall into three classes:
+#     (1) Silently accepted as pg_dump no-op (OWNER,
+#         ENABLE/DISABLE TRIGGER)
+#     (2) Parsed but rejected by convert.rs (FORCE
+#         RLS, REPLICA IDENTITY, VALIDATE CONSTRAINT)
+#     (3) Not in sqlparser grammar (OF/NOT OF,
+#         INHERIT/NO INHERIT, CLUSTER ON, SET
+#         LOGGED/UNLOGGED/SCHEMA, ALTER COLUMN SET
+#         STATISTICS/STORAGE)
+#
+#   For pg_dump round-tripping: class (1) is fine
+#   (silent OK); classes (2) and (3) error and break
+#   the dump. Apps porting PG schema definitions
+#   that depend on REPLICA IDENTITY FULL (logical-
+#   rep for PK-less tables) need to drop those
+#   clauses, since zeta's CDC mechanism is different.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — IDENTICAL
+# behavior. The intentional no-op arm and the catch-
+# all reject both live in convert.rs, shared by both
+# wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: DOCUMENTED INTENTIONAL — OWNER TO,
+#     ENABLE/DISABLE TRIGGER USER/ALL all silent no-op.
+#   # zeta-adapt: KNOWN GAP — FORCE / NO FORCE RLS,
+#     REPLICA IDENTITY <mode>, VALIDATE CONSTRAINT
+#     all error "unsupported ALTER TABLE operation".
+#   # zeta-adapt: KNOWN GAP — OF type / NOT OF /
+#     INHERIT / NO INHERIT / CLUSTER ON all error at
+#     sqlparser grammar.
+#   # zeta-adapt: KNOWN GAP — SET LOGGED/UNLOGGED/
+#     SCHEMA/WITHOUT CLUSTER all error "Expected: ("
+#     because sqlparser only knows SET (k = v).
+#   # zeta-adapt: KNOWN GAP — ALTER COLUMN SET
+#     STATISTICS / SET STORAGE — sqlparser ALTER
+#     COLUMN sub-grammar lists only 4 ops; SET
+#     STATISTICS / STORAGE not among them.
+
+DROP TABLE IF EXISTS at_t;
+CREATE TABLE at_t (id INT, v TEXT);
+
+--echo === SHAPE A — DOCUMENTED INTENTIONAL no-op (pg_dump compat) ===
+
+ALTER TABLE at_t OWNER TO admin_user;
+ALTER TABLE at_t OWNER TO CURRENT_USER;
+ALTER TABLE at_t ENABLE TRIGGER USER;
+ALTER TABLE at_t ENABLE TRIGGER ALL;
+
+--echo === SHAPE B — "unsupported ALTER TABLE operation: <op>" (convert.rs catch-all) ===
+
+--error 1064
+ALTER TABLE at_t FORCE ROW LEVEL SECURITY;
+--error 1064
+ALTER TABLE at_t NO FORCE ROW LEVEL SECURITY;
+--error 1064
+ALTER TABLE at_t REPLICA IDENTITY DEFAULT;
+--error 1064
+ALTER TABLE at_t REPLICA IDENTITY FULL;
+--error 1064
+ALTER TABLE at_t REPLICA IDENTITY NOTHING;
+--error 1064
+ALTER TABLE at_t REPLICA IDENTITY USING INDEX idx_x;
+--error 1064
+ALTER TABLE at_t VALIDATE CONSTRAINT some_c;
+
+--echo === SHAPE C — sqlparser ALTER TABLE grammar gap (top-level op not recognized) ===
+
+--error 1064
+ALTER TABLE at_t OF some_type;
+--error 1064
+ALTER TABLE at_t NOT OF;
+--error 1064
+ALTER TABLE at_t INHERIT parent_t;
+--error 1064
+ALTER TABLE at_t NO INHERIT parent_t;
+--error 1064
+ALTER TABLE at_t CLUSTER ON some_idx;
+
+--echo === SHAPE D — sqlparser SET arm expects parens (SET (k = v)) ===
+
+--error 1064
+ALTER TABLE at_t SET LOGGED;
+--error 1064
+ALTER TABLE at_t SET UNLOGGED;
+--error 1064
+ALTER TABLE at_t SET SCHEMA public;
+--error 1064
+ALTER TABLE at_t SET WITHOUT CLUSTER;
+
+--echo === SHAPE E — sqlparser ALTER COLUMN sub-grammar gap ===
+
+--error 1064
+ALTER TABLE at_t ALTER COLUMN id SET STATISTICS 100;
+--error 1064
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE PLAIN;
+--error 1064
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE EXTERNAL;
+--error 1064
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE EXTENDED;
+--error 1064
+ALTER TABLE at_t ALTER COLUMN v SET STORAGE MAIN;
+
+DROP TABLE at_t;
