@@ -1,0 +1,41 @@
+=== SHAPE A — option-clause silent-accept (4 shapes, CORRUPTION-class) ===
+=== A1 WITH GRANT OPTION — silent (cascading-authority modifier dropped) ===
+GRANT SELECT ON g TO u1 WITH GRANT OPTION;
+=== A2 GRANTED BY — silent (grantor-identity audit field dropped) ===
+GRANT SELECT ON g TO u1 GRANTED BY postgres;
+=== A3 REVOKE CASCADE — silent (cascading-revoke modifier dropped) ===
+REVOKE SELECT ON g FROM u1 CASCADE;
+=== A4 REVOKE RESTRICT — silent (revoke-only-if-safe guard dropped) ===
+REVOKE SELECT ON g FROM u1 RESTRICT;
+=== SHAPE B — PG batch-grant silent-accept (3 shapes, CORRUPTION-class) ===
+=== B5 GRANT ON ALL TABLES IN SCHEMA — silent (bulk-provision noop) ===
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO u1;
+=== B6 GRANT ON ALL SEQUENCES IN SCHEMA — silent (SERIAL-consumer setup noop) ===
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO u1;
+=== B7 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA — silent (ORM-migration noop) ===
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO u1;
+=== SHAPE C — database-level / PUBLIC silent-accept (3 shapes, CORRUPTION-class) ===
+=== C8 GRANT TEMPORARY ON DATABASE — silent (temp-table privilege dropped) ===
+GRANT TEMPORARY ON DATABASE gdb TO u1;
+=== C9 GRANT ALL PRIVILEGES ON DATABASE — silent (DATABASE object-type dropped) ===
+GRANT ALL PRIVILEGES ON DATABASE gdb TO u1;
+=== C10 GRANT SELECT TO PUBLIC — silent (PUBLIC pseudo-role dropped) ===
+GRANT SELECT ON g TO PUBLIC;
+=== SHAPE D — 4-shape fingerprint catalog (object-types NOT in grammar) ===
+=== D11 GRANT <role> TO <role> WITH ADMIN OPTION — "Expected: a privilege keyword, found: r1" at col 7 ===
+GRANT r1 TO u1 WITH ADMIN OPTION;
+ERROR 1064: SQL parse error: sql parser error: Expected: a privilege keyword, found: r1 at Line: 1, Column: 7
+=== D12 GRANT ON LANGUAGE — "Expected: TO, found: plpgsql" at col 25 ===
+GRANT USAGE ON LANGUAGE plpgsql TO u1;
+ERROR 1064: SQL parse error: sql parser error: Expected: TO, found: plpgsql at Line: 1, Column: 25
+=== D13 GRANT ON TABLESPACE — "Expected: TO, found: pg_default" at col 28 (mirror of D12, different token+col) ===
+GRANT CREATE ON TABLESPACE pg_default TO u1;
+ERROR 1064: SQL parse error: sql parser error: Expected: TO, found: pg_default at Line: 1, Column: 28
+=== D14 REVOKE GRANT OPTION FOR — "Expected: a privilege keyword, found: GRANT" at col 8 (mirror of D11, different token+col) ===
+REVOKE GRANT OPTION FOR SELECT ON g FROM u1;
+ERROR 1064: SQL parse error: sql parser error: Expected: a privilege keyword, found: GRANT at Line: 1, Column: 8
+=== SHAPE E — SUPPORT baselines (2 shapes, bound the slice) ===
+=== E15 GRANT ALL ON <table> — silent baseline (bare grant in-grammar) ===
+GRANT ALL ON g TO u1;
+=== E16 GRANT USAGE ON SCHEMA — silent baseline (re-pin of auth_basic_extra:64 form) ===
+GRANT USAGE ON SCHEMA public TO u1;
