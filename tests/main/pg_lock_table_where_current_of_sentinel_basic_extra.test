@@ -1,0 +1,172 @@
+# Independently authored PG LOCK TABLE statement family +
+# WHERE CURRENT OF cursor-target sentinel slice for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - LOCK TABLE … IN SHARE MODE and LOCK TABLE … IN
+#     EXCLUSIVE MODE are pinned at lock_basic_extra:62-70
+#     (PR-original lock smoke). The other PG lock modes
+#     — ACCESS SHARE / ROW SHARE / ROW EXCLUSIVE / SHARE
+#     UPDATE EXCLUSIVE / SHARE ROW EXCLUSIVE / ACCESS
+#     EXCLUSIVE, plus NOWAIT — have ZERO prior coverage
+#     (wide-grep of tests/main/*.test).
+#   - WHERE CURRENT OF <cursor> in UPDATE / DELETE has
+#     ZERO prior coverage (wide-grep returns no hits).
+#   - PG cursor family itself (DECLARE / FETCH / MOVE /
+#     CLOSE) is pinned-as-unsupported at PR #392
+#     (pg_cursor_family_sentinel_basic_extra). This
+#     slice's WHERE CURRENT OF is a SECONDARY gap —
+#     even if cursors worked, the WHERE clause
+#     sub-grammar wouldn't accept CURRENT OF.
+#   - SELECT-level row locking (FOR UPDATE OF <tbl>,
+#     FOR SHARE, NOWAIT, SKIP LOCKED) is supported,
+#     covered by lock_basic_extra + pg14_cte_lock_tz.
+#     DIFFERENT surface — explicit table lock statement
+#     vs row-level lock clause on SELECT.
+#
+# Pre-existing rejection shapes from prior taxonomies:
+#   - Shape (d) — "Expected: an SQL statement, found:
+#     <KW> at Line: 1, Column: 1" — see PR #371 mysql_
+#     maintenance_cmds_sentinel_basic_extra:84-86,
+#     PR #392 pg_cursor_family (MOVE).
+#   - Shape (e) — "Expected: end of statement, found:
+#     <KW>" — see lock_basic_extra:87-91 for the
+#     `LOCK IN SHARE MODE` trailing-clause variant
+#     (errors at `IN`).
+#
+# This slice pins:
+#
+#   Shape (d) — LOCK TABLE … IN <mode> MODE [NOWAIT]
+#   (sqlparser has no LOCK statement-arm at all):
+#     - ACCESS SHARE MODE
+#     - ROW SHARE MODE
+#     - ROW EXCLUSIVE MODE
+#     - SHARE UPDATE EXCLUSIVE MODE
+#     - SHARE ROW EXCLUSIVE MODE
+#     - ACCESS EXCLUSIVE MODE
+#     - ACCESS SHARE MODE NOWAIT (mode + NOWAIT modifier)
+#     - LOCK TABLE inside BEGIN…COMMIT (errors with
+#       same fingerprint, then cascades — confirms LOCK
+#       isn't special-cased anywhere).
+#   All error with errno 1064 "Expected: an SQL
+#   statement, found: LOCK at Line: 1, Column: 1" —
+#   uniform Shape (d) fingerprint regardless of mode.
+#
+#   Shape (e) — WHERE CURRENT OF <cursor> in UPDATE
+#   / DELETE (sqlparser parses UPDATE/DELETE but
+#   doesn't recognize CURRENT OF in the WHERE
+#   sub-grammar):
+#     - UPDATE … WHERE CURRENT OF <cursor>
+#     - DELETE … WHERE CURRENT OF <cursor>
+#   Both error 1064 "Expected: end of statement,
+#   found: OF" — fingerprint shape matches
+#   lock_basic_extra:87-91 `LOCK IN SHARE MODE`.
+#
+# Big-picture finding:
+#
+#   PG explicit table-lock statement family is
+#   absent from zeta: sqlparser doesn't have LOCK
+#   as a statement keyword (Shape (d)). All 8
+#   shapes — 6 PG lock modes + NOWAIT modifier +
+#   in-transaction — produce the same fingerprint.
+#
+#   pg_dump emits `LOCK TABLE foo IN ACCESS SHARE
+#   MODE` as the first thing it does for each table
+#   when dumping; this will parse-reject. PG dump
+#   compatibility on zeta requires a pg_dump
+#   variant that elides LOCK TABLE statements, or
+#   zeta needs a Shape-(d) catch-all that no-ops
+#   LOCK TABLE (lock acquisition is single-conn
+#   no-op anyway under current snapshot semantics,
+#   same as SELECT FOR UPDATE in lock_basic_extra).
+#
+#   WHERE CURRENT OF is the canonical PG cursor-
+#   based update pattern (DECLARE c CURSOR FOR
+#   SELECT … FOR UPDATE; FETCH … FROM c; UPDATE
+#   … WHERE CURRENT OF c). With the cursor family
+#   itself unsupported (PR #392), and the WHERE
+#   sub-grammar also unsupported, this is a
+#   double-gap. Apps must rewrite to keyed
+#   UPDATE (… WHERE id = ?) — which works.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — PG LOCK TABLE … IN
+#     <mode> MODE [NOWAIT] errors 1064 uniformly
+#     across all 6 PG lock modes. Shape (d). No
+#     substitute — zeta-side single-writer MVCC
+#     means table-level locks are effectively
+#     unnecessary; pg_dump compat needs a
+#     parser-side no-op accept.
+#   # zeta-adapt: KNOWN GAP — UPDATE/DELETE …
+#     WHERE CURRENT OF <cursor> errors 1064
+#     "Expected: end of statement, found: OF".
+#     Shape (e). Compounds with PR #392 (cursor
+#     family unsupported). Rewrite to keyed
+#     UPDATE/DELETE on PK.
+
+CREATE TABLE lt2 (id INT PRIMARY KEY, n INT);
+INSERT INTO lt2 VALUES (1, 10), (2, 20), (3, 30);
+
+--echo === Shape (d) — LOCK TABLE … IN ACCESS SHARE MODE ===
+
+--error 1064
+LOCK TABLE lt2 IN ACCESS SHARE MODE;
+
+--echo === Shape (d) — LOCK TABLE … IN ROW SHARE MODE ===
+
+--error 1064
+LOCK TABLE lt2 IN ROW SHARE MODE;
+
+--echo === Shape (d) — LOCK TABLE … IN ROW EXCLUSIVE MODE ===
+
+--error 1064
+LOCK TABLE lt2 IN ROW EXCLUSIVE MODE;
+
+--echo === Shape (d) — LOCK TABLE … IN SHARE UPDATE EXCLUSIVE MODE ===
+
+--error 1064
+LOCK TABLE lt2 IN SHARE UPDATE EXCLUSIVE MODE;
+
+--echo === Shape (d) — LOCK TABLE … IN SHARE ROW EXCLUSIVE MODE ===
+
+--error 1064
+LOCK TABLE lt2 IN SHARE ROW EXCLUSIVE MODE;
+
+--echo === Shape (d) — LOCK TABLE … IN ACCESS EXCLUSIVE MODE ===
+
+--error 1064
+LOCK TABLE lt2 IN ACCESS EXCLUSIVE MODE;
+
+--echo === Shape (d) — LOCK TABLE … IN ACCESS SHARE MODE NOWAIT (NOWAIT modifier) ===
+
+--error 1064
+LOCK TABLE lt2 IN ACCESS SHARE MODE NOWAIT;
+
+--echo === Shape (d) — LOCK TABLE inside BEGIN/COMMIT (cascades) ===
+
+# Confirms LOCK isn't special-cased in any txn-command
+# dispatcher; same Shape (d) fingerprint, then the
+# txn-abort cascade kicks in (PR #392 fingerprint).
+BEGIN;
+--error 1064
+LOCK TABLE lt2 IN ACCESS EXCLUSIVE MODE;
+--error 1105
+SELECT 1;
+COMMIT;
+
+--echo === Shape (e) — UPDATE … WHERE CURRENT OF <cursor> ===
+
+# sqlparser parses UPDATE but doesn't recognize
+# CURRENT OF in the WHERE sub-grammar. Errors at
+# `OF` keyword. Compounds with PR #392 (cursor
+# family unsupported).
+--error 1064
+UPDATE lt2 SET n = 99 WHERE CURRENT OF mycursor;
+
+--echo === Shape (e) — DELETE … WHERE CURRENT OF <cursor> ===
+
+--error 1064
+DELETE FROM lt2 WHERE CURRENT OF mycursor;
+
+DROP TABLE lt2;
