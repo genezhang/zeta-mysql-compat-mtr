@@ -1,0 +1,47 @@
+=== Setup ===
+CREATE TABLE t_atvar (id INT PRIMARY KEY, v INT);
+INSERT INTO t_atvar VALUES (1, 10);
+=== SET @var — both `=` and `:=` parse silently ===
+# No error, no observable binding (verified by the
+# READ-side errors below).
+SET @id = 1;
+SET @id := 1;
+=== SET @@global.<unknown> / @@session.<unknown> ===
+# NOVEL: qualified-unknown SETs are silent no-ops,
+# matching the bare @@<unknown> = X path (which
+# variable_basic_extra:68 pinned for known names).
+SET @@global.foo = 1;
+SET @@session.bar = 'whatever';
+=== @var READ in INSERT VALUES — errno 1064 ===
+# The `INSERT ... VALUES (..., @last_id)` idiom from
+# `SET @last_id = LAST_INSERT_ID();` is broken here.
+INSERT INTO t_atvar VALUES (@id + 1, 20);
+ERROR 1064: SQL parse error: unsupported unary operator: @
+=== @var READ in SELECT WHERE — errno 1064 ===
+SELECT * FROM t_atvar WHERE id = @id;
+ERROR 1064: SQL parse error: unsupported unary operator: @
+=== @var READ in UPDATE SET and WHERE — errno 1064 ===
+UPDATE t_atvar SET v = @id WHERE id = 1;
+ERROR 1064: SQL parse error: unsupported unary operator: @
+=== @var READ in DELETE WHERE — errno 1064 ===
+DELETE FROM t_atvar WHERE id = @id;
+ERROR 1064: SQL parse error: unsupported unary operator: @
+=== @@global.<unknown> / @@session.<unknown> READ — NULL ===
+# NOVEL: the unknown-sysvar-to-NULL fallback is
+# symmetric across @@GLOBAL./@@SESSION./bare forms.
+SELECT @@global.unknown_thing;
+@@global.unknown_thing
+NULL
+SELECT @@session.unknown_thing;
+@@session.unknown_thing
+NULL
+=== Arithmetic on string-typed @@<var> — silent NULL ===
+# NOVEL: @@version is '8.0.36-zeta' (a string) but
+# @@version + 1 returns NULL — no coercion, no error,
+# no warning. Apps version-gating with arithmetic
+# comparisons silently take the wrong branch.
+SELECT @@version + 1;
+@@version + 1
+NULL
+=== Cleanup ===
+DROP TABLE t_atvar;
