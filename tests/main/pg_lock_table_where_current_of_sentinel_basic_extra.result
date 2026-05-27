@@ -1,0 +1,37 @@
+CREATE TABLE lt2 (id INT PRIMARY KEY, n INT);
+INSERT INTO lt2 VALUES (1, 10), (2, 20), (3, 30);
+=== Shape (d) — LOCK TABLE … IN ACCESS SHARE MODE ===
+LOCK TABLE lt2 IN ACCESS SHARE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== Shape (d) — LOCK TABLE … IN ROW SHARE MODE ===
+LOCK TABLE lt2 IN ROW SHARE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== Shape (d) — LOCK TABLE … IN ROW EXCLUSIVE MODE ===
+LOCK TABLE lt2 IN ROW EXCLUSIVE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== Shape (d) — LOCK TABLE … IN SHARE UPDATE EXCLUSIVE MODE ===
+LOCK TABLE lt2 IN SHARE UPDATE EXCLUSIVE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== Shape (d) — LOCK TABLE … IN SHARE ROW EXCLUSIVE MODE ===
+LOCK TABLE lt2 IN SHARE ROW EXCLUSIVE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== Shape (d) — LOCK TABLE … IN ACCESS EXCLUSIVE MODE ===
+LOCK TABLE lt2 IN ACCESS EXCLUSIVE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== Shape (d) — LOCK TABLE … IN ACCESS SHARE MODE NOWAIT (NOWAIT modifier) ===
+LOCK TABLE lt2 IN ACCESS SHARE MODE NOWAIT;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+=== Shape (d) — LOCK TABLE inside BEGIN/COMMIT (cascades) ===
+BEGIN;
+LOCK TABLE lt2 IN ACCESS EXCLUSIVE MODE;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: LOCK at Line: 1, Column: 1
+SELECT 1;
+ERROR 1105: current transaction is aborted, commands ignored until end of transaction block
+COMMIT;
+=== Shape (e) — UPDATE … WHERE CURRENT OF <cursor> ===
+UPDATE lt2 SET n = 99 WHERE CURRENT OF mycursor;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: OF at Line: 1, Column: 37
+=== Shape (e) — DELETE … WHERE CURRENT OF <cursor> ===
+DELETE FROM lt2 WHERE CURRENT OF mycursor;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: OF at Line: 1, Column: 31
+DROP TABLE lt2;
