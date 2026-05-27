@@ -1,0 +1,296 @@
+# Independently authored PG CAST target-type sentinel
+# slice — TIME-family asymmetry + identifier-type gap +
+# NATIONAL CHARACTER parse-reject + 6th hand-rolled
+# formatter witness. NOT copied or adapted from MySQL's
+# mysql-test/ or PG regress.
+#
+# Adjacent companion slices (do NOT duplicate):
+#   - cast_target_type_aliases_basic_extra.test pins
+#     the full MySQL-NAME alias matrix: JSON / STRING
+#     working aliases; DATETIME / BLOB / TINYTEXT /
+#     BINARY / VARBINARY / YEAR / NVARCHAR / NTEXT
+#     SENTINEL rejects; BYTEA plan-vs-runtime split.
+#     Also pins SMALLINT / INT2, INTEGER / INT4 / INT8,
+#     REAL / FLOAT4, DOUBLE PRECISION / FLOAT8 SUPPORT
+#     pins (lines 92-107). This slice does NOT re-pin
+#     INT2 / FLOAT4 alias support — already covered
+#     there.
+#   - cast_basic_extra.test pins INT/INTEGER/BIGINT
+#     aliases, TEXT/VARCHAR/CHAR aliases, BYTEA runtime
+#     reject, CONVERT(x, SIGNED/UNSIGNED) → 1064.
+#   - type_cast_edges_basic_extra.test pins numeric
+#     overflow, BIGINT silent-saturation, BOOL/Int,
+#     DECIMAL truncation. Includes a `cannot cast to
+#     <T>` comment witness for BOOLEAN → INT in header,
+#     but no TIMESTAMP/TIME-family target probing.
+#   - range_type_basic_extra.test pins `cannot cast to
+#     TEXT` comment for range types.
+#   - current_schema_citext_basic_extra.test pins
+#     `cannot cast to CITEXT` comment for CITEXT alias.
+#   - boolean_logic_basic_extra.test references
+#     `cannot cast to INT` for BOOLEAN.
+#   - PR #427's tstzrange / MULTIRANGE CAST gap slice
+#     (adjacent reference) is the IMMEDIATELY adjacent
+#     prior CAST-registry gap finding. THIS slice
+#     extends to TIME-family and PG identifier types.
+#
+#   Pre-author dedup grep on tests/main/*.test for
+#   TIMETZ / TIME WITH TIME ZONE / TIME WITHOUT TIME
+#   ZONE / NCHAR / AS name / AS xid / NATIONAL
+#   CHARACTER / cannot cast: NO --error directives on
+#   any of these new probe targets. Only comment-level
+#   mentions of "cannot cast to <T>" pattern in 4
+#   files (range, citext, boolean_logic, type_cast_
+#   edges) — none probe the TIMESTAMP-with-float8
+#   surface. Per [[feedback_gap_scan_must_grep_all_
+#   files]] the case-insensitive grep was the full
+#   population.
+#
+# This slice pins THREE structural findings:
+#
+#   FINDING 1 — TIME-vs-TIMESTAMP CAST-registry
+#   ASYMMETRY. The PG/SQL-standard `TIME` family
+#   (TIMETZ, TIME WITH TIME ZONE, TIME WITHOUT TIME
+#   ZONE) is NOT in zeta's CAST registry, yet the
+#   `TIMESTAMP` family (TIMESTAMP WITHOUT TIME ZONE,
+#   TIMESTAMP WITH TIME ZONE) IS. Both TIME and
+#   TIMESTAMP are first-class PG types with parallel
+#   spellings; zeta has covered only one half of the
+#   pair. Migration risk: any PG schema or query that
+#   round-trips through TIME WITH TIME ZONE will hit
+#   the catch-all `unsupported CAST target type` reject,
+#   even though TIMESTAMP-equivalent expressions work.
+#   This is the SAME pattern as PR #427's MULTIRANGE
+#   gap: parser recognizes the spelling but the runtime
+#   CAST dispatcher has no arm. Cross-link
+#   [[project_two_layer_type_recognition_pattern]].
+#
+#   FINDING 2 — PG IDENTIFIER-TYPE PARTIAL-REGISTRY
+#   ASYMMETRY. PG's internal identifier types are
+#   accepted asymmetrically: `"char"` (PG 1-byte
+#   internal type, lowercase, requires double quotes
+#   for keyword disambiguation) IS in the CAST
+#   registry; `name` (PG 64-byte identifier) and `xid`
+#   (PG transaction ID) are NOT. None of these have
+#   user-facing utility in zeta — but pg_catalog and
+#   information_schema queries from PG client tools
+#   routinely cast to these. The same CAST registry
+#   that knows `"char"` (a niche type) has skipped
+#   `name` (used in every pg_catalog column). NCHAR(n)
+#   (SQL Server-ish narrow national char) is also
+#   rejected — included here because it shares the
+#   identifier-character-type slot of the parser
+#   surface and IS accepted by sqlparser at parse
+#   time, only to reject at the runtime dispatcher
+#   (same plan-vs-runtime asymmetry as BYTEA in
+#   cast_target_type_aliases:181). Cross-link
+#   [[project_two_layer_type_recognition_pattern]] and
+#   [[project_function_arms_gap_closed]] (function-arm
+#   shape (c) pattern, now extended to CAST targets).
+#
+#   FINDING 3 — 6th HAND-ROLLED ERROR FORMATTER
+#   WITNESS: `cannot cast to TIMESTAMP`. When the
+#   CAST registry HAS the target type but the source
+#   value type is incompatible (here: float8
+#   `+infinity` → TIMESTAMP), the runtime emits
+#   `cannot cast to TIMESTAMP` — a DIFFERENT shape
+#   from the `unsupported CAST target type: <type>`
+#   family. Critical fingerprints:
+#     (a) the target type IS echoed (TIMESTAMP) but
+#         the source type is NOT
+#     (b) NO `at Line: N, Column: M` suffix
+#     (c) verb is `cannot cast`, NOT `unsupported`
+#   This places it firmly in the
+#   [[project_hand_rolled_error_formatters]] cluster
+#   as the 6th witness, joining:
+#     1. ON COMMIT smushed-typo (PR #457)
+#     2. CREATE FUNCTION body-required (PR #458)
+#     3. unsupported DROP STAGE statement (PR #455)
+#     4. unsupported DROP ROLE statement (PR #460)
+#     5. unsupported DROP USER statement (PR #460)
+#     6. cannot cast to TIMESTAMP   (THIS SLICE)
+#   Note the previous 5 witnesses are all PARSE-LAYER
+#   or DROP-DISPATCHER rejects; THIS one is in the
+#   VALUE-CAST runtime — proving the hand-rolled-
+#   formatter pattern spans MULTIPLE engine layers,
+#   not just the parser/DDL surface. Error-string
+#   matchers that key off the Line/Column suffix will
+#   NOT match this row.
+#
+# Big-picture finding:
+#
+#   The PG CAST surface has FOUR distinct rejection
+#   shapes, each pinned in a different SHAPE block:
+#     - SHAPE A — TIME-family runtime catch-all
+#       `unsupported CAST target type: <T>` (no
+#       Line/Column, but ECHOES target spelling
+#       verbatim including `WITH TIME ZONE` suffix).
+#     - SHAPE B — Identifier-type runtime catch-all
+#       (same formatter as A; the asymmetry vs `"char"`
+#       SUPPORT pin is what's novel).
+#     - SHAPE C — Parse-layer reject for NATIONAL
+#       CHARACTER VARYING: errno 1064, `Expected: ),
+#       found: CHARACTER at Line: 1, Column: 29`
+#       (standard sqlparser whitelist error WITH Line/
+#       Column, fundamentally DIFFERENT code path from
+#       A/B). NATIONAL is absorbed elsewhere; the
+#       `CHARACTER` keyword arrives in an unexpected
+#       position.
+#     - SHAPE D — Runtime `cannot cast to <T>`
+#       formatter (Finding 3 — 6th hand-rolled witness).
+#   The same CAST target-type surface takes FOUR error
+#   paths; pinning the boundary between them is the
+#   point of this slice.
+#
+# Wire divergence check: probed via mysqlwire (MTR
+# canonical, dynamic port reservation). Per
+# [[feedback_probe_wire_match_slice_wire]] pgwire was
+# NOT separately probed — the CAST registry sits below
+# the wire boundary and errors are stable across
+# clients.
+#
+# Adaptation notes:
+#   # zeta-adapt: TIME-family CAST — `CAST(x AS TIMETZ)`,
+#     `CAST(x AS TIME WITH TIME ZONE)`, `CAST(x AS TIME
+#     WITHOUT TIME ZONE)` all error 1105 `unsupported
+#     CAST target type: <T>`. Use plain `CAST(x AS
+#     TIMESTAMP)` instead — the TIMESTAMP family DOES
+#     work (see SHAPE A SUPPORT pin). If time-zone
+#     handling matters, route through a TIMESTAMP and
+#     extract the time portion via DATE_PART / EXTRACT.
+#   # zeta-adapt: PG identifier-type CAST — `CAST(x AS
+#     name)` and `CAST(x AS xid)` error 1105
+#     `unsupported CAST target type: <T>`. Use TEXT
+#     instead. pg_catalog / information_schema queries
+#     that cast through these types will need
+#     rewriting.
+#   # zeta-adapt: NCHAR(n) — `CAST(x AS NCHAR(n))`
+#     errors 1105 `unsupported CAST target type:
+#     NCHAR(n)`. Use CHAR(n) or VARCHAR(n).
+#   # zeta-adapt: NATIONAL CHARACTER VARYING(n) — the
+#     parser rejects this at parse time (1064,
+#     `Expected: ), found: CHARACTER`). Use VARCHAR(n)
+#     or CHARACTER VARYING(n) — both work per cast_
+#     target_type_aliases:117. The NATIONAL keyword
+#     itself is partially absorbed; the trailing
+#     CHARACTER lands in the wrong grammar slot.
+#   # zeta-adapt: float8 → TIMESTAMP — `CAST(x::float8
+#     AS TIMESTAMP)` errors 1105 `cannot cast to
+#     TIMESTAMP` (DIFFERENT shape from the unsupported-
+#     target rejects above; this is a value-cast
+#     surface message). PG accepts `'infinity'::float8`
+#     as a TIMESTAMP via the special infinity sentinel;
+#     zeta does not. Route via `to_timestamp(x)` if
+#     epoch-style conversion is what's wanted.
+
+--echo === SHAPE A — TIME-family CAST-registry gap (3 rejects + 1 TIMESTAMP-family SUPPORT) ===
+
+# TIMETZ is the PG short-spelling for TIME WITH TIME
+# ZONE. zeta's parser accepts it at parse time (no
+# 1064 parse-reject) but the runtime CAST dispatcher
+# has no arm — catch-all formatter ECHOES the bare
+# spelling.
+--error 1105
+SELECT CAST('12:00' AS TIMETZ);
+
+# Long-form TIME WITH TIME ZONE — same gap, ECHOES
+# the full multi-keyword spelling including WITH TIME
+# ZONE suffix.
+--error 1105
+SELECT CAST('12:00:00+05:00' AS TIME WITH TIME ZONE);
+
+# TIME WITHOUT TIME ZONE — completes the TIME family.
+# The presence of TWO TIME variants (with/without
+# time zone) plus the short alias TIMETZ all missing
+# from the registry shows the gap is FAMILY-WIDE, not
+# a single-keyword omission.
+--error 1105
+SELECT CAST('12:00:00' AS TIME WITHOUT TIME ZONE);
+
+# SUPPORT pin: TIMESTAMP WITHOUT TIME ZONE — the
+# parallel TIMESTAMP family spelling DOES work. This
+# is the asymmetry frame for Finding 1: same SQL-
+# standard syntactic family, opposite CAST-registry
+# coverage. If a future change unifies TIME +
+# TIMESTAMP into one dispatcher arm this SUPPORT pin
+# will keep working AND the three rejects above must
+# be flipped to SUPPORT.
+SELECT CAST('2024-01-01 12:00:00' AS TIMESTAMP WITHOUT TIME ZONE) AS timestamp_without_tz_works;
+
+--echo === SHAPE B — PG identifier-type CAST-registry gap (3 rejects + 1 "char" SUPPORT) ===
+
+# NCHAR(n) — SQL Server narrow-national-char-ish.
+# Accepted at parse time, rejected at runtime — the
+# same plan-vs-runtime asymmetry as BYTEA in
+# cast_target_type_aliases:181. The parens form
+# carries through verbatim in the error message.
+--error 1105
+SELECT CAST('a' AS NCHAR(5));
+
+# `name` — PG 64-byte internal identifier type. Every
+# pg_catalog column that holds a name (relname,
+# attname, proname, etc.) is of this type. NOT in the
+# CAST registry; client tools that cast through `name`
+# will hit this reject.
+--error 1105
+SELECT CAST('a' AS name);
+
+# `xid` — PG transaction ID type. Surfaces in
+# pg_locks, pg_stat_activity, and txid_current()
+# queries. NOT in the CAST registry.
+--error 1105
+SELECT CAST('1/1' AS xid);
+
+# SUPPORT pin: `"char"` (lowercase, double-quoted to
+# disambiguate from the CHAR keyword) is PG's 1-byte
+# internal type — niche, used in pg_catalog flag
+# columns like pg_class.relkind. zeta HAS this arm in
+# the CAST registry. NULL → NULL is the safest probe
+# (no source-value coverage to inadvertently
+# duplicate). If a future change adds `name` and
+# `xid` to the registry this SUPPORT pin will keep
+# working AND the three rejects above must be flipped
+# to SUPPORT.
+SELECT CAST(NULL AS "char") AS char_internal_works;
+
+--echo === SHAPE C — NATIONAL CHARACTER VARYING parse-layer reject (1 reject) ===
+
+# DIFFERENT code path from SHAPE A/B: this rejects at
+# PARSE time (errno 1064, with Line/Column suffix)
+# instead of at the runtime CAST dispatcher. The
+# NATIONAL keyword is partially absorbed by the
+# parser's CAST target grammar; the trailing
+# `CHARACTER` keyword arrives in an unexpected
+# position (where `)` was expected). Pins the
+# fingerprint:
+#   `Expected: ), found: CHARACTER at Line: 1,
+#    Column: 29`
+# Plain `CHARACTER VARYING(10)` (without NATIONAL)
+# works per cast_target_type_aliases:117; only the
+# NATIONAL prefix triggers this parse-reject.
+--error 1064
+SELECT CAST('a' AS NATIONAL CHARACTER VARYING(10));
+
+--echo === SHAPE D — hand-rolled `cannot cast to TIMESTAMP` formatter (1 reject, 6th witness) ===
+
+# Distinct from the catch-all `unsupported CAST
+# target type: <T>` formatter used in SHAPES A/B:
+# here the target TIMESTAMP IS in the registry, but
+# the runtime CAST dispatcher rejects the source
+# value type (float8) with a DIFFERENT bespoke
+# message: `cannot cast to TIMESTAMP`. Fingerprints:
+#   (a) target type ECHOED (TIMESTAMP)
+#   (b) source type NOT echoed (no float8)
+#   (c) NO `at Line: N, Column: M` suffix
+#   (d) verb `cannot cast` (vs `unsupported`)
+# These four fingerprints together place this in the
+# [[project_hand_rolled_error_formatters]] cluster
+# as the 6th witness. Note: the previous 5 witnesses
+# were all parser-layer or DDL-dispatcher rejects;
+# this one is in the runtime VALUE-CAST surface,
+# proving the hand-rolled-formatter pattern spans
+# multiple engine layers (not just the parser/DDL
+# corner). PG accepts `'infinity'::float8` as a
+# TIMESTAMP via its infinity sentinel; zeta does not.
+--error 1105
+SELECT CAST('+infinity'::float8 AS TIMESTAMP);

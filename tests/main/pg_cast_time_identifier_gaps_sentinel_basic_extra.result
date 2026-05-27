@@ -1,0 +1,26 @@
+=== SHAPE A — TIME-family CAST-registry gap (3 rejects + 1 TIMESTAMP-family SUPPORT) ===
+SELECT CAST('12:00' AS TIMETZ);
+ERROR 1105: execution error: unsupported CAST target type: TIMETZ
+SELECT CAST('12:00:00+05:00' AS TIME WITH TIME ZONE);
+ERROR 1105: execution error: unsupported CAST target type: TIME WITH TIME ZONE
+SELECT CAST('12:00:00' AS TIME WITHOUT TIME ZONE);
+ERROR 1105: execution error: unsupported CAST target type: TIME WITHOUT TIME ZONE
+SELECT CAST('2024-01-01 12:00:00' AS TIMESTAMP WITHOUT TIME ZONE) AS timestamp_without_tz_works;
+timestamp_without_tz_works
+2024-01-01 12:00:00
+=== SHAPE B — PG identifier-type CAST-registry gap (3 rejects + 1 "char" SUPPORT) ===
+SELECT CAST('a' AS NCHAR(5));
+ERROR 1105: execution error: unsupported CAST target type: NCHAR(5)
+SELECT CAST('a' AS name);
+ERROR 1105: execution error: unsupported CAST target type: name
+SELECT CAST('1/1' AS xid);
+ERROR 1105: execution error: unsupported CAST target type: xid
+SELECT CAST(NULL AS "char") AS char_internal_works;
+char_internal_works
+NULL
+=== SHAPE C — NATIONAL CHARACTER VARYING parse-layer reject (1 reject) ===
+SELECT CAST('a' AS NATIONAL CHARACTER VARYING(10));
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: CHARACTER at Line: 1, Column: 29
+=== SHAPE D — hand-rolled `cannot cast to TIMESTAMP` formatter (1 reject, 6th witness) ===
+SELECT CAST('+infinity'::float8 AS TIMESTAMP);
+ERROR 1105: execution error: cannot cast to TIMESTAMP
