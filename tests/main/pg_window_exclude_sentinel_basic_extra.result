@@ -1,0 +1,36 @@
+=== Setup ===
+DROP TABLE IF EXISTS wf_excl;
+CREATE TABLE wf_excl (id INT, v INT);
+INSERT INTO wf_excl VALUES (1,10), (2,20), (3,30), (4,40), (5,50);
+=== Baseline (works): ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING — rolling sum ===
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS s FROM wf_excl ORDER BY id;
+id	v	s
+1	10	30
+2	20	60
+3	30	90
+4	40	120
+5	50	90
+=== EXCLUDE CURRENT ROW — "Expected: ), found: EXCLUDE at Line: 1, Column: 78" ===
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE CURRENT ROW) FROM wf_excl;
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 1, Column: 78
+=== EXCLUDE GROUP — same fingerprint, same col ===
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE GROUP) FROM wf_excl;
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 1, Column: 78
+=== EXCLUDE TIES — same fingerprint, same col ===
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE TIES) FROM wf_excl;
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 1, Column: 78
+=== EXCLUDE NO OTHERS — same fingerprint, same col (even the no-op SQL-standard explicit-default form rejects) ===
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE NO OTHERS) FROM wf_excl;
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 1, Column: 78
+=== PG-portability rewrite: `agg(v) OVER (...) - v` for additive aggregates ===
+SELECT id, v,
+       SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) - v AS s_excl_self
+  FROM wf_excl
+  ORDER BY id;
+id	v	s_excl_self
+1	10	20
+2	20	40
+3	30	60
+4	40	80
+5	50	40
+DROP TABLE wf_excl;
