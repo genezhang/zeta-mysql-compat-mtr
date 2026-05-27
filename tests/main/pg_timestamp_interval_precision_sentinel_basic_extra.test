@@ -1,0 +1,244 @@
+# Independently authored TIMESTAMP(n) precision /
+# INTERVAL field-qualifier sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - TIMESTAMP(n) precision specifier in CAST / column
+#     type: ZERO prior coverage. Pre-check grepped all
+#     of tests/main/*.test for `TIMESTAMP(`; only hits
+#     are UNIX_TIMESTAMP(), MAKE_TIMESTAMP(), and
+#     TO_TIMESTAMP() function calls — DIFFERENT shape
+#     (function arg, not type-precision modifier).
+#   - INTERVAL field qualifiers (DAY / YEAR / SECOND(n)
+#     / DAY TO SECOND / YEAR TO MONTH / HOUR / MINUTE
+#     / MONTH) in CAST: ZERO prior coverage. Grepped
+#     `INTERVAL DAY|YEAR|SECOND|MONTH|HOUR|MINUTE`
+#     across tests/main/*.test; only hits are TWO
+#     comment lines (adddate_subdate_basic_extra and
+#     date_add_sub_extras_basic_extra) describing
+#     INTERVAL DAY semantics — NOT actual CAST AS
+#     INTERVAL <unit> probes.
+#   - Bare unqualified INTERVAL '<literal>': supported
+#     and pinned elsewhere (basic INTERVAL '5 days'
+#     works — confirmed via probe, returns 120:00:00).
+#     Out of scope here.
+#   - CAST AS DATETIME(6): pre-existing parse-reject
+#     pin at cast_target_type_aliases_basic_extra. That
+#     is the MySQL spelling; DIFFERENT shape from the
+#     PG-standard TIMESTAMP(n).
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - SILENT-DROP BUG pattern: pre-existing at PR #391
+#     (INHERITS), PR #407 (SCHEMA AUTHORIZATION), PR
+#     #408 (WITH ORDINALITY), PR #4xx (SELECT INTO
+#     new-table). All share the same mechanism:
+#     sqlparser parses the modifier into the AST,
+#     zeta's convert.rs (parser-to-IR pass) never
+#     reads the field, the rest of the statement
+#     executes normally. Witness here: `'…'::TIMESTAMP(0)`
+#     returns the literal with FULL microsecond
+#     precision instead of truncating to seconds.
+#   - "unsupported CAST target type: <T>" (error 1105):
+#     pre-existing fingerprint at cast_target_type_
+#     aliases_basic_extra for DATETIME, BLOB, TINYBLOB,
+#     etc. Same error surface for the INTERVAL field-
+#     qualifier family — zeta's CAST dispatcher has no
+#     arm for INTERVAL <unit> forms.
+#
+# This slice pins:
+#
+#   PG TIMESTAMP(n) precision specifier — SILENT-DROP
+#   BUG (headline):
+#     - `'2024-01-01 12:00:00.123456'::TIMESTAMP(0)`
+#       returns `2024-01-01 12:00:00.123456` (real
+#       PG: `2024-01-01 12:00:00` — fractional truncated
+#       to whole seconds for (0)).
+#     - `'2024-01-01 12:00:00.123456'::TIMESTAMP(3)`
+#       returns `2024-01-01 12:00:00.123456` (real
+#       PG: `2024-01-01 12:00:00.123` — truncated to
+#       milliseconds).
+#     - `'2024-01-01 12:00:00.123456'::TIMESTAMP(6)`
+#       returns `2024-01-01 12:00:00.123456` (matches
+#       PG tautologically since 6 is full precision).
+#     - Same silent-drop for `CAST(… AS TIMESTAMP(n))`
+#       spelling — both CAST syntaxes route through
+#       the same dispatcher.
+#     - Same silent-drop for `TIMESTAMP(n) WITH TIME
+#       ZONE` / `TIMESTAMP(n) WITHOUT TIME ZONE` in
+#       CAST.
+#     - Same silent-drop for `TIMESTAMP(n)` column-
+#       type declaration: INSERTed values come back at
+#       full 6-digit microsecond precision regardless
+#       of the declared (n). Witness via SELECT after
+#       INSERT into TIMESTAMP(3) WITH TIME ZONE column.
+#     - Mechanism: sqlparser parses the (n) precision
+#       into the AST node, zeta's type-conversion
+#       layer reads the base type (TIMESTAMP) but
+#       never reads the precision modifier. End result:
+#       all TIMESTAMP values store/return at full
+#       microsecond precision, period.
+#
+#   PG INTERVAL field-qualifier family — uniform CAST
+#   parse-reject (secondary, "known gap"):
+#     - `'5'::INTERVAL DAY` → error 1105 "unsupported
+#       CAST target type: INTERVAL DAY".
+#     - `'2'::INTERVAL YEAR` → error 1105 "unsupported
+#       CAST target type: INTERVAL YEAR".
+#     - `'12:34:56.789012'::INTERVAL SECOND(3)` → error
+#       1105 "unsupported CAST target type: INTERVAL
+#       SECOND(3)".
+#     - `'1 day 12:34:56'::INTERVAL DAY TO SECOND` →
+#       error 1105 "unsupported CAST target type:
+#       INTERVAL DAY TO SECOND".
+#     - `'12 months'::INTERVAL YEAR TO MONTH` → error
+#       1105 "unsupported CAST target type: INTERVAL
+#       YEAR TO MONTH".
+#     - Uniform pattern: zeta's CAST dispatcher has no
+#       arms for the SQL-standard INTERVAL field-
+#       qualifier sub-grammar (single units, single-
+#       unit with precision, range units). The bare
+#       unqualified `INTERVAL '<lit>'` form works
+#       because that takes a different parse path
+#       (interval literal, not CAST target).
+#
+# Big-picture finding:
+#
+#   TIMESTAMP(n) silent-drop is the dangerous one. Apps
+#   that declare TIMESTAMP(0) for second-precision
+#   storage contracts (e.g., to match a downstream
+#   API/JSON schema that emits whole-second epoch
+#   values) or TIMESTAMP(3) for millisecond contracts
+#   will silently get full microsecond precision back.
+#   Downstream consumers that do exact-string
+#   comparisons (timestamp formatters, hash-based
+#   dedup, fingerprinting) will see mismatches against
+#   PG-source reference data. Worse, there is no error
+#   or warning — the (n) is parsed and dropped without
+#   trace.
+#
+#   The INTERVAL field-qualifier family is the safe
+#   companion: parse-reject means apps porting from
+#   PG-standard INTERVAL specifications get an explicit
+#   "unsupported" error at first use, not silent wrong
+#   answers. Workaround: use bare `INTERVAL '<n unit>'`
+#   literal form (e.g., `INTERVAL '5 days'`) instead
+#   of `CAST(… AS INTERVAL DAY)`.
+#
+#   Source: zeta-parser type-conversion layer reads
+#   the DataType variant tag (Timestamp, Interval) but
+#   ignores the precision/qualifier sub-fields. Pattern
+#   matches the PR #391 INHERITS / PR #407 SCHEMA
+#   AUTHORIZATION / PR #408 WITH ORDINALITY / SELECT
+#   INTO silent-drop family — modifier parsed into
+#   AST, then ignored downstream.
+#
+# Wire divergence check: probed mysqlwire (port
+# 13501); the (n) precision silent-drop happens in the
+# shared zeta-parser/type-conversion layer, so pgwire
+# should exhibit the identical silent-drop (both wires
+# delegate type handling to the same backend). The
+# INTERVAL field-qualifier rejects also originate at
+# the CAST dispatcher, shared by both wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-DROP BUG — TIMESTAMP(n)
+#     precision specifier silently ignored in both
+#     CAST and column-type declarations. Values
+#     always store/return at full 6-digit microsecond
+#     precision regardless of declared (n). Apps
+#     depending on (n) for precision contracts will
+#     get unexpected full-precision values with no
+#     warning. No SQL-level workaround for the
+#     storage shape; downstream consumers must
+#     explicitly truncate with DATE_TRUNC('second',
+#     ts) / DATE_TRUNC('milliseconds', ts) etc.
+#   # zeta-adapt: KNOWN GAP — `'<lit>'::INTERVAL
+#     <unit>` (DAY / YEAR / MONTH / SECOND(n)) and
+#     range forms (DAY TO SECOND / YEAR TO MONTH)
+#     all parse-reject at the CAST dispatcher with
+#     `unsupported CAST target type: INTERVAL <unit>`.
+#     Workaround: use the bare unqualified literal
+#     form `INTERVAL '<n unit>'` which takes a
+#     different parse path.
+
+--echo === PG TIMESTAMP(n) CAST — SILENT-DROP: (n) precision parsed but ignored ===
+
+# Headline BUG. Real PG truncates the fractional
+# seconds of the literal to match the declared (n):
+# (0) → no fractional, (3) → 3-digit ms, (6) → 6-
+# digit us. zeta returns full 6-digit microseconds
+# for ALL three — the (n) is silently dropped.
+
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(0) AS t0_should_be_sec;
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(3) AS t3_should_be_ms;
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(6) AS t6_full_us;
+
+--echo === CAST(… AS TIMESTAMP(n)) spelling — same silent-drop ===
+
+# Both `::TIMESTAMP(n)` and `CAST(… AS TIMESTAMP(n))`
+# route through the same type dispatcher, so identical
+# silent-drop.
+
+SELECT CAST('2024-01-01 12:00:00.999999' AS TIMESTAMP(0)) AS cast_t0_should_be_sec;
+SELECT CAST('2024-01-01 12:00:00.999999' AS TIMESTAMP(3)) AS cast_t3_should_be_ms;
+
+--echo === TIMESTAMP(n) WITH/WITHOUT TIME ZONE in CAST — same silent-drop ===
+
+# The TIME ZONE / WITHOUT TIME ZONE qualifier doesn't
+# affect the (n) handling; both spellings silent-drop
+# the precision.
+
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(3) WITHOUT TIME ZONE AS twotz_should_be_ms;
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(3) WITH TIME ZONE    AS twtz_should_be_ms;
+
+--echo === TIMESTAMP(3) WITH TIME ZONE column — INSERT then SELECT proves storage silent-drop ===
+
+# Most material variant of the BUG: column-type
+# declaration. Apps using TIMESTAMP(3) to declare
+# millisecond-precision contracts will see full
+# microseconds come back. Inserted `.999999` and
+# `.5` (which would render as `.500` for ms (3))
+# both return at full 6-digit precision (`.999999`
+# and `.500000`).
+
+DROP TABLE IF EXISTS ts_prec_col;
+CREATE TABLE ts_prec_col (id INT, ts TIMESTAMP(3) WITH TIME ZONE);
+INSERT INTO ts_prec_col VALUES (1, '2024-01-01 12:00:00.999999+00');
+INSERT INTO ts_prec_col VALUES (2, '2024-01-01 12:00:00.5+00');
+SELECT id, ts FROM ts_prec_col ORDER BY id;
+DROP TABLE ts_prec_col;
+
+--echo === PG INTERVAL DAY CAST → "unsupported CAST target type: INTERVAL DAY" ===
+
+# Single-unit field qualifier. SQL-standard form for
+# "this string is a day count". Not in zeta's CAST
+# dispatcher.
+--error 1105
+SELECT '5'::INTERVAL DAY;
+
+--echo === PG INTERVAL YEAR CAST → "unsupported CAST target type: INTERVAL YEAR" ===
+--error 1105
+SELECT '2'::INTERVAL YEAR;
+
+--echo === PG INTERVAL SECOND(3) CAST → "unsupported CAST target type: INTERVAL SECOND(3)" ===
+
+# Single unit with sub-second precision. SQL-standard
+# spelling for "interpret as seconds with millisecond
+# precision".
+--error 1105
+SELECT '12:34:56.789012'::INTERVAL SECOND(3);
+
+--echo === PG INTERVAL DAY TO SECOND CAST → "unsupported CAST target type: INTERVAL DAY TO SECOND" ===
+
+# Range-unit (day..second). SQL-standard for full
+# day+time interval parsing.
+--error 1105
+SELECT '1 day 12:34:56'::INTERVAL DAY TO SECOND;
+
+--echo === PG INTERVAL YEAR TO MONTH CAST → "unsupported CAST target type: INTERVAL YEAR TO MONTH" ===
+
+# Range-unit (year..month). SQL-standard for year/month
+# interval parsing distinct from day/time.
+--error 1105
+SELECT '12 months'::INTERVAL YEAR TO MONTH;
