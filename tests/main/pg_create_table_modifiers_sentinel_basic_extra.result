@@ -1,0 +1,44 @@
+=== SHAPE A === UNLOGGED/LOGGED reject at CREATE-object-type whitelist (4th whitelist in series)
+CREATE UNLOGGED TABLE u1 (id INT);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: UNLOGGED at Line: 1, Column: 8
+CREATE LOGGED TABLE l1 (id INT);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: LOGGED at Line: 1, Column: 8
+CREATE UNLOGGED TEMP TABLE ut1 (id INT);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: UNLOGGED at Line: 1, Column: 8
+CREATE TEMP UNLOGGED TABLE ut2 (id INT);
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: UNLOGGED at Line: 1, Column: 13
+=== SHAPE B === GLOBAL/LOCAL TEMP all four modifier orderings silently accepted
+DROP TABLE IF EXISTS gt1;
+CREATE GLOBAL TEMPORARY TABLE gt1 (id INT);
+DROP TABLE gt1;
+DROP TABLE IF EXISTS gt2;
+CREATE GLOBAL TEMP TABLE gt2 (id INT);
+DROP TABLE gt2;
+DROP TABLE IF EXISTS lt1;
+CREATE LOCAL TEMPORARY TABLE lt1 (id INT);
+DROP TABLE lt1;
+DROP TABLE IF EXISTS lt2;
+CREATE LOCAL TEMP TABLE lt2 (id INT);
+DROP TABLE lt2;
+=== SHAPE C === ON COMMIT DELETE/PRESERVE ROWS silent on TEMP; ON COMMIT DROP silent on NON-TEMP (BUG)
+DROP TABLE IF EXISTS oc_t1;
+CREATE TEMPORARY TABLE oc_t1 (id INT) ON COMMIT DELETE ROWS;
+DROP TABLE oc_t1;
+DROP TABLE IF EXISTS oc_t2;
+CREATE TEMPORARY TABLE oc_t2 (id INT) ON COMMIT PRESERVE ROWS;
+DROP TABLE oc_t2;
+DROP TABLE IF EXISTS oc_perm;
+CREATE TABLE oc_perm (id INT) ON COMMIT DROP;
+DROP TABLE oc_perm;
+=== SHAPE D === ON COMMIT unknown option — SMUSHED-ERROR-MESSAGE TYPO ("DROPNOSUCHOPT")
+CREATE TEMP TABLE oc_bad (id INT) ON COMMIT NOSUCHOPT;
+ERROR 1064: SQL parse error: sql parser error: Expecting DELETE ROWS, PRESERVE ROWS or DROPNOSUCHOPT
+=== SHAPE E === USING table-access-method — reject at end-of-statement (column varies with name length)
+CREATE TABLE u (id INT) USING heap;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: USING at Line: 1, Column: 25
+CREATE TABLE u2 (id INT) USING noaccess;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: USING at Line: 1, Column: 26
+=== SHAPE G === BASELINE: ON COMMIT DROP on TEMP table (re-pin of temp_table_basic_extra:104 boundary)
+DROP TABLE IF EXISTS tt_oc_b;
+CREATE TEMP TABLE tt_oc_b (id INT) ON COMMIT DROP;
+DROP TABLE tt_oc_b;

@@ -1,0 +1,201 @@
+# Independently authored PG CREATE TABLE-modifiers sentinel
+# slice for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/.
+#
+# Adjacent prior coverage (do NOT duplicate, cite as baseline):
+#   - temp_table_basic_extra:104 — `CREATE TEMPORARY TABLE
+#     tt_oc (id INT) ON COMMIT DROP` already pinned as
+#     silent-accept boundary. Re-pin here under SHAPE G as a
+#     baseline marker; the new pins extend to DELETE ROWS,
+#     PRESERVE ROWS, the non-TEMP-table BUG case, and the
+#     smushed-error-typo case.
+#   - partition_basic_extra:142 — `CREATE TABLE ... PARTITION
+#     OF parent FOR VALUES FROM (1) TO (10)` already pinned
+#     with errno 1105 "internal error: at least one column
+#     required". Dedup-grep hit; the internal-error-leak
+#     finding (originally proposed as SHAPE F) is therefore
+#     DROPPED from this slice — see headline note 5 below.
+#
+# Wide-grep verification (case-insensitive) for the four
+# new fingerprints returned zero priors:
+#   - `CREATE UNLOGGED|LOGGED TABLE`             — zero
+#   - `CREATE GLOBAL|LOCAL TEMP[ORARY] TABLE`    — zero
+#   - `ON COMMIT DELETE|PRESERVE ROWS|NOSUCHOPT` — zero
+#   - `CREATE TABLE ... USING <am>`              — zero
+# (UNLOGGED appears elsewhere only in ALTER TABLE SET
+# UNLOGGED and SELECT INTO UNLOGGED — different surfaces.)
+#
+# This slice pins FIVE structural findings (six rejection
+# shapes, sixteen statements):
+#
+#   1. CREATE-object-type whitelist (SHAPE A) — UNLOGGED /
+#      LOGGED reject at the sqlparser CREATE dispatcher
+#      with "Expected: an object type after CREATE, found:
+#      <KEYWORD>". This is the 4th distinct whitelist in
+#      the dialect/whitelist series, joining ALTER TABLE
+#      (PR #452), ALTER COLUMN (PR #454), DROP (PR #455),
+#      and constraint (PR #456). UNLOGGED rejects whether
+#      it precedes or follows TEMP (sqlparser hits the
+#      first unknown keyword — col 8 for UNLOGGED-first,
+#      col 13 for TEMP-first).
+#
+#   2. GLOBAL/LOCAL TEMP grammar coverage (SHAPE B) — all
+#      four modifier orderings silently accepted (GLOBAL
+#      TEMPORARY, GLOBAL TEMP, LOCAL TEMPORARY, LOCAL TEMP).
+#      Not a bug per se: PG itself treats GLOBAL as
+#      deprecated noop and LOCAL as default. Pinned to
+#      document grammar coverage.
+#
+#   3. ON COMMIT non-TEMP silent-accept (SHAPE C) — BUG:
+#      ON COMMIT DROP applied to a NON-TEMP table is
+#      silently accepted. PG rejects this with
+#      "ON COMMIT can only be used on temporary tables".
+#      The TEMP variants (DELETE ROWS / PRESERVE ROWS) are
+#      also silently accepted (matches PG semantics for
+#      TEMP, but zeta has no temp-table teardown machinery
+#      so the option is effectively a noop).
+#
+#   4. SMUSHED-ERROR-MESSAGE TYPO (SHAPE D) — NEW class
+#      of bug: ON COMMIT with an unknown option yields
+#      "Expecting DELETE ROWS, PRESERVE ROWS or
+#      DROPNOSUCHOPT" — the last whitelist item DROP is
+#      concatenated with the unexpected token NOSUCHOPT
+#      with no separator. PG-correct would be "or DROP,
+#      found: NOSUCHOPT". This is an error-message
+#      construction defect: the formatter is missing a
+#      separator/found-clause before the unexpected token.
+#      The smushing also LEAKS the ON COMMIT whitelist
+#      (DELETE ROWS / PRESERVE ROWS / DROP), confirming
+#      the grammar knows all three TEMP-table options.
+#
+#   5. USING table-access-method reject (SHAPE E) — PG's
+#      pluggable-storage extension `CREATE TABLE t (...)
+#      USING heap | zheap | ...` is not in zeta's grammar.
+#      Fails with "Expected: end of statement, found:
+#      USING" at the column following the closing paren,
+#      so the entire CREATE TABLE body parses fine and the
+#      reject happens at end-of-statement. Column number
+#      varies with table-name length (proves the reject
+#      site is positional, not lexical).
+#
+#   Originally proposed SHAPE F — PARTITION OF internal-
+#   error leak — DROPPED. Already pinned at
+#   partition_basic_extra:142 with the exact error text
+#   "internal error: at least one column required". Dedup
+#   discovered during pre-author grep (per the slice-
+#   recommendation-grep-first feedback rule). The internal-
+#   error-leak finding stands but the witness is the prior
+#   pin, not this slice.
+#
+# Big-picture finding:
+#
+#   PG CREATE TABLE modifiers fragment across three
+#   distinct rejection sites:
+#     - CREATE-dispatcher whitelist (Shape A — UNLOGGED /
+#       LOGGED unknown as object-type prefix).
+#     - End-of-statement reject (Shape E — USING is
+#       unexpected AFTER a valid CREATE TABLE body).
+#     - ON-COMMIT-options whitelist with a smushed-error-
+#       message construction bug (Shape D — DROPNOSUCHOPT).
+#   Plus two silent-accept surfaces (Shapes B and C) where
+#   the grammar swallows PG-standard syntax with no
+#   enforcement — Shape C contains the only BUG of the
+#   bunch (ON COMMIT on non-TEMP table).
+#
+#   Apps porting PG schemas with UNLOGGED, table access
+#   methods, or relying on ON COMMIT semantics for
+#   transaction-scoped cleanup must rewrite — UNLOGGED and
+#   USING reject hard; ON COMMIT silently noops.
+#
+# Cross-links (memory notes):
+#   - feedback_wire_path_divergence_check — all probes via
+#     mysqlwire (MTR canonical), pgwire NOT tested for
+#     these surfaces.
+#   - project_two_layer_type_recognition_pattern — the
+#     SHAPE A whitelist is an analog: parser knows TABLE
+#     but not UNLOGGED as a CREATE-object-type qualifier.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CREATE UNLOGGED TABLE and
+#     CREATE LOGGED TABLE both fail at the sqlparser
+#     CREATE-dispatcher (Shape A). UNLOGGED tokenizes
+#     before TEMP if both are present.
+#   # zeta-adapt: SILENT ACCEPT — CREATE GLOBAL/LOCAL
+#     [TEMPORARY|TEMP] TABLE accepted as ordinary TEMP
+#     table. Matches PG (which deprecates GLOBAL, treats
+#     LOCAL as default).
+#   # zeta-adapt: BUG — ON COMMIT DROP on a NON-TEMP table
+#     silently accepted; PG rejects.
+#   # zeta-adapt: BUG (error-message construction) — ON
+#     COMMIT with unknown option emits "DROPNOSUCHOPT"
+#     (smushed last-whitelist-item + unexpected-token).
+#   # zeta-adapt: KNOWN GAP — CREATE TABLE ... USING <am>
+#     rejected at end-of-statement (Shape E). No
+#     substitute; drop the USING clause.
+
+--echo === SHAPE A === UNLOGGED/LOGGED reject at CREATE-object-type whitelist (4th whitelist in series)
+
+--error 1064
+CREATE UNLOGGED TABLE u1 (id INT);
+--error 1064
+CREATE LOGGED TABLE l1 (id INT);
+--error 1064
+CREATE UNLOGGED TEMP TABLE ut1 (id INT);
+--error 1064
+CREATE TEMP UNLOGGED TABLE ut2 (id INT);
+
+--echo === SHAPE B === GLOBAL/LOCAL TEMP all four modifier orderings silently accepted
+
+DROP TABLE IF EXISTS gt1;
+CREATE GLOBAL TEMPORARY TABLE gt1 (id INT);
+DROP TABLE gt1;
+
+DROP TABLE IF EXISTS gt2;
+CREATE GLOBAL TEMP TABLE gt2 (id INT);
+DROP TABLE gt2;
+
+DROP TABLE IF EXISTS lt1;
+CREATE LOCAL TEMPORARY TABLE lt1 (id INT);
+DROP TABLE lt1;
+
+DROP TABLE IF EXISTS lt2;
+CREATE LOCAL TEMP TABLE lt2 (id INT);
+DROP TABLE lt2;
+
+--echo === SHAPE C === ON COMMIT DELETE/PRESERVE ROWS silent on TEMP; ON COMMIT DROP silent on NON-TEMP (BUG)
+
+DROP TABLE IF EXISTS oc_t1;
+CREATE TEMPORARY TABLE oc_t1 (id INT) ON COMMIT DELETE ROWS;
+DROP TABLE oc_t1;
+
+DROP TABLE IF EXISTS oc_t2;
+CREATE TEMPORARY TABLE oc_t2 (id INT) ON COMMIT PRESERVE ROWS;
+DROP TABLE oc_t2;
+
+# BUG: ON COMMIT is valid only on TEMP tables in PG; zeta
+# silently accepts it on a permanent table.
+DROP TABLE IF EXISTS oc_perm;
+CREATE TABLE oc_perm (id INT) ON COMMIT DROP;
+DROP TABLE oc_perm;
+
+--echo === SHAPE D === ON COMMIT unknown option — SMUSHED-ERROR-MESSAGE TYPO ("DROPNOSUCHOPT")
+
+# NEW class of bug: the error-message formatter concatenates
+# the last whitelist item (`DROP`) with the unexpected token
+# (`NOSUCHOPT`) with no separator. PG-correct would have a
+# "found: <token>" clause or at minimum a separator.
+--error 1064
+CREATE TEMP TABLE oc_bad (id INT) ON COMMIT NOSUCHOPT;
+
+--echo === SHAPE E === USING table-access-method — reject at end-of-statement (column varies with name length)
+
+--error 1064
+CREATE TABLE u (id INT) USING heap;
+--error 1064
+CREATE TABLE u2 (id INT) USING noaccess;
+
+--echo === SHAPE G === BASELINE: ON COMMIT DROP on TEMP table (re-pin of temp_table_basic_extra:104 boundary)
+
+DROP TABLE IF EXISTS tt_oc_b;
+CREATE TEMP TABLE tt_oc_b (id INT) ON COMMIT DROP;
+DROP TABLE tt_oc_b;
