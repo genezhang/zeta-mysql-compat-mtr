@@ -1,0 +1,49 @@
+=== PG TIMESTAMP(n) CAST — SILENT-DROP: (n) precision parsed but ignored ===
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(0) AS t0_should_be_sec;
+t0_should_be_sec
+2024-01-01 12:00:00.123456
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(3) AS t3_should_be_ms;
+t3_should_be_ms
+2024-01-01 12:00:00.123456
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(6) AS t6_full_us;
+t6_full_us
+2024-01-01 12:00:00.123456
+=== CAST(… AS TIMESTAMP(n)) spelling — same silent-drop ===
+SELECT CAST('2024-01-01 12:00:00.999999' AS TIMESTAMP(0)) AS cast_t0_should_be_sec;
+cast_t0_should_be_sec
+2024-01-01 12:00:00.999999
+SELECT CAST('2024-01-01 12:00:00.999999' AS TIMESTAMP(3)) AS cast_t3_should_be_ms;
+cast_t3_should_be_ms
+2024-01-01 12:00:00.999999
+=== TIMESTAMP(n) WITH/WITHOUT TIME ZONE in CAST — same silent-drop ===
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(3) WITHOUT TIME ZONE AS twotz_should_be_ms;
+twotz_should_be_ms
+2024-01-01 12:00:00.123456
+SELECT '2024-01-01 12:00:00.123456'::TIMESTAMP(3) WITH TIME ZONE    AS twtz_should_be_ms;
+twtz_should_be_ms
+2024-01-01 12:00:00.123456
+=== TIMESTAMP(3) WITH TIME ZONE column — INSERT then SELECT proves storage silent-drop ===
+DROP TABLE IF EXISTS ts_prec_col;
+CREATE TABLE ts_prec_col (id INT, ts TIMESTAMP(3) WITH TIME ZONE);
+INSERT INTO ts_prec_col VALUES (1, '2024-01-01 12:00:00.999999+00');
+INSERT INTO ts_prec_col VALUES (2, '2024-01-01 12:00:00.5+00');
+SELECT id, ts FROM ts_prec_col ORDER BY id;
+id	ts
+1	2024-01-01 12:00:00.999999
+2	2024-01-01 12:00:00.500000
+DROP TABLE ts_prec_col;
+=== PG INTERVAL DAY CAST → "unsupported CAST target type: INTERVAL DAY" ===
+SELECT '5'::INTERVAL DAY;
+ERROR 1105: execution error: unsupported CAST target type: INTERVAL DAY
+=== PG INTERVAL YEAR CAST → "unsupported CAST target type: INTERVAL YEAR" ===
+SELECT '2'::INTERVAL YEAR;
+ERROR 1105: execution error: unsupported CAST target type: INTERVAL YEAR
+=== PG INTERVAL SECOND(3) CAST → "unsupported CAST target type: INTERVAL SECOND(3)" ===
+SELECT '12:34:56.789012'::INTERVAL SECOND(3);
+ERROR 1105: execution error: unsupported CAST target type: INTERVAL SECOND(3)
+=== PG INTERVAL DAY TO SECOND CAST → "unsupported CAST target type: INTERVAL DAY TO SECOND" ===
+SELECT '1 day 12:34:56'::INTERVAL DAY TO SECOND;
+ERROR 1105: execution error: unsupported CAST target type: INTERVAL DAY TO SECOND
+=== PG INTERVAL YEAR TO MONTH CAST → "unsupported CAST target type: INTERVAL YEAR TO MONTH" ===
+SELECT '12 months'::INTERVAL YEAR TO MONTH;
+ERROR 1105: execution error: unsupported CAST target type: INTERVAL YEAR TO MONTH
