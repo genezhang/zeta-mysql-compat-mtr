@@ -1,0 +1,331 @@
+# Independently authored PG USER / ROLE grammar-leak +
+# hand-rolled-formatter sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/ or PG regress.
+#
+# Adjacent companion slices (do NOT duplicate):
+#   - auth_basic_extra.test pins the bare-form known
+#     gaps:
+#       * line 93:  CREATE ROLE r1
+#       * line 98:  CREATE ROLE r2 WITH LOGIN
+#       * line 103: DROP ROLE r1
+#       * line 108: DROP ROLE IF EXISTS no_such
+#       * line 118: CREATE USER u1 (bare)
+#       * line 128: DROP USER u1
+#       * line 138: ALTER USER u1 IDENTIFIED BY 'newpw'
+#       * line 143: ALTER ROLE r1 WITH PASSWORD 'newpw'
+#     The bare-form parse-reject is ALREADY pinned by
+#     errno 1064; this slice does NOT re-pin those exact
+#     spellings. It pins the STRUCTURE of the four
+#     rejection patterns and the MESSAGE-SHAPE
+#     fingerprints (Line/Column suffix vs hand-rolled
+#     bespoke formatter), which auth_basic_extra does
+#     NOT capture.
+#   - pg_pubsub_replication_sentinel:240 pins
+#     `CREATE ROLE r REPLICATION` (shape c, attribute-
+#     keyword variant). This slice covers DIFFERENT
+#     PG role attributes (LOGIN, NOLOGIN, PASSWORD,
+#     SUPERUSER, CREATEDB, CREATEROLE, BYPASSRLS,
+#     ENCRYPTED, VALID UNTIL, CONNECTION LIMIT, IN ROLE,
+#     IN GROUP, ROLE, ADMIN, RENAME TO, SET search_path,
+#     ALTER ROLE ALL).
+#   - pg_fdw_inherits_sentinel:159-161 pins
+#     `CREATE USER MAPPING FOR ...` (the FDW composite
+#     that sqlparser's CREATE USER arm consumes). This
+#     slice covers the SIMPLE-FORM `CREATE USER <name>
+#     <option> ...` grammar, not the MAPPING composite.
+#
+#   Pre-author dedup grep on tests/main/*.test for
+#   `CREATE USER`, `CREATE ROLE`, `ALTER USER`,
+#   `ALTER ROLE`, `DROP USER`, `DROP ROLE`: hits as
+#   above. Per [[feedback_gap_scan_must_grep_all_files]]
+#   the case-insensitive grep was the full population.
+#
+# This slice pins FOUR structural findings:
+#
+#   FINDING 1 — CROSS-DIALECT MySQL GRAMMAR LEAK in
+#   CREATE USER. zeta's sqlparser fork has the MySQL
+#   CREATE USER grammar (`name = value` option pairs),
+#   NOT PG's `name OPTION value [OPTION value ...]`
+#   grammar. Every PG option keyword after the user
+#   name (PASSWORD, SUPERUSER, NOSUPERUSER, CREATEDB,
+#   CREATEROLE, LOGIN, NOLOGIN, ENCRYPTED, VALID UNTIL,
+#   CONNECTION LIMIT, IN ROLE, IN GROUP, ROLE, ADMIN,
+#   BYPASSRLS) is rejected with `Expected: =, found:
+#   <token>` at the column where the PG option keyword
+#   appears. Most damning: an UNKNOWN identifier like
+#   `NOSUCHOPT 'x'` STILL produces `Expected: =, found:
+#   'x'` — proving the `= value` requirement is at the
+#   GRAMMAR layer, not a per-keyword registry. The
+#   parser will accept ANY identifier as an option name
+#   as long as it is followed by `=` and a value. This
+#   is parallel to PR #452's Hive/Spark contamination
+#   of the ALTER TABLE whitelist:
+#   [[project_two_layer_type_recognition_pattern]] —
+#   wrong dialect's grammar leaked into the PG-facing
+#   surface. CORRUPTION-class for PG `CREATE USER` DDL
+#   coming from migration scripts or pg_dump output.
+#
+#   Compare with PR #459's CREATE DATABASE silent-
+#   accept of `NOSUCHOPT 'x'` (no grammar requirement
+#   at all — the parser drops unknown options
+#   silently). CREATE DATABASE and CREATE USER occupy
+#   OPPOSITE EXTREMES of the parse-time validation
+#   spectrum: CREATE DATABASE swallows nonsense without
+#   complaint; CREATE USER demands MySQL grammar even
+#   for nonsense option names.
+#
+#   FINDING 2 — CREATE ROLE / ALTER USER / ALTER ROLE
+#   shape (c) catch-all. The ENTIRE statement family —
+#   CREATE ROLE with any KNOWN PG attribute keyword,
+#   ALTER USER WITH PASSWORD, ALTER USER RENAME TO,
+#   ALTER USER SET search_path, ALTER ROLE WITH
+#   NOLOGIN, and the PG14+ ALTER ROLE ALL SET <param>
+#   — is routed through the shape (c) catch-all:
+#   `unsupported statement: sqlparser::ast::Statement`
+#   (the Debug repr of the AST variant, per
+#   [[project_function_arms_gap_closed]]). zeta has
+#   ZERO executor arms for the ROLE-management AST
+#   variants. Migration risk: every PG role attribute
+#   change silently fails the same way and is
+#   indistinguishable from one another at the error-
+#   string layer.
+#
+#   FINDING 3 — KW-vs-UNKNOWN-IDENTIFIER ASYMMETRY in
+#   CREATE ROLE / ALTER USER. Within the CREATE ROLE /
+#   ALTER USER family there is a TWO-STAGE asymmetry:
+#   KNOWN PG keywords (LOGIN, NOLOGIN, RENAME, SET,
+#   PASSWORD) route through the sqlparser AST and hit
+#   shape (c); UNKNOWN identifiers (`NOSUCHOPT`) hit
+#   the parser-layer whitelist FIRST and reject with
+#   `Expected: end of statement, found: NOSUCHOPT at
+#   Line: 1, Column: N`. Two different code paths for
+#   what looks like the same syntactic position:
+#   ROLE-attribute slot. Cross-link
+#   [[project_two_layer_type_recognition_pattern]] —
+#   parser-arm vs dispatcher-arm divergence again.
+#
+#   NOTE the THIRD asymmetry within CREATE USER: there
+#   the UNKNOWN identifier follows the MySQL grammar
+#   (Finding 1) and `NOSUCHOPT 'x'` rejects with
+#   `Expected: =`. Three distinct error paths for
+#   "unknown option in PG user/role DDL", split by
+#   statement keyword. Pinning the asymmetry is the
+#   point of this slice.
+#
+#   FINDING 4 — DROP ROLE / DROP USER HAND-ROLLED
+#   FORMATTERS (4th and 5th witnesses of the
+#   [[project_hand_rolled_error_formatters]] pattern).
+#   `DROP ROLE r1` errors with `unsupported DROP ROLE
+#   statement` and `DROP USER u1` errors with
+#   `unsupported DROP USER statement` — neither
+#   carries the `at Line: N, Column: M` suffix that
+#   sqlparser appends to its whitelist errors. These
+#   are bespoke formatters parallel to:
+#     * PR #455's `unsupported DROP STAGE statement`
+#       (DROP-family bespoke formatter #1)
+#     * PR #452's ALTER TABLE Hive/Spark whitelist
+#       formatter
+#     * PR #457's `Expecting DELETE ROWS, PRESERVE
+#       ROWS or DROPNOSUCHOPT` smushed-typo for ON
+#       COMMIT
+#     * PR #458's `CREATE FUNCTION requires a function
+#       body (AS $$ ... $$)`
+#   This brings the cluster of known hand-rolled error
+#   paths to FIVE — three of them in the DROP family
+#   (STAGE, ROLE, USER). Each carries its own risk of
+#   typo / drift / formatting inconsistency since none
+#   of them is generated by sqlparser. Error-string
+#   matchers that key off the `at Line:` suffix will
+#   NOT match these errors.
+#
+# Big-picture finding:
+#
+#   The PG user/role DDL surface is fragmented across
+#   FOUR distinct parser/dispatcher behaviors:
+#     - CREATE USER: cross-dialect MySQL grammar leak
+#       — every option position demands `= value`
+#       (Finding 1).
+#     - CREATE ROLE / ALTER USER / ALTER ROLE with
+#       KNOWN PG keywords: shape (c) catch-all
+#       (Finding 2).
+#     - CREATE ROLE / ALTER USER with UNKNOWN
+#       identifier: parser-whitelist reject with
+#       Line/Column (Finding 3).
+#     - DROP USER / DROP ROLE: bespoke hand-rolled
+#       formatter without Line/Column (Finding 4).
+#   The same statement family takes four code paths.
+#   Pinning the boundary between them is the point of
+#   this slice.
+#
+# Wire divergence check: probed via mysqlwire (MTR
+# canonical, dynamic port reservation). Per
+# [[feedback_probe_wire_match_slice_wire]] pgwire was
+# NOT separately probed — error messages are stable
+# across clients for parse-layer rejects.
+#
+# Adaptation notes:
+#   # zeta-adapt: CROSS-DIALECT MySQL GRAMMAR LEAK —
+#     PG `CREATE USER u PASSWORD 'pw'` errors 1064
+#     `Expected: =, found: 'pw' at Line: 1, Column:
+#     25`. Use `CREATE USER u (placeholder)` only if
+#     no options are needed; otherwise the statement
+#     CANNOT be expressed in zeta. Strip from
+#     migration scripts.
+#   # zeta-adapt: KNOWN GAP — `CREATE ROLE r LOGIN
+#     PASSWORD 'pw'` errors 1064 `unsupported
+#     statement: sqlparser::ast::Statement` via the
+#     shape (c) catch-all. Same for `CREATE ROLE r
+#     NOLOGIN`, `ALTER USER u WITH PASSWORD 'newpw'`,
+#     `ALTER USER u RENAME TO u2`, `ALTER USER u SET
+#     search_path = pg_catalog`, `ALTER ROLE r WITH
+#     NOLOGIN`, `ALTER ROLE ALL SET <param> = <val>`.
+#     All silently fail at the dispatcher with the
+#     same error message; do not key off the message
+#     to distinguish them.
+#   # zeta-adapt: ASYMMETRY — `CREATE ROLE r
+#     NOSUCHOPT` errors 1064 `Expected: end of
+#     statement, found: NOSUCHOPT at Line: 1, Column:
+#     16` (parser whitelist reject), DIFFERENT from
+#     the shape (c) message above. Same asymmetry for
+#     `ALTER USER u NOSUCHOPT 'x'`. Migration tooling
+#     that maps known-keyword vs unknown-identifier
+#     errors should expect different messages.
+#   # zeta-adapt: HAND-ROLLED ERROR PATHS — `DROP ROLE
+#     <name>` errors 1064 `unsupported DROP ROLE
+#     statement` and `DROP USER <name>` errors 1064
+#     `unsupported DROP USER statement`. NEITHER
+#     carries the `at Line: N, Column: M` suffix.
+#     Error-string matchers that key off the Line/
+#     Column suffix will NOT match.
+
+--echo === PATTERN alpha — CREATE USER MySQL `= value` grammar leak (12 rejects) ===
+
+# Every PG CREATE USER option keyword demands `=
+# <value>` after the user name. The Most damning row
+# is u13 NOSUCHOPT 'x' — even a fabricated identifier
+# is accepted as an option name, then the `= value`
+# requirement still applies. The grammar layer is
+# MySQL `name = value` pairs, not the PG
+# `name OPTION value` form.
+
+--error 1064
+CREATE USER u1 PASSWORD 'pw';
+
+--error 1064
+CREATE USER u2 SUPERUSER PASSWORD 'pw';
+
+--error 1064
+CREATE USER u3 NOSUPERUSER CREATEDB CREATEROLE LOGIN PASSWORD 'pw';
+
+--error 1064
+CREATE USER u4 WITH PASSWORD 'pw';
+
+--error 1064
+CREATE USER u5 ENCRYPTED PASSWORD 'pw';
+
+--error 1064
+CREATE USER u6 VALID UNTIL '2030-01-01';
+
+--error 1064
+CREATE USER u7 CONNECTION LIMIT 5;
+
+--error 1064
+CREATE USER u8 IN ROLE r1;
+
+--error 1064
+CREATE USER u9 IN GROUP r1;
+
+--error 1064
+CREATE USER u10 ROLE r1;
+
+--error 1064
+CREATE USER u11 ADMIN r1;
+
+--error 1064
+CREATE USER u12 BYPASSRLS;
+
+--error 1064
+CREATE USER u13 NOSUCHOPT 'x';
+
+--echo === PATTERN beta — CREATE ROLE shape (c) catch-all + NOSUCHOPT asymmetry (2 rejects) ===
+
+# Bare `CREATE ROLE r1` is pinned in auth_basic_extra:
+# 93. `CREATE ROLE r2 WITH LOGIN` is pinned in
+# auth_basic_extra:98. `CREATE ROLE r REPLICATION` is
+# pinned in pg_pubsub_replication_sentinel:240. This
+# slice adds the LOGIN PASSWORD composite (parallel to
+# auth_basic_extra:98 but with a SECOND attribute
+# keyword) and the bare NOLOGIN attribute (covered by
+# auth_basic_extra:98 only as `WITH LOGIN`, not the
+# negated form). The NOSUCHOPT row pins the parser-
+# whitelist reject — DIFFERENT error path from the
+# shape (c) above (per Finding 3 in header).
+
+--error 1064
+CREATE ROLE r1 LOGIN PASSWORD 'pw';
+
+--error 1064
+CREATE ROLE r2 NOLOGIN;
+
+--error 1064
+CREATE ROLE r3 NOSUCHOPT;
+
+--echo === PATTERN gamma — ALTER USER / ALTER ROLE shape (c) + NOSUCHOPT asymmetry (6 rejects) ===
+
+# `ALTER USER u IDENTIFIED BY '<pw>'` (MySQL form) is
+# pinned in auth_basic_extra:138 with a DIFFERENT
+# error message. `ALTER ROLE r WITH PASSWORD '<pw>'`
+# is pinned in auth_basic_extra:143. This slice covers
+# the OTHER PG ALTER USER / ALTER ROLE variants:
+#   - ALTER USER u WITH PASSWORD '<pw>' (PG form,
+#     different from the MySQL IDENTIFIED BY form)
+#   - ALTER USER u RENAME TO <name>
+#   - ALTER USER u SET <param> = <value>
+#   - ALTER ROLE r WITH NOLOGIN (different attribute
+#     from the PASSWORD form in auth_basic_extra)
+#   - ALTER ROLE ALL SET <param> = <value> (PG14+
+#     cluster-wide form)
+# All hit shape (c). The NOSUCHOPT row pins the SAME
+# parser-whitelist asymmetry as PATTERN beta — DIFFERENT
+# error path from shape (c).
+
+--error 1064
+ALTER USER u1 WITH PASSWORD 'newpw';
+
+--error 1064
+ALTER USER u1 RENAME TO u1x;
+
+--error 1064
+ALTER USER u1 SET search_path = pg_catalog;
+
+--error 1064
+ALTER ROLE r1 WITH NOLOGIN;
+
+--error 1064
+ALTER ROLE ALL SET search_path = pg_catalog;
+
+--error 1064
+ALTER USER u1 NOSUCHOPT 'x';
+
+--echo === PATTERN delta — DROP ROLE / DROP USER hand-rolled formatters (2 rejects) ===
+
+# Bare `DROP ROLE r1` is pinned in auth_basic_extra:
+# 103 and `DROP USER u1` in auth_basic_extra:128 with
+# errno 1064 only. THIS slice re-pins both with
+# DIFFERENT identifiers AND pins the message-shape
+# fingerprint (no `at Line: N, Column: M` suffix) as
+# the 4th and 5th witnesses of the
+# [[project_hand_rolled_error_formatters]] cluster.
+# Both bypass the standard sqlparser error formatter
+# and emit bespoke strings. Per the PR #455
+# precedent, these are companion bespoke formatters
+# to `unsupported DROP STAGE statement` — three of
+# the five hand-rolled witnesses are in the DROP
+# family.
+
+--error 1064
+DROP ROLE r_drop_witness;
+
+--error 1064
+DROP USER u_drop_witness;

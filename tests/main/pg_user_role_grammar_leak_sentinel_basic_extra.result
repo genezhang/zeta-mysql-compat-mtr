@@ -1,0 +1,52 @@
+=== PATTERN alpha — CREATE USER MySQL `= value` grammar leak (12 rejects) ===
+CREATE USER u1 PASSWORD 'pw';
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: 'pw' at Line: 1, Column: 25
+CREATE USER u2 SUPERUSER PASSWORD 'pw';
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: PASSWORD at Line: 1, Column: 26
+CREATE USER u3 NOSUPERUSER CREATEDB CREATEROLE LOGIN PASSWORD 'pw';
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: CREATEDB at Line: 1, Column: 28
+CREATE USER u4 WITH PASSWORD 'pw';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PASSWORD at Line: 1, Column: 21
+CREATE USER u5 ENCRYPTED PASSWORD 'pw';
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: PASSWORD at Line: 1, Column: 26
+CREATE USER u6 VALID UNTIL '2030-01-01';
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: UNTIL at Line: 1, Column: 22
+CREATE USER u7 CONNECTION LIMIT 5;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: LIMIT at Line: 1, Column: 27
+CREATE USER u8 IN ROLE r1;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: ROLE at Line: 1, Column: 19
+CREATE USER u9 IN GROUP r1;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: GROUP at Line: 1, Column: 19
+CREATE USER u10 ROLE r1;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: r1 at Line: 1, Column: 22
+CREATE USER u11 ADMIN r1;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: r1 at Line: 1, Column: 23
+CREATE USER u12 BYPASSRLS;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: EOF
+CREATE USER u13 NOSUCHOPT 'x';
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: 'x' at Line: 1, Column: 27
+=== PATTERN beta — CREATE ROLE shape (c) catch-all + NOSUCHOPT asymmetry (2 rejects) ===
+CREATE ROLE r1 LOGIN PASSWORD 'pw';
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE ROLE r2 NOLOGIN;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+CREATE ROLE r3 NOSUCHOPT;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: NOSUCHOPT at Line: 1, Column: 16
+=== PATTERN gamma — ALTER USER / ALTER ROLE shape (c) + NOSUCHOPT asymmetry (6 rejects) ===
+ALTER USER u1 WITH PASSWORD 'newpw';
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ALTER USER u1 RENAME TO u1x;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ALTER USER u1 SET search_path = pg_catalog;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ALTER ROLE r1 WITH NOLOGIN;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ALTER ROLE ALL SET search_path = pg_catalog;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ALTER USER u1 NOSUCHOPT 'x';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: NOSUCHOPT at Line: 1, Column: 15
+=== PATTERN delta — DROP ROLE / DROP USER hand-rolled formatters (2 rejects) ===
+DROP ROLE r_drop_witness;
+ERROR 1064: SQL parse error: unsupported DROP ROLE statement
+DROP USER u_drop_witness;
+ERROR 1064: SQL parse error: unsupported DROP USER statement
