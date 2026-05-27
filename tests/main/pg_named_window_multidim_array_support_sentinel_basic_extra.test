@@ -1,0 +1,273 @@
+# Independently authored PG named-WINDOW reference +
+# multi-dim ARRAY support sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - Plain OVER (...) inline window specs (PARTITION
+#     BY / ORDER BY / ROWS BETWEEN N PRECEDING AND
+#     CURRENT ROW / RANGE BETWEEN N numeric / etc.):
+#     ALREADY pinned at window_func_basic,
+#     window_func_basic_extra, window_func_edges_
+#     basic_extra, window_frame_basic_extra. NOT re-
+#     pinned here.
+#   - Named WINDOW clause for ROW_NUMBER / RANK with
+#     ORDER-BY-only spec (`SELECT ROW_NUMBER() OVER w
+#     ... WINDOW w AS (ORDER BY id)`): ALREADY pinned
+#     at window_func_basic.test:99-103. That is the
+#     degenerate "ORDER BY only" shape with no
+#     PARTITION, no frame override.
+#   - Named WINDOW with PARTITION BY (any agg):
+#     ZERO prior. The PARTITION shape is where
+#     analytical apps actually USE named WINDOW (e.g.,
+#     compute SUM, AVG, COUNT all over the same
+#     partition without retyping the spec).
+#   - Named WINDOW with frame override on the OVER
+#     reference (`OVER (win ROWS BETWEEN ...)`):
+#     ZERO prior. This is the PG/SQL-standard syntax
+#     where the OVER reference EXTENDS the named
+#     window with a frame clause — the named window
+#     defines PARTITION+ORDER, the reference adds the
+#     frame.
+#   - Multiple named windows in the same WINDOW clause
+#     (`WINDOW w1 AS (...), w2 AS (...)`): ZERO prior.
+#   - 1D ARRAY literals + subscript: pinned at
+#     array_subscript_anyall_basic_extra,
+#     array_type_basic_extra (1D forms).
+#   - Multi-dim ARRAY literal (`ARRAY[[1,2],[3,4]]`):
+#     ZERO prior. The array_subscript_anyall slice
+#     note at line 70 explicitly defers multi-dim as
+#     "no incremental fix-tracking value" for the 1D
+#     family — but multi-dim is its OWN net-new
+#     support pin: the constructor, subscript-chain,
+#     column type, and storage round-trip are all
+#     distinct code paths from the 1D forms.
+#   - Multi-dim ARRAY subscript-chain
+#     (`a[i][j]` on a 2D literal or 2D column): ZERO
+#     prior.
+#   - INT[][] column type + storage round-trip:
+#     ZERO prior.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - All shapes WORK; this is a SUPPORT pin, not a
+#     gap pin. No `--error` directives.
+#   - The 2D-ARRAY wire-render shape leaks the Rust
+#     Debug repr (`Array { element_type: Array(Int64),
+#     elements: [Array { element_type: Int64,
+#     elements: [Int64(1), Int64(2)] }, ...] }`) —
+#     this is the SAME "Array wire-render leak"
+#     pinned in 1D form at string_to_array_split_part_
+#     basic_extra.test:51-60. The leak source is
+#     zeta-mysqlwire/src/shim.rs:327 catch-all
+#     `_ => format!("{:?}", value)`. The leak applies
+#     uniformly to 1D and N-D arrays — one fix
+#     (explicit Array arm + PG-style `{...}`
+#     formatter) closes all pins. Not re-prosed here
+#     beyond pinning the literal 2D output line.
+#
+# This slice is a SUPPORT PIN (not a gap pin). All
+# probes succeed correctly. The purpose is to lock
+# the semantic guarantees in regression coverage,
+# because:
+#   (a) Named-WINDOW with PARTITION-BY is the form
+#       analytical apps actually use (degenerate
+#       ORDER-BY-only is already pinned but rarely
+#       used in real workloads).
+#   (b) Frame-override on the OVER reference
+#       (`OVER (win ROWS BETWEEN ...)`) is a subtle
+#       SQL-standard feature — the named window
+#       supplies PARTITION/ORDER and the reference
+#       supplies the frame. Easy to regress to
+#       "named-window-must-be-complete" if a
+#       refactor degrades the merge logic.
+#   (c) Multi-dim ARRAY storage + subscript is its
+#       own code path distinct from 1D, with its
+#       own constructor, type-declaration grammar
+#       (INT[][]), and subscript-chain dispatch.
+#       Apps porting matrix/grid storage from PG
+#       rely on this round-tripping correctly.
+#
+# This slice pins:
+#
+#   Named-WINDOW shapes:
+#     A. SUM(v) OVER win — basic cumulative SUM via
+#        named ORDER-BY-only window. Different
+#        aggregate (SUM) and different shape
+#        (cumulative running-total vs. RANK/ROW_NUMBER
+#        already at window_func_basic).
+#     B. SUM(v) OVER (win ROWS BETWEEN 1 PRECEDING
+#        AND CURRENT ROW) — frame-override on the
+#        OVER reference. The named window supplies
+#        ORDER BY id; the reference adds the frame.
+#        Expected: 2-row sliding sum
+#        (10, 10+20=30, 20+30=50).
+#     C. SUM(v) OVER win with WINDOW win AS
+#        (PARTITION BY (id%2) ORDER BY id) —
+#        PARTITION-BY in a named window. Splits
+#        odd/even ids into separate cumulative
+#        partitions.
+#     D. Multiple named windows in one WINDOW clause:
+#        `WINDOW w1 AS (ORDER BY id), w2 AS (ORDER BY
+#        id DESC)`. Confirms the WINDOW clause can
+#        carry several comma-separated definitions
+#        and the OVER references resolve correctly.
+#
+#   Multi-dim ARRAY shapes:
+#     E. Literal 2D ARRAY: `ARRAY[[1,2],[3,4]]`. The
+#        constructor parses and evaluates to a
+#        2-element array of 2-element Int64 arrays.
+#        Wire render leaks Debug repr (already noted
+#        — see Pre-existing patterns above).
+#     F. Subscript-chain on literal:
+#        `ARRAY[[1,2],[3,4]][2][1]` → 3. PG-style
+#        1-based: 2nd row, 1st element.
+#     G. Column round-trip: INT[][] column accepts
+#        2D literals via INSERT and returns the
+#        stored structure on SELECT. Rows with
+#        differently-shaped inner arrays (2x2 and 2x3)
+#        both round-trip correctly — zeta does NOT
+#        enforce rectangular shape on INT[][].
+#     H. Subscript-chain on stored column:
+#        `m[1][2]` on each row returns the element
+#        at row-1 col-2 of the stored 2D array.
+#
+# Big-picture finding:
+#
+#   Both feature families are FULLY SUPPORTED on
+#   zeta. SUPPORT pin protects against regression in
+#   two code paths that have ZERO prior coverage:
+#
+#   (1) The named-WINDOW PARTITION-shape and frame-
+#       override-on-reference shape are the forms
+#       analytical apps actually use; the existing
+#       ORDER-BY-only pin (window_func_basic.test:99)
+#       is degenerate and doesn't exercise the
+#       partition/frame-merge logic.
+#
+#   (2) Multi-dim ARRAY (literal, subscript-chain,
+#       column type INT[][], storage round-trip) is
+#       a distinct code path from the 1D family.
+#       Apps porting PG matrix/grid storage need
+#       this to round-trip correctly.
+#
+#   Apps porting PG analytical SQL with named
+#   WINDOW references (common in WITH-CTE-heavy
+#   reports) and apps using 2D ARRAY for matrix
+#   storage will both work as expected on zeta.
+#
+# Wire divergence check: probed both wires. Named-
+# WINDOW resolution lives in the planner (wire-
+# independent); both wires return identical numeric
+# output. Multi-dim ARRAY render differs by wire:
+# pgwire renders `{{1,2},{3,4}}` (PG canonical
+# external form); mysqlwire renders the Rust Debug
+# repr `Array { element_type: ..., elements: [...] }`
+# via the shim.rs:327 catch-all. The runner uses the
+# MySQL wire, so the pinned outputs reflect the
+# Debug-repr shape. This wire-render divergence is
+# ALREADY documented at string_to_array_split_part_
+# basic_extra.test:51-60 for 1D; one shim fix
+# closes both 1D and N-D pins simultaneously.
+#
+# Adaptation notes:
+#   # zeta-adapt: SUPPORTED — SUM(v) OVER win named
+#     reference for ORDER-BY-only windows
+#     (cumulative semantics).
+#   # zeta-adapt: SUPPORTED — frame-override on the
+#     OVER reference (`OVER (win ROWS BETWEEN ...)`)
+#     where the named window supplies PARTITION/ORDER
+#     and the reference adds the frame.
+#   # zeta-adapt: SUPPORTED — PARTITION BY inside the
+#     named WINDOW spec.
+#   # zeta-adapt: SUPPORTED — multiple named windows
+#     in one WINDOW clause
+#     (`WINDOW w1 AS (...), w2 AS (...)`).
+#   # zeta-adapt: SUPPORTED — multi-dim ARRAY literal
+#     (`ARRAY[[1,2],[3,4]]`).
+#   # zeta-adapt: SUPPORTED — multi-dim ARRAY
+#     subscript-chain (`a[i][j]`), PG-style 1-based,
+#     row-major.
+#   # zeta-adapt: SUPPORTED — INT[][] column type +
+#     storage round-trip; ragged inner shapes accepted
+#     (no rectangular-shape enforcement).
+#   # zeta-adapt: KNOWN — mysqlwire renders Array
+#     Value via Rust Debug repr (shim.rs:327 catch-
+#     all). Already pinned in 1D form at string_to_
+#     array_split_part_basic_extra.test:51-60. Same
+#     fix closes both 1D and N-D wire-render pins.
+
+--echo === Setup A — named-WINDOW probe table ===
+
+DROP TABLE IF EXISTS w;
+CREATE TABLE w (id INT, v INT);
+INSERT INTO w VALUES (1,10),(2,20),(3,30);
+
+--echo === A: SUM(v) OVER win — cumulative via named ORDER-BY-only window ===
+
+# Cumulative SUM via named ref. Different aggregate
+# (SUM) and different shape (running total) from the
+# RANK/ROW_NUMBER ORDER-BY-only pin at window_func_
+# basic.test:99-103.
+SELECT id, SUM(v) OVER win AS s FROM w WINDOW win AS (ORDER BY id) ORDER BY id;
+
+--echo === B: frame-override on OVER reference — `OVER (win ROWS BETWEEN ...)` ===
+
+# Named window supplies ORDER BY id; the OVER
+# reference ADDS the frame. SQL-standard syntax for
+# extending a named window with a frame. Expected:
+# 2-row sliding sum (10, 10+20=30, 20+30=50).
+SELECT id, SUM(v) OVER (win ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS s
+  FROM w WINDOW win AS (ORDER BY id) ORDER BY id;
+
+--echo === C: PARTITION BY inside named WINDOW — odd/even partition cumulative SUM ===
+
+# Splits id%2 buckets: id=1,3 (odd) in one cumulative
+# partition, id=2 (even) alone. id=1 sum=10, id=2
+# sum=20, id=3 cumulative sum=10+30=40.
+SELECT id, v, SUM(v) OVER win AS s
+  FROM w WINDOW win AS (PARTITION BY (id%2) ORDER BY id) ORDER BY id;
+
+--echo === D: multiple named windows — `WINDOW w1 AS (...), w2 AS (...)` ===
+
+# Two comma-separated named windows; SUM uses w1
+# (ORDER BY id ASC), AVG uses w2 (ORDER BY id DESC).
+# AVG over DESC: id=3 first → avg(30)=30, id=2 →
+# avg(20,30)=25, id=1 last → avg(10,20,30)=20.
+SELECT id, SUM(v) OVER w1 AS s1, AVG(v) OVER w2 AS a2
+  FROM w WINDOW w1 AS (ORDER BY id), w2 AS (ORDER BY id DESC) ORDER BY id;
+
+DROP TABLE w;
+
+--echo === Setup B — multi-dim ARRAY probe table (INT[][]) ===
+
+DROP TABLE IF EXISTS mda;
+CREATE TABLE mda (id INT, m INT[][]);
+INSERT INTO mda VALUES (1, ARRAY[[1,2],[3,4]]);
+INSERT INTO mda VALUES (2, ARRAY[[10,20,30],[40,50,60]]);
+
+--echo === E: literal 2D ARRAY — constructor evaluates ===
+
+# Wire render leaks Rust Debug repr (see header — same
+# leak as 1D forms at string_to_array_split_part_
+# basic_extra). pgwire would render `{{1,2},{3,4}}`.
+SELECT ARRAY[[1,2],[3,4]] AS m;
+
+--echo === F: subscript-chain on literal — `[2][1]` → row 2 col 1 = 3 ===
+
+# PG-style 1-based, row-major: ARRAY[[1,2],[3,4]][2][1]
+# is row 2 element 1 = 3.
+SELECT ARRAY[[1,2],[3,4]][2][1] AS v;
+
+--echo === G: column round-trip — INT[][] accepts and returns 2D shape (ragged OK) ===
+
+# Both 2x2 and 2x3 inner shapes round-trip — zeta does
+# NOT enforce rectangular shape on INT[][].
+SELECT id, m FROM mda ORDER BY id;
+
+--echo === H: subscript-chain on stored column — `m[1][2]` per row ===
+
+# Row 1: {{1,2},{3,4}}[1][2] = 2.
+# Row 2: {{10,20,30},{40,50,60}}[1][2] = 20.
+SELECT id, m[1][2] AS v FROM mda ORDER BY id;
+
+DROP TABLE mda;

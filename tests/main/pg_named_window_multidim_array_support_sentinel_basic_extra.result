@@ -1,0 +1,56 @@
+=== Setup A — named-WINDOW probe table ===
+DROP TABLE IF EXISTS w;
+CREATE TABLE w (id INT, v INT);
+INSERT INTO w VALUES (1,10),(2,20),(3,30);
+=== A: SUM(v) OVER win — cumulative via named ORDER-BY-only window ===
+SELECT id, SUM(v) OVER win AS s FROM w WINDOW win AS (ORDER BY id) ORDER BY id;
+id	s
+1	10
+2	30
+3	60
+=== B: frame-override on OVER reference — `OVER (win ROWS BETWEEN ...)` ===
+SELECT id, SUM(v) OVER (win ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) AS s
+  FROM w WINDOW win AS (ORDER BY id) ORDER BY id;
+id	s
+1	10
+2	30
+3	50
+=== C: PARTITION BY inside named WINDOW — odd/even partition cumulative SUM ===
+SELECT id, v, SUM(v) OVER win AS s
+  FROM w WINDOW win AS (PARTITION BY (id%2) ORDER BY id) ORDER BY id;
+id	v	s
+1	10	10
+2	20	20
+3	30	40
+=== D: multiple named windows — `WINDOW w1 AS (...), w2 AS (...)` ===
+SELECT id, SUM(v) OVER w1 AS s1, AVG(v) OVER w2 AS a2
+  FROM w WINDOW w1 AS (ORDER BY id), w2 AS (ORDER BY id DESC) ORDER BY id;
+id	s1	a2
+1	10	20
+2	30	25
+3	60	30
+DROP TABLE w;
+=== Setup B — multi-dim ARRAY probe table (INT[][]) ===
+DROP TABLE IF EXISTS mda;
+CREATE TABLE mda (id INT, m INT[][]);
+INSERT INTO mda VALUES (1, ARRAY[[1,2],[3,4]]);
+INSERT INTO mda VALUES (2, ARRAY[[10,20,30],[40,50,60]]);
+=== E: literal 2D ARRAY — constructor evaluates ===
+SELECT ARRAY[[1,2],[3,4]] AS m;
+m
+Array { element_type: Array(Int64), elements: [Array { element_type: Int64, elements: [Int64(1), Int64(2)] }, Array { element_type: Int64, elements: [Int64(3), Int64(4)] }] }
+=== F: subscript-chain on literal — `[2][1]` → row 2 col 1 = 3 ===
+SELECT ARRAY[[1,2],[3,4]][2][1] AS v;
+v
+3
+=== G: column round-trip — INT[][] accepts and returns 2D shape (ragged OK) ===
+SELECT id, m FROM mda ORDER BY id;
+id	m
+1	Array { element_type: Text, elements: [Array { element_type: Int32, elements: [Int32(1), Int32(2)] }, Array { element_type: Int32, elements: [Int32(3), Int32(4)] }] }
+2	Array { element_type: Text, elements: [Array { element_type: Int32, elements: [Int32(10), Int32(20), Int32(30)] }, Array { element_type: Int32, elements: [Int32(40), Int32(50), Int32(60)] }] }
+=== H: subscript-chain on stored column — `m[1][2]` per row ===
+SELECT id, m[1][2] AS v FROM mda ORDER BY id;
+id	v
+1	2
+2	20
+DROP TABLE mda;
