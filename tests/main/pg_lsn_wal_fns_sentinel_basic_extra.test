@@ -1,0 +1,179 @@
+# Independently authored PG `pg_lsn` type + WAL-
+# inspection function sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - pg_lsn column type / literal cast: ZERO prior
+#     (grepped tests/main/*.test for "pg_lsn").
+#   - pg_current_wal_lsn / pg_current_wal_insert_lsn
+#     / pg_wal_lsn_diff / pg_last_wal_receive_lsn /
+#     pg_walfile_name SQL functions: ZERO prior
+#     (grepped for "pg_current_wal", "pg_wal_lsn_diff",
+#     "pg_walfile_name").
+#   - SQL slot-management fns (pg_create_logical_
+#     replication_slot / pg_drop_replication_slot)
+#     + PUBLICATION / SUBSCRIPTION DDL +
+#     pg_replication_slots catalog read: pinned at
+#     pg_pubsub_replication_sentinel. That slice
+#     covers the slot/publication SIDE of replication;
+#     this slice covers the LSN/WAL-inspection SIDE.
+#     Different function families, no overlap.
+#   - pg_2pc_sentinel: prepared-transaction admin
+#     fns. Different family.
+#   - pg_txn_mgmt_admin_fns_sentinel: txid_current /
+#     pg_backend_pid / pg_terminate_backend family.
+#     Different family.
+#
+# Pre-existing rejection shape patterns:
+#   - "SQL parse error: unsupported data type:
+#     <name>" — pre-existing fingerprint at column-
+#     DDL reject (pg_money_bit_types_sentinel for
+#     money/BIT/VARBIT, pg_geometric_types_sentinel
+#     for POINT/LINE, pg_network_types_sentinel).
+#     `pg_lsn` is a new type-name witness.
+#   - "execution error: unsupported CAST target
+#     type: <name>" — pre-existing fingerprint at
+#     literal-cast reject (same slices). `pg_lsn`
+#     is a new cast-target witness.
+#   - "execution error: unknown function: <name>" —
+#     pre-existing fingerprint at many slices (e.g.,
+#     pg_txn_mgmt_admin_fns_sentinel for txid_*,
+#     pg_pubsub_replication_sentinel for pg_create_
+#     logical_replication_slot). Five new function-
+#     name witnesses here.
+#
+# This slice pins:
+#
+#   `pg_lsn` column type → Shape "unsupported data
+#   type: pg_lsn" (1064). Convert.rs-level reject
+#   at DDL parse — never reaches the catalog layer.
+#
+#   `'X/Y'::pg_lsn` literal cast → Shape "unsupported
+#   CAST target type: pg_lsn" (1105). Cast type
+#   table has no entry for pg_lsn.
+#
+#   pg_current_wal_lsn() — current WAL insert/flush
+#   position (PG monitors this to track write
+#   progress) → "unknown function: pg_current_wal_lsn".
+#
+#   pg_current_wal_insert_lsn() — current WAL insert
+#   position (separate from flush position) →
+#   "unknown function: pg_current_wal_insert_lsn".
+#
+#   pg_wal_lsn_diff(lsn1, lsn2) — byte-distance
+#   between two LSNs (used to compute replication
+#   lag) → "unknown function: pg_wal_lsn_diff".
+#
+#   pg_last_wal_receive_lsn() — receiver-side
+#   last-received LSN (replica observability) →
+#   "unknown function: pg_last_wal_receive_lsn".
+#
+#   pg_walfile_name(lsn) — WAL segment filename
+#   containing the given LSN (archiving / log
+#   rotation) → "unknown function: pg_walfile_name".
+#
+# Big-picture finding:
+#
+#   The PG SQL-level WAL-inspection surface
+#   (`pg_lsn` type + `pg_*_wal_*` / `pg_walfile_*`
+#   functions) is entirely absent on zeta. This is
+#   a DOCUMENTED GAP, not a bug:
+#
+#     - zeta's durable substrate is its own append-
+#       only log-store (see CLAUDE.md: "Storage:
+#       LSM-backed persistent MVCC store ... crash
+#       recovery via log replay"), NOT a PG-style
+#       WAL with 24-character `X/Y` LSN positions.
+#     - CDC is emitted as pgoutput frames over the
+#       PG replication protocol (zeta-pgwire/src/
+#       replication/), with internal log-positions
+#       NOT exposed as SQL-queryable LSNs.
+#     - There is no equivalent of pg_wal/ directory
+#       on disk with named segment files, so
+#       pg_walfile_name() has no possible mapping.
+#
+#   Apps porting from PG that depend on WAL SQL
+#   inspection must:
+#     - Replication-lag monitoring: subscribe to
+#       the CDC stream and compare client-side
+#       received-timestamps against commit
+#       timestamps embedded in pgoutput. The
+#       commit_ts is already in each frame.
+#     - Write-position polling: use the replication
+#       protocol's IDENTIFY_SYSTEM and START_
+#       REPLICATION feedback messages directly.
+#     - WAL-archive monitoring: not applicable;
+#       zeta's log-store has its own segment
+#       rotation (see zeta-log-store) that is not
+#       exposed via SQL.
+#
+#   This gap is INTENTIONAL given zeta's log-centric
+#   transaction protocol (no separate WAL: the log
+#   IS the durability boundary). Re-implementing
+#   pg_lsn as a SQL type would imply exposing
+#   internal log offsets in a stable user-facing
+#   format, which zeta has chosen not to commit to.
+#
+# Wire divergence check: probed both wires (pgwire
+# port 13501 and mysqlwire port 3307) — identical
+# fingerprints on every probe. `pg_lsn` type-name
+# reject happens at the convert.rs (type-table)
+# layer, wire-independent. Function lookup is at
+# executor function-dispatch, wire-independent.
+# No wire-divergent behavior to pin separately.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — `pg_lsn` SQL type not
+#     exposed (DDL column + literal cast both
+#     reject). zeta's log-store positions are not
+#     surfaced as a SQL-queryable type.
+#   # zeta-adapt: KNOWN GAP — entire pg_*_wal_*lsn /
+#     pg_walfile_name family unknown. Use the CDC
+#     stream's embedded commit_ts for replication-
+#     lag observability instead.
+#   # zeta-adapt: DESIGN-INTENT — this gap is
+#     deliberate, not deferred work. See CLAUDE.md
+#     "log-centric transaction protocol" and
+#     zeta-pgwire/src/replication/ for the
+#     replacement observability surface.
+
+--echo === `pg_lsn` column type — "unsupported data type: pg_lsn" (1064) ===
+
+# convert.rs-level type-table reject. Never reaches
+# the catalog layer.
+--error 1064
+CREATE TABLE lsn_tbl (l pg_lsn);
+
+--echo === `'X/Y'::pg_lsn` literal cast — "unsupported CAST target type: pg_lsn" (1105) ===
+
+# Cast-target lookup has no entry for pg_lsn. The
+# `16/B374D848` hex form is the canonical PG LSN
+# textual representation.
+--error 1105
+SELECT '16/B374D848'::pg_lsn;
+
+--echo === pg_current_wal_lsn() — current WAL insert/flush position ===
+
+--error 1105
+SELECT pg_current_wal_lsn();
+
+--echo === pg_current_wal_insert_lsn() — current WAL insert position ===
+
+--error 1105
+SELECT pg_current_wal_insert_lsn();
+
+--echo === pg_wal_lsn_diff(lsn1, lsn2) — byte-distance between two LSNs (replication-lag math) ===
+
+--error 1105
+SELECT pg_wal_lsn_diff('16/B374D848', '16/B374D000');
+
+--echo === pg_last_wal_receive_lsn() — receiver-side last-received LSN (replica observability) ===
+
+--error 1105
+SELECT pg_last_wal_receive_lsn();
+
+--echo === pg_walfile_name(lsn) — WAL segment filename for given LSN (archiving / log rotation) ===
+
+--error 1105
+SELECT pg_walfile_name('16/B374D848');
