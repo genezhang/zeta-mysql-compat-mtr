@@ -1,0 +1,12 @@
+=== Shape A — option-suffix WITHOUT `WITH` rejects at parser (col 22) ===
+CREATE EXTENSION foo SCHEMA s1;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: SCHEMA at Line: 1, Column: 22
+CREATE EXTENSION foo VERSION '1.0';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: VERSION at Line: 1, Column: 22
+CREATE EXTENSION foo CASCADE;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: CASCADE at Line: 1, Column: 22
+CREATE EXTENSION foo NOSUCHOPT;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: NOSUCHOPT at Line: 1, Column: 22
+=== Shape B — option-suffix WITH `WITH` reaches the hand-rolled help-text dispatcher (1105) ===
+CREATE EXTENSION foo WITH SCHEMA s1 VERSION '1.0' CASCADE;
+ERROR 1105: execution error: extension "foo" is not available — Zeta does not support PostgreSQL C extensions. Natively supported: plpgsql, uuid-ossp, pgcrypto, pg_stat_statements, citext, pg_trgm

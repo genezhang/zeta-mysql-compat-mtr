@@ -1,0 +1,171 @@
+# Independently authored CREATE EXTENSION option-form
+# grammar-bifurcation sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/ or PG regress.
+#
+# Adjacent companion slices (do NOT duplicate):
+#   - create_extension_basic_extra.test:79-119 +
+#     .result:11-17 ALREADY pin the bare-form
+#     hand-rolled help-text formatter
+#     (`extension "<name>" is not available — Zeta does
+#     not support PostgreSQL C extensions. Natively
+#     supported: plpgsql, uuid-ossp, pgcrypto,
+#     pg_stat_statements, citext, pg_trgm`) for unknown
+#     names (postgis/hstore/ltree) and the case-
+#     insensitive whitelist. This slice does NOT
+#     re-pin the bare-form 1105 → it pins the
+#     OPTION-FORM grammar branches that ARE NOT
+#     reached in that slice.
+#   - pg_fdw_inherits_sentinel_basic_extra.test:140-
+#     151 + .result:11-13 ALREADY pin Shape A
+#     (`CREATE FOREIGN DATA WRAPPER` / `CREATE FOREIGN
+#     TABLE` → `Expected: an object type after
+#     CREATE, found: FOREIGN`), Shape (c)
+#     (`CREATE SERVER ...` → catch-all), and the
+#     `CREATE USER MAPPING FOR PUBLIC SERVER ...` →
+#     `Expected: =, found: PUBLIC at Line: 1, Column:
+#     25` fingerprint. This slice does NOT re-pin
+#     them; it cross-links from the option-form
+#     finding to the FDW family.
+#   - pg_user_role_grammar_leak_sentinel_basic_extra
+#     pins the CREATE USER `name = value` MySQL
+#     grammar leak (1st witness). The FOR-PUBLIC
+#     USER MAPPING fingerprint cross-linked here is
+#     the 2nd witness — its `--error 1064` ack is
+#     already at pg_fdw_inherits_sentinel:161; this
+#     slice does NOT re-pin it.
+#
+#   Pre-author dedup grep on tests/main/*.test for
+#   `CREATE EXTENSION (WITH|SCHEMA|VERSION|CASCADE)`:
+#   ZERO hits — option-form CREATE EXTENSION grammar
+#   has no prior coverage anywhere in the corpus.
+#   Per [[feedback_gap_scan_must_grep_all_files]] the
+#   wide grep (all .test files, case-insensitive)
+#   was the full population.
+#
+# This slice pins ONE structural finding with FOUR
+# shapes of supporting evidence:
+#
+#   FINDING — CREATE EXTENSION GRAMMAR BIFURCATION.
+#   `CREATE EXTENSION <name>` and
+#   `CREATE EXTENSION <name> WITH <opts>` reach the
+#   same hand-rolled help-text formatter at the
+#   dispatcher (1105 with em-dash + natively-supported
+#   list), but `CREATE EXTENSION <name> <opt>` WITHOUT
+#   the leading `WITH` keyword rejects at the parser
+#   layer (1064, `Expected: end of statement, found:
+#   <opt-kw> at Line: 1, Column: 22`) — for SCHEMA,
+#   VERSION, CASCADE, AND for an UNKNOWN identifier
+#   like NOSUCHOPT. The parser does NOT have a
+#   per-option-name table; the bare-form arm
+#   terminates after the extension name and refuses
+#   anything that isn't `;`. The WITH-prefix arm
+#   accepts the entire trailing option list and
+#   discards it on the way to the dispatcher (zeta
+#   never honors SCHEMA / VERSION / CASCADE). TWO
+#   distinct grammar branches; SAME logical
+#   operation; OPPOSITE failure-vs-dispatch
+#   behavior. This is the parser-layer analog of
+#   [[project_two_layer_type_recognition_pattern]]:
+#   the same statement form is fingerprinted
+#   differently depending on which keyword
+#   introduces the option list.
+#
+#   FOUR shapes pin the bifurcation:
+#
+#     Shape A — option-suffix WITHOUT `WITH` rejects
+#     at parser (4 keywords, all reject at col 22):
+#       * `CREATE EXTENSION foo SCHEMA s1`     → 1064
+#       * `CREATE EXTENSION foo VERSION '1.0'` → 1064
+#       * `CREATE EXTENSION foo CASCADE`       → 1064
+#       * `CREATE EXTENSION foo NOSUCHOPT`     → 1064
+#     The NOSUCHOPT case is the most damning — it
+#     proves the rejection is GRAMMAR-LAYER
+#     (`Expected: end of statement`), not a per-
+#     option-name registry. The parser does NOT
+#     check whether the trailing word is a recognized
+#     option keyword; it rejects ANY token that
+#     follows the bare extension name.
+#
+#     Shape B — option-suffix WITH `WITH` reaches the
+#     hand-rolled help-text dispatcher (1105 with
+#     em-dash + natively-supported list):
+#       * `CREATE EXTENSION foo WITH SCHEMA s1
+#          VERSION '1.0' CASCADE` → 1105
+#     SAME extension name, SAME options, OPPOSITE
+#     fingerprint — the WITH grammar branch consumes
+#     the entire option list, then the dispatcher
+#     fails the name lookup. The options are
+#     SILENTLY DISCARDED on the way through —
+#     supplying SCHEMA / VERSION / CASCADE to a
+#     hypothetically-whitelisted extension would
+#     give no warning that those clauses were
+#     dropped.
+#
+# Big-picture finding:
+#
+#   This is a NEW EXEMPLAR of the parser-layer
+#   bifurcation pattern. PG's grammar accepts BOTH
+#   `CREATE EXTENSION foo SCHEMA s1` AND
+#   `CREATE EXTENSION foo WITH SCHEMA s1` as
+#   equivalent (the `WITH` is optional noise). Zeta's
+#   sqlparser fork accepts the WITH form and rejects
+#   the bare form, so migration scripts that emit
+#   the more common WITH-less spelling (pg_dump uses
+#   the bare form in some cases) get 1064 at the
+#   parse layer while the WITH-prefixed spelling
+#   gets a more informative 1105 at the dispatcher.
+#   APPS porting from PG will see DIFFERENT failure
+#   surfaces for SYNTACTICALLY-EQUIVALENT spellings
+#   of the same statement — the textbook two-layer
+#   recognition trap.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — `CREATE EXTENSION
+#     <name> SCHEMA s1` (or VERSION / CASCADE)
+#     WITHOUT a leading `WITH` keyword errors 1064
+#     at parse. Rewrite as
+#     `CREATE EXTENSION <name> WITH SCHEMA s1` —
+#     the WITH-prefixed form reaches the dispatcher,
+#     where the options are SILENTLY DISCARDED.
+#   # zeta-adapt: KNOWN BUG — the WITH-prefixed
+#     option list (SCHEMA / VERSION / CASCADE) is
+#     accepted then dropped. No warning is emitted
+#     that the schema-target / version-pin /
+#     cascade-install semantics were ignored. If
+#     your migration depends on any of those, do
+#     not rely on `CREATE EXTENSION ... WITH ...`
+#     to honor them.
+
+--echo === Shape A — option-suffix WITHOUT `WITH` rejects at parser (col 22) ===
+
+# The bare-form grammar arm terminates after the
+# extension name. Any trailing token errors 1064 at
+# col 22 regardless of whether it is a recognized
+# option keyword.
+--error 1064
+CREATE EXTENSION foo SCHEMA s1;
+--error 1064
+CREATE EXTENSION foo VERSION '1.0';
+--error 1064
+CREATE EXTENSION foo CASCADE;
+# Most damning — UNKNOWN identifier rejects with the
+# SAME fingerprint, proving the rejection is
+# grammar-layer (no per-option-name registry).
+--error 1064
+CREATE EXTENSION foo NOSUCHOPT;
+
+--echo === Shape B — option-suffix WITH `WITH` reaches the hand-rolled help-text dispatcher (1105) ===
+
+# Same extension name, same options, opposite
+# fingerprint. The WITH grammar arm consumes the
+# entire trailing option list and passes through to
+# the dispatcher; the dispatcher fails the name
+# lookup with the em-dash hand-rolled formatter.
+# Bare-form 1105 fingerprint is pinned at
+# create_extension_basic_extra.result:11-17 — NOT
+# re-pinned here; the novel evidence is that the
+# WITH-prefix branch reaches the SAME formatter
+# DESPITE the option list having no effect.
+--error 1105
+CREATE EXTENSION foo WITH SCHEMA s1 VERSION '1.0' CASCADE;
