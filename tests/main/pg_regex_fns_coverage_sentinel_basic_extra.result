@@ -1,0 +1,92 @@
+=== regexp_matches: basic 2-arg, no capture groups → array of whole match ===
+SELECT regexp_matches('hello world', 'world')              AS basic_match;
+basic_match
+Array { element_type: Text, elements: [String("world")] }
+SELECT regexp_matches('aaabbb', 'b+')                      AS quantifier_match;
+quantifier_match
+Array { element_type: Text, elements: [String("bbb")] }
+SELECT regexp_matches('hello world', '^hello')             AS anchored_start;
+anchored_start
+Array { element_type: Text, elements: [String("hello")] }
+SELECT regexp_matches('hello world', 'world$')             AS anchored_end;
+anchored_end
+Array { element_type: Text, elements: [String("world")] }
+=== regexp_matches: with capture groups → array of GROUPS (whole match dropped) ===
+SELECT regexp_matches('hello world', '(w)(orld)')          AS two_groups;
+two_groups
+Array { element_type: Text, elements: [String("w"), String("orld")] }
+SELECT regexp_matches('abc123', '([a-z]+)([0-9]+)')        AS alpha_num_groups;
+alpha_num_groups
+Array { element_type: Text, elements: [String("abc"), String("123")] }
+SELECT regexp_matches('hello world', '(world)')            AS one_group;
+one_group
+Array { element_type: Text, elements: [String("world")] }
+=== regexp_matches: no match → NULL (not empty array, not zero rows) ===
+SELECT regexp_matches('hello world', 'xyz')                AS no_match;
+no_match
+NULL
+SELECT regexp_matches('hello world', 'xyz') IS NULL        AS no_match_pred;
+no_match_pred
+1
+SELECT regexp_matches('', 'a')                             AS empty_source_no_match;
+empty_source_no_match
+NULL
+=== regexp_matches: 'g' flag SILENTLY ACCEPTED but NO-OP (first match only) ===
+SELECT regexp_matches('aaabbb', 'b+', 'g')                 AS g_flag_quantifier;
+g_flag_quantifier
+Array { element_type: Text, elements: [String("bbb")] }
+SELECT regexp_matches('a1 b2 c3', '[a-z][0-9]', 'g')       AS g_flag_multi_token;
+g_flag_multi_token
+Array { element_type: Text, elements: [String("a1")] }
+SELECT regexp_matches('a1 b2 c3', '[a-z][0-9]')            AS no_g_flag_same;
+no_g_flag_same
+Array { element_type: Text, elements: [String("a1")] }
+=== regexp_matches: 'i' flag = case-insensitive (honored) ===
+SELECT regexp_matches('HELLO', 'hello')                    AS case_default_no_match;
+case_default_no_match
+NULL
+SELECT regexp_matches('HELLO', 'hello', 'i')               AS case_insensitive_match;
+case_insensitive_match
+Array { element_type: Text, elements: [String("HELLO")] }
+=== regexp_matches: NULL propagation on source or pattern ===
+SELECT regexp_matches(NULL, 'x')                           AS null_source;
+null_source
+NULL
+SELECT regexp_matches('foo', NULL)                         AS null_pattern;
+null_pattern
+NULL
+SELECT regexp_matches(NULL, 'x') IS NULL                   AS null_source_pred;
+null_source_pred
+1
+=== regexp_matches: arity errors → 1105 ===
+SELECT regexp_matches();
+ERROR 1105: execution error: REGEXP_MATCHES requires 2 or 3 arguments
+SELECT regexp_matches('foo');
+ERROR 1105: execution error: REGEXP_MATCHES requires 2 or 3 arguments
+SELECT regexp_matches('foo', 'o', 'g', 'x');
+ERROR 1105: execution error: REGEXP_MATCHES requires 2 or 3 arguments
+=== regexp_matches: invalid regex → 1105 ===
+SELECT regexp_matches('foo', '[unclosed');
+ERROR 1105: execution error: invalid regex: regex parse error:
+    [unclosed
+    ^
+error: unclosed character class
+=== regexp_match (singular alias) — same impl arm as regexp_matches ===
+SELECT regexp_match('hello world', 'world')                AS singular_basic;
+singular_basic
+Array { element_type: Text, elements: [String("world")] }
+SELECT regexp_match('abc123', '([a-z]+)([0-9]+)')          AS singular_groups;
+singular_groups
+Array { element_type: Text, elements: [String("abc"), String("123")] }
+=== regexp_split_to_array: KNOWN GAP — unknown function ===
+SELECT regexp_split_to_array('a,b,c', ',');
+ERROR 1105: execution error: unknown function: regexp_split_to_array
+SELECT regexp_split_to_array('a, b,  c', '[,\s]+');
+ERROR 1105: execution error: unknown function: regexp_split_to_array
+SELECT regexp_split_to_array('aXbYcZd', '[XYZ]');
+ERROR 1105: execution error: unknown function: regexp_split_to_array
+=== regexp_split_to_table: KNOWN GAP — unknown function (set-returning sibling) ===
+SELECT regexp_split_to_table('a,b,c', ',');
+ERROR 1105: execution error: unknown function: regexp_split_to_table
+SELECT regexp_split_to_table('a, b,  c', '[,\s]+');
+ERROR 1105: execution error: unknown function: regexp_split_to_table
