@@ -1,0 +1,105 @@
+=== SHAPE A1 — TRUNCATE ONLY t (BUG: PG semantic modifier silently dropped) ===
+DROP TABLE IF EXISTS t_only;
+DROP TABLE IF EXISTS t_only2;
+CREATE TABLE t_only (id INT PRIMARY KEY);
+INSERT INTO t_only VALUES (1), (2), (3);
+TRUNCATE ONLY t_only;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE A2 — TRUNCATE TABLE ONLY t (TABLE keyword + ONLY) ===
+INSERT INTO t_only VALUES (1), (2);
+TRUNCATE TABLE ONLY t_only;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE A3 — TRUNCATE ONLY t RESTART IDENTITY CASCADE (ONLY + cascade qualifiers) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE ONLY t_only RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE A4 — TRUNCATE ONLY t1, t2 (multi-table global ONLY) ===
+CREATE TABLE t_only2 (id INT PRIMARY KEY);
+INSERT INTO t_only VALUES (1);
+INSERT INTO t_only2 VALUES (1);
+TRUNCATE ONLY t_only, t_only2;
+SELECT COUNT(*) AS c1 FROM t_only;
+c1
+0
+SELECT COUNT(*) AS c2 FROM t_only2;
+c2
+0
+=== SHAPE A5 — TRUNCATE t1, ONLY t2 (per-table ONLY mix) ===
+INSERT INTO t_only VALUES (1);
+INSERT INTO t_only2 VALUES (1);
+TRUNCATE t_only, ONLY t_only2;
+SELECT COUNT(*) AS c1 FROM t_only;
+c1
+0
+SELECT COUNT(*) AS c2 FROM t_only2;
+c2
+0
+=== SHAPE B1 — TRUNCATE TABLE t RESTRICT (BUG: PG FK-check modifier silently dropped) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only RESTRICT;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE B2 — TRUNCATE t RESTRICT (no TABLE keyword) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only RESTRICT;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE B3 — TRUNCATE TABLE t RESTART IDENTITY RESTRICT (RESTRICT + RESTART) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only RESTART IDENTITY RESTRICT;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE C1 — TRUNCATE TABLE t* (BUG: PG inheritance-descend wildcard silently dropped) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only*;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE C2 — TRUNCATE TABLE t* RESTART IDENTITY CASCADE (wildcard + cascade qualifiers) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only* RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE D1 — TRUNCATE t RESTART IDENTITY CASCADE (canonical order — OK) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE D2 — TRUNCATE t CASCADE RESTART IDENTITY (BUG: CASCADE-first rejected; PG accepts) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only CASCADE RESTART IDENTITY;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: RESTART at Line: 1, Column: 25
+TRUNCATE t_only;
+=== SHAPE D3 — TRUNCATE t CONTINUE IDENTITY CASCADE (canonical order — OK) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only CONTINUE IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+=== SHAPE D4 — TRUNCATE t CASCADE CONTINUE IDENTITY (BUG: CASCADE-first rejected; PG accepts) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only CASCADE CONTINUE IDENTITY;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: CONTINUE at Line: 1, Column: 25
+TRUNCATE t_only;
+=== SHAPE E — TRUNCATE ONLY noexist_t (1146 — confirms ONLY parse path reaches lookup) ===
+TRUNCATE ONLY noexist_table_xyz;
+ERROR 1146: table not found: test.public.noexist_table_xyz
+=== SHAPE F — TRUNCATE t RESTART IDENTITY CASCADE (canonical SUPPORT pin) ===
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+c
+0
+DROP TABLE t_only;
+DROP TABLE t_only2;
