@@ -58,9 +58,11 @@
 #     cast also errors 1105 (pinned in
 #     type_cast_edges_basic_extra); use CASE WHEN bool
 #     THEN 1 ELSE 0 END.
-#   # zeta-adapt: KNOWN GAP — `<bool> XOR <bool>` infix
-#     operator errors 1064 'unsupported binary operator:
-#     XOR'. Substitute via `(a OR b) AND NOT (a AND b)`.
+#   # zeta-adapt: FIXED — `<bool> XOR <bool>` infix operator
+#     is now supported with correct MySQL semantics: TRUE XOR
+#     FALSE = 1, TRUE XOR TRUE = 0, NULL XOR x = NULL. Pinned
+#     below; the `(a OR b) AND NOT (a AND b)` substitute is
+#     no longer needed but still correct.
 
 --echo === Boolean operator precedence — NOT > AND > OR ===
 
@@ -107,7 +109,9 @@ SELECT CASE WHEN TRUE THEN 1 ELSE 0 END AS r_lit, CASE WHEN 1 < 2 THEN 'yes' ELS
 
 SELECT 1 = TRUE AS one_eq_t, 0 = FALSE AS zero_eq_f;
 
---echo === KNOWN DIVERGENCE: 1 AND 0 returns NULL (MySQL: 0) ===
+--echo === FIXED: 1 AND 0 now returns 0 (correct MySQL coercion) ===
+# Previously zeta returned NULL (PG-style strict 3VL), now
+# returns 0 matching MySQL's INT→BOOL coercion for AND.
 
 SELECT 1 AND 0 AS and_int;
 
@@ -124,9 +128,10 @@ SELECT id, n FROM bi WHERE n;
 --error 1105
 SELECT TRUE + 1;
 
---echo === KNOWN GAP: XOR infix operator — errno 1064 ===
+--echo === FIXED: XOR infix is now supported (correct MySQL boolean XOR) ===
 
---error 1064
 SELECT TRUE XOR FALSE;
+SELECT TRUE XOR TRUE;
+SELECT NULL XOR TRUE;
 
 DROP TABLE bi;

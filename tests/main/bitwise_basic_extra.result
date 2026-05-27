@@ -53,9 +53,22 @@ bl5	bl10
 SELECT (6 | 3) - (6 & 3) AS xor_workaround;
 xor_workaround
 5
-=== KNOWN GAP: XOR infix — errno 1064 ===
+=== FIXED: XOR infix is now supported as BOOLEAN XOR (MySQL semantics) ===
 SELECT 6 XOR 3 AS r;
-ERROR 1064: SQL parse error: unsupported binary operator: XOR
+r
+0
+SELECT TRUE XOR FALSE AS r;
+r
+1
+SELECT TRUE XOR TRUE AS r;
+r
+0
+SELECT NULL XOR TRUE AS r;
+r
+NULL
+=== KNOWN GAP: ^ infix (MySQL BITWISE XOR) — errno 1064 ===
+SELECT 6 ^ 3 AS r;
+ERROR 1064: SQL parse error: unsupported binary operator: ^
 === KNOWN GAP: XOR(a, b) function form — errno 1105 ===
 SELECT XOR(6, 3) AS r;
 ERROR 1105: execution error: unknown function: XOR
