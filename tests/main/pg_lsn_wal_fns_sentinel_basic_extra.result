@@ -1,0 +1,21 @@
+=== `pg_lsn` column type — "unsupported data type: pg_lsn" (1064) ===
+CREATE TABLE lsn_tbl (l pg_lsn);
+ERROR 1064: SQL parse error: unsupported data type: pg_lsn
+=== `'X/Y'::pg_lsn` literal cast — "unsupported CAST target type: pg_lsn" (1105) ===
+SELECT '16/B374D848'::pg_lsn;
+ERROR 1105: execution error: unsupported CAST target type: pg_lsn
+=== pg_current_wal_lsn() — current WAL insert/flush position ===
+SELECT pg_current_wal_lsn();
+ERROR 1105: execution error: unknown function: pg_current_wal_lsn
+=== pg_current_wal_insert_lsn() — current WAL insert position ===
+SELECT pg_current_wal_insert_lsn();
+ERROR 1105: execution error: unknown function: pg_current_wal_insert_lsn
+=== pg_wal_lsn_diff(lsn1, lsn2) — byte-distance between two LSNs (replication-lag math) ===
+SELECT pg_wal_lsn_diff('16/B374D848', '16/B374D000');
+ERROR 1105: execution error: unknown function: pg_wal_lsn_diff
+=== pg_last_wal_receive_lsn() — receiver-side last-received LSN (replica observability) ===
+SELECT pg_last_wal_receive_lsn();
+ERROR 1105: execution error: unknown function: pg_last_wal_receive_lsn
+=== pg_walfile_name(lsn) — WAL segment filename for given LSN (archiving / log rotation) ===
+SELECT pg_walfile_name('16/B374D848');
+ERROR 1105: execution error: unknown function: pg_walfile_name
