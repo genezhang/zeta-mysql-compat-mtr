@@ -1,0 +1,81 @@
+# pg_rows_from_empty_group_by_sentinel_basic_extra.test
+#
+# Compat-MTR sentinel pinning two PG-idiomatic constructs that zeta rejects on
+# the MySQL wire — plus a same-semantic / different-path asymmetry between
+# `GROUP BY ()` and `GROUP BY GROUPING SETS (())`.
+#
+# === STRUCTURAL FINDINGS ===
+# 1. Empty-grouping asymmetry — same semantic, two parser paths.
+#    `GROUP BY ()` (PG's bare empty grouping = grand total) REJECTS with
+#    `unsupported expression: ()`. The equivalent `GROUP BY GROUPING SETS (())`
+#    WORKS and returns the grand total. Same logical operation, different code
+#    paths. The GROUPING SETS (()) success path is already pinned at
+#    `pg_grouping_multicol_sentinel_basic_extra.test:124`; this slice pins the
+#    bare `()` reject side and the asymmetry headline.
+#
+# 2. 7th hand-rolled formatter witness — Pattern P1 (literal-echo).
+#    `unsupported expression: ()` has NO `Line: X, Column: Y` suffix → it is a
+#    hand-rolled formatter (not sqlparser-passthrough), and fits Pattern P1
+#    (`unsupported expression: <literal>`) from the PR #462 META taxonomy. New
+#    family member alongside `unsupported expression: ROW(...)`,
+#    `unsupported expression: COLLATE`, etc. See
+#    `pg_hand_rolled_formatter_taxonomy_sentinel_basic_extra.test`.
+#
+# 3. ROWS FROM (...) — zero-prior, sqlparser whitelist gap.
+#    `SELECT * FROM ROWS FROM (generate_series(1,3), generate_series(10,12))`
+#    and the WITH ORDINALITY variant BOTH reject identically:
+#    `sql parser error: Expected: end of statement, found: FROM at Line: 1, Column: 20`.
+#    Fingerprint HAS Line/Column suffix → sqlparser-passthrough, NOT hand-rolled.
+#    ROWS FROM is PG's construct for parallel-iterating multiple set-returning
+#    functions in a single FROM clause. `unnest(...) WITH ORDINALITY` itself IS
+#    supported (pinned at `pg_ordinality_match_reflection_sentinel_basic_extra.test:177`)
+#    — only the `ROWS FROM` wrapper is missing.
+#
+# === PRIOR COVERAGE / CROSS-REFS ===
+# - `pg_grouping_multicol_sentinel_basic_extra.test:124` — GROUPING SETS (())
+#   grand-total success path (contrast side of SHAPE B).
+# - `pg_ordinality_match_reflection_sentinel_basic_extra.test:177` — bare
+#   `unnest(...) WITH ORDINALITY` success path (contrast side of SHAPE A.2).
+# - `pg_hand_rolled_formatter_taxonomy_sentinel_basic_extra.test` — META
+#   taxonomy of the 8-pattern hand-rolled formatter family; SHAPE B is the 7th
+#   witness for Pattern P1 (literal-echo).
+# - `group_by_edges_basic_extra.test` — ROLLUP/CUBE/GROUPING SETS multi-column
+#   coverage; this slice fills in the BARE `()` empty-grouping gap.
+#
+# === ZETA-ADAPTS ===
+# PG idiomatic → zeta substitute:
+# - `GROUP BY ()` (grand total)         → `GROUP BY GROUPING SETS (())` (works).
+# - `ROWS FROM (a(), b())` (parallel)   → split into separate FROM-clause
+#                                         subqueries with `JOIN ... ON true`
+#                                         for the cross product, or use a single
+#                                         `unnest(...)` / `generate_series(...)`
+#                                         when only one SRF is needed.
+
+--echo === setup ===
+CREATE TABLE rb (id INT, v INT);
+INSERT INTO rb VALUES (1, 10), (2, 20), (3, 30), (4, 40);
+
+--echo === SHAPE A: ROWS FROM (...) — multi-arg table-function form, zero prior coverage ===
+--echo # Expected: PG accepts and parallel-iterates the SRFs.
+--echo # zeta: sqlparser rejects — ROWS keyword not in FROM-clause whitelist.
+--error 1064
+SELECT * FROM ROWS FROM (generate_series(1, 3), generate_series(10, 12));
+
+--echo === SHAPE A.2: ROWS FROM (...) WITH ORDINALITY — same reject ===
+--error 1064
+SELECT * FROM ROWS FROM (generate_series(1, 3)) WITH ORDINALITY;
+
+--echo === SHAPE B: GROUP BY () — bare empty grouping (PG: grand total) ===
+--echo # 7th hand-rolled formatter witness — fingerprint has NO Line/Column suffix.
+--echo # Pattern P1 (literal-echo) from PR #462 META: `unsupported expression: <literal>`.
+--error 1064
+SELECT SUM(v) FROM rb GROUP BY ();
+
+--echo === SHAPE C: GROUP BY GROUPING SETS (()) — same semantic, WORKS ===
+--echo # Asymmetry: equivalent grand-total via the GROUPING SETS path succeeds.
+--echo # Already pinned at pg_grouping_multicol_sentinel_basic_extra.test:124; cited
+--echo # here as the contrast side of the SHAPE B reject.
+SELECT SUM(v) AS grand FROM rb GROUP BY GROUPING SETS (());
+
+--echo === Cleanup ===
+DROP TABLE rb;
