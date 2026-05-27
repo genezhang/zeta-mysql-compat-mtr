@@ -1,0 +1,44 @@
+=== Setup parent ===
+DROP TABLE IF EXISTS pro_c1; DROP TABLE IF EXISTS pro_c2;
+DROP TABLE IF EXISTS pro_c3; DROP TABLE IF EXISTS pro_c4;
+DROP TABLE IF EXISTS pro_c5; DROP TABLE IF EXISTS pro_c6;
+DROP TABLE IF EXISTS pro_c7; DROP TABLE IF EXISTS pro_c8;
+DROP TABLE IF EXISTS pro_c9; DROP TABLE IF EXISTS pro_c10;
+DROP TABLE IF EXISTS pro_c11; DROP TABLE IF EXISTS pro_baseline;
+DROP TABLE IF EXISTS pro_p;
+CREATE TABLE pro_p (id INT PRIMARY KEY);
+=== SHAPE A === ON UPDATE action variants — silent-accept
+CREATE TABLE pro_c1 (pid INT REFERENCES pro_p(id) ON UPDATE SET NULL);
+CREATE TABLE pro_c2 (pid INT REFERENCES pro_p(id) ON UPDATE SET DEFAULT);
+CREATE TABLE pro_c3 (pid INT REFERENCES pro_p(id) ON UPDATE RESTRICT);
+CREATE TABLE pro_c4 (pid INT REFERENCES pro_p(id) ON UPDATE NO ACTION);
+=== SHAPE B === Combined ON DELETE + ON UPDATE — silent-accept
+CREATE TABLE pro_c5 (pid INT REFERENCES pro_p(id)
+  ON DELETE CASCADE ON UPDATE CASCADE);
+=== SHAPE C === DEFERRABLE qualifier variants — silent-accept
+CREATE TABLE pro_c6 (pid INT REFERENCES pro_p(id) DEFERRABLE);
+CREATE TABLE pro_c7 (pid INT REFERENCES pro_p(id) NOT DEFERRABLE);
+CREATE TABLE pro_c8 (pid INT REFERENCES pro_p(id)
+  DEFERRABLE INITIALLY IMMEDIATE);
+=== SHAPE D === Combined MATCH FULL + DEFERRABLE INITIALLY DEFERRED — silent-accept
+CREATE TABLE pro_c9 (pid INT REFERENCES pro_p(id)
+  MATCH FULL DEFERRABLE INITIALLY DEFERRED);
+=== SHAPE E === PG15+ column-list for SET NULL / SET DEFAULT — sqlparser reject
+CREATE TABLE pro_c10 (pid INT REFERENCES pro_p(id) ON DELETE SET NULL (pid));
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: ( at Line: 1, Column: 71
+CREATE TABLE pro_c11 (pid INT REFERENCES pro_p(id) ON DELETE SET DEFAULT (pid));
+ERROR 1064: SQL parse error: sql parser error: Expected: ',' or ')' after column definition, found: ( at Line: 1, Column: 74
+=== SHAPE F === Support pin — baseline ON DELETE CASCADE inline form succeeds
+CREATE TABLE pro_baseline (pid INT REFERENCES pro_p(id) ON DELETE CASCADE);
+=== Cleanup ===
+DROP TABLE pro_baseline;
+DROP TABLE pro_c9;
+DROP TABLE pro_c8;
+DROP TABLE pro_c7;
+DROP TABLE pro_c6;
+DROP TABLE pro_c5;
+DROP TABLE pro_c4;
+DROP TABLE pro_c3;
+DROP TABLE pro_c2;
+DROP TABLE pro_c1;
+DROP TABLE pro_p;

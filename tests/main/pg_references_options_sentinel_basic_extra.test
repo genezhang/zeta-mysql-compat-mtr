@@ -1,0 +1,244 @@
+# Independently authored sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/. Pins PG REFERENCES option-clause silent-
+# accept behavior across the action-variants, qualifier-
+# variants, and the PG15+ column-list reject.
+#
+# Existing coverage (do NOT duplicate):
+#   - fk_basic_extra.test:120-127 — ONLY pins ON UPDATE
+#     CASCADE (the "errno 1105 known divergence" — PK
+#     update path can never fire). The other four ON
+#     UPDATE action variants (SET NULL / SET DEFAULT /
+#     RESTRICT / NO ACTION) have NO prior coverage.
+#   - fk_basic_extra.test:113-118 — ONLY pins the
+#     DEFERRABLE INITIALLY DEFERRED long-form. The
+#     other DEFERRABLE qualifier variants (bare
+#     DEFERRABLE, NOT DEFERRABLE, DEFERRABLE INITIALLY
+#     IMMEDIATE) have NO prior coverage.
+#   - fk_alter_basic_extra.test:148-154 — pins single-
+#     column MATCH FULL silent no-op via FOREIGN KEY
+#     long-form. NO prior pin of MATCH FULL combined
+#     with a DEFERRABLE qualifier through the inline
+#     column-level REFERENCES form.
+#   - pg_ordinality_match_reflection_sentinel_basic_
+#     extra.test — pins MATCH FULL composite partial-
+#     NULL silent SEMANTIC degradation. Orthogonal to
+#     this slice's option-grammar coverage.
+#   - PG15+ column-list `ON DELETE SET NULL (col)` /
+#     `ON DELETE SET DEFAULT (col)` — ZERO prior
+#     coverage (grep'd ALL .test files).
+#
+# This slice pins:
+#
+#   ON UPDATE action-variant family — SILENT-ACCEPT
+#   registry-gap BUG witness:
+#     - ON UPDATE SET NULL / SET DEFAULT / RESTRICT /
+#       NO ACTION all parse and persist with no
+#       runtime enforcement of the action semantic.
+#       The grammar swallows the keyword, but the
+#       referential-action registry never fires
+#       because zeta does not support updating PK
+#       columns in-place (see fk_basic_extra:120-127
+#       for the ON UPDATE CASCADE proof of the same
+#       underlying gap). Whereas ON UPDATE CASCADE
+#       errors at runtime when UPDATE is attempted,
+#       these four siblings have no observable
+#       runtime trigger at all — the parser accepts
+#       the option, and CREATE TABLE returns success
+#       with no diagnostic that the action will be
+#       unenforced.
+#     - SECURITY: apps depending on ON UPDATE SET
+#       NULL to null child rows on parent PK update
+#       get NO enforcement; the FK column is left
+#       pointing at the no-longer-existent parent
+#       value. Same for SET DEFAULT.
+#
+#   DEFERRABLE qualifier-variant family — SILENT-
+#   ACCEPT registry-gap BUG witness:
+#     - DEFERRABLE (bare, no INITIALLY clause), NOT
+#       DEFERRABLE, and DEFERRABLE INITIALLY IMMEDIATE
+#       all parse and accept silently. fk_basic_extra
+#       already pins DEFERRABLE INITIALLY DEFERRED;
+#       this slice fills the remaining three forms.
+#     - Combined MATCH FULL + DEFERRABLE INITIALLY
+#       DEFERRED also accepts silently — composes
+#       across the match-mode and deferral-mode
+#       sub-registries.
+#     - SECURITY: apps using DEFERRABLE/NOT DEFERRABLE
+#       to assert transaction-boundary FK semantics
+#       get NO actual deferral (already pinned at
+#       fk_basic_extra:39-43). The bare and IMMEDIATE
+#       forms join the silent-accept witness set.
+#
+#   PG15+ column-list for SET NULL / SET DEFAULT —
+#   GRAMMAR-LAYER REJECT witness:
+#     - PG15 added the syntax `ON DELETE SET NULL
+#       (col1, col2, ...)` and `ON DELETE SET DEFAULT
+#       (col1, col2, ...)` to restrict which FK
+#       columns get nulled/defaulted on parent
+#       delete. zeta's sqlparser layer does NOT
+#       recognize the trailing column-list — it
+#       rejects with the generic CREATE TABLE column-
+#       definition parser error citing the open paren
+#       position.
+#     - Position cited in the error reflects the
+#       length of the action keyword: the runner
+#       reports col 71 for SET NULL's open paren and
+#       col 74 for SET DEFAULT's open paren; the
+#       3-column shift exactly matches the length
+#       difference between SET NULL and SET DEFAULT
+#       (the keyword DEFAULT is 4 chars longer than
+#       NULL, minus 1 for the elided space — net 3).
+#       The shift IS the witness that the parser is
+#       advancing through the keyword token before
+#       reaching the unexpected open paren.
+#
+# Headline structural findings (TWO):
+#   1. REFERENCES action + qualifier registry has no
+#      validation. Nine distinct PG REFERENCES option
+#      combinations (4 ON UPDATE action variants + 1
+#      combined ON DELETE/UPDATE + 3 DEFERRABLE
+#      qualifier variants + 1 composed MATCH FULL +
+#      DEFERRABLE INITIALLY DEFERRED) all silent-
+#      accept at CREATE TABLE time. Contrast with
+#      fk_basic_extra:127's ON UPDATE CASCADE which
+#      errors at RUNTIME because the UPDATE path
+#      itself trips the PK-update reject — the
+#      grammar layer accepts everything; only the
+#      CASCADE action happens to have an observable
+#      runtime trigger (and even then the trigger is
+#      a generic "PK update not supported" error, not
+#      a CASCADE-aware diagnostic).
+#   2. PG15+ column-list for SET NULL / SET DEFAULT
+#      actions is not in the grammar. Both
+#      `ON DELETE SET NULL (col)` and
+#      `ON DELETE SET DEFAULT (col)` reject at the
+#      sqlparser layer with the column-definition
+#      "Expected: ',' or ')' after column definition,
+#      found: ( at Line: 1, Column: <N>" shape, where
+#      <N> tracks the keyword length (71 for SET
+#      NULL, 74 for SET DEFAULT — the 3-column shift
+#      matches the keyword length asymmetry).
+#
+# Cross-links:
+#   [[project_function_arms_gap_closed]] — silent-
+#   accept theme; REFERENCES-options registry is a
+#   structural sibling of the function-arms gap
+#   (parser swallows the keyword, no runtime fires).
+#   [[project_two_layer_type_recognition_pattern]] —
+#   parser-vs-runtime asymmetry; here the grammar
+#   accepts everything and only the runtime CASCADE
+#   path errors, similar to the type-parser vs CAST
+#   dispatcher divergence.
+#
+# Wire divergence check: mysqlwire canonical via the
+# runner. Probed via mysql -e during shape discovery;
+# both wires accept identically because the option-
+# clause acceptance is at the parser→IR conversion
+# layer, BEFORE either wire's executor.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-ACCEPT BUG — ON UPDATE SET
+#     NULL / SET DEFAULT / RESTRICT / NO ACTION all
+#     accepted at CREATE TABLE but never fire
+#     (zeta cannot update PK columns in-place). Apps
+#     depending on ON UPDATE actions must restructure
+#     writes to DELETE + re-INSERT under the new PK.
+#   # zeta-adapt: SILENT-ACCEPT BUG — DEFERRABLE,
+#     NOT DEFERRABLE, DEFERRABLE INITIALLY IMMEDIATE
+#     all accepted at CREATE TABLE but FK evaluation
+#     is always EAGER (per fk_basic_extra:39-43).
+#   # zeta-adapt: KNOWN GAP — PG15+ column-list
+#     `ON DELETE SET NULL (col)` and SET DEFAULT
+#     equivalent are rejected at parser layer (1064).
+#     Rewrite to the non-column-list form (which
+#     silent-accepts, see Shape A above).
+
+--echo === Setup parent ===
+
+DROP TABLE IF EXISTS pro_c1; DROP TABLE IF EXISTS pro_c2;
+DROP TABLE IF EXISTS pro_c3; DROP TABLE IF EXISTS pro_c4;
+DROP TABLE IF EXISTS pro_c5; DROP TABLE IF EXISTS pro_c6;
+DROP TABLE IF EXISTS pro_c7; DROP TABLE IF EXISTS pro_c8;
+DROP TABLE IF EXISTS pro_c9; DROP TABLE IF EXISTS pro_c10;
+DROP TABLE IF EXISTS pro_c11; DROP TABLE IF EXISTS pro_baseline;
+DROP TABLE IF EXISTS pro_p;
+CREATE TABLE pro_p (id INT PRIMARY KEY);
+
+--echo === SHAPE A === ON UPDATE action variants — silent-accept
+
+# Shape A1: ON UPDATE SET NULL — no prior pin (fk_basic_extra:127
+# only covers ON UPDATE CASCADE).
+CREATE TABLE pro_c1 (pid INT REFERENCES pro_p(id) ON UPDATE SET NULL);
+
+# Shape A2: ON UPDATE SET DEFAULT — no prior pin.
+CREATE TABLE pro_c2 (pid INT REFERENCES pro_p(id) ON UPDATE SET DEFAULT);
+
+# Shape A3: ON UPDATE RESTRICT — no prior pin.
+CREATE TABLE pro_c3 (pid INT REFERENCES pro_p(id) ON UPDATE RESTRICT);
+
+# Shape A4: ON UPDATE NO ACTION — no prior pin.
+CREATE TABLE pro_c4 (pid INT REFERENCES pro_p(id) ON UPDATE NO ACTION);
+
+--echo === SHAPE B === Combined ON DELETE + ON UPDATE — silent-accept
+
+# Shape B5: ON DELETE CASCADE ON UPDATE CASCADE composed —
+# no prior pin of the composed form.
+CREATE TABLE pro_c5 (pid INT REFERENCES pro_p(id)
+  ON DELETE CASCADE ON UPDATE CASCADE);
+
+--echo === SHAPE C === DEFERRABLE qualifier variants — silent-accept
+
+# Shape C6: bare DEFERRABLE (no INITIALLY clause) — no prior pin
+# (fk_basic_extra:118 only pins DEFERRABLE INITIALLY DEFERRED).
+CREATE TABLE pro_c6 (pid INT REFERENCES pro_p(id) DEFERRABLE);
+
+# Shape C7: NOT DEFERRABLE — no prior pin.
+CREATE TABLE pro_c7 (pid INT REFERENCES pro_p(id) NOT DEFERRABLE);
+
+# Shape C8: DEFERRABLE INITIALLY IMMEDIATE — no prior pin.
+CREATE TABLE pro_c8 (pid INT REFERENCES pro_p(id)
+  DEFERRABLE INITIALLY IMMEDIATE);
+
+--echo === SHAPE D === Combined MATCH FULL + DEFERRABLE INITIALLY DEFERRED — silent-accept
+
+# Shape D9: composed across match-mode and deferral-mode
+# sub-registries. Neither prior covers the inline column-level
+# REFERENCES form combining the two.
+CREATE TABLE pro_c9 (pid INT REFERENCES pro_p(id)
+  MATCH FULL DEFERRABLE INITIALLY DEFERRED);
+
+--echo === SHAPE E === PG15+ column-list for SET NULL / SET DEFAULT — sqlparser reject
+
+# Shape E10: ON DELETE SET NULL (col) — PG15+ syntax restricting
+# which FK columns get nulled. sqlparser layer rejects at the
+# open-paren position (col 63 — tracks SET NULL keyword length).
+--error 1064
+CREATE TABLE pro_c10 (pid INT REFERENCES pro_p(id) ON DELETE SET NULL (pid));
+
+# Shape E11: ON DELETE SET DEFAULT (col) — PG15+ equivalent.
+# Position shifts to col 66 because SET DEFAULT is longer.
+--error 1064
+CREATE TABLE pro_c11 (pid INT REFERENCES pro_p(id) ON DELETE SET DEFAULT (pid));
+
+--echo === SHAPE F === Support pin — baseline ON DELETE CASCADE inline form succeeds
+
+# Shape F12: re-pin of the well-covered fk_basic_extra:120-127
+# baseline; confirms the inline column-level REFERENCES form
+# accepts the supported ON DELETE CASCADE action used as the
+# reference shape for Shape A's "silent-accept" comparison.
+CREATE TABLE pro_baseline (pid INT REFERENCES pro_p(id) ON DELETE CASCADE);
+
+--echo === Cleanup ===
+
+DROP TABLE pro_baseline;
+DROP TABLE pro_c9;
+DROP TABLE pro_c8;
+DROP TABLE pro_c7;
+DROP TABLE pro_c6;
+DROP TABLE pro_c5;
+DROP TABLE pro_c4;
+DROP TABLE pro_c3;
+DROP TABLE pro_c2;
+DROP TABLE pro_c1;
+DROP TABLE pro_p;
