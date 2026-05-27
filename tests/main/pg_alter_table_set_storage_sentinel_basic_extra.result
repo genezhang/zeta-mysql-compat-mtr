@@ -1,0 +1,22 @@
+DROP TABLE IF EXISTS at1;
+CREATE TABLE at1 (id INT, v TEXT);
+=== PATTERN P1 — SET (k = v) parses, dispatcher rejects with literal echo (no storage-param registry) ===
+ALTER TABLE at1 SET (fillfactor = 70);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: SET (fillfactor = 70)
+ALTER TABLE at1 SET (autovacuum_enabled = false);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: SET (autovacuum_enabled = false)
+ALTER TABLE at1 SET (nosuchopt = 99);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: SET (nosuchopt = 99)
+=== PATTERN P2 — RESET (k) hits top-level action whitelist; error text leaks SWAP / SET TBLPROPERTIES (Hive/Spark dialect contamination) ===
+ALTER TABLE at1 RESET (fillfactor);
+ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: RESET at Line: 1, Column: 17
+=== PATTERN P3 — SET <token> without opening paren rejected uniformly at column 21 (sqlparser SET arm is rigid) ===
+ALTER TABLE at1 SET WITHOUT OIDS;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: WITHOUT at Line: 1, Column: 21
+ALTER TABLE at1 SET WITH OIDS;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: WITH at Line: 1, Column: 21
+ALTER TABLE at1 SET TABLESPACE pg_default;
+ERROR 1064: SQL parse error: sql parser error: Expected: (, found: TABLESPACE at Line: 1, Column: 21
+=== SUPPORT — baseline: ADD COLUMN succeeds (re-pin: dispatcher accepts allowed actions) ===
+ALTER TABLE at1 ADD COLUMN c INT;
+DROP TABLE at1;

@@ -1,0 +1,133 @@
+# Independently authored PG ALTER TABLE SET /
+# RESET storage-options and table-level qualifier
+# sentinel slice for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Prior coverage (intersecting forms; this slice
+# DOES NOT re-pin them):
+#   - SET LOGGED / SET UNLOGGED / SET SCHEMA / SET
+#     WITHOUT CLUSTER / CLUSTER ON <idx>: covered at
+#     pg_alter_table_pg_ops_sentinel_basic_extra
+#     (SHAPE C top-level whitelist reject; SHAPE D
+#     sqlparser SET-arm "Expected: (" reject).
+#   - The "Expected: ADD, RENAME, PARTITION, SWAP,
+#     DROP, REPLICA IDENTITY, SET, or SET TBLPROPER-
+#     TIES after ALTER TABLE" whitelist text: also
+#     surfaces at pg_alter_table_pg_ops_sentinel.
+#
+# What's NEW here (genuine greenfield, zero prior
+# coverage per `grep -liE 'ALTER TABLE.*SET \\(|...'`
+# returning only the sibling slice above):
+#   - ALTER TABLE ... SET (k = v) — storage-param
+#     forms (fillfactor, autovacuum_enabled,
+#     <unknown>); none had a probed fingerprint.
+#   - ALTER TABLE ... RESET (k) — counterpart
+#     RESET form for clearing storage params.
+#   - ALTER TABLE ... SET WITHOUT OIDS / SET WITH
+#     OIDS / SET TABLESPACE — three more table-
+#     level SET <qualifier> forms not covered by
+#     the sibling slice (which pins only LOGGED /
+#     UNLOGGED / SCHEMA / WITHOUT CLUSTER).
+#
+# THREE structural findings (headline):
+#
+#   F1 — NO STORAGE-PARAM REGISTRY at the parser
+#   layer. PATTERN P1 below shows that `SET (k=v)`
+#   *parses* into the AST, then convert.rs's dis-
+#   patcher uniformly rejects with a literal-echo:
+#       "unsupported ALTER TABLE operation: SET (<text>)"
+#   The probe for `nosuchopt = 99` is rejected with
+#   the SAME shape as `fillfactor = 70` — proving
+#   the parser doesn't validate the option name
+#   against any known-storage-param table; ANY
+#   identifier flows through to the dispatcher.
+#
+#   F2 — DIALECT-CONTAMINATION LEAK in the parser
+#   error text. PATTERN P2 below: the rejection
+#   message for `RESET (k)` reads
+#       "Expected: ADD, RENAME, PARTITION, SWAP,
+#       DROP, REPLICA IDENTITY, SET, or SET
+#       TBLPROPERTIES after ALTER TABLE, found:
+#       RESET at Line: 1, Column: 17"
+#   That whitelist exposes `SWAP` and
+#   `SET TBLPROPERTIES` — both Hive/Spark dialect
+#   vocabulary, NOT in PostgreSQL's ALTER TABLE
+#   grammar. The error message itself is evidence
+#   that zeta's sqlparser fork pulled in non-PG
+#   action keywords at the top-level grammar.
+#
+#   F3 — SET GRAMMAR RIGID: opening-paren manda-
+#   tory. PATTERN P3 below: once `SET` is consumed,
+#   sqlparser unconditionally requires `(`. Three
+#   more PG-legitimate table-level forms — SET
+#   WITHOUT OIDS, SET WITH OIDS, SET TABLESPACE —
+#   all collapse to the SAME column-21 fingerprint:
+#       "Expected: (, found: <KW> at Line: 1, Column: 21"
+#   The column position is constant (21 = byte
+#   after `ALTER TABLE at1 SET `) regardless of
+#   which keyword follows. This is structurally
+#   parallel to the REINDEX uniform-fingerprint
+#   pattern (PR #449) but at a different layer
+#   (token-level rather than statement-type-level).
+#
+# Cross-link: this is parser/dispatcher-layer
+# behavior analogous to the type-registry mismatch
+# at convert.rs (`project_two_layer_type_recogni-
+# tion_pattern`) and worth the same wire-divergence
+# check (`feedback_wire_path_divergence_check`) —
+# all three patterns observed live in convert.rs +
+# sqlparser, shared by both wires.
+#
+# Apps that round-trip PG schemas via pg_dump will
+# hit ALL three patterns: pg_dump emits SET (k = v)
+# for tables that override fillfactor or auto-
+# vacuum; SET TABLESPACE for non-default table-
+# spaces; SET WITHOUT OIDS for legacy tables. Each
+# is a separate failure shape.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — SET (k = v) storage
+#     params parse but convert.rs rejects with
+#     literal-echo "unsupported ALTER TABLE
+#     operation: SET (<text>)". No parser-side
+#     storage-param registry.
+#   # zeta-adapt: KNOWN GAP — RESET (k) hits the
+#     top-level action whitelist; error text leaks
+#     SWAP / SET TBLPROPERTIES (non-PG dialect
+#     contamination).
+#   # zeta-adapt: KNOWN GAP — SET WITHOUT OIDS /
+#     WITH OIDS / TABLESPACE all error
+#     "Expected: (" — sqlparser only knows
+#     SET (k = v) at column 21.
+
+DROP TABLE IF EXISTS at1;
+CREATE TABLE at1 (id INT, v TEXT);
+
+--echo === PATTERN P1 — SET (k = v) parses, dispatcher rejects with literal echo (no storage-param registry) ===
+
+--error 1064
+ALTER TABLE at1 SET (fillfactor = 70);
+--error 1064
+ALTER TABLE at1 SET (autovacuum_enabled = false);
+--error 1064
+ALTER TABLE at1 SET (nosuchopt = 99);
+
+--echo === PATTERN P2 — RESET (k) hits top-level action whitelist; error text leaks SWAP / SET TBLPROPERTIES (Hive/Spark dialect contamination) ===
+
+--error 1064
+ALTER TABLE at1 RESET (fillfactor);
+
+--echo === PATTERN P3 — SET <token> without opening paren rejected uniformly at column 21 (sqlparser SET arm is rigid) ===
+
+--error 1064
+ALTER TABLE at1 SET WITHOUT OIDS;
+--error 1064
+ALTER TABLE at1 SET WITH OIDS;
+--error 1064
+ALTER TABLE at1 SET TABLESPACE pg_default;
+
+--echo === SUPPORT — baseline: ADD COLUMN succeeds (re-pin: dispatcher accepts allowed actions) ===
+
+ALTER TABLE at1 ADD COLUMN c INT;
+
+DROP TABLE at1;
