@@ -1,0 +1,25 @@
+=== ALTER MATERIALIZED VIEW (9 forms) — ALTER restricted-list "found: MATERIALIZED" at col 7 ===
+ALTER MATERIALIZED VIEW mv RENAME TO mv2;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW mv OWNER TO postgres;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW mv SET SCHEMA public;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW mv SET TABLESPACE pg_default;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW mv ALTER COLUMN id SET STATISTICS 100;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW mv SET (autovacuum_enabled = false);
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW IF EXISTS mv RENAME TO mv2;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW mv CLUSTER ON idx;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+ALTER MATERIALIZED VIEW ALL IN TABLESPACE old_ts SET TABLESPACE pg_default;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: MATERIALIZED at Line: 1, Column: 7
+=== CREATE FUNCTION ... BEGIN ATOMIC (SQL-standard body, PG 14+, pg_dump-emitted) — "found: BEGIN" ===
+CREATE FUNCTION f1() RETURNS INT LANGUAGE SQL BEGIN ATOMIC SELECT 1; END;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: BEGIN at Line: 1, Column: 47
+=== confirm BEGIN ATOMIC did not register f1 in catalog (parse-reject was a true no-op) ===
+SELECT f1();
+ERROR 1105: execution error: unknown function: f1
