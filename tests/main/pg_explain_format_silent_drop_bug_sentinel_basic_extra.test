@@ -1,0 +1,283 @@
+# Independently authored EXPLAIN-modifier silent-drop
+# CORRUPTION-class sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (read carefully — DO NOT duplicate):
+#   - `EXPLAIN FORMAT=JSON SELECT * FROM ep` (MySQL
+#     top-level FORMAT= syntax): pinned in
+#     explain_basic_extra.test:81. Different shape —
+#     unparenthesized MySQL FORMAT= form. Documented
+#     there as "no-op stability".
+#   - `EXPLAIN (VERBOSE) SELECT * FROM ep`: pinned in
+#     explain_basic_extra.test:85. Different shape —
+#     VERBOSE alone (no FORMAT). Documented there as
+#     "no-op stability".
+#   - `EXPLAIN (FORMAT YAML)`, `(FORMAT XML)`,
+#     `(FORMAT JUNK)`, `(ANALYZE, BUFFERS)`,
+#     `(BUFFERS)`, `(COSTS OFF)`, `(SETTINGS)`,
+#     `FORMAT=TREE`: pinned in
+#     explain_format_basic_extra.test (lines 81-111).
+#     Documented there as scattered "no-op" notes.
+#   - `EXPLAIN ANALYZE INSERT/UPDATE/DELETE` (1105
+#     errno): pinned in explain_format_basic_extra.test
+#     lines 127-140. Different shape — DML targets.
+#
+# Genuinely ZERO prior coverage on these shapes (grep
+# verified across tests/main/*.test):
+#   - `EXPLAIN (FORMAT JSON)` (PG-parenthesized JSON —
+#     the form pgAdmin / Datadog APM / monitoring tools
+#     emit programmatically). Prior coverage only has
+#     the MySQL top-level `EXPLAIN FORMAT=JSON` form
+#     and the parenthesized YAML/XML/JUNK variants —
+#     NOT (FORMAT JSON) specifically.
+#   - `EXPLAIN (FORMAT TEXT)` (control / accidental-
+#     match case proving the silent-drop hits even on
+#     the spelling that "happens to" be the actual
+#     output format).
+#   - `EXPLAIN (FORMAT JSON, VERBOSE)` (multi-option
+#     combo — proves both modifiers dropped in the same
+#     parens list).
+#   - `EXPLAIN (COSTS off, FORMAT JSON)` (multi-option
+#     combo with lowercase `off` boolean — proves the
+#     boolean-arg form and FORMAT JSON are both
+#     silently dropped together).
+#   - `EXPLAIN (FORMAT TEXT, ANALYZE TRUE)` (explicit
+#     boolean-arg ANALYZE form — different shape from
+#     the bare `ANALYZE` keyword and the `(ANALYZE,
+#     BUFFERS)` shape already pinned).
+#
+# Pre-existing pattern fingerprints this slice joins:
+#   - CORRUPTION-class family: PR #421 (DEFAULT
+#     subquery stored as text), PR #432 (TIMESTAMP(n)
+#     precision silent-drop). Shared mechanism: the
+#     modifier parses successfully into the AST, the
+#     IR-conversion pass never reads the field, the
+#     statement executes with default behavior — apps
+#     receive WRONG CONTENT with no error or warning.
+#     This slice extends the family to EXPLAIN's
+#     option list.
+#   - SILENT-DROP family: PRs #391 (INHERITS), #407
+#     (SCHEMA AUTHORIZATION), #408 (WITH ORDINALITY),
+#     and the SELECT INTO new-table family. EXPLAIN's
+#     FORMAT/ANALYZE/BUFFERS options follow the same
+#     mechanism.
+#
+# This slice pins (EIGHT shapes — all EXPLAIN-option
+# silent-drops on `SELECT 1`, plus ONE support pin):
+#
+#   CORRUPTION-class BUG — EXPLAIN option modifiers
+#   silently dropped (headline):
+#
+#     Shape A — `EXPLAIN (FORMAT JSON) SELECT 1`:
+#       returns the standard text plan tree, NOT a
+#       JSON document. pgAdmin / Datadog APM /
+#       monitoring tools that call JSON.parse() on
+#       the result will fail with a confusing
+#       "unexpected token" SyntaxError far from the
+#       actual cause (the silent format-drop here).
+#
+#     Shape B — `EXPLAIN (FORMAT XML) SELECT 1`:
+#       returns the standard text plan tree, NOT an
+#       XML document.
+#
+#     Shape C — `EXPLAIN (FORMAT YAML) SELECT 1`:
+#       returns the standard text plan tree, NOT a
+#       YAML document.
+#
+#     Shape D — `EXPLAIN (FORMAT TEXT) SELECT 1`:
+#       returns the standard text plan tree. Control
+#       case — matches by accident (TEXT is the
+#       always-emitted format), proving the silent-
+#       drop is uniform across ALL FORMAT names.
+#
+#     Shape E — `EXPLAIN (FORMAT JSON, VERBOSE) SELECT
+#     1` (multi-option combo): returns plain text.
+#       Both FORMAT JSON and VERBOSE are silently
+#       dropped in a single parens list.
+#
+#     Shape F — `EXPLAIN (COSTS off, FORMAT JSON)
+#     SELECT 1`: returns plain text WITH costs still
+#       shown. Both the boolean-arg `COSTS off` and
+#       `FORMAT JSON` silently dropped.
+#
+#     Shape G — `EXPLAIN FORMAT=JSON SELECT 1` (MySQL
+#     top-level `FORMAT=` syntax on a literal SELECT,
+#     not on a table): returns plain text. Wire-shape
+#       confirmation that the silent-drop spans both
+#       the PG parens syntax AND the MySQL FORMAT=
+#       syntax — both wire-paths arrive at the same
+#       broken behavior. (Cross-references
+#       explain_basic_extra.test:81, which pins the
+#       same shape on `SELECT * FROM ep`.)
+#
+#     Shape H — `EXPLAIN (FORMAT TEXT, ANALYZE TRUE)
+#     SELECT 1` (explicit boolean-arg ANALYZE): returns
+#       plain text only. NO Execution Time / Actual
+#       Rows lines emitted — the query was NOT
+#       actually run. ANALYZE silently dropped, just
+#       like the `(ANALYZE, BUFFERS)` shape pinned in
+#       explain_format_basic_extra.test:91.
+#
+#     Shape I — `EXPLAIN (ANALYZE, BUFFERS) SELECT 1`:
+#       returns plain text only. Same shape as
+#       explain_format_basic_extra.test:91 but on a
+#       literal-SELECT (DualScan) target. Re-pinned
+#       here to make the CORRUPTION-class story
+#       self-contained inside this sentinel.
+#
+#   SUPPORT pin — bare `EXPLAIN SELECT 1`:
+#     - Works as expected, returns the standard text
+#       plan tree (`Project [1] / DualScan`). Control
+#       case: proves the bug is option-modifier-
+#       specific, not an EXPLAIN-wide breakage. Apps
+#       calling plain EXPLAIN are unaffected.
+#
+# Big-picture finding:
+#
+#   This is CORRUPTION-class, not "missing-feature"
+#   class. Apps don't get an error or warning — they
+#   get a STRING with the wrong content type. pgAdmin,
+#   Datadog APM, New Relic, AWS Performance Insights,
+#   and every other plan-visualization / APM tool
+#   that issues `EXPLAIN (FORMAT JSON) <q>` and then
+#   `JSON.parse(result)` will fail at parse time
+#   with `SyntaxError: Unexpected token Q` (the `Q`
+#   from `QUERY PLAN`). The error is far from the
+#   cause — the operator sees a JSON parse error and
+#   blames their JSON library, not the database.
+#
+#   Joins the CORRUPTION-class family established by:
+#     - PR #421 DEFAULT subquery (stores subquery as
+#       text literal instead of evaluating);
+#     - PR #432 TIMESTAMP(n) precision silent-drop
+#       (full microseconds returned regardless of
+#       declared (n)).
+#
+#   Same mechanism in all three: the AST node carries
+#   the modifier, but the IR-conversion / dispatcher
+#   layer never reads the field. No surface telemetry
+#   distinguishes "honored" from "silently dropped"
+#   at the wire — the result is the same shape it
+#   would have been without the modifier.
+#
+#   ANALYZE silent-drop has a second hazard: in real
+#   PG, ANALYZE causes side-effects (the query is
+#   actually executed). Apps that assume ANALYZE TRUE
+#   inside the parens form will run the query are
+#   wrong here — the query is NOT run for the parens
+#   form (only the top-level `EXPLAIN ANALYZE` keyword
+#   form runs it; see explain_format_basic_extra.test
+#   header). Apps using ANALYZE TRUE in parens form
+#   to "warm" the planner or trigger a side-effect
+#   will silently see no effect.
+#
+# Wire divergence check: both the MySQL top-level
+# `FORMAT=JSON` form and the PG-parenthesized
+# `(FORMAT JSON)` form silent-drop identically. The
+# silent-drop happens in the EXPLAIN executor (post-
+# parse), which is shared by both wires. mysqlwire
+# probe (port 13599) confirms identical text-plan
+# output for all 9 shapes. pgwire is expected to
+# exhibit the same silent-drop (same dispatcher).
+#
+# Adaptation notes:
+#   # zeta-adapt: CORRUPTION-class BUG — EXPLAIN
+#     option modifiers (FORMAT JSON/XML/YAML/TEXT,
+#     ANALYZE [TRUE|FALSE], BUFFERS, COSTS off,
+#     VERBOSE) silently dropped in BOTH the PG-
+#     parenthesized form `EXPLAIN (FORMAT JSON) <q>`
+#     and the MySQL top-level form `EXPLAIN
+#     FORMAT=JSON <q>`. Output is always the standard
+#     text plan tree. NO error, NO warning. Tools
+#     that JSON.parse() the result will fail with
+#     a confusing SyntaxError far from the actual
+#     cause. Workaround: do NOT call EXPLAIN (FORMAT
+#     JSON) against zeta — issue plain `EXPLAIN <q>`
+#     and parse the text-plan tree, or use the
+#     top-level `EXPLAIN ANALYZE <q>` form which is
+#     functional (see explain_basic_extra.test
+#     header) for actual-execution timing.
+#   # zeta-adapt: KNOWN DIVERGENCE — `(ANALYZE TRUE)`
+#     boolean-arg form is also a silent no-op (no
+#     execution, no Execution Time lines). Only the
+#     top-level `EXPLAIN ANALYZE <q>` keyword form
+#     actually runs the query.
+
+--echo === Shape A: EXPLAIN (FORMAT JSON) — returns TEXT plan, NOT JSON (CORRUPTION) ===
+
+# Headline BUG. pgAdmin, Datadog APM, monitoring tools
+# call this and JSON.parse() the result. They get
+# `QUERY PLAN\nProject [1]\n  DualScan` — SyntaxError
+# on first token. No error from the database; the
+# diagnostic shows up far away in the client.
+
+EXPLAIN (FORMAT JSON) SELECT 1;
+
+--echo === Shape B: EXPLAIN (FORMAT XML) — returns TEXT plan, NOT XML ===
+
+EXPLAIN (FORMAT XML) SELECT 1;
+
+--echo === Shape C: EXPLAIN (FORMAT YAML) — returns TEXT plan, NOT YAML ===
+
+EXPLAIN (FORMAT YAML) SELECT 1;
+
+--echo === Shape D: EXPLAIN (FORMAT TEXT) — control case, matches by accident ===
+
+# Proves the silent-drop is uniform across ALL FORMAT
+# names: the dispatcher never reads the FORMAT field,
+# always emits the text shape. TEXT just happens to
+# match what the dispatcher always emits.
+
+EXPLAIN (FORMAT TEXT) SELECT 1;
+
+--echo === Shape E: EXPLAIN (FORMAT JSON, VERBOSE) — multi-option, both dropped ===
+
+EXPLAIN (FORMAT JSON, VERBOSE) SELECT 1;
+
+--echo === Shape F: EXPLAIN (COSTS off, FORMAT JSON) — boolean-arg + FORMAT both dropped ===
+
+# Costs are still shown (would be hidden if COSTS off
+# were honored), FORMAT JSON is dropped. Two silent-
+# drops in one parens list.
+
+EXPLAIN (COSTS off, FORMAT JSON) SELECT 1;
+
+--echo === Shape G: EXPLAIN FORMAT=JSON (MySQL top-level form on literal SELECT) — TEXT ===
+
+# Cross-wire confirmation. The MySQL top-level
+# FORMAT= form and the PG parens form converge on the
+# same silent-drop. Different parse path, same broken
+# executor.
+
+EXPLAIN FORMAT=JSON SELECT 1;
+
+--echo === Shape H: EXPLAIN (FORMAT TEXT, ANALYZE TRUE) — ANALYZE dropped, query NOT run ===
+
+# No "Execution Time:" or "Actual Rows:" lines emitted.
+# In real PG, ANALYZE TRUE inside parens runs the
+# query (just like the bare ANALYZE form). Here both
+# the boolean-arg ANALYZE and the FORMAT TEXT are
+# parsed and discarded; the dispatcher emits the
+# static plan tree without executing.
+
+EXPLAIN (FORMAT TEXT, ANALYZE TRUE) SELECT 1;
+
+--echo === Shape I: EXPLAIN (ANALYZE, BUFFERS) — both dropped on DualScan target ===
+
+# Same shape as explain_format_basic_extra.test:91
+# but against the literal-SELECT (DualScan) target.
+# Re-pinned to keep the CORRUPTION-class story self-
+# contained: ANALYZE silent-drop holds across both
+# table and DualScan plan sources.
+
+EXPLAIN (ANALYZE, BUFFERS) SELECT 1;
+
+--echo === SUPPORT pin: bare EXPLAIN SELECT 1 — works, control case ===
+
+# Proves the bug is option-modifier-specific, NOT an
+# EXPLAIN-wide breakage. Apps calling plain EXPLAIN
+# are unaffected; only callers using FORMAT/ANALYZE/
+# BUFFERS/VERBOSE/COSTS modifiers in the parens form
+# (or FORMAT= top-level form) hit the silent-drop.
+
+EXPLAIN SELECT 1;
