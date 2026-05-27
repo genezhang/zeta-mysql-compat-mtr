@@ -1,0 +1,43 @@
+=== Setup ===
+DROP TABLE IF EXISTS ca;
+DROP TABLE IF EXISTS cb;
+CREATE TABLE ca (a INT, b INT);
+CREATE TABLE cb (b INT, c INT);
+INSERT INTO ca VALUES (1, 2), (3, 4);
+INSERT INTO cb VALUES (2, 5), (4, 6);
+=== INTERSECT CORRESPONDING (bare) — "found: CORRESPONDING at Line: 1, Column: 31" ===
+SELECT a, b FROM ca INTERSECT CORRESPONDING SELECT b, c FROM cb;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: CORRESPONDING at Line: 1, Column: 31
+=== INTERSECT CORRESPONDING BY (b) — same fingerprint, same col (parser bails at CORRESPONDING before reading BY) ===
+SELECT a, b FROM ca INTERSECT CORRESPONDING BY (b) SELECT b, c FROM cb;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: CORRESPONDING at Line: 1, Column: 31
+=== EXCEPT CORRESPONDING (bare) — "found: CORRESPONDING at Line: 1, Column: 28" (shorter verb keyword shifts the position) ===
+SELECT a, b FROM ca EXCEPT CORRESPONDING SELECT b, c FROM cb;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: CORRESPONDING at Line: 1, Column: 28
+=== EXCEPT CORRESPONDING BY (b) — same fingerprint, same col ===
+SELECT a, b FROM ca EXCEPT CORRESPONDING BY (b) SELECT b, c FROM cb;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: CORRESPONDING at Line: 1, Column: 28
+=== UNION CORRESPONDING BY (b) — "found: CORRESPONDING at Line: 1, Column: 27" (extends existing bare-UNION coverage with the BY variant) ===
+SELECT a, b FROM ca UNION CORRESPONDING BY (b) SELECT b, c FROM cb;
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: CORRESPONDING at Line: 1, Column: 27
+=== BASELINE (works): CREATE SCHEMA — confirms the SCHEMA noun is wired; only the ALTER verb is the gap ===
+DROP SCHEMA IF EXISTS sch1;
+CREATE SCHEMA sch1;
+=== ALTER SCHEMA RENAME TO — Layer 1 (AST-level reject): "unsupported statement: sqlparser::ast::Statement" ===
+ALTER SCHEMA sch1 RENAME TO sch2;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== ALTER SCHEMA OWNER TO — Layer 1 (AST-level reject): same fingerprint as RENAME TO ===
+ALTER SCHEMA sch1 OWNER TO postgres;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== ALTER SCHEMA IF EXISTS ... RENAME TO — Layer 1 (AST-level reject): IF EXISTS guard doesn't change the layer ===
+ALTER SCHEMA IF EXISTS sch1 RENAME TO sch2;
+ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+=== ALTER SCHEMA ... OWNED BY — Layer 2 (grammar-level reject): "Expected: ALTER SCHEMA operation, found: OWNED at Line: 1, Column: 19" ===
+ALTER SCHEMA sch1 OWNED BY postgres;
+ERROR 1064: SQL parse error: sql parser error: Expected: ALTER SCHEMA operation, found: OWNED at Line: 1, Column: 19
+=== ALTER SCHEMA ... SET SEARCH_PATH — Layer 2 (grammar-level reject): "Expected: ALTER SCHEMA operation, found: SET at Line: 1, Column: 19" ===
+ALTER SCHEMA sch1 SET SEARCH_PATH = 'public';
+ERROR 1064: SQL parse error: sql parser error: Expected: ALTER SCHEMA operation, found: SET at Line: 1, Column: 19
+DROP SCHEMA sch1;
+DROP TABLE ca;
+DROP TABLE cb;

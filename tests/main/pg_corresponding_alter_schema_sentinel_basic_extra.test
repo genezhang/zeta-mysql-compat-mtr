@@ -1,0 +1,255 @@
+# Independently authored sentinel slice for the GPL
+# MTR-format runner.  Combines two unrelated PG/SQL-
+# standard surfaces that both parse-reject today, so a
+# single slice locks down both gaps with one runner
+# invocation.  NOT copied or adapted from MySQL's
+# mysql-test/ or PG's regress.
+#
+# Existing coverage (do NOT duplicate):
+#   - UNION CORRESPONDING (bare, no BY): pinned at one
+#     probe in set_ops_edges_basic_extra:111. That probe
+#     covers only the bare UNION shape.
+#   - INTERSECT CORRESPONDING (bare or BY): ZERO prior
+#     coverage. Grep'd tests/main/*.test for the literal
+#     substrings "INTERSECT.*CORRESP", "EXCEPT.*CORRESP",
+#     "CORRESPONDING BY" — only the one UNION hit above.
+#   - EXCEPT CORRESPONDING (bare or BY): ZERO prior
+#     coverage.
+#   - UNION CORRESPONDING BY (cols): ZERO prior coverage
+#     (the existing probe is bare, no BY clause).
+#   - ALTER SCHEMA (any shape): ZERO prior coverage.
+#     Grep'd tests/main/*.test for "ALTER SCHEMA" — no
+#     hits.
+#
+# This slice pins:
+#
+# A. The SQL-standard set-op CORRESPONDING family on the
+#    two set-op verbs not yet pinned (INTERSECT, EXCEPT)
+#    plus the BY (cols) form on all three verbs.  All
+#    five shapes share the same sqlparser-rs parse-
+#    reject fingerprint with the column index landing
+#    exactly at the CORRESPONDING token, which is
+#    determined by the prefix length and the set-op
+#    keyword length:
+#      - INTERSECT (10 chars) + space → col 31
+#      - EXCEPT    ( 7 chars) + space → col 28
+#      - UNION     ( 6 chars) + space → col 27
+#    The keyword-agnostic shape demonstrates the gap is
+#    in the set-op sub-grammar's tail (CORRESPONDING
+#    isn't a recognized continuation), not in any per-
+#    verb handler.  The BY (cols) form parses to the
+#    same column index (the parser bails at
+#    CORRESPONDING before it sees BY), so even the
+#    explicit-column-match form of the SQL-standard
+#    clause is unreachable.
+#
+# B. The ALTER SCHEMA family.  This one pins a notable
+#    TWO-LAYER REJECTION SPLIT:
+#
+#      Layer 1 — sqlparser-rs accepts the statement,
+#      convert.rs rejects it as
+#      "unsupported statement: sqlparser::ast::Statement":
+#        - ALTER SCHEMA sch1 RENAME TO sch2
+#        - ALTER SCHEMA sch1 OWNER TO postgres
+#        - ALTER SCHEMA IF EXISTS sch1 RENAME TO sch2
+#      sqlparser-rs has AST nodes for these, but the
+#      conversion layer doesn't dispatch to a handler
+#      so they uniformly fall through to the generic
+#      AST-level reject fingerprint
+#      ("unsupported statement: sqlparser::ast::Statement").
+#
+#      Layer 2 — sqlparser-rs rejects before convert.rs
+#      ever sees the AST, with
+#      "Expected: ALTER SCHEMA operation, found: <KW>
+#      at Line: 1, Column: 19" (col 19 = position right
+#      after "ALTER SCHEMA sch1 ", i.e. where the
+#      operation keyword starts):
+#        - ALTER SCHEMA sch1 OWNED BY postgres
+#        - ALTER SCHEMA sch1 SET SEARCH_PATH = 'public'
+#      These operations aren't in sqlparser-rs's ALTER
+#      SCHEMA sub-grammar at all, so they parse-reject
+#      with a positional error instead of the generic
+#      AST-level reject.
+#
+#    The split is informative for app porters: the
+#    Layer-1 forms have a recognizable AST and could in
+#    principle be wired up later with no grammar
+#    change; the Layer-2 forms need a sqlparser-rs
+#    grammar extension first.  Both layers surface as
+#    errno 1064 over the MySQL wire so the surface-
+#    level diagnostic is uniform; the split is only
+#    visible via the message body.
+#
+# Working CREATE SCHEMA baseline — `CREATE SCHEMA sch1`
+# works (no echo output, just the statement-echo
+# line).  Confirms the SCHEMA noun isn't itself the
+# gap — only the ALTER verb on it is.  The DROP
+# SCHEMA at teardown also works, confirming DROP is
+# wired even though ALTER isn't.
+#
+# Big-picture finding:
+#
+#   The SQL-standard `CORRESPONDING [BY (cols)]` set-
+#   op column-matching clause is entirely unreachable
+#   on zeta across all three set-op verbs (UNION,
+#   INTERSECT, EXCEPT) and both forms (bare and
+#   explicit-by-cols).  Apps emitting standard SQL
+#   that uses CORRESPONDING for name-based column
+#   alignment (instead of position-based) must rewrite
+#   each branch to project columns in the same
+#   positional order — a mechanical transformation but
+#   one that requires knowing both sides' column
+#   names.
+#
+#   ALTER SCHEMA is similarly unreachable for every
+#   shape probed (RENAME TO, OWNER TO, IF EXISTS
+#   RENAME, OWNED BY, SET SEARCH_PATH).  The CREATE
+#   and DROP halves of the schema lifecycle work, but
+#   schemas are immutable after creation — there is no
+#   in-place rename or ownership transfer.  The
+#   workaround is to create a new schema, recreate the
+#   contents inside it, and drop the old one.  This
+#   makes any tool that performs schema-level
+#   refactors (e.g. ownership normalization scripts,
+#   tenant-renaming jobs, multi-schema migration tools)
+#   non-portable until either the grammar (Layer 2) or
+#   convert.rs (Layer 1) gains support.
+#
+# Wire divergence check: the existing UNION
+# CORRESPONDING probe (set_ops_edges_basic_extra:111)
+# runs on the mysqlwire path.  The grammar lives in
+# sqlparser-rs which is shared by both wires, so
+# pgwire is expected to give the same fingerprint.
+# ALTER SCHEMA likewise routes through convert.rs in
+# both wires.  (Not separately probed here — the
+# shared-grammar / shared-converter design means the
+# fingerprint is wire-agnostic at this layer.)
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — INTERSECT CORRESPONDING
+#     (bare) parse-rejects with "Expected: SELECT,
+#     VALUES, or a subquery in the query body, found:
+#     CORRESPONDING at Line: 1, Column: 31".  Workaround:
+#     project columns positionally in matching order on
+#     both sides.
+#   # zeta-adapt: KNOWN GAP — INTERSECT CORRESPONDING BY
+#     (cols) parse-rejects at the same column (parser
+#     bails at CORRESPONDING before reading BY).  Same
+#     workaround.
+#   # zeta-adapt: KNOWN GAP — EXCEPT CORRESPONDING parse-
+#     rejects at col 28 (shorter verb keyword shifts the
+#     position).  Same workaround.
+#   # zeta-adapt: KNOWN GAP — EXCEPT CORRESPONDING BY
+#     (cols) parse-rejects at col 28.  Same workaround.
+#   # zeta-adapt: KNOWN GAP — UNION CORRESPONDING BY
+#     (cols) parse-rejects at col 27 (extends the
+#     existing bare-UNION-CORRESPONDING coverage with
+#     the BY variant).  Same workaround.
+#   # zeta-adapt: BASELINE — CREATE SCHEMA sch1 works.
+#     DROP SCHEMA sch1 also works.  The lifecycle has
+#     no ALTER verb.
+#   # zeta-adapt: KNOWN GAP — Layer 1 (AST-level reject):
+#     ALTER SCHEMA ... RENAME TO / OWNER TO / IF EXISTS
+#     RENAME TO all give "unsupported statement:
+#     sqlparser::ast::Statement".  sqlparser-rs has the
+#     AST nodes; the convert.rs dispatch is missing.
+#   # zeta-adapt: KNOWN GAP — Layer 2 (grammar-level
+#     reject): ALTER SCHEMA ... OWNED BY / SET <param>
+#     give "Expected: ALTER SCHEMA operation, found:
+#     <KW> at Line: 1, Column: 19".  sqlparser-rs's
+#     ALTER SCHEMA sub-grammar doesn't include these
+#     operations.  Workaround for any ALTER SCHEMA
+#     shape: create-new-and-migrate.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS ca;
+DROP TABLE IF EXISTS cb;
+CREATE TABLE ca (a INT, b INT);
+CREATE TABLE cb (b INT, c INT);
+INSERT INTO ca VALUES (1, 2), (3, 4);
+INSERT INTO cb VALUES (2, 5), (4, 6);
+
+--echo === INTERSECT CORRESPONDING (bare) — "found: CORRESPONDING at Line: 1, Column: 31" ===
+
+# sqlparser-rs set-op sub-grammar terminates at the
+# verb keyword; CORRESPONDING is not recognized as a
+# continuation.  Column 31 = position right after the
+# space following INTERSECT in the prefix
+# "SELECT a, b FROM ca INTERSECT ".
+--error 1064
+SELECT a, b FROM ca INTERSECT CORRESPONDING SELECT b, c FROM cb;
+
+--echo === INTERSECT CORRESPONDING BY (b) — same fingerprint, same col (parser bails at CORRESPONDING before reading BY) ===
+
+--error 1064
+SELECT a, b FROM ca INTERSECT CORRESPONDING BY (b) SELECT b, c FROM cb;
+
+--echo === EXCEPT CORRESPONDING (bare) — "found: CORRESPONDING at Line: 1, Column: 28" (shorter verb keyword shifts the position) ===
+
+--error 1064
+SELECT a, b FROM ca EXCEPT CORRESPONDING SELECT b, c FROM cb;
+
+--echo === EXCEPT CORRESPONDING BY (b) — same fingerprint, same col ===
+
+--error 1064
+SELECT a, b FROM ca EXCEPT CORRESPONDING BY (b) SELECT b, c FROM cb;
+
+--echo === UNION CORRESPONDING BY (b) — "found: CORRESPONDING at Line: 1, Column: 27" (extends existing bare-UNION coverage with the BY variant) ===
+
+# The bare UNION CORRESPONDING probe lives in
+# set_ops_edges_basic_extra:111.  This probe extends
+# that to the BY (cols) variant.
+--error 1064
+SELECT a, b FROM ca UNION CORRESPONDING BY (b) SELECT b, c FROM cb;
+
+--echo === BASELINE (works): CREATE SCHEMA — confirms the SCHEMA noun is wired; only the ALTER verb is the gap ===
+
+DROP SCHEMA IF EXISTS sch1;
+CREATE SCHEMA sch1;
+
+--echo === ALTER SCHEMA RENAME TO — Layer 1 (AST-level reject): "unsupported statement: sqlparser::ast::Statement" ===
+
+# sqlparser-rs accepts this and produces an AST node;
+# convert.rs has no dispatch for ALTER SCHEMA so it
+# falls through to the generic unsupported-statement
+# message.
+--error 1064
+ALTER SCHEMA sch1 RENAME TO sch2;
+
+--echo === ALTER SCHEMA OWNER TO — Layer 1 (AST-level reject): same fingerprint as RENAME TO ===
+
+--error 1064
+ALTER SCHEMA sch1 OWNER TO postgres;
+
+--echo === ALTER SCHEMA IF EXISTS ... RENAME TO — Layer 1 (AST-level reject): IF EXISTS guard doesn't change the layer ===
+
+# Even with the IF EXISTS guard (which would normally
+# turn a missing-target error into a silent no-op),
+# the convert.rs dispatch still rejects.  The reject
+# fires before the IF EXISTS check would have been
+# evaluated.
+--error 1064
+ALTER SCHEMA IF EXISTS sch1 RENAME TO sch2;
+
+--echo === ALTER SCHEMA ... OWNED BY — Layer 2 (grammar-level reject): "Expected: ALTER SCHEMA operation, found: OWNED at Line: 1, Column: 19" ===
+
+# sqlparser-rs's ALTER SCHEMA sub-grammar doesn't
+# include OWNED BY as a recognized operation, so it
+# rejects with a positional error before convert.rs
+# ever sees an AST.  Column 19 = position right after
+# "ALTER SCHEMA sch1 " (18 chars + 1).
+--error 1064
+ALTER SCHEMA sch1 OWNED BY postgres;
+
+--echo === ALTER SCHEMA ... SET SEARCH_PATH — Layer 2 (grammar-level reject): "Expected: ALTER SCHEMA operation, found: SET at Line: 1, Column: 19" ===
+
+# Same Layer 2 fingerprint, different keyword token.
+# Confirms the rejection is keyword-agnostic at the
+# ALTER SCHEMA operation slot.
+--error 1064
+ALTER SCHEMA sch1 SET SEARCH_PATH = 'public';
+
+DROP SCHEMA sch1;
+DROP TABLE ca;
+DROP TABLE cb;
