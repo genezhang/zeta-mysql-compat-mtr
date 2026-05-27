@@ -1,0 +1,141 @@
+=== date_part SUPPORT: quarter / week / doy / dow on DATE ===
+SELECT date_part('quarter', DATE '2024-08-15')         AS q;
+q
+3
+SELECT date_part('quarter', DATE '2024-01-01')         AS q_jan;
+q_jan
+1
+SELECT date_part('week',    DATE '2024-03-15')         AS wk;
+wk
+11
+SELECT date_part('doy',     DATE '2024-03-15')         AS doy;
+doy
+75
+SELECT date_part('dow',     DATE '2024-03-15')         AS dow_fri;
+dow_fri
+5
+SELECT date_part('dow',     DATE '2024-03-17')         AS dow_sun;
+dow_sun
+0
+=== date_part SUPPORT: hour / minute / second on TIME ===
+SELECT date_part('hour',   TIME '14:25:30')            AS h;
+h
+14
+SELECT date_part('minute', TIME '14:25:30')            AS m;
+m
+25
+SELECT date_part('second', TIME '14:25:30')            AS s;
+s
+30
+=== date_part SUPPORT: microseconds / milliseconds on TIMESTAMP ===
+SELECT date_part('microseconds', TIMESTAMP '2024-01-01 12:00:00')      AS us;
+us
+0
+SELECT date_part('milliseconds', TIMESTAMP '2024-01-01 12:34:56.789')  AS ms;
+ms
+56789
+=== date_part SUPPORT: day on INTERVAL ===
+SELECT date_part('day',  INTERVAL '5 days')            AS days;
+days
+5
+=== date_part SUPPORT: NULL propagation through expr arg ===
+SELECT date_part('year', NULL)                         AS null_expr;
+null_expr
+NULL
+SELECT date_part('year', NULL) IS NULL                 AS null_expr_pred;
+null_expr_pred
+1
+=== date_part GAP: 'isodow' → unsupported field ===
+SELECT date_part('isodow', DATE '2024-03-17');
+ERROR 1105: execution error: unsupported EXTRACT field for DATE: ISODOW
+=== date_part GAP: 'timezone' → unsupported field ===
+SELECT date_part('timezone', TIMESTAMP '2024-01-01 12:00:00');
+ERROR 1105: execution error: unsupported EXTRACT field: TIMEZONE
+=== date_part GAP: unknown field → unsupported field ===
+SELECT date_part('bogus', DATE '2024-03-15');
+ERROR 1105: execution error: unsupported EXTRACT field for DATE: BOGUS
+=== date_part GAP: TIME input rejects date fields ===
+SELECT date_part('year', TIME '14:25:30');
+ERROR 1105: execution error: unsupported EXTRACT field for TIME: YEAR
+=== date_part GAP: string input not implicit-cast ===
+SELECT date_part('year', '2024-03-15');
+ERROR 1105: execution error: EXTRACT requires timestamp, date, or interval
+=== date_part GAP: NULL field arg → keyword required ===
+SELECT date_part(NULL, DATE '2024-03-15');
+ERROR 1105: execution error: EXTRACT field must be a keyword
+=== date_part GAP: arity errors → 1105 ===
+SELECT date_part();
+ERROR 1105: execution error: EXTRACT requires 2 arguments (field, expr)
+SELECT date_part('year');
+ERROR 1105: execution error: EXTRACT requires 2 arguments (field, expr)
+=== LIMIT ALL: explicit no-limit (PG / SQL-standard) ===
+DROP TABLE IF EXISTS limit_all_t;
+CREATE TABLE limit_all_t (id INTEGER);
+INSERT INTO limit_all_t VALUES (1), (2), (3), (4), (5);
+SELECT id FROM limit_all_t ORDER BY id LIMIT ALL;
+id
+1
+2
+3
+4
+5
+=== LIMIT ALL: with OFFSET (both orderings parse) ===
+SELECT id FROM limit_all_t ORDER BY id OFFSET 2 LIMIT ALL;
+id
+3
+4
+5
+SELECT id FROM limit_all_t ORDER BY id LIMIT ALL OFFSET 3;
+id
+4
+5
+=== LIMIT ALL OFFSET beyond rows → empty result ===
+SELECT id FROM limit_all_t ORDER BY id LIMIT ALL OFFSET 100;
+=== LIMIT NULL = LIMIT ALL (synonyms) ===
+SELECT id FROM limit_all_t ORDER BY id LIMIT NULL;
+id
+1
+2
+3
+4
+5
+DROP TABLE limit_all_t;
+=== div() SUPPORT: PG truncated division across sign quadrants ===
+SELECT div(10,   3)   AS pp;
+pp
+3
+SELECT div(-10,  3)   AS np;
+np
+-3
+SELECT div(10,  -3)   AS pn;
+pn
+-3
+SELECT div(-10, -3)   AS nn;
+nn
+3
+=== div() SUPPORT: decimal dividend truncates toward zero ===
+SELECT div(10.5, 3)   AS dec_div;
+dec_div
+3
+=== div() SUPPORT: NULL propagation ===
+SELECT div(NULL, 1)   AS null_a;
+null_a
+NULL
+SELECT div(1, NULL)   AS null_b;
+null_b
+NULL
+=== div() GAP: division by zero → 1105 ===
+SELECT div(10, 0);
+ERROR 1105: execution error: division by zero
+=== div() GAP: arity errors → 1105 ===
+SELECT div(1);
+ERROR 1105: execution error: DIV requires 2 arguments
+SELECT div(1, 2, 3);
+ERROR 1105: execution error: DIV requires 2 arguments
+=== date_bin: KNOWN GAP — unknown function (PG 14+) ===
+SELECT date_bin(INTERVAL '15 minutes', TIMESTAMP '2024-01-01 12:37:00', TIMESTAMP '2024-01-01 00:00:00');
+ERROR 1105: execution error: unknown function: date_bin
+SELECT date_bin('1 hour', TIMESTAMP '2024-01-01 12:37:00', TIMESTAMP '2024-01-01 00:00:00');
+ERROR 1105: execution error: unknown function: date_bin
+SELECT date_bin('1 day',  TIMESTAMP '2024-03-15 14:30:00', TIMESTAMP '2024-01-01 00:00:00');
+ERROR 1105: execution error: unknown function: date_bin

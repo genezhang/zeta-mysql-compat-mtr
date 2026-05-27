@@ -1,0 +1,283 @@
+# Independently authored PG date/conv-function-family
+# sentinel slice for the GPL MTR-format runner. NOT copied
+# or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - date_part: ALREADY covered for fields year, month,
+#     century, decade, millennium, epoch at:
+#       extract_extended_fields_basic_extra.test:136 (alias-
+#         equivalence with EXTRACT for century/decade/
+#         millennium/epoch)
+#       temporal_arithmetic_basic_extra.test:95-96 (year on
+#         DATE; month on TIMESTAMP)
+#     This slice pins the REMAINING fields:
+#       quarter, week, doy, dow, microseconds, milliseconds,
+#       hour/minute/second on TIME, day on INTERVAL, plus
+#       NULL/error edges and TWO gap fields (ISODOW,
+#       TIMEZONE) that error rather than alias to EXTRACT.
+#   - LIMIT ALL: ZERO prior compat-mtr coverage. grep'd all
+#     tests/main/*.test (case-insensitive) — no hits.
+#     limit_offset_basic_extra and limit_offset_edges cover
+#     `LIMIT n`, `LIMIT m, n`, `LIMIT NULL`, `FETCH FIRST`,
+#     `LIMIT 0`, but never `LIMIT ALL`.
+#   - LIMIT NULL: covered in limit_offset_edges; this slice
+#     additionally pins the EQUIVALENCE to LIMIT ALL
+#     (zeta-adapt: both return all rows).
+#   - div(): ZERO prior coverage of the FUNCTION form (PG
+#     `div(num, num)`). The MySQL `a DIV b` OPERATOR is
+#     covered elsewhere, but the function-form arm is novel.
+#   - date_bin: ZERO prior coverage. PG 14+ function — gap.
+#   - to_number: ALREADY substantially covered at
+#     pg_conversion_fns_basic_extra.test:178-221 (basic,
+#     S99 sign, decimal, NULL, arity, G/D rejection). This
+#     slice does NOT re-pin to_number — its partial-impl
+#     pattern is already on record.
+#
+# Big-picture finding:
+#
+#   PG-flavor date-field extraction in zeta has THREE
+#   coverage tiers visible in this slice:
+#     1) date_part SUPPORT — quarter/week/doy/dow/hour/
+#        minute/second/microseconds/milliseconds all
+#        return correct integer values; alias to EXTRACT.
+#     2) date_part GAP — 'isodow' and 'timezone' error
+#        with `unsupported EXTRACT field` despite being
+#        documented PG fields. ISODOW is the ISO-8601
+#        day-of-week (1=Mon..7=Sun), distinct from dow
+#        (0=Sun..6=Sat). TIMEZONE returns the offset in
+#        seconds from UTC; both are PG primitives apps
+#        commonly assume present.
+#     3) date_bin (PG 14+) — entire function missing
+#        (`unknown function: date_bin`). Apps doing
+#        time-bucket queries (Grafana, metrics, IoT) must
+#        use DATE_TRUNC for fixed-period bins or roll
+#        their own arithmetic. date_bin's arbitrary-stride
+#        feature (e.g. '15 minutes', '6 hours') has NO
+#        substitute.
+#
+#   LIMIT ALL is the SQL-standard / PG spelling for "no
+#   row limit". zeta accepts it and returns all rows;
+#   `OFFSET n LIMIT ALL` and `LIMIT ALL OFFSET n` both
+#   work; `LIMIT NULL` is treated as a synonym.
+#
+#   div() is PG's truncated-division function (sign of
+#   the result follows mathematical truncation toward
+#   zero). zeta's arm matches PG exactly across all four
+#   sign quadrants. mod() shares the same arm shape and
+#   is already covered upstream — div() was the missing
+#   companion.
+#
+# Adaptation notes:
+#   # zeta-adapt: date_part('quarter', DATE) → integer
+#     1..4 (PG returns DOUBLE PRECISION; zeta returns
+#     integer, render as integer).
+#   # zeta-adapt: date_part('dow', DATE) → 0..6 (0=Sun);
+#     date_part('isodow', DATE) → error `unsupported
+#     EXTRACT field for DATE: ISODOW`. PG returns 1..7
+#     (1=Mon) for isodow.
+#   # zeta-adapt: date_part('timezone', TIMESTAMP) →
+#     error `unsupported EXTRACT field: TIMEZONE`. PG
+#     returns offset in seconds.
+#   # zeta-adapt: date_part on TIME-typed input rejects
+#     date fields (year/month/day error with `unsupported
+#     EXTRACT field for TIME`). Symmetric to EXTRACT.
+#   # zeta-adapt: date_part field arg must be a string
+#     literal — passing NULL errors with `EXTRACT field
+#     must be a keyword`. The expression arg, however,
+#     propagates NULL (date_part('year', NULL) → NULL).
+#   # zeta-adapt: date_part on string input → error
+#     `EXTRACT requires timestamp, date, or interval`.
+#     PG would implicit-cast; zeta does not.
+#   # zeta-adapt: KNOWN GAP — date_bin('stride', ts,
+#     origin) errors with `unknown function: date_bin`.
+#     INTERVAL-form and string-form both reject.
+#   # zeta-adapt: LIMIT ALL — explicit no-limit; returns
+#     every row that the underlying SELECT produces.
+#     `OFFSET n LIMIT ALL` and `LIMIT ALL OFFSET n` both
+#     parse and execute.
+#   # zeta-adapt: LIMIT NULL is a SYNONYM for LIMIT ALL —
+#     both return all rows. (PG documents LIMIT NULL as
+#     "no limit"; zeta matches.)
+#   # zeta-adapt: div(a, b) — PG-style truncated
+#     division. Sign of result follows truncation toward
+#     zero: div(-10, 3) = -3, div(10, -3) = -3,
+#     div(-10, -3) = 3. div(x, 0) → 1105 `division by
+#     zero`. div() arity != 2 → 1105 `DIV requires 2
+#     arguments`.
+
+--echo === date_part SUPPORT: quarter / week / doy / dow on DATE ===
+
+# All return integer field values. Quarter is 1..4, week
+# is ISO-week 1..53, doy is day-of-year 1..366, dow is
+# 0..6 (0=Sun).
+SELECT date_part('quarter', DATE '2024-08-15')         AS q;
+SELECT date_part('quarter', DATE '2024-01-01')         AS q_jan;
+SELECT date_part('week',    DATE '2024-03-15')         AS wk;
+SELECT date_part('doy',     DATE '2024-03-15')         AS doy;
+SELECT date_part('dow',     DATE '2024-03-15')         AS dow_fri;
+SELECT date_part('dow',     DATE '2024-03-17')         AS dow_sun;
+
+--echo === date_part SUPPORT: hour / minute / second on TIME ===
+
+# TIME-typed input supports time fields only; date fields
+# on TIME error (pinned in GAP section below).
+SELECT date_part('hour',   TIME '14:25:30')            AS h;
+SELECT date_part('minute', TIME '14:25:30')            AS m;
+SELECT date_part('second', TIME '14:25:30')            AS s;
+
+--echo === date_part SUPPORT: microseconds / milliseconds on TIMESTAMP ===
+
+# milliseconds returns SS*1000 + ms (so 56.789s → 56789);
+# microseconds returns SS*1e6 + us. Our literal has no
+# fractional seconds so microseconds is 0.
+SELECT date_part('microseconds', TIMESTAMP '2024-01-01 12:00:00')      AS us;
+SELECT date_part('milliseconds', TIMESTAMP '2024-01-01 12:34:56.789')  AS ms;
+
+--echo === date_part SUPPORT: day on INTERVAL ===
+
+# INTERVAL is the third accepted type; day field extracts
+# the day count.
+SELECT date_part('day',  INTERVAL '5 days')            AS days;
+
+--echo === date_part SUPPORT: NULL propagation through expr arg ===
+
+# Field arg cannot be NULL (errors as keyword), but the
+# expr arg propagates NULL normally.
+SELECT date_part('year', NULL)                         AS null_expr;
+SELECT date_part('year', NULL) IS NULL                 AS null_expr_pred;
+
+--echo === date_part GAP: 'isodow' → unsupported field ===
+
+# PG: 1..7 (1=Mon..7=Sun). zeta errors. Apps must
+# compute manually: ((dow + 6) % 7) + 1, or CASE on dow.
+--error 1105
+SELECT date_part('isodow', DATE '2024-03-17');
+
+--echo === date_part GAP: 'timezone' → unsupported field ===
+
+# PG: offset in seconds from UTC. zeta errors. No
+# substitute for naive TIMESTAMP (no zone attached);
+# TIMESTAMPTZ would need similar treatment.
+--error 1105
+SELECT date_part('timezone', TIMESTAMP '2024-01-01 12:00:00');
+
+--echo === date_part GAP: unknown field → unsupported field ===
+
+# Defensive — unknown field names are rejected, not
+# silently zero'd.
+--error 1105
+SELECT date_part('bogus', DATE '2024-03-15');
+
+--echo === date_part GAP: TIME input rejects date fields ===
+
+# TIME has no year/month/day — the impl reports the
+# specific type/field combo.
+--error 1105
+SELECT date_part('year', TIME '14:25:30');
+
+--echo === date_part GAP: string input not implicit-cast ===
+
+# PG would implicit-cast 'YYYY-MM-DD' strings; zeta does
+# not. Apps must explicit-cast: date_part('year', DATE
+# '2024-03-15').
+--error 1105
+SELECT date_part('year', '2024-03-15');
+
+--echo === date_part GAP: NULL field arg → keyword required ===
+
+# Field arg is a parser-level keyword, not a value.
+--error 1105
+SELECT date_part(NULL, DATE '2024-03-15');
+
+--echo === date_part GAP: arity errors → 1105 ===
+
+--error 1105
+SELECT date_part();
+--error 1105
+SELECT date_part('year');
+
+--echo === LIMIT ALL: explicit no-limit (PG / SQL-standard) ===
+
+DROP TABLE IF EXISTS limit_all_t;
+CREATE TABLE limit_all_t (id INTEGER);
+INSERT INTO limit_all_t VALUES (1), (2), (3), (4), (5);
+
+# Explicit LIMIT ALL returns every row.
+SELECT id FROM limit_all_t ORDER BY id LIMIT ALL;
+
+--echo === LIMIT ALL: with OFFSET (both orderings parse) ===
+
+# OFFSET n LIMIT ALL — skip n, take rest.
+SELECT id FROM limit_all_t ORDER BY id OFFSET 2 LIMIT ALL;
+
+# LIMIT ALL OFFSET n — same semantics, different
+# syntactic ordering.
+SELECT id FROM limit_all_t ORDER BY id LIMIT ALL OFFSET 3;
+
+--echo === LIMIT ALL OFFSET beyond rows → empty result ===
+
+# OFFSET past the row count yields zero rows.
+SELECT id FROM limit_all_t ORDER BY id LIMIT ALL OFFSET 100;
+
+--echo === LIMIT NULL = LIMIT ALL (synonyms) ===
+
+# zeta-adapt: LIMIT NULL returns all rows — equivalent
+# to LIMIT ALL. PG documents NULL as "no limit".
+SELECT id FROM limit_all_t ORDER BY id LIMIT NULL;
+
+DROP TABLE limit_all_t;
+
+--echo === div() SUPPORT: PG truncated division across sign quadrants ===
+
+# div(a, b) truncates toward zero. Result signs:
+#   (+, +) → +    e.g. div( 10,  3) =  3
+#   (-, +) → -    e.g. div(-10,  3) = -3
+#   (+, -) → -    e.g. div( 10, -3) = -3
+#   (-, -) → +    e.g. div(-10, -3) =  3
+SELECT div(10,   3)   AS pp;
+SELECT div(-10,  3)   AS np;
+SELECT div(10,  -3)   AS pn;
+SELECT div(-10, -3)   AS nn;
+
+--echo === div() SUPPORT: decimal dividend truncates toward zero ===
+
+# div(10.5, 3) → 3 (truncated quotient, not 3.5).
+SELECT div(10.5, 3)   AS dec_div;
+
+--echo === div() SUPPORT: NULL propagation ===
+
+SELECT div(NULL, 1)   AS null_a;
+SELECT div(1, NULL)   AS null_b;
+
+--echo === div() GAP: division by zero → 1105 ===
+
+# Both div(x, 0) and mod(x, 0) error. mod gap is pinned
+# elsewhere; div is the missing companion shape.
+--error 1105
+SELECT div(10, 0);
+
+--echo === div() GAP: arity errors → 1105 ===
+
+--error 1105
+SELECT div(1);
+--error 1105
+SELECT div(1, 2, 3);
+
+--echo === date_bin: KNOWN GAP — unknown function (PG 14+) ===
+
+# PG 14+ time-bucket primitive: round timestamp down to
+# nearest stride relative to origin. No zeta equivalent
+# for arbitrary strides. Substitute for fixed periods:
+# DATE_TRUNC('hour', ts) etc.; no substitute for '15
+# minutes' or '6 hours' stride buckets.
+
+# INTERVAL-form rejected.
+--error 1105
+SELECT date_bin(INTERVAL '15 minutes', TIMESTAMP '2024-01-01 12:37:00', TIMESTAMP '2024-01-01 00:00:00');
+
+# String-form rejected (same shape).
+--error 1105
+SELECT date_bin('1 hour', TIMESTAMP '2024-01-01 12:37:00', TIMESTAMP '2024-01-01 00:00:00');
+
+--error 1105
+SELECT date_bin('1 day',  TIMESTAMP '2024-03-15 14:30:00', TIMESTAMP '2024-01-01 00:00:00');
