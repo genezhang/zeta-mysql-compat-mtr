@@ -1,0 +1,72 @@
+=== Setup — base table + plain MATERIALIZED VIEW ===
+DROP TABLE IF EXISTS public.mvb;
+CREATE TABLE public.mvb (id INT PRIMARY KEY, v INT);
+INSERT INTO public.mvb VALUES (1, 10), (2, 20), (3, 30);
+=== Support pin — CREATE MATERIALIZED VIEW (bare) and SELECT control ===
+# Confirms the MV `public.mv` exists and is queryable.
+# Every error below — "view <x> does not exist" — is
+# FALSIFIED against this row count: the MV materialized
+# three rows, SELECT returns them, the view is real.
+CREATE MATERIALIZED VIEW public.mv AS SELECT id, v*2 AS dbl FROM public.mvb;
+SELECT id, dbl FROM public.mv ORDER BY id;
+id	dbl
+1	20
+2	40
+3	60
+=== Support pin — REFRESH MATERIALIZED VIEW (bare) works ===
+REFRESH MATERIALIZED VIEW public.mv;
+SELECT id, dbl FROM public.mv ORDER BY id;
+id	dbl
+1	20
+2	40
+3	60
+=== NEW BUG — REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv ===
+# The CONCURRENTLY keyword is absorbed into the table
+# identifier. The wire error literally contains
+# "concurrently public.mv" — proving the parser
+# treated "concurrently public.mv" as ONE name.
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv;
+ERROR 1105: execution error: view "concurrently public.mv" does not exist
+=== NEW BUG — REFRESH MATERIALIZED VIEW public.mv WITH DATA ===
+# WITH DATA absorbed: identifier becomes
+# "public.mv with data". PG semantics: WITH DATA is
+# the explicit default form, equivalent to bare
+# REFRESH. Here it errors.
+REFRESH MATERIALIZED VIEW public.mv WITH DATA;
+ERROR 1105: execution error: view "public.mv with data" does not exist
+=== NEW BUG — REFRESH MATERIALIZED VIEW public.mv WITH NO DATA ===
+# WITH NO DATA absorbed: identifier becomes
+# "public.mv with no data". PG semantics: clears the
+# materialized rows but keeps the view metadata
+# (ETL cache-invalidate idiom). Here it errors.
+REFRESH MATERIALIZED VIEW public.mv WITH NO DATA;
+ERROR 1105: execution error: view "public.mv with no data" does not exist
+=== Parse-reject — CREATE MATERIALIZED VIEW … WITH NO DATA: errno 1064 ===
+# Distinct from the REFRESH-side gobble: the CREATE-side
+# WITH NO DATA clause is rejected at sqlparser, not
+# absorbed into an identifier. Different bug class,
+# adjacent surface. Pinned here so a future fix to the
+# REFRESH gobble doesn't accidentally silently start
+# accepting CREATE … WITH NO DATA as well.
+DROP TABLE IF EXISTS public.mvb2;
+CREATE TABLE public.mvb2 (id INT PRIMARY KEY, v INT);
+CREATE MATERIALIZED VIEW public.mv2 AS SELECT id FROM public.mvb2 WITH NO DATA;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: WITH at Line: 1, Column: 67
+=== Support pin — MV survives all the failed REFRESH attempts ===
+# Final SELECT confirms the MV is still queryable with the
+# original snapshot. The gobbling-bug errors did NOT
+# corrupt the view; they merely failed to refresh it.
+SELECT id, dbl FROM public.mv ORDER BY id;
+id	dbl
+1	20
+2	40
+3	60
+=== KNOWN GAP (local control) — DROP MATERIALIZED VIEW: errno 1064 ===
+# Already pinned at view_options_basic_extra; repeated
+# here so this slice is self-contained for cleanup.
+# The MV is effectively permanent in this data dir.
+DROP MATERIALIZED VIEW public.mv;
+ERROR 1064: SQL parse error: unsupported DROP MATERIALIZED VIEW statement
+=== Cleanup — drop the base tables (MV remains, see gap above) ===
+DROP TABLE public.mvb;
+DROP TABLE public.mvb2;

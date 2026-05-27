@@ -1,0 +1,209 @@
+# Independently authored PG MATERIALIZED VIEW refresh
+# bug sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/ or PG
+# regress.
+#
+# Headline: NEW BUG class — token-misclassification at
+# the parser. The REFRESH MATERIALIZED VIEW path
+# accepts the keyword "REFRESH MATERIALIZED VIEW" and
+# then GREEDILY ABSORBS the surrounding whitespace-
+# delimited tokens into the table-name identifier. The
+# wire confirms the bug by echoing the absorbed string
+# verbatim back in the error message:
+#
+#     REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv
+#       -> view "concurrently public.mv" does not exist
+#
+#     REFRESH MATERIALIZED VIEW public.mv WITH DATA
+#       -> view "public.mv with data" does not exist
+#
+#     REFRESH MATERIALIZED VIEW public.mv WITH NO DATA
+#       -> view "public.mv with no data" does not exist
+#
+# The error string with embedded reserved keyword(s)
+# is the falsifier: the planner committed the absorbed
+# tokens as one identifier. The MV `public.mv` DOES
+# exist — plain `REFRESH MATERIALIZED VIEW public.mv`
+# succeeds against it earlier in this same script, and
+# the SELECT control confirms the rows. Only the
+# modifier-decorated forms gobble.
+#
+# Existing coverage (do NOT duplicate):
+#   - view_options_basic_extra: pins
+#     CREATE MATERIALIZED VIEW (bare), REFRESH
+#     MATERIALIZED VIEW (bare), DROP MATERIALIZED VIEW
+#     reject (errno 1064), MV invisibility to
+#     information_schema. Zero coverage for the
+#     CONCURRENTLY / WITH DATA / WITH NO DATA modifiers
+#     OR the CREATE … WITH NO DATA modifier — those
+#     are the new ground here.
+#
+# Zero prior coverage for:
+#   - REFRESH MATERIALIZED VIEW CONCURRENTLY <name>
+#     (Debezium / pg_dump-emitted form for non-blocking
+#     refresh).
+#   - REFRESH MATERIALIZED VIEW <name> WITH DATA
+#     (PG-explicit default; idempotent in PG).
+#   - REFRESH MATERIALIZED VIEW <name> WITH NO DATA
+#     (cache-reset / ETL-pipeline reset form).
+#   - CREATE MATERIALIZED VIEW … WITH NO DATA
+#     (create-empty-then-refresh shape).
+#
+# Why this matters (big picture):
+#
+#   PG-style materialized-view refresh in production
+#   pipelines almost never uses the bare form. The two
+#   dominant shapes are:
+#
+#     (a) REFRESH MATERIALIZED VIEW CONCURRENTLY mv;
+#         — used by every analytics dashboard / CDC
+#         consumer to refresh without blocking readers
+#         (requires a UNIQUE index but otherwise
+#         drop-in for plain REFRESH).
+#
+#     (b) REFRESH MATERIALIZED VIEW mv WITH NO DATA;
+#         — used by ETL pipelines to invalidate the
+#         snapshot before a downstream rebuild
+#         (clears the materialized rows; the view
+#         metadata stays).
+#
+#   Both fail here with errno 1105 and the misleading
+#   "view <gobbled-name> does not exist" message. A
+#   migrator staring at that error will conclude the
+#   MV wasn't created, retry CREATE, fail again on the
+#   already-exists path (or not — see view_options
+#   sentinel for the MV introspection gap), and not
+#   recognize the actual root cause is "the modifier
+#   keywords were absorbed into the identifier".
+#
+#   Adjacent witnesses for the token-misclassification
+#   class: nothing prior in this repo — this slice
+#   introduces the class.
+#
+# Wire divergence check: probed via mysqlwire. The
+# REFRESH MATERIALIZED VIEW path lives in convert.rs
+# / the executor (the error originates from the same
+# "view does not exist" code path that returns errno
+# 1105 on both wires); pgwire emits the same gobbled-
+# identifier string. Behavior is shared.
+#
+# Runner note: all identifiers are schema-qualified
+# with `public.` because the runner's mysql_async path
+# bypasses search_path resolution for the
+# CREATE MATERIALIZED VIEW entrypoint (already pinned
+# at view_options_basic_extra). Qualification has no
+# bearing on the gobbling-bug demonstration: the
+# trailing modifier keywords still get absorbed.
+#
+# Adaptation notes:
+#   # zeta-adapt: SUPPORT — CREATE MATERIALIZED VIEW
+#     (bare, no WITH clause) parses and materializes.
+#     SELECT against the MV returns the snapshotted
+#     rows (e.g., a `v*2` projection returns doubled
+#     values).
+#   # zeta-adapt: SUPPORT — REFRESH MATERIALIZED VIEW
+#     <name> (bare) works.
+#   # zeta-adapt: NEW BUG — REFRESH MATERIALIZED VIEW
+#     CONCURRENTLY <name> errors 1105
+#     "view \"concurrently <name>\" does not exist".
+#     The CONCURRENTLY keyword is absorbed into the
+#     identifier.
+#   # zeta-adapt: NEW BUG — REFRESH MATERIALIZED VIEW
+#     <name> WITH DATA errors 1105
+#     "view \"<name> with data\" does not exist". The
+#     WITH DATA clause is absorbed.
+#   # zeta-adapt: NEW BUG — REFRESH MATERIALIZED VIEW
+#     <name> WITH NO DATA errors 1105
+#     "view \"<name> with no data\" does not exist".
+#     The WITH NO DATA clause is absorbed.
+#   # zeta-adapt: PARSE-REJECT — CREATE MATERIALIZED
+#     VIEW … WITH NO DATA errors 1064 at sqlparser
+#     "Expected: end of statement, found: WITH". The
+#     CREATE-side WITH NO DATA modifier is rejected
+#     ahead of the executor (different class from the
+#     REFRESH-side gobble).
+#   # zeta-adapt: KNOWN GAP — DROP MATERIALIZED VIEW
+#     <name> errors 1064 (already pinned at
+#     view_options_basic_extra; repeated here as a
+#     local cleanup-path control so this slice is
+#     self-contained).
+
+--echo === Setup — base table + plain MATERIALIZED VIEW ===
+
+DROP TABLE IF EXISTS public.mvb;
+CREATE TABLE public.mvb (id INT PRIMARY KEY, v INT);
+INSERT INTO public.mvb VALUES (1, 10), (2, 20), (3, 30);
+
+--echo === Support pin — CREATE MATERIALIZED VIEW (bare) and SELECT control ===
+--echo # Confirms the MV `public.mv` exists and is queryable.
+--echo # Every error below — "view <x> does not exist" — is
+--echo # FALSIFIED against this row count: the MV materialized
+--echo # three rows, SELECT returns them, the view is real.
+
+CREATE MATERIALIZED VIEW public.mv AS SELECT id, v*2 AS dbl FROM public.mvb;
+SELECT id, dbl FROM public.mv ORDER BY id;
+
+--echo === Support pin — REFRESH MATERIALIZED VIEW (bare) works ===
+
+REFRESH MATERIALIZED VIEW public.mv;
+SELECT id, dbl FROM public.mv ORDER BY id;
+
+--echo === NEW BUG — REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv ===
+--echo # The CONCURRENTLY keyword is absorbed into the table
+--echo # identifier. The wire error literally contains
+--echo # "concurrently public.mv" — proving the parser
+--echo # treated "concurrently public.mv" as ONE name.
+
+--error 1105
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv;
+
+--echo === NEW BUG — REFRESH MATERIALIZED VIEW public.mv WITH DATA ===
+--echo # WITH DATA absorbed: identifier becomes
+--echo # "public.mv with data". PG semantics: WITH DATA is
+--echo # the explicit default form, equivalent to bare
+--echo # REFRESH. Here it errors.
+
+--error 1105
+REFRESH MATERIALIZED VIEW public.mv WITH DATA;
+
+--echo === NEW BUG — REFRESH MATERIALIZED VIEW public.mv WITH NO DATA ===
+--echo # WITH NO DATA absorbed: identifier becomes
+--echo # "public.mv with no data". PG semantics: clears the
+--echo # materialized rows but keeps the view metadata
+--echo # (ETL cache-invalidate idiom). Here it errors.
+
+--error 1105
+REFRESH MATERIALIZED VIEW public.mv WITH NO DATA;
+
+--echo === Parse-reject — CREATE MATERIALIZED VIEW … WITH NO DATA: errno 1064 ===
+--echo # Distinct from the REFRESH-side gobble: the CREATE-side
+--echo # WITH NO DATA clause is rejected at sqlparser, not
+--echo # absorbed into an identifier. Different bug class,
+--echo # adjacent surface. Pinned here so a future fix to the
+--echo # REFRESH gobble doesn't accidentally silently start
+--echo # accepting CREATE … WITH NO DATA as well.
+
+DROP TABLE IF EXISTS public.mvb2;
+CREATE TABLE public.mvb2 (id INT PRIMARY KEY, v INT);
+--error 1064
+CREATE MATERIALIZED VIEW public.mv2 AS SELECT id FROM public.mvb2 WITH NO DATA;
+
+--echo === Support pin — MV survives all the failed REFRESH attempts ===
+--echo # Final SELECT confirms the MV is still queryable with the
+--echo # original snapshot. The gobbling-bug errors did NOT
+--echo # corrupt the view; they merely failed to refresh it.
+
+SELECT id, dbl FROM public.mv ORDER BY id;
+
+--echo === KNOWN GAP (local control) — DROP MATERIALIZED VIEW: errno 1064 ===
+--echo # Already pinned at view_options_basic_extra; repeated
+--echo # here so this slice is self-contained for cleanup.
+--echo # The MV is effectively permanent in this data dir.
+
+--error 1064
+DROP MATERIALIZED VIEW public.mv;
+
+--echo === Cleanup — drop the base tables (MV remains, see gap above) ===
+
+DROP TABLE public.mvb;
+DROP TABLE public.mvb2;
