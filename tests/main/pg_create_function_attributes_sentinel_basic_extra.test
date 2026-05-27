@@ -1,0 +1,197 @@
+# Independently authored PG CREATE FUNCTION attribute
+# keyword sentinel slice for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/ or PG
+# regress.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE FUNCTION RETURNS TABLE(...) + RETURNS SETOF
+#     <type>: pg_create_function_non_trigger_sentinel
+#     pins silent-CREATE + SRF unknown-fn dispatch
+#     fingerprint and SETOF parse-reject. Does NOT
+#     cover the attribute-keyword family.
+#   - CREATE FUNCTION ... BEGIN ATOMIC body:
+#     pg_alter_mv_begin_atomic_sentinel pins "Expected:
+#     end of statement, found: BEGIN" parse-reject for
+#     the body form. Does NOT cover the attribute
+#     keywords that precede the body.
+#   - ALTER FUNCTION / ALTER PROCEDURE (with attribute
+#     keywords after the parens): pg_alter_func_proc_
+#     lo_io_sentinel pins ALTER-restricted-list
+#     "found: FUNCTION" / "found: PROCEDURE" at col 7.
+#     Attributes never reached because ALTER bails
+#     earlier; this slice exercises CREATE which DOES
+#     reach the attribute-clause parser.
+#   - Bare CREATE FUNCTION (no attributes):
+#     info_schema_stubs_basic_extra:113 uses
+#     CREATE FUNCTION info_schema_stub_fn — bare form
+#     prior, NOT a duplicate of the attribute family.
+#
+#   Pre-author dedup grep on tests/main/*.test for
+#   CREATE.*FUNCTION combined with IMMUTABLE | STABLE |
+#   VOLATILE | STRICT | PARALLEL | SECURITY DEFINER |
+#   SECURITY INVOKER | LEAKPROOF | COST [0-9] |
+#   TRANSFORM FOR | WINDOW: ZERO hits. The CREATE
+#   FUNCTION attribute family is greenfield.
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "Expected: end of statement, found: <KW>" at
+#     attribute-clause column position — used by
+#     pg_create_function_non_trigger_sentinel for SETOF
+#     and pg_alter_mv_begin_atomic_sentinel for BEGIN.
+#     This slice contributes 5 NEW <KW> witnesses
+#     (LEAKPROOF, NOT, COST, TRANSFORM, WINDOW) plus a
+#     chain-walk variant (Shape E) where the rejection
+#     column is body-position-dependent.
+#
+# This slice pins THREE bug-class findings:
+#
+#   FINDING 1 — SILENT-ACCEPT of 13 PG attribute
+#   keywords. Volatility (IMMUTABLE, STABLE, VOLATILE),
+#   null-handling (STRICT, CALLED ON NULL INPUT,
+#   RETURNS NULL ON NULL INPUT), parallelism (PARALLEL
+#   {SAFE,RESTRICTED,UNSAFE}), security (SECURITY
+#   {DEFINER,INVOKER}), and SET (SET <var> = <val>,
+#   SET <var> TO <val>) all parse silently with NO
+#   error and NO warning. CORRUPTION-class for any app
+#   that relies on the attribute semantics — a function
+#   declared SECURITY DEFINER in zeta does NOT actually
+#   run with elevated privileges, an IMMUTABLE function
+#   is NOT memoized in the planner, a STRICT function
+#   is NOT short-circuited on NULL inputs. pg_dump
+#   output that includes attribute-bearing functions
+#   will appear to apply cleanly but the attribute
+#   contract is silently violated at runtime.
+#
+#   FINDING 2 — 5 attribute keywords NOT in the
+#   parser's known-keyword registry: LEAKPROOF (and its
+#   NOT LEAKPROOF variant), COST, TRANSFORM, WINDOW.
+#   All produce the SAME shape "Expected: end of
+#   statement, found: <KW>" rejection at the column
+#   immediately after the RETURNS type, varying only in
+#   the unrecognized keyword and column position. This
+#   is the INVERSE of the GRANT/REVOKE 4-shape
+#   fingerprint catalog from PR #450 (where different
+#   object-types produced DIFFERENT fingerprints): here
+#   the parser bails immediately at the first unknown
+#   keyword, so all unknown-attribute paths converge on
+#   the same fingerprint with varying token position.
+#
+#   FINDING 3 — CHAIN-ATTRIBUTE PARSER REGISTRY
+#   CONFIRMED. Shape E proves the parser walks the
+#   attribute chain LEFT-TO-RIGHT and silently drops
+#   each known keyword before reaching an unknown one.
+#   `CREATE FUNCTION f20() RETURNS INT STRICT IMMUTABLE
+#   PARALLEL SAFE COST 5 LANGUAGE SQL AS 'SELECT 1'`
+#   rejects at COST with col 66 — exactly the byte
+#   position after STRICT (3 known kws), IMMUTABLE
+#   (1 known kw), and PARALLEL SAFE (2 known kws) have
+#   been consumed. This confirms the registry is
+#   consulted per-keyword rather than as a fixed
+#   prefix match.
+#
+# Big-picture finding:
+#
+#   zeta's CREATE FUNCTION parser implements a known-
+#   attribute-keyword REGISTRY: 13 keywords are
+#   recognized and silently dropped (no executor-side
+#   semantics attached); 5 keywords are not in the
+#   registry and produce a uniform 1064 fingerprint at
+#   the attribute-clause column. This is a hybrid bug
+#   class — CORRUPTION at the silent-accept layer (the
+#   attribute contract is silently void) combined with
+#   PARSE-GAP at the registry-miss layer (5 attributes
+#   are not even acknowledged as valid PG syntax).
+#
+#   Cross-link: [[project_two_layer_type_recognition_
+#   pattern]] — same two-layer divergence as the
+#   type-parser vs CAST-dispatcher split (PR #427).
+#   Here the registry walks one layer (parser-accept)
+#   without a corresponding executor-attach layer.
+#
+# Wire divergence check: probed via mysqlwire (MTR
+# canonical, dynamic port reservation). pgwire shares
+# the same sqlparser layer for CREATE FUNCTION, so the
+# fingerprints should match — not separately probed in
+# this slice.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-ACCEPT BUG — 13 PG CREATE
+#     FUNCTION attribute keywords (IMMUTABLE, STABLE,
+#     VOLATILE, STRICT, CALLED ON NULL INPUT, RETURNS
+#     NULL ON NULL INPUT, PARALLEL SAFE/RESTRICTED/
+#     UNSAFE, SECURITY DEFINER/INVOKER, SET = / SET TO)
+#     parse silently with no error and no warning. The
+#     attribute contract is silently void at runtime —
+#     do NOT rely on SECURITY DEFINER, IMMUTABLE
+#     memoization, STRICT short-circuiting, etc., in
+#     ported PG code.
+#   # zeta-adapt: KNOWN GAP — 5 PG CREATE FUNCTION
+#     attribute keywords (LEAKPROOF, NOT LEAKPROOF,
+#     COST <n>, TRANSFORM FOR TYPE <t>, WINDOW)
+#     parse-reject at the attribute-clause column with
+#     "Expected: end of statement, found: <KW>". Strip
+#     these from migration scripts; they have no
+#     analog in zeta.
+#   # zeta-adapt: CHAIN-ATTRIBUTE BEHAVIOR — the parser
+#     walks the attribute chain left-to-right; known
+#     keywords are silently dropped, the first unknown
+#     keyword aborts the parse at its column position.
+
+--echo === SHAPE A — volatility + null-handling attributes: SILENT-ACCEPT (6 forms) ===
+
+DROP FUNCTION IF EXISTS f1;
+CREATE FUNCTION f1() RETURNS INT IMMUTABLE LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f2;
+CREATE FUNCTION f2() RETURNS INT STABLE LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f3;
+CREATE FUNCTION f3() RETURNS INT VOLATILE LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f4;
+CREATE FUNCTION f4() RETURNS INT STRICT LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f5;
+CREATE FUNCTION f5() RETURNS INT CALLED ON NULL INPUT LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f6;
+CREATE FUNCTION f6() RETURNS INT RETURNS NULL ON NULL INPUT LANGUAGE SQL AS 'SELECT 1';
+
+--echo === SHAPE B — parallelism attributes: SILENT-ACCEPT (3 forms) ===
+
+DROP FUNCTION IF EXISTS f9;
+CREATE FUNCTION f9() RETURNS INT PARALLEL SAFE LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f10;
+CREATE FUNCTION f10() RETURNS INT PARALLEL RESTRICTED LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f11;
+CREATE FUNCTION f11() RETURNS INT PARALLEL UNSAFE LANGUAGE SQL AS 'SELECT 1';
+
+--echo === SHAPE C — security + SET attributes: SILENT-ACCEPT (4 forms) ===
+
+DROP FUNCTION IF EXISTS f14;
+CREATE FUNCTION f14() RETURNS INT SECURITY DEFINER LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f15;
+CREATE FUNCTION f15() RETURNS INT SECURITY INVOKER LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f16;
+CREATE FUNCTION f16() RETURNS INT SET search_path = pg_catalog LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f17;
+CREATE FUNCTION f17() RETURNS INT SET timezone TO 'UTC' LANGUAGE SQL AS 'SELECT 1';
+
+--echo === SHAPE D — registry-miss attributes: 1064 "Expected: end of statement, found: <KW>" (5 forms) ===
+
+DROP FUNCTION IF EXISTS f7;
+--error 1064
+CREATE FUNCTION f7() RETURNS INT LEAKPROOF LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f8;
+--error 1064
+CREATE FUNCTION f8() RETURNS INT NOT LEAKPROOF LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f12;
+--error 1064
+CREATE FUNCTION f12() RETURNS INT COST 100 LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f18;
+--error 1064
+CREATE FUNCTION f18() RETURNS INT TRANSFORM FOR TYPE int LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS f19;
+--error 1064
+CREATE FUNCTION f19() RETURNS INT WINDOW LANGUAGE SQL AS 'SELECT 1';
+
+--echo === SHAPE E — chain-attribute proof: parser walks STRICT IMMUTABLE PARALLEL SAFE then rejects at COST col 66 ===
+
+DROP FUNCTION IF EXISTS f20;
+--error 1064
+CREATE FUNCTION f20() RETURNS INT STRICT IMMUTABLE PARALLEL SAFE COST 5 LANGUAGE SQL AS 'SELECT 1';
