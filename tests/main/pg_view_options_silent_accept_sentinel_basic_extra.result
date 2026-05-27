@@ -1,0 +1,99 @@
+=== Setup ===
+DROP TABLE IF EXISTS tprobe;
+CREATE TABLE tprobe (id INT PRIMARY KEY, val INT);
+INSERT INTO tprobe VALUES (1, 10), (2, 20), (3, 30);
+=== Shape A: CREATE VIEW WITH (security_barrier = true) — SUCCESS, option silently dropped (BUG) ===
+CREATE VIEW v_sb1 WITH (security_barrier = true) AS SELECT id, val FROM tprobe;
+SELECT id, val FROM v_sb1;
+id	val
+1	10
+2	20
+3	30
+=== Shape B: CREATE VIEW WITH (security_invoker = true) — SUCCESS, silently dropped ===
+CREATE VIEW v_si1 WITH (security_invoker = true) AS SELECT id, val FROM tprobe;
+SELECT id FROM v_si1;
+id
+1
+2
+3
+=== Shape C: CREATE VIEW WITH (check_option = 'cascaded') — SUCCESS, silently dropped ===
+CREATE VIEW v_co1 WITH (check_option = 'cascaded') AS SELECT id, val FROM tprobe;
+SELECT id FROM v_co1;
+id
+1
+2
+3
+=== Shape D: CREATE VIEW WITH (check_option = 'local') — SUCCESS, silently dropped ===
+CREATE VIEW v_co2 WITH (check_option = 'local') AS SELECT id, val FROM tprobe;
+SELECT id FROM v_co2;
+id
+1
+2
+3
+=== Shape E: CREATE VIEW WITH (nonsense_option = true) — SUCCESS (HEADLINE BUG) ===
+CREATE VIEW v_ns1 WITH (nonsense_option = true) AS SELECT id, val FROM tprobe;
+SELECT id FROM v_ns1;
+id
+1
+2
+3
+=== Shape F: CREATE VIEW WITH (sb=true, check_option='local') — multi-option, both silently dropped ===
+CREATE VIEW v_multi WITH (security_barrier = true, check_option = 'local') AS SELECT id, val FROM tprobe;
+SELECT id FROM v_multi;
+id
+1
+2
+3
+=== Shape G: CREATE VIEW WITH (some_opt = 42) — integer value, silently dropped ===
+CREATE VIEW v_intval WITH (some_opt = 42) AS SELECT id, val FROM tprobe;
+SELECT id FROM v_intval;
+id
+1
+2
+3
+=== Shape H: CREATE VIEW WITH () — empty options list, silently accepted ===
+CREATE VIEW v_empty WITH () AS SELECT id, val FROM tprobe;
+SELECT id FROM v_empty;
+id
+1
+2
+3
+=== Shape I: CREATE VIEW ... WITH CHECK OPTION — 1064 "found: WITH" (re-pin from view_basic_extra) ===
+CREATE VIEW v_chk AS SELECT id, val FROM tprobe WITH CHECK OPTION;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: WITH at Line: 1, Column: 49
+=== Shape J: CREATE VIEW ... WITH LOCAL CHECK OPTION — same fingerprint (NEW spelling) ===
+CREATE VIEW v_chk_local AS SELECT id, val FROM tprobe WITH LOCAL CHECK OPTION;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: WITH at Line: 1, Column: 55
+=== Shape K: CREATE VIEW ... WITH CASCADED CHECK OPTION — same fingerprint (NEW spelling) ===
+CREATE VIEW v_chk_casc AS SELECT id, val FROM tprobe WITH CASCADED CHECK OPTION;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: WITH at Line: 1, Column: 54
+=== Shape L: ALTER VIEW v SET (opts) — 1064 "Expected: AS, found: SET" at col 18 ===
+ALTER VIEW v_sb1 SET (security_barrier = false);
+ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: SET at Line: 1, Column: 18
+=== Shape M: ALTER VIEW v RESET (opts) — 1064 "Expected: AS, found: RESET" at col 18 ===
+ALTER VIEW v_sb1 RESET (security_barrier);
+ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: RESET at Line: 1, Column: 18
+=== Shape N: ALTER VIEW v OWNER TO ... — 1064 "Expected: AS, found: OWNER" at col 18 ===
+ALTER VIEW v_sb1 OWNER TO postgres;
+ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: OWNER at Line: 1, Column: 18
+=== Shape O: ALTER VIEW v RENAME TO ... — 1064 "Expected: AS, found: RENAME" at col 18 ===
+ALTER VIEW v_sb1 RENAME TO v_sb1_renamed;
+ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: RENAME at Line: 1, Column: 18
+=== Shape P: CREATE VIEW WITH (fake.option = 42) — dotted option name parse-rejects (inconsistency) ===
+CREATE VIEW v_dotted WITH (fake.option = 42) AS SELECT id FROM tprobe;
+ERROR 1064: SQL parse error: sql parser error: Expected: =, found: . at Line: 1, Column: 32
+=== SUPPORT pin: view created via silent-drop body remains functional ===
+SELECT id, val FROM v_ns1 WHERE val >= 20;
+id	val
+2	20
+3	30
+=== Cleanup ===
+DROP VIEW IF EXISTS v_sb1;
+DROP VIEW IF EXISTS v_si1;
+DROP VIEW IF EXISTS v_co1;
+DROP VIEW IF EXISTS v_co2;
+DROP VIEW IF EXISTS v_ns1;
+DROP VIEW IF EXISTS v_multi;
+DROP VIEW IF EXISTS v_intval;
+DROP VIEW IF EXISTS v_empty;
+DROP TABLE tprobe;

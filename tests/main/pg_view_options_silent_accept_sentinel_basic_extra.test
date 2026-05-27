@@ -1,0 +1,456 @@
+# Independently authored PG VIEW-options silent-accept
+# CORRUPTION-class sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/
+# or PG regress.
+#
+# Existing coverage (read carefully — DO NOT duplicate):
+#   - `CREATE VIEW v AS SELECT ... WITH CHECK OPTION`
+#     (trailing WITH-CHECK-OPTION on a single shape):
+#     pinned in view_basic_extra.test:85 as a known 1064
+#     parse-reject. THIS slice extends that pin by also
+#     pinning `WITH LOCAL CHECK OPTION` and `WITH
+#     CASCADED CHECK OPTION` (the qualified SQL-standard
+#     spellings), AND adds the entirely uncovered
+#     `CREATE VIEW v WITH (options) AS SELECT ...`
+#     prefix-form silent-accept.
+#   - `ALTER VIEW v AS SELECT ...` (definition-replace
+#     form): pinned in view_basic_extra.test:90 as a
+#     known 1064 parse-reject. THIS slice extends that
+#     pin with `ALTER VIEW v SET (opts)`, `ALTER VIEW
+#     v RESET (opts)`, `ALTER VIEW v OWNER TO ...`,
+#     and `ALTER VIEW v RENAME TO ...` — four distinct
+#     trailing-clause shapes, all rejecting at the same
+#     "Expected: AS, found: <KW>" gate (the ALTER VIEW
+#     grammar only accepts a trailing AS clause).
+#   - CREATE OR REPLACE VIEW, MATERIALIZED VIEW (bare),
+#     RECURSIVE VIEW, view-with-ORDER-BY / DISTINCT /
+#     subquery / explicit-column-list / JOIN — all
+#     pinned in view_options_basic_extra.test. Neither
+#     `WITH (options)` prefix nor any ALTER VIEW
+#     trailing-clause shape appears there.
+#   - `CREATE VIEW IF NOT EXISTS`, `DROP VIEW CASCADE`,
+#     view column-rename — pinned in view_basic_extra
+#     and view_basic. Orthogonal to this slice.
+#
+# Pre-existing pattern fingerprints this slice joins:
+#   - CORRUPTION-class family: PR #421 (DEFAULT
+#     subquery stored as text), PR #432 (TIMESTAMP(n)
+#     precision silent-drop), pg_explain_format_silent_
+#     drop_bug_sentinel (FORMAT JSON / ANALYZE TRUE /
+#     COSTS off silently dropped). Shared mechanism:
+#     the modifier parses successfully (no error, no
+#     warning), the IR-conversion / dispatcher layer
+#     never reads the field, the statement executes
+#     with default behavior. This slice extends the
+#     family to CREATE VIEW's WITH (options) clause.
+#   - "Expected: end of statement, found: WITH" —
+#     pre-existing at view_basic_extra:85. DUPLICATE
+#     fingerprint shape; pinned here twice more (LOCAL
+#     and CASCADED qualifiers) to extend coverage of
+#     the SQL-standard WITH-CHECK-OPTION spelling
+#     family. Column number is position-dependent.
+#   - "Expected: AS, found: <KW>" at col 18 — NEW
+#     fingerprint at this slice for the ALTER VIEW
+#     grammar's restricted trailing-clause set. Witness
+#     keywords contributed by this slice: SET, RESET,
+#     OWNER, RENAME (four). The ALTER VIEW dispatcher
+#     accepts only the `AS <select>` form; every other
+#     PG-standard trailing clause fails here.
+#   - "Expected: =, found: ." — NEW fingerprint at
+#     this slice for dotted option names. Note: this
+#     shape parse-REJECTS while plain identifiers
+#     silent-ACCEPT — the inconsistency itself is
+#     witness-worthy.
+#
+# This slice pins (FIFTEEN shapes — eight silent-accept
+# BUGs, four ALTER VIEW parse-rejects, three CHECK
+# OPTION parse-rejects, plus support pins):
+#
+#   CORRUPTION-class BUG — CREATE VIEW WITH (options)
+#   silently accepts ANY option name AND any value
+#   shape (headline):
+#
+#     Shape A — `CREATE VIEW v WITH (security_barrier
+#     = true) AS SELECT ...`: SUCCESS. The option is
+#       silently dropped. Real PG would enable
+#       barrier-style protection that blocks leaky
+#       functions from being pushed below the view
+#       predicate. zeta returns a view that has NO
+#       enforcement — apps relying on security_barrier
+#       for row-level-security tooling get views with
+#       no protection AND no diagnostic.
+#
+#     Shape B — `CREATE VIEW v WITH (security_invoker
+#     = true) AS SELECT ...`: SUCCESS. The
+#       security_invoker option is silently dropped.
+#       Real PG would resolve table access under the
+#       invoker's privileges (vs. owner). zeta has no
+#       distinction; the option is ignored.
+#
+#     Shape C — `CREATE VIEW v WITH (check_option =
+#     'cascaded') AS SELECT ...`: SUCCESS. The
+#       check_option option is silently dropped. Real
+#       PG would enforce the view's predicate on
+#       INSERT/UPDATE through the view. zeta drops the
+#       option AND through-view DML is broken anyway
+#       (view_basic_extra:95 pins INSERT INTO view →
+#       1146), so apps relying on check_option for
+#       write-validation get NO enforcement on the path
+#       that does work AND a confusing 1146 on the
+#       path that doesn't.
+#
+#     Shape D — `CREATE VIEW v WITH (check_option =
+#     'local') AS SELECT ...`: SUCCESS. Same family,
+#       different qualifier. Silently dropped.
+#
+#     Shape E — `CREATE VIEW v WITH (nonsense_option
+#     = true) AS SELECT ...`: SUCCESS. THE HEADLINE
+#       BUG. Real PG errors `unrecognized parameter
+#       "nonsense_option"` and refuses to create the
+#       view. zeta silently accepts ANY identifier as
+#       an option name. A typo in a schema migration
+#       (e.g. `secuirty_barrier` for `security_barrier`)
+#       is silently swallowed; the migration appears
+#       successful while delivering a view with NO
+#       protection. There is NO surface telemetry to
+#       distinguish "option was honored" from "option
+#       was typo'd and ignored" — both succeed silently
+#       with the same response shape.
+#
+#     Shape F — `CREATE VIEW v WITH (security_barrier
+#     = true, check_option = 'local') AS SELECT ...`
+#     (multi-option list): SUCCESS. Both options
+#       silently dropped together. The list-parsing
+#       grammar accepts an arbitrary-length comma-
+#       separated set; none of the entries are
+#       validated against an allowed-list at any later
+#       pass.
+#
+#     Shape G — `CREATE VIEW v WITH (some_opt = 42)
+#     AS SELECT ...` (integer value): SUCCESS. The
+#       grammar accepts any literal expression as the
+#       value, not just identifiers/strings. Numeric
+#       values are silently dropped along with
+#       everything else.
+#
+#     Shape H — `CREATE VIEW v WITH () AS SELECT ...`
+#     (empty options list): SUCCESS. Even an empty
+#       parens list parses and the view is created.
+#       Real PG errors `syntax error at or near ")"`
+#       on this — at minimum the grammar should
+#       require at least one option inside the parens.
+#       zeta accepts the no-op WITH () clause silently.
+#
+#   PARSE-REJECT — SQL-standard WITH CHECK OPTION
+#   trailing clause (the spelling SQL:1999 / PG / DB2
+#   use; distinct from the WITH (check_option = '...')
+#   prefix form pinned above):
+#
+#     Shape I — `CREATE VIEW v AS SELECT ... WITH
+#     CHECK OPTION` (bare): errors 1064 "Expected: end
+#       of statement, found: WITH". Cross-references
+#       view_basic_extra:85 which pins this exact
+#       shape; re-pinned here for self-contained
+#       narrative within the slice.
+#
+#     Shape J — `CREATE VIEW v AS SELECT ... WITH
+#     LOCAL CHECK OPTION`: same fingerprint. Same
+#       grammar gate, distinct SQL spelling. NEW
+#       coverage — only the unqualified `WITH CHECK
+#       OPTION` was previously pinned.
+#
+#     Shape K — `CREATE VIEW v AS SELECT ... WITH
+#     CASCADED CHECK OPTION`: same fingerprint. The
+#       third SQL-standard spelling. NEW coverage.
+#
+#   PARSE-REJECT — ALTER VIEW trailing-clause shapes
+#   beyond the `AS <select>` form:
+#
+#     Shape L — `ALTER VIEW v SET (security_barrier =
+#     false)`: errors 1064 "Expected: AS, found: SET
+#       at Line: 1, Column: 18". The ALTER VIEW
+#       grammar only accepts a trailing `AS <select>`
+#       form. The PG-standard `SET (opts)` mutation
+#       path is unreachable. Apps porting `ALTER VIEW
+#       ... SET (security_barrier = ...)` must drop
+#       and recreate.
+#
+#     Shape M — `ALTER VIEW v RESET (security_barrier)`:
+#       errors 1064 "Expected: AS, found: RESET at
+#       Line: 1, Column: 18". Same gate, different
+#       keyword. NEW witness.
+#
+#     Shape N — `ALTER VIEW v OWNER TO postgres`:
+#       errors 1064 "Expected: AS, found: OWNER at
+#       Line: 1, Column: 18". Same gate. NEW witness.
+#
+#     Shape O — `ALTER VIEW v RENAME TO v2`: errors
+#       1064 "Expected: AS, found: RENAME at Line: 1,
+#       Column: 18". Same gate. NEW witness. Note:
+#       `ALTER TABLE ... RENAME` works for tables (per
+#       alter_table_basic) but the ALTER VIEW
+#       dispatcher does NOT share the rename branch.
+#
+#   PARSE-REJECT — edge case for the silent-accept set:
+#
+#     Shape P — `CREATE VIEW v WITH (fake.option = 42)
+#     AS SELECT ...` (dotted option name): errors 1064
+#       "Expected: =, found: . at Line: 1, Column: 28".
+#       The silent-accept holds only for simple
+#       identifier option names; the grammar
+#       requires the option name to be a single token.
+#       Inconsistency-witness: zeta silently accepts
+#       `nonsense_option` (any identifier, no list)
+#       but parse-rejects `fake.option` (any dotted
+#       form). Neither matches real PG, which errors
+#       on both with `unrecognized parameter`.
+#
+#   SUPPORT pin — view body remains functional after
+#   silent-accept:
+#
+#     A view created with `WITH (nonsense_option =
+#     true)` SELECTs correctly. The silent-drop only
+#     affects the OPTION; the view's projection /
+#     filter / etc. all work as if the WITH clause
+#     weren't there. Proves the bug is option-scoped,
+#     not a view-wide breakage.
+#
+# Big-picture finding:
+#
+#   This is the worst kind of silent-accept: nonsense
+#   option names (typos, copy-paste errors, paste from
+#   a different DB's docs) succeed silently. A schema
+#   migration tool that runs `CREATE VIEW ... WITH
+#   (security_barrier = true)` against zeta will report
+#   success, but the resulting view has NO row-level
+#   protection. A query that relies on the predicate
+#   being evaluated BEFORE leaky-function pushdown
+#   (the whole point of security_barrier) is now a
+#   covert data-leak vector. The operator has no
+#   in-band signal that the option was ignored.
+#
+#   The asymmetry between silent-accept (any plain
+#   identifier) and parse-reject (dotted name, or the
+#   ALTER VIEW SET/RESET shapes) reveals the
+#   implementation gap: the CREATE VIEW dispatcher
+#   reaches a grammar production that accepts and
+#   discards `WITH (ident = value)` lists, while the
+#   ALTER VIEW dispatcher never reaches the option-
+#   list grammar at all. Both code paths need to
+#   reach the same option-validation layer that does
+#   NOT exist today.
+#
+#   Joins the CORRUPTION-class family: PR #421
+#   (DEFAULT subquery stored as text), PR #432
+#   (TIMESTAMP(n) precision silent-drop), pg_explain_
+#   format_silent_drop_bug_sentinel (FORMAT JSON et
+#   al. silently dropped). Same mechanism: the
+#   modifier parses, the IR/dispatcher never reads
+#   the field, no surface telemetry distinguishes
+#   honored from dropped.
+#
+# Wire divergence check: probed via mysqlwire (port
+# 3307). The CREATE VIEW dispatcher is in convert.rs
+# (parser-shared); both pgwire and mysqlwire route
+# through the same sqlparser entrypoint. The silent-
+# accept behavior comes from the grammar accepting
+# the WITH (options) list without any downstream
+# validation pass — wire-independent. No separate
+# pgwire pin needed.
+#
+# Adaptation notes:
+#   # zeta-adapt: CORRUPTION-class BUG — `CREATE VIEW
+#     v WITH (opts) AS SELECT ...` silently accepts
+#     ANY option name (incl. nonsense / typos) and
+#     ANY value (string, identifier, integer, even
+#     empty list). NO error, NO warning. The option
+#     is dropped; the view is functional but
+#     unprotected. Apps must NOT rely on
+#     security_barrier, security_invoker, or
+#     check_option for any kind of enforcement.
+#     Substitute: enforce predicates via base-table
+#     CHECK constraints or via a per-row trigger;
+#     RLS-style protection has no portable substitute.
+#   # zeta-adapt: KNOWN GAP — SQL-standard `WITH
+#     CHECK OPTION` trailing clauses (bare, LOCAL,
+#     and CASCADED qualifiers) all error 1064 at
+#     parse. Substitute: enforce via CHECK constraint
+#     on the base table.
+#   # zeta-adapt: KNOWN GAP — `ALTER VIEW v SET
+#     (opts)`, `RESET (opts)`, `OWNER TO ...`, and
+#     `RENAME TO ...` all error 1064 at the
+#     "Expected: AS, found: <KW>" gate. The ALTER
+#     VIEW grammar only accepts the `AS <select>`
+#     form. Substitute: DROP and CREATE OR REPLACE
+#     for mutation; ownership / rename have no
+#     portable substitute.
+#   # zeta-adapt: KNOWN GAP — `CREATE VIEW v WITH
+#     (fake.option = 42)` errors 1064 "Expected: =,
+#     found: ." on the dot, while the otherwise-
+#     identical `CREATE VIEW v WITH (fake_option =
+#     42)` silently accepts. The inconsistency is
+#     witness-worthy: the silent-accept gate is
+#     scoped to single-token option names only.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS tprobe;
+CREATE TABLE tprobe (id INT PRIMARY KEY, val INT);
+INSERT INTO tprobe VALUES (1, 10), (2, 20), (3, 30);
+
+--echo === Shape A: CREATE VIEW WITH (security_barrier = true) — SUCCESS, option silently dropped (BUG) ===
+
+# Real PG would create a view that blocks leaky-function
+# pushdown below the view predicate (the row-level-
+# security guarantee). zeta drops the option silently
+# AND returns a fully-functional view with NO
+# protection. Apps building RLS layers via
+# security_barrier get a covert data-leak vector.
+
+CREATE VIEW v_sb1 WITH (security_barrier = true) AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id, val FROM v_sb1;
+
+--echo === Shape B: CREATE VIEW WITH (security_invoker = true) — SUCCESS, silently dropped ===
+
+CREATE VIEW v_si1 WITH (security_invoker = true) AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id FROM v_si1;
+
+--echo === Shape C: CREATE VIEW WITH (check_option = 'cascaded') — SUCCESS, silently dropped ===
+
+# Real PG would enforce the view's predicate on
+# INSERT/UPDATE/DELETE through the view. zeta drops
+# the option AND through-view DML is broken anyway
+# (view_basic_extra:95 pins INSERT INTO v → 1146),
+# so apps relying on check_option for write-validation
+# get nothing on the path that works AND a confusing
+# 1146 on the path that doesn't.
+
+CREATE VIEW v_co1 WITH (check_option = 'cascaded') AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id FROM v_co1;
+
+--echo === Shape D: CREATE VIEW WITH (check_option = 'local') — SUCCESS, silently dropped ===
+
+CREATE VIEW v_co2 WITH (check_option = 'local') AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id FROM v_co2;
+
+--echo === Shape E: CREATE VIEW WITH (nonsense_option = true) — SUCCESS (HEADLINE BUG) ===
+
+# THE worst kind of silent-accept: a NONSENSE option
+# name (or a typo of a real one like `secuirty_barrier`)
+# is silently swallowed. Real PG errors `unrecognized
+# parameter "nonsense_option"`. zeta returns success
+# with no diagnostic. A schema migration with a typo
+# is reported as succeeded while delivering a view
+# with NO protection.
+
+CREATE VIEW v_ns1 WITH (nonsense_option = true) AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id FROM v_ns1;
+
+--echo === Shape F: CREATE VIEW WITH (sb=true, check_option='local') — multi-option, both silently dropped ===
+
+CREATE VIEW v_multi WITH (security_barrier = true, check_option = 'local') AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id FROM v_multi;
+
+--echo === Shape G: CREATE VIEW WITH (some_opt = 42) — integer value, silently dropped ===
+
+CREATE VIEW v_intval WITH (some_opt = 42) AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id FROM v_intval;
+
+--echo === Shape H: CREATE VIEW WITH () — empty options list, silently accepted ===
+
+# Real PG errors `syntax error at or near ")"` on the
+# empty list. zeta accepts the no-op WITH () clause.
+# The grammar production for the options list does
+# not require at least one entry.
+
+CREATE VIEW v_empty WITH () AS SELECT id, val FROM tprobe;
+--sorted_result
+SELECT id FROM v_empty;
+
+--echo === Shape I: CREATE VIEW ... WITH CHECK OPTION — 1064 "found: WITH" (re-pin from view_basic_extra) ===
+
+# SQL-standard trailing-WITH-CHECK-OPTION form. Pinned
+# at view_basic_extra:85; re-pinned here for self-
+# contained narrative inside the slice.
+
+--error 1064
+CREATE VIEW v_chk AS SELECT id, val FROM tprobe WITH CHECK OPTION;
+
+--echo === Shape J: CREATE VIEW ... WITH LOCAL CHECK OPTION — same fingerprint (NEW spelling) ===
+
+--error 1064
+CREATE VIEW v_chk_local AS SELECT id, val FROM tprobe WITH LOCAL CHECK OPTION;
+
+--echo === Shape K: CREATE VIEW ... WITH CASCADED CHECK OPTION — same fingerprint (NEW spelling) ===
+
+--error 1064
+CREATE VIEW v_chk_casc AS SELECT id, val FROM tprobe WITH CASCADED CHECK OPTION;
+
+--echo === Shape L: ALTER VIEW v SET (opts) — 1064 "Expected: AS, found: SET" at col 18 ===
+
+# ALTER VIEW grammar accepts only `AS <select>`; the
+# PG-standard SET (opts) mutation path is unreachable.
+
+--error 1064
+ALTER VIEW v_sb1 SET (security_barrier = false);
+
+--echo === Shape M: ALTER VIEW v RESET (opts) — 1064 "Expected: AS, found: RESET" at col 18 ===
+
+--error 1064
+ALTER VIEW v_sb1 RESET (security_barrier);
+
+--echo === Shape N: ALTER VIEW v OWNER TO ... — 1064 "Expected: AS, found: OWNER" at col 18 ===
+
+--error 1064
+ALTER VIEW v_sb1 OWNER TO postgres;
+
+--echo === Shape O: ALTER VIEW v RENAME TO ... — 1064 "Expected: AS, found: RENAME" at col 18 ===
+
+# Note: ALTER TABLE ... RENAME works for tables; the
+# ALTER VIEW dispatcher does NOT share the rename
+# branch.
+
+--error 1064
+ALTER VIEW v_sb1 RENAME TO v_sb1_renamed;
+
+--echo === Shape P: CREATE VIEW WITH (fake.option = 42) — dotted option name parse-rejects (inconsistency) ===
+
+# The silent-accept set is scoped to single-token
+# option names. A dotted name parse-rejects, while
+# the otherwise-identical `fake_option = 42` silently
+# accepts. Neither matches real PG (which would
+# `unrecognized parameter` on both).
+
+--error 1064
+CREATE VIEW v_dotted WITH (fake.option = 42) AS SELECT id FROM tprobe;
+
+--echo === SUPPORT pin: view created via silent-drop body remains functional ===
+
+# Proves the silent-drop is option-scoped, not a
+# view-wide breakage. v_ns1 (from Shape E, nonsense
+# option) projects/filters correctly — the view body
+# is fully usable. The data is right; only the
+# protection / write-validation contract is silently
+# absent.
+
+--sorted_result
+SELECT id, val FROM v_ns1 WHERE val >= 20;
+
+--echo === Cleanup ===
+
+DROP VIEW IF EXISTS v_sb1;
+DROP VIEW IF EXISTS v_si1;
+DROP VIEW IF EXISTS v_co1;
+DROP VIEW IF EXISTS v_co2;
+DROP VIEW IF EXISTS v_ns1;
+DROP VIEW IF EXISTS v_multi;
+DROP VIEW IF EXISTS v_intval;
+DROP VIEW IF EXISTS v_empty;
+DROP TABLE tprobe;
