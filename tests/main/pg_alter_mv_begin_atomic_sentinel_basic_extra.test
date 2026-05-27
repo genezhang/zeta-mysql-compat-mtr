@@ -1,0 +1,178 @@
+# Independently authored PG ALTER MATERIALIZED VIEW
+# family + CREATE FUNCTION ... BEGIN ATOMIC sentinel
+# slice for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/ or PG regress.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE MATERIALIZED VIEW (bare) and REFRESH
+#     MATERIALIZED VIEW (bare) — view_options_basic_extra
+#     (CREATE form parses+materializes; REFRESH bare
+#     works; DROP MATERIALIZED VIEW rejects 1064; MV
+#     invisible to information_schema).
+#   - REFRESH MATERIALIZED VIEW {CONCURRENTLY | WITH DATA
+#     | WITH NO DATA} — pg_materialized_view_refresh_bug
+#     _sentinel (token-gobbling bug class).
+#   - ALTER MATERIALIZED VIEW family — ZERO prior
+#     coverage. Grepped tests/main/*.test: no hits.
+#   - CREATE FUNCTION ... BEGIN ATOMIC — ZERO prior
+#     coverage. Grepped tests/main/*.test for
+#     "BEGIN ATOMIC" and "LANGUAGE SQL BEGIN": no hits.
+#     Adjacent: pg_create_function_non_trigger_sentinel
+#     pins RETURNS TABLE(...) silent-accept + RETURNS
+#     SETOF parse-reject; function_def_basic_extra pins
+#     scalar RETURNS forms. Neither exercises a
+#     BEGIN ATOMIC body.
+#
+# Pre-existing rejection shape patterns (per
+# fingerprint-dedup discipline):
+#   - "Expected: one of VIEW or TYPE or TABLE or INDEX
+#     or ROLE or POLICY or CONNECTOR or ICEBERG or
+#     SCHEMA or USER or OPERATOR, found: <KW>" at col 7
+#     — pre-existing at:
+#       event_use_partition_sentinel:101 (kw EVENT —
+#         MySQL EVENT scheduler)
+#       pg_alter_func_proc_lo_io_sentinel (FUNCTION,
+#         PROCEDURE)
+#       pg_ddl_tablespace_conversion_group_sentinel
+#         (GROUP)
+#       PR #395 (DEFAULT)
+#       pg_event_trigger_large_object_sentinel:28
+#         (LARGE) and the EVENT-trigger duplicate (PR
+#         #429)
+#     DUPLICATE FINGERPRINT — pinned here as the NEXT
+#     witness in the shared ALTER-allowed-list chain.
+#     This slice contributes kw MATERIALIZED.
+#   - "Expected: end of statement, found: BEGIN at
+#     Line: 1, Column: 47" — NEW fingerprint at this
+#     slice for CREATE FUNCTION ... BEGIN ATOMIC. The
+#     column number is body-position-dependent (47 for
+#     the exact prefix `CREATE FUNCTION f1() RETURNS
+#     INT LANGUAGE SQL `), but the SHAPE — "Expected:
+#     end of statement, found: BEGIN" — is the
+#     structural fingerprint: sqlparser exits the
+#     CREATE FUNCTION grammar after the LANGUAGE clause
+#     and does not recognize the SQL-standard
+#     BEGIN ATOMIC ... END body form.
+#   - "unknown function: f1" — pre-existing at
+#     function_def_basic_extra (sqlfn), PRs #349-#369
+#     (function-arm gap closure). DUPLICATE — pinned as
+#     the runtime witness that the parse-rejected
+#     CREATE FUNCTION was a true no-op (the function
+#     never made it into the catalog).
+#
+# This slice pins:
+#
+#   ALTER MATERIALIZED VIEW (9 variants):
+#     RENAME TO, OWNER TO, SET SCHEMA, SET TABLESPACE,
+#     ALTER COLUMN ... SET STATISTICS, SET (storage
+#     parameter), IF EXISTS RENAME TO, CLUSTER ON, and
+#     ALL IN TABLESPACE ... SET TABLESPACE. All NINE
+#     forms reject at the `MATERIALIZED` token with the
+#     IDENTICAL ALTER-allowed-list fingerprint at col 7
+#     — the trailing clauses are unreached because the
+#     gate is at the dispatcher. NEW kw witness
+#     MATERIALIZED, joining the documented set: EVENT
+#     (PR #429), DEFAULT (PR #395), FUNCTION, PROCEDURE,
+#     GROUP, LARGE (PR #429).
+#
+#   CREATE FUNCTION ... LANGUAGE SQL BEGIN ATOMIC ...
+#   END (SQL:2003 standard body form, PG 14+):
+#     Parse-rejected at the `BEGIN` token. sqlparser
+#     does not recognize the SQL-standard BEGIN ATOMIC
+#     body for SQL functions. Real-world relevance:
+#     modern pg_dump emits BEGIN ATOMIC for SQL-language
+#     functions on PG 14+ targets (because the
+#     string-literal AS '<body>' form has dependency-
+#     tracking caveats). Apps roundtripping schema
+#     through modern pg_dump → zeta will hit this
+#     parse-reject; the function is not catalogged
+#     (confirmed by subsequent `SELECT f1()` returning
+#     "unknown function: f1", not a different "exists
+#     but no body" shape).
+#
+# Big-picture findings:
+#
+#   STRUCTURAL — "shared ALTER allowed-list" sentinel
+#   continues to bind. The 11-keyword ALTER whitelist
+#   (VIEW / TYPE / TABLE / INDEX / ROLE / POLICY /
+#   CONNECTOR / ICEBERG / SCHEMA / USER / OPERATOR)
+#   excludes every PG-only ALTER object family. Every
+#   ALTER MATERIALIZED VIEW form rejects at the same
+#   gate — there is no path to reach the trailing
+#   clause grammar (OWNER / RENAME / SET / CLUSTER /
+#   IF EXISTS). This is the documented behavior; no
+#   bug, just gap. Witness count for this fingerprint:
+#   7 keywords (EVENT, DEFAULT, FUNCTION, PROCEDURE,
+#   GROUP, LARGE, MATERIALIZED).
+#
+#   BEGIN ATOMIC is the SQL-standard SQL-function body
+#   form, added in PG 14 (2021). pg_dump's
+#   `--no-quote-fn-bodies` flag and the implicit
+#   modern-PG default emit BEGIN ATOMIC for SQL fns —
+#   so any pg_dump output from a recent PG source will
+#   include this shape. zeta's sqlparser-derived parser
+#   does not support it; the migration path is either
+#   (a) re-dump with older syntax (string-literal body)
+#   or (b) rewrite the function in a supported form
+#   (RETURNS trigger, per CLAUDE.md). Scalar SQL
+#   functions are already a silent-accept gap (per
+#   pg_create_function_non_trigger_sentinel), so
+#   BEGIN ATOMIC failing earlier — at parse — is
+#   actually a less-misleading failure mode than the
+#   string-literal AS '<body>' form.
+#
+# Wire divergence check: the ALTER and CREATE FUNCTION
+# dispatchers live in convert.rs (parser-shared). Both
+# pgwire and mysqlwire route through the same sqlparser
+# entrypoint; the rejection shape comes from sqlparser's
+# grammar and is wire-independent. No wire-divergence
+# pinning needed here.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — every ALTER MATERIALIZED
+#     VIEW form errors 1064 at the `MATERIALIZED`
+#     keyword (ALTER restricted-list gate at col 7).
+#     The only supported MV mutation path is
+#     CREATE MATERIALIZED VIEW (bare) at create-time;
+#     post-create ALTER is unreachable. Apps porting PG
+#     MV management must drop+recreate instead of
+#     ALTER.
+#   # zeta-adapt: KNOWN GAP — CREATE FUNCTION ...
+#     LANGUAGE SQL BEGIN ATOMIC ... END errors 1064 at
+#     the `BEGIN` keyword. Modern pg_dump output for
+#     SQL-language functions must be rewritten to the
+#     string-literal AS '<body>' form (which silently
+#     accepts per pg_create_function_non_trigger_
+#     sentinel) or, preferably, to a supported
+#     RETURNS trigger form.
+
+--echo === ALTER MATERIALIZED VIEW (9 forms) — ALTER restricted-list "found: MATERIALIZED" at col 7 ===
+
+--error 1064
+ALTER MATERIALIZED VIEW mv RENAME TO mv2;
+--error 1064
+ALTER MATERIALIZED VIEW mv OWNER TO postgres;
+--error 1064
+ALTER MATERIALIZED VIEW mv SET SCHEMA public;
+--error 1064
+ALTER MATERIALIZED VIEW mv SET TABLESPACE pg_default;
+--error 1064
+ALTER MATERIALIZED VIEW mv ALTER COLUMN id SET STATISTICS 100;
+--error 1064
+ALTER MATERIALIZED VIEW mv SET (autovacuum_enabled = false);
+--error 1064
+ALTER MATERIALIZED VIEW IF EXISTS mv RENAME TO mv2;
+--error 1064
+ALTER MATERIALIZED VIEW mv CLUSTER ON idx;
+--error 1064
+ALTER MATERIALIZED VIEW ALL IN TABLESPACE old_ts SET TABLESPACE pg_default;
+
+--echo === CREATE FUNCTION ... BEGIN ATOMIC (SQL-standard body, PG 14+, pg_dump-emitted) — "found: BEGIN" ===
+
+--error 1064
+CREATE FUNCTION f1() RETURNS INT LANGUAGE SQL BEGIN ATOMIC SELECT 1; END;
+
+--echo === confirm BEGIN ATOMIC did not register f1 in catalog (parse-reject was a true no-op) ===
+
+--error 1105
+SELECT f1();
