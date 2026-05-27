@@ -1,0 +1,25 @@
+=== setup ===
+CREATE TABLE rb (id INT, v INT);
+INSERT INTO rb VALUES (1, 10), (2, 20), (3, 30), (4, 40);
+=== SHAPE A: ROWS FROM (...) — multi-arg table-function form, zero prior coverage ===
+# Expected: PG accepts and parallel-iterates the SRFs.
+# zeta: sqlparser rejects — ROWS keyword not in FROM-clause whitelist.
+SELECT * FROM ROWS FROM (generate_series(1, 3), generate_series(10, 12));
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: FROM at Line: 1, Column: 20
+=== SHAPE A.2: ROWS FROM (...) WITH ORDINALITY — same reject ===
+SELECT * FROM ROWS FROM (generate_series(1, 3)) WITH ORDINALITY;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: FROM at Line: 1, Column: 20
+=== SHAPE B: GROUP BY () — bare empty grouping (PG: grand total) ===
+# 7th hand-rolled formatter witness — fingerprint has NO Line/Column suffix.
+# Pattern P1 (literal-echo) from PR #462 META: `unsupported expression: <literal>`.
+SELECT SUM(v) FROM rb GROUP BY ();
+ERROR 1064: SQL parse error: unsupported expression: ()
+=== SHAPE C: GROUP BY GROUPING SETS (()) — same semantic, WORKS ===
+# Asymmetry: equivalent grand-total via the GROUPING SETS path succeeds.
+# Already pinned at pg_grouping_multicol_sentinel_basic_extra.test:124; cited
+# here as the contrast side of the SHAPE B reject.
+SELECT SUM(v) AS grand FROM rb GROUP BY GROUPING SETS (());
+grand
+100
+=== Cleanup ===
+DROP TABLE rb;
