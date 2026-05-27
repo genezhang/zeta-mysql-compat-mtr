@@ -1,0 +1,300 @@
+# Independently authored PG printf-style format() bug
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (read carefully — DO NOT duplicate):
+#   - MySQL `FORMAT(number, decimals[, locale])` (thousands-
+#     separator number formatter): pinned exhaustively in
+#     format_basic_extra.test (arity, rounding, locale,
+#     decimals clamp, NULL passthrough, non-finite f64).
+#     That slice covers the NUMERIC form only and never
+#     touches a printf-style format string.
+#   - `format_type(23, NULL)`: pinned at
+#     pg_ordinality_match_reflection_sentinel_basic_extra
+#     .test:236. Different function (one_arg/two_arg type-
+#     name formatter, not the printf one).
+#
+# Genuinely ZERO prior coverage on these shapes (grep
+# verified across tests/main/*.test — `format\(`,
+# `SELECT format`, `EXECUTE format`):
+#   - PG `format(fmtstr, args...)` printf-style with `%s`,
+#     `%I`, `%L`, `%%`, positional `%1$s`. None of the
+#     spec characters have ever been pinned.
+#   - The `EXECUTE format('SELECT * FROM %I WHERE c = %L',
+#     ...)` dynamic-SQL escape idiom (canonical PG ORM /
+#     pgPLSQL / Debezium pattern).
+#
+# Pre-existing pattern fingerprints this slice joins:
+#   - CORRUPTION-class family: PR #421 (DEFAULT subquery
+#     stored as text literal), PR #432 (TIMESTAMP(n)
+#     precision silent-drop), PR #438 (EXPLAIN option
+#     modifiers FORMAT/ANALYZE/BUFFERS silent-drop).
+#     Shared mechanism: the wire reports success, the
+#     value/output is structurally a STRING but its
+#     content is WRONG. No error, no warning. Downstream
+#     parsers / SQL re-executors blow up far from the
+#     cause.
+#
+# THE BUG (CORRUPTION class):
+#
+#   PG's `format(fmtstr, args...)` is the printf-style
+#   string interpolation function. Specs:
+#     %s — string-coerce the arg
+#     %I — quote_ident()       (table/column names)
+#     %L — quote_literal()     (string literals)
+#     %% — literal `%`
+#     %1$s — positional reference to arg 1
+#
+#   In zeta, `format(fmtstr, arg, ...)` is silently
+#   re-routed to the MySQL `FORMAT(number, decimals)`
+#   function. The fmtstr coerces to number `0`, the arg
+#   coerces to decimals `0`, and the call returns the
+#   string `'0'` for EVERY printf-style invocation.
+#
+#   Mechanism proof (pinned below as Shape M1/M2):
+#     - `format(0, 0)` → '0'          (the route)
+#     - `format(1234.5678, 2)` → '1,234.57'
+#       (proves zeta is running the MySQL numeric
+#        FORMAT() function — note the comma separator
+#        and 2-decimal rounding).
+#
+# Why this is CORRUPTION-class (joins PR #421/#432/#438):
+#
+#   - Wrong content, NO error signal. The wire returns
+#     the literal string "0" — not even NULL or empty.
+#   - Apps use `format()` for SQL-escape in dynamic SQL:
+#       EXECUTE format('SELECT * FROM %I WHERE c = %L',
+#                      tbl_name, val);
+#     With this bug, the inner string becomes "0", so
+#     `EXECUTE` runs `0` as SQL — either a parse error
+#     far from the cause, or (worse) some accidental
+#     match if "0" happens to be a valid statement
+#     fragment elsewhere.
+#   - CDC / replication pipelines that generate INSERT
+#     statements via format(): silent data loss. Every
+#     row formatted to the string "0".
+#   - ORM raw-mode SQL builders (Django RawQuery,
+#     SQLAlchemy text() with format) emit garbage.
+#
+# Wire divergence check: the function dispatch table is
+# shared across pgwire and mysqlwire (both wires reach
+# the same `format` builtin in zeta-executor). The
+# silent reroute to MySQL FORMAT happens in the function
+# resolver, not in either wire layer. Expected identical
+# behavior on both wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: CORRUPTION-class BUG — PG printf-
+#     style `format(fmtstr, args...)` is silently
+#     re-routed to MySQL `FORMAT(number, decimals)`.
+#     Every printf-style call (with `%s`, `%I`, `%L`,
+#     `%%`, `%1$s`) returns the literal string "0"
+#     regardless of the format string and args. NO
+#     error, NO warning. Workaround: do NOT call
+#     printf-style format() against zeta. Build
+#     dynamic SQL via string concatenation with
+#     manual quote_ident()/quote_literal() (if
+#     available) or via bind parameters in the
+#     prepared-statement protocol. EXECUTE format(...)
+#     dynamic SQL inside DO blocks / functions will
+#     run the literal string "0" as SQL.
+#   # zeta-adapt: single-arg form `format(fmtstr)`
+#     errors 1105 with the MySQL message "FORMAT
+#     requires 2 or 3 arguments (number, decimals
+#     [, locale])". The error message text itself is
+#     the clearest tell that the reroute is to the
+#     MySQL numeric FORMAT, not the PG printf one.
+#   # zeta-adapt: `format('%s', NULL)` (and similar
+#     fmtstr-plus-NULL shapes) returns SQL NULL (NULL
+#     coerces to decimals=NULL, which short-circuits
+#     FORMAT() to NULL). Different output from the
+#     all-non-NULL shapes (which return "0") but
+#     equally wrong — neither matches PG semantics
+#     (PG: `%s` formats NULL as the literal `'<NULL>'`).
+#
+# This slice pins (TEN shapes — eight CORRUPTION shapes,
+# two mechanism-proof shapes):
+#
+#   CORRUPTION-class BUG — printf-style format() returns
+#   "0" regardless of args (headline):
+#
+#     Shape A — `format('hi %s', 'world')` → '0'
+#       (real PG: 'hi world'). Basic %s interpolation,
+#       single arg.
+#
+#     Shape B — `format('val=%I', 'my_ident')` → '0'
+#       (real PG: 'val="my_ident"'). %I is supposed to
+#       quote_ident() the arg.
+#
+#     Shape C — `format('val=%L', 'literal')` → '0'
+#       (real PG: 'val=''literal'''). %L is supposed to
+#       quote_literal() the arg.
+#
+#     Shape D — `format('val=%s, num=%s', 'x', 42)` →
+#       '0' (real PG: 'val=x, num=42'). Two args, mixed
+#       types.
+#
+#     Shape E — `format('SELECT * FROM %I WHERE c =
+#       %L', 'users', 'alice')` → '0' (real PG:
+#       'SELECT * FROM "users" WHERE c = ''alice''').
+#       The headline EXECUTE format() dynamic-SQL
+#       idiom. If wrapped in EXECUTE, runs the string
+#       '0' as SQL.
+#
+#     Shape F — `format('%I.%I', 'public', 'users')`
+#       → '0' (real PG: '"public"."users"'). Two
+#       %I specs back-to-back, qualified identifier.
+#
+#     Shape G — `format('%1$s-%1$s', 'x')` → '0'
+#       (real PG: 'x-x'). Positional reference,
+#       same arg twice.
+#
+#     Shape H — `format('%s', 'only')` → '0'
+#       (real PG: 'only'). Single spec, single arg —
+#       the minimal printf shape.
+#
+#   MECHANISM-PROOF pins — show WHY the result is "0":
+#
+#     Shape M1 — `format(0, 0)` → '0'. Numeric
+#       FORMAT(0, 0) returns the literal string '0'.
+#       This is the exact code path every shape above
+#       is hitting after the silent reroute (fmtstr
+#       string coerces to number 0, arg coerces to
+#       decimals 0).
+#
+#     Shape M2 — `format(1234.5678, 2)` → '1,234.57'.
+#       Decisively proves the reroute: thousand-
+#       separator comma and 2-decimal rounding are the
+#       fingerprint of MySQL FORMAT(number, decimals).
+#       PG's printf format() would treat the first arg
+#       as a fmtstr and error / return the literal.
+#
+#   PARSE/ARITY witness pins:
+#
+#     Shape P1 — `format('plain string')` (no args
+#       beyond fmtstr) errors 1105 "FORMAT requires 2
+#       or 3 arguments (number, decimals[, locale])".
+#       The error MESSAGE TEXT itself is the clearest
+#       proof of the reroute — the words "number,
+#       decimals[, locale]" come from MySQL FORMAT,
+#       NOT PG printf format. PG accepts single-arg
+#       format() (the fmtstr passes through unchanged).
+#
+#     Shape P2 — `format('%s', NULL)` → SQL NULL.
+#       Different output from the all-non-NULL shapes
+#       (which return '0'), because NULL coerces to
+#       decimals=NULL, which short-circuits FORMAT()
+#       to NULL. Pin the divergence to lock it in —
+#       apps that happen to pass NULL through %s will
+#       see SQL NULL instead of '0' (and instead of
+#       PG's literal '<NULL>' string).
+
+--echo === Shape A: format('hi %s', 'world') — returns '0' instead of 'hi world' (CORRUPTION) ===
+
+# Headline BUG. Real PG: 'hi world'. zeta: '0'.
+
+SELECT format('hi %s', 'world') AS basic_s;
+
+--echo === Shape B: format('val=%I', 'my_ident') — quote_ident dropped, returns '0' ===
+
+# Real PG: 'val="my_ident"' (%I wraps the arg in
+# double-quotes per quote_ident() rules). zeta: '0'.
+
+SELECT format('val=%I', 'my_ident') AS quote_ident_spec;
+
+--echo === Shape C: format('val=%L', 'literal') — quote_literal dropped, returns '0' ===
+
+# Real PG: 'val=''literal''' (%L wraps the arg in
+# single-quotes per quote_literal() rules — the SQL
+# escape used for embedding values in dynamic SQL).
+# zeta: '0'.
+
+SELECT format('val=%L', 'literal') AS quote_literal_spec;
+
+--echo === Shape D: format('val=%s, num=%s', 'x', 42) — multi-arg %s, returns '0' ===
+
+# Real PG: 'val=x, num=42' (two %s specs, mixed string
+# and integer args). zeta: '0'.
+
+SELECT format('val=%s, num=%s', 'x', 42) AS two_args_mixed;
+
+--echo === Shape E: format('SELECT * FROM %I WHERE c = %L', 'users', 'alice') — dynamic SQL, returns '0' (CORRUPTION HEADLINE) ===
+
+# The canonical PG dynamic-SQL escape pattern. Real PG:
+# 'SELECT * FROM "users" WHERE c = ''alice'''. Apps wrap
+# this in EXECUTE inside DO blocks / functions to build
+# safely-quoted dynamic SQL at runtime. zeta returns
+# '0', so EXECUTE format(...) runs the literal '0' as
+# SQL — either a parse error far from the cause, or
+# (worse) a silent semantic divergence.
+
+SELECT format('SELECT * FROM %I WHERE c = %L', 'users', 'alice') AS dynamic_sql_idiom;
+
+--echo === Shape F: format('%I.%I', 'public', 'users') — qualified identifier, returns '0' ===
+
+# Real PG: '"public"."users"'. Two %I specs back-to-
+# back is the schema-qualified-name pattern. zeta: '0'.
+
+SELECT format('%I.%I', 'public', 'users') AS qualified_ident;
+
+--echo === Shape G: format('%1$s-%1$s', 'x') — positional reference, returns '0' ===
+
+# Real PG: 'x-x' (%1$s is the positional form that
+# references arg 1; using it twice prints the same arg
+# twice). zeta: '0'.
+
+SELECT format('%1$s-%1$s', 'x') AS positional_ref;
+
+--echo === Shape H: format('%s', 'only') — minimal printf shape, returns '0' ===
+
+# Real PG: 'only'. The smallest possible printf-style
+# call: one spec, one arg. zeta: '0'.
+
+SELECT format('%s', 'only') AS minimal_printf;
+
+--echo === Shape M1: format(0, 0) — mechanism proof, returns '0' ===
+
+# This is the numeric FORMAT(number, decimals) code
+# path every printf-style shape above ends up hitting
+# after the silent reroute. The fmtstr ('hi %s' etc.)
+# coerces to number 0; the arg coerces to decimals 0;
+# FORMAT(0, 0) returns the literal string '0'.
+
+SELECT format(0, 0) AS numeric_zero_zero;
+
+--echo === Shape M2: format(1234.5678, 2) — mechanism proof, '1,234.57' (MySQL numeric FORMAT fingerprint) ===
+
+# Decisive proof of the silent reroute: the comma
+# thousand-separator and 2-decimal rounding are the
+# unique fingerprint of MySQL's FORMAT(number, decimals).
+# PG's printf format() would treat '1234.5678' as a
+# fmtstr and pass it through unchanged (no specs to
+# expand). zeta's '1,234.57' result conclusively
+# identifies which function is actually being called.
+
+SELECT format(1234.5678, 2) AS numeric_decimal_proof;
+
+--echo === Shape P1: format('plain string') single-arg — errors 1105 with MySQL message ===
+
+# The error MESSAGE TEXT is the clearest proof of the
+# silent reroute. PG's printf format() accepts a single
+# argument (the fmtstr) and returns it unchanged. zeta
+# requires 2-or-3 args because it has wired format() to
+# the numeric MySQL FORMAT(number, decimals[, locale]).
+# The words "number, decimals[, locale]" in the error
+# can ONLY come from the MySQL numeric impl — they have
+# no meaning in the PG printf one.
+
+--error 1105
+SELECT format('plain string');
+
+--echo === Shape P2: format('%s', NULL) — returns SQL NULL (not '0', not '<NULL>' literal) ===
+
+# Divergent output from Shapes A-H: NULL coerces to
+# decimals=NULL, which short-circuits FORMAT() to
+# return SQL NULL. Real PG: '<NULL>' literal (the
+# printf format() treats NULL args as the literal
+# four-character string '<NULL>'). Pin the zeta
+# divergence to lock it in.
+
+SELECT format('%s', NULL) AS fmt_spec_with_null_arg;
