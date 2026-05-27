@@ -1,0 +1,166 @@
+# Independently authored MySQL @-prefixed session-variable
+# end-to-end sentinel for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - variable_basic_extra pins the surface forms of
+#     SELECT @@<var>, SET @@<var>, SET @x, SELECT @x (1064),
+#     SELECT @@<var> AS r, (@@var) parenthesised (1064).
+#   - sysvar_broad_basic_extra pins the broader hardcoded
+#     @@<var> identity surface (charset, version_*, license,
+#     unknown -> NULL).
+#   - This slice complements both by pinning the END-TO-END
+#     MYSQL IDIOM — what apps actually do with @-vars —
+#     across all four DML contexts (INSERT VALUES /
+#     SELECT WHERE / UPDATE SET+WHERE / DELETE WHERE), plus
+#     three rarely-tested @@-shapes: qualified-unknown,
+#     SET @@global.<unknown>, and arithmetic on a string-
+#     typed @@<var> ('@@version + 1').
+#
+# This slice pins (NOVEL surface, not in prior tests):
+#   - SET @user_var = value parses silently BUT the value
+#     is invisible to the planner — reading @user_var in
+#     ANY expression context emits the same fingerprint:
+#     `ERROR 1064: SQL parse error: unsupported unary
+#      operator: @`. Pinned across all four DML contexts
+#     to prove the asymmetry isn't accidental to one path.
+#   - The MySQL `SET @last_id = LAST_INSERT_ID(); INSERT
+#     ... VALUES (..., @last_id)` pattern is BROKEN end-
+#     to-end — write succeeds, all four read sites error.
+#   - SET @@global.<unknown> = X and SET @@session.<unknown>
+#     = X are BOTH silent no-ops (qualified, not just bare).
+#   - SELECT @@global.<unknown_var> and SELECT @@session.
+#     <unknown_var> return NULL — the unknown-sysvar-to-
+#     NULL fallback is symmetric across @@SESSION./@@GLOBAL.
+#     prefixes, not just bare @@<name> (which
+#     sysvar_broad_basic_extra pinned).
+#   - SELECT @@version + 1 returns NULL (NOT a 1064 and
+#     NOT '8.0.36-zeta' + 1) — silent string-to-number
+#     coercion failure on a known string-typed @@<var>
+#     used in arithmetic.
+#
+# Big-picture finding (THREE-FINGERPRINT, NOT TWO):
+#
+#   The probe brief framed this as a "two-fingerprint two-
+#   codepath" pattern (SET path rejects `@`/`@@` at parse
+#   time; SELECT path rejects via convert.rs unary-op).
+#   Empirical verification against the current shim shows
+#   the real surface is THREE fingerprints, NOT two:
+#
+#   F1. SET @x / SET @@anything (incl. qualified-unknown):
+#       PARSES SILENTLY. No error, no observable state
+#       change (no session_vars binding visible to the
+#       planner). Both the parser-rejection theory AND
+#       the "value is stored" theory are wrong — the
+#       statement is accepted and discarded.
+#
+#   F2. SELECT @x (user-var read, ANY context): ERROR
+#       1064 "SQL parse error: unsupported unary operator:
+#       @". This holds in SELECT projection, SELECT WHERE,
+#       INSERT VALUES, UPDATE SET, UPDATE WHERE, DELETE
+#       WHERE. Single uniform fingerprint.
+#
+#   F3. SELECT @@<sysvar> (system-var read): RETURNS A
+#       VALUE — either the shim's hardcoded answer
+#       (@@version='8.0.36-zeta', @@autocommit='ON') OR
+#       NULL for any unknown name, INCLUDING qualified
+#       forms (@@global.foo, @@session.foo). Never errors.
+#
+#   Implication for migration: the common MySQL session-
+#   state idiom (SET @x = ...; ... use @x in DML) fails
+#   uniformly with errno 1064 at every read site, which
+#   is GOOD for porters (clear signal, single error code
+#   to grep for) but BAD for ORMs that silently `SET @x`
+#   on connection setup and then never read — those will
+#   appear to work but with no actual binding (silent
+#   data loss vs MySQL semantics).
+#
+# Big-picture finding (ARITHMETIC ON STRING @@<var>):
+#
+#   SELECT @@version is '8.0.36-zeta' (a string), but
+#   SELECT @@version + 1 returns NULL silently. Real
+#   MySQL would either coerce '8' → 8 (and return 9) or
+#   warn. zeta neither warns nor errors. Apps doing
+#   version-gating like `IF @@version >= 8.0 THEN ...`
+#   will silently take the FALSE branch. Pin
+#   @@<var>-arithmetic to NULL so any future change
+#   (numeric coercion, error, or warning) trips this
+#   sentinel.
+#
+# Adaptation notes:
+#   # zeta-adapt: SET @user_var = value is silent — the
+#     value is NOT bound. Substitute: CTE-derived literal
+#     (`WITH cte AS (SELECT N AS x) ...`) or push the
+#     constant directly into the DML.
+#   # zeta-adapt: SET @@global.<unknown> / SET
+#     @@session.<unknown> are silent — the qualified
+#     unknown-sysvar SET path matches the bare-unknown
+#     SET path (both no-op).
+#   # zeta-adapt: SELECT @@global.<unknown> /
+#     @@session.<unknown> return NULL, matching bare
+#     unknown @@<var>. Pin known names explicitly if you
+#     rely on the value.
+#   # zeta-adapt: Arithmetic on string-typed @@<var>
+#     returns NULL, not a coerced number. Cast
+#     explicitly or compare full strings.
+
+--echo === Setup ===
+
+CREATE TABLE t_atvar (id INT PRIMARY KEY, v INT);
+INSERT INTO t_atvar VALUES (1, 10);
+
+--echo === SET @var — both `=` and `:=` parse silently ===
+--echo # No error, no observable binding (verified by the
+--echo # READ-side errors below).
+
+SET @id = 1;
+SET @id := 1;
+
+--echo === SET @@global.<unknown> / @@session.<unknown> ===
+--echo # NOVEL: qualified-unknown SETs are silent no-ops,
+--echo # matching the bare @@<unknown> = X path (which
+--echo # variable_basic_extra:68 pinned for known names).
+
+SET @@global.foo = 1;
+SET @@session.bar = 'whatever';
+
+--echo === @var READ in INSERT VALUES — errno 1064 ===
+--echo # The `INSERT ... VALUES (..., @last_id)` idiom from
+--echo # `SET @last_id = LAST_INSERT_ID();` is broken here.
+
+--error 1064
+INSERT INTO t_atvar VALUES (@id + 1, 20);
+
+--echo === @var READ in SELECT WHERE — errno 1064 ===
+
+--error 1064
+SELECT * FROM t_atvar WHERE id = @id;
+
+--echo === @var READ in UPDATE SET and WHERE — errno 1064 ===
+
+--error 1064
+UPDATE t_atvar SET v = @id WHERE id = 1;
+
+--echo === @var READ in DELETE WHERE — errno 1064 ===
+
+--error 1064
+DELETE FROM t_atvar WHERE id = @id;
+
+--echo === @@global.<unknown> / @@session.<unknown> READ — NULL ===
+--echo # NOVEL: the unknown-sysvar-to-NULL fallback is
+--echo # symmetric across @@GLOBAL./@@SESSION./bare forms.
+
+SELECT @@global.unknown_thing;
+SELECT @@session.unknown_thing;
+
+--echo === Arithmetic on string-typed @@<var> — silent NULL ===
+--echo # NOVEL: @@version is '8.0.36-zeta' (a string) but
+--echo # @@version + 1 returns NULL — no coercion, no error,
+--echo # no warning. Apps version-gating with arithmetic
+--echo # comparisons silently take the wrong branch.
+
+SELECT @@version + 1;
+
+--echo === Cleanup ===
+
+DROP TABLE t_atvar;
