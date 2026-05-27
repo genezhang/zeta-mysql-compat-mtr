@@ -1,0 +1,450 @@
+# Independently authored PG `to_char()` partial-
+# implementation CORRUPTION-class sentinel slice for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/.
+#
+# Existing coverage (read carefully — DO NOT duplicate):
+#   - `TO_CHAR(DATE '2023-04-05', 'YYYY-MM-DD')` at
+#     function_basic.test:118 — ONE shape, pinning ONLY
+#     the basic-WORKS spec `YYYY-MM-DD`. No coverage of
+#     any other format code, no number form, no overflow
+#     handling, no "kept literally" partial-impl
+#     mechanism. Verified via grep across `tests/main/
+#     *.test` for `to_char\(` / `TO_CHAR\(` — that one
+#     line is the entire prior surface.
+#
+# Genuinely ZERO prior coverage on these shapes (grep
+# verified across tests/main/*.test):
+#   - `to_char(num, fmt)` numeric form — ANY format spec,
+#     including the WORKS subset (digit/zero slots, S
+#     sign, L currency, '.' decimal, ',' group sep).
+#   - `to_char(num, fmt)` overflow behavior (`###`
+#     width-fail indicator).
+#   - `to_char(num, fmt)` KEPT-LITERAL partial-impl bug
+#     for B (blank-if-zero), RN (Roman numeral), FM (no-
+#     fill), EEEE (scientific), TH (ordinal), XXX (hex),
+#     PR (paren-on-negative — actually IMPLEMENTED!),
+#     MI (left-sign — actually IMPLEMENTED!).
+#   - `to_char(date/timestamp, fmt)` form for ANY spec
+#     other than the one `YYYY-MM-DD` pin already in
+#     function_basic.test.
+#   - `to_char(timestamp, fmt)` KEPT-LITERAL partial-
+#     impl bug for `Day`, `Month`, `Mon`, `Dy`, `AM`,
+#     `PM`, `Q`, `WW`, `DOY`, `D`, `CC`, `TZ`, `MS`,
+#     `IYYY`, `IW`, `ID`, and the quoted-literal `"T"`
+#     escape.
+#
+# Pre-existing pattern fingerprints this slice joins:
+#   - CORRUPTION-class family: PR #421 (DEFAULT subquery
+#     stored as text literal), PR #432 (TIMESTAMP(n)
+#     precision silent-drop), PR #438 (EXPLAIN option
+#     modifiers FORMAT/ANALYZE/BUFFERS silent-drop),
+#     PR #440 (PG printf-style `format()` silently
+#     re-routed to MySQL numeric `FORMAT(num, dec)`).
+#     Shared mechanism: the wire reports success, the
+#     value/output is structurally a STRING but its
+#     content is WRONG. No error, no warning. Apps that
+#     pipe the output into downstream parsers, report
+#     templates, or label generators get garbage that
+#     LOOKS LIKE a format example back — particularly
+#     hard to notice in eyeballed test runs because the
+#     output "kind of" looks right.
+#
+# THE BUG (CORRUPTION class):
+#
+#   PG's `to_char()` has two function arms:
+#     `to_char(numeric, text)` — numeric formatting with
+#         template patterns: 9 (digit), 0 (zero-pad),
+#         . (decimal), , (group), S (sign), L (currency
+#         locale), B (blank-if-zero), RN (Roman),
+#         EEEE (scientific), FM (no-fill / strip
+#         padding), TH (ordinal), XXX (hex), PR (paren
+#         on negative), MI (left-justified sign).
+#     `to_char(timestamp, text)` — date/time formatting
+#         with template patterns: YYYY/YY (year), MM
+#         (month num), DD (day-of-month), Day (day-name
+#         padded), Month (month-name padded), Mon/Dy
+#         (abbreviated), HH24/HH12 (hour), MI (minute),
+#         SS (second), MS (millisecond), AM/PM (period
+#         marker), Q (quarter), WW (week-of-year),
+#         DOY (day-of-year), D (day-of-week 1-7),
+#         CC (century), IYYY/IW/ID (ISO week-year
+#         family), TZ (timezone abbreviation), plus
+#         `"..."` for quoted literal passthrough.
+#
+#   In zeta, ONLY a partial subset of these template
+#   patterns is implemented. The OTHERS are passed
+#   through to the output AS LITERAL TEXT — the parser
+#   sees an unknown spec, fails to match it to a
+#   handler, and the spec characters fall through to
+#   the result string unchanged. No error. No warning.
+#
+#   This is materially worse than the more-common
+#   "spec silently ignored" shape (where the spec would
+#   simply not appear in the output): here the spec
+#   characters APPEAR in the output verbatim, so the
+#   user gets back a string that LOOKS LIKE a format
+#   example. `to_char(now(), 'Day Month YYYY')` returns
+#   the string `'Day Month 2024'` — a partly-rendered
+#   template that is trivial to mistake for "almost
+#   right" in a glance-pass through a report.
+#
+#   Overflow has a separate (but also non-erroring)
+#   shape: `to_char(1234.56, '999.99')` returns
+#   `'###.##'` (the integer part doesn't fit the 3-
+#   digit slot — three `#` chars replace the value).
+#   Real PG returns `'1234.56'` for the same call
+#   (PG uses the `.99` slot count as a HINT, not a
+#   hard cap on the integer side, and emits the full
+#   value if it fits the larger slot count).
+#
+# Why this is CORRUPTION-class (joins PR #421/#432/
+# #438/#440):
+#   - Wrong content, NO error signal. Wire returns a
+#     plain VARCHAR result that LOOKS like a normal
+#     format output — only the spec characters are
+#     visible-but-wrong.
+#   - Report generators / CDC label formatters / audit
+#     log timestamp renderers emit garbage that propagates
+#     to dashboards, exported CSVs, and operator emails
+#     before anyone notices the spec chars.
+#   - Django ORM raw queries, dashboard SQL templates,
+#     and tooling that emit PG-style `to_char()` (because
+#     PG-on-the-wire is the contract) will silently
+#     start emitting `'Day Month 2024'` instead of
+#     `'Friday March 2024'`. The downstream consumer
+#     gets a string that has the right SHAPE but wrong
+#     CONTENT.
+#   - Width-overflow `###` shape is the SAME class but
+#     visually different — it looks more like an obvious
+#     "this is wrong" but PG never emits it (PG widens
+#     the field), so any app that ported `to_char(num,
+#     '999.99')` from PG will get `'###.##'` instead of
+#     the expected value.
+#
+# Wire divergence check: the `to_char` function dispatch
+# is in zeta-executor (shared scalar registry). Both
+# pgwire and mysqlwire reach the same impl — the
+# partial-impl parser is the same code path. Probed via
+# mysqlwire (this slice's wire); expected identical
+# behavior on pgwire.
+#
+# Adaptation notes:
+#   # zeta-adapt: CORRUPTION-class BUG (numeric form) —
+#     `to_char(num, fmt)` keeps UNIMPLEMENTED format
+#     codes in the output verbatim instead of erroring
+#     or stripping them. Implemented codes: 0/9 (digit
+#     slots), '.', ',', S (sign), L (currency → '$'
+#     USD only), PR (paren-on-negative), MI (left sign).
+#     Silently-kept-literal codes (incomplete list):
+#     B (blank-if-zero), RN (Roman numeral), FM (no-
+#     fill modifier), EEEE (scientific), TH (ordinal),
+#     XXX (hex). Workaround: format numbers in
+#     application code; do NOT pass any PG template
+#     pattern other than the implemented subset above.
+#   # zeta-adapt: CORRUPTION-class BUG (numeric form,
+#     overflow) — `to_char(num, fmt)` emits `###` chars
+#     when the integer part exceeds the slot count
+#     (e.g. `to_char(1234.5, '999.9')` → `'###.#'`).
+#     Real PG emits the full value (`'1234.5'`).
+#     Workaround: size the format string for the
+#     maximum expected value, or use the digit-AND-
+#     zero pattern (`'0000.0'`) which avoids the
+#     overflow indicator.
+#   # zeta-adapt: CORRUPTION-class BUG (date form) —
+#     `to_char(date/timestamp, fmt)` keeps UNIMPLEMENTED
+#     format codes in the output verbatim. Implemented
+#     codes: YYYY, YY, MM, DD, HH24, HH12 (partial —
+#     digits run together with next chars), MI (minute),
+#     SS. Silently-kept-literal codes (incomplete list):
+#     Day, Month, Mon, Dy, AM, PM, Q, WW, DOY, D, CC,
+#     TZ, MS, IYYY, IW, ID. The quoted-literal `"..."`
+#     escape is ALSO not implemented — the double-quote
+#     characters appear in the output instead of being
+#     stripped. Workaround: build date/time strings in
+#     application code or via the MySQL `DATE_FORMAT`
+#     function (which uses `%`-prefixed specs and is
+#     fully implemented).
+#   # zeta-adapt: `to_char(NULL, fmt)` returns SQL NULL
+#     (pinned). This is the one well-behaved case in
+#     the function and matches PG semantics.
+#
+# This slice pins (TWELVE shapes — eight CORRUPTION
+# shapes split across numeric / date / overflow buckets,
+# two WORKS-baseline pins, two PARTIAL-WORKS-but-
+# noteworthy pins, and one NULL-passthrough support
+# pin):
+#
+#   WORKS-baseline pins (lock the implemented subset
+#   so any future regression in the WORKING codes is
+#   visible alongside the partial-impl drift):
+#
+#     Shape W1 — `to_char(1234.5678, '0000.0000')` →
+#       '1234.5678'. The digit-and-zero pattern works
+#       (no overflow because the slot count matches).
+#     Shape W2 — `to_char(DATE '2024-03-15', 'YYYY-MM-
+#       DD')` → '2024-03-15'. Basic date format works
+#       (the only PG date spec pinned anywhere prior).
+#
+#   CORRUPTION-class BUG — numeric form, KEPT-LITERAL
+#   (headline):
+#
+#     Shape A — `to_char(1, 'RN')` → 'RN' (real PG:
+#       '          I'). The Roman-numeral format code
+#       is kept LITERALLY in the output. Particularly
+#       insidious because the result LOOKS LIKE the
+#       user passed the wrong arg.
+#     Shape B — `to_char(1234.5678, 'B99999')` →
+#       'B 1234' (real PG: ' 1234' — the B modifier
+#       means "render blanks if value is zero", non-
+#       printing for nonzero values). The B character
+#       leaks into the output.
+#     Shape C — `to_char(1234.5678, 'FM999G999D99')`
+#       → 'FM  1,234.56' (real PG: '1,234.56' — the
+#       FM modifier means "no padding"). The FM
+#       characters leak into the output AND padding
+#       is not stripped (the implemented codes G/D
+#       happen to work as group-sep/decimal-point).
+#     Shape D — `to_char(1234, '9999TH')` → '1234TH'
+#       (real PG: '1234TH'). LOOKS correct by
+#       coincidence — `1234` ends in `4` so the
+#       English ordinal happens to be `TH` — but the
+#       TH chars are kept literally regardless of the
+#       trailing digit. Compare with Shape D2 which
+#       proves the literal-kept mechanism.
+#     Shape D2 — `to_char(1, '9TH')` → '1TH' (real
+#       PG: '1ST'). PROOF that TH is literal-kept,
+#       not implemented: the ordinal for 1 is `ST`,
+#       not `TH`. zeta returns `TH` regardless.
+#     Shape E — `to_char(123, 'XXX')` → 'XXX' (real
+#       PG: ' 7b' — hex 7B for decimal 123). The X
+#       hex-digit specs are kept literally; no hex
+#       conversion happens.
+#
+#   CORRUPTION-class BUG — numeric form, OVERFLOW:
+#
+#     Shape F — `to_char(1234.5678, '999.99')` →
+#       '###.##' (real PG: '1234.57' — PG widens the
+#       field rather than emitting overflow chars).
+#       The `#` overflow indicator is the most
+#       visually-obvious failure mode but PG never
+#       emits it.
+#     Shape F2 — `to_char(1.5e10, '9.99EEEE')` →
+#       '#.##' (real PG: '  1.50e+10' — scientific
+#       notation). Combined fault: EEEE is not
+#       implemented (would be kept literal alone)
+#       AND the value overflows the 1-digit integer
+#       slot (so `#` appears even though the EEEE
+#       chars are stripped, which is a third
+#       inconsistency on top).
+#
+#   CORRUPTION-class BUG — date form, KEPT-LITERAL:
+#
+#     Shape G — `to_char(DATE '2024-03-15', 'Day, DD
+#       Month YYYY')` → 'Day, 15 Month 2024' (real PG:
+#       'Friday   , 15 March      2024'). HEADLINE
+#       date-form CORRUPTION — the `Day` and `Month`
+#       full-name specs are kept LITERALLY in the
+#       output. Report templates and PDF/CSV
+#       generators will emit the literal strings
+#       `Day` and `Month` instead of weekday/month
+#       names.
+#     Shape H — `to_char(TIMESTAMP '2024-03-15
+#       02:25:30', 'HH12:MI:SS AM')` → '0212:25:30
+#       AM' (real PG: '02:25:30 AM'). Two separate
+#       faults visible: (1) HH12 emits the `02` but
+#       the `:` separator is consumed by the parser
+#       attempting `MI`-after-`H` which then matches
+#       again — the digits run together; (2) the
+#       `AM` period-marker spec is kept LITERALLY
+#       in the output. Note: real PG would also emit
+#       `AM` for a 02:25:30 time, but zeta emits `AM`
+#       for the 14:25:30 PM time as well (see Shape
+#       H2) — proving literal-kept, not implemented.
+#     Shape H2 — `to_char(TIMESTAMP '2024-03-15
+#       14:25:30', 'AM')` → 'AM' (real PG: 'PM' for
+#       a 14:25:30 input). PROOF that AM is literal-
+#       kept, not implemented: a 14:25:30 input is
+#       afternoon, so the period marker should be
+#       PM, not AM. zeta returns the literal `AM`
+#       chars unchanged.
+#     Shape I — `to_char(TIMESTAMP '2024-03-15
+#       14:25:30', 'IYYY-IW-ID')` → 'I24Y-IW-ID'
+#       (real PG: '2024-11-5' — ISO week-year, ISO
+#       week, ISO day-of-week). Particularly bizarre
+#       output: the parser matches the bare `Y` after
+#       `I` as a year spec (returning `24`), then
+#       leaves the surrounding `I` and `Y` literals
+#       in place, then keeps `IW` and `ID` entirely
+#       literal. The output `I24Y-IW-ID` mixes a
+#       correctly-parsed year fragment with literal
+#       spec chars.
+#
+#   NULL-passthrough support pin (well-behaved case):
+#
+#     Shape Z — `to_char(NULL, 'YYYY')` → SQL NULL.
+#       The one shape in the function that matches PG
+#       semantics. Pin it as the support case so any
+#       future regression that ALSO breaks NULL
+#       handling is caught.
+
+--echo === Shape W1: to_char(1234.5678, '0000.0000') — works (digit-and-zero pattern) ===
+
+# Baseline pin: the digit-AND-zero pattern works
+# correctly (no overflow, no kept-literal chars). Lock
+# in the WORKS subset so partial-impl drift is visible
+# alongside any future regression of the working codes.
+
+SELECT to_char(1234.5678, '0000.0000') AS works_zero_pattern;
+
+--echo === Shape W2: to_char(DATE '2024-03-15', 'YYYY-MM-DD') — works (basic date format) ===
+
+# Baseline pin: the YYYY/MM/DD spec works on a DATE
+# input. This is the one shape pinned anywhere prior
+# (function_basic.test:118). Re-pinning here makes the
+# WORKS/KEPT-LITERAL contrast obvious within this
+# slice.
+
+SELECT to_char(DATE '2024-03-15', 'YYYY-MM-DD') AS works_basic_date;
+
+--echo === Shape A: to_char(1, 'RN') — Roman numeral kept literally, returns 'RN' instead of 'I' (CORRUPTION) ===
+
+# Real PG: '          I' (right-padded Roman numeral
+# for the integer 1). zeta returns the literal `RN`
+# chars unchanged — particularly insidious because
+# the result looks like the user mis-pasted the
+# format string into the value slot.
+
+SELECT to_char(1, 'RN') AS rn_kept_literal;
+
+--echo === Shape B: to_char(1234.5678, 'B99999') — B modifier kept literally, returns 'B 1234' instead of ' 1234' ===
+
+# Real PG: ' 1234' (the B modifier means "render
+# blanks if value is zero"; for a nonzero value it
+# is non-printing). zeta keeps the `B` character in
+# the output verbatim.
+
+SELECT to_char(1234.5678, 'B99999') AS b_modifier_kept;
+
+--echo === Shape C: to_char(1234.5678, 'FM999G999D99') — FM modifier kept literally, returns 'FM  1,234.56' ===
+
+# Real PG: '1,234.56' (FM modifier strips padding,
+# G is group separator, D is decimal point). zeta:
+# the G/D codes happen to work (group sep / decimal
+# pinned to ',' / '.' for the en_US locale), but
+# the FM chars leak into the output AND the leading
+# padding is NOT stripped (the FM functionality is
+# absent, only its CHARACTERS are kept).
+
+SELECT to_char(1234.5678, 'FM999G999D99') AS fm_modifier_kept;
+
+--echo === Shape D: to_char(1234, '9999TH') — TH kept literally, accidentally matches PG output for digit 4 ===
+
+# Real PG: '1234TH' (English ordinal for a number
+# ending in 4 IS 'TH'). LOOKS correct but is
+# coincidental — see Shape D2 for the proof.
+
+SELECT to_char(1234, '9999TH') AS th_accidental_match;
+
+--echo === Shape D2: to_char(1, '9TH') — TH kept literally, returns '1TH' instead of '1ST' (PROOF) ===
+
+# Real PG: '1ST' (English ordinal for 1 is `ST`,
+# not `TH`). zeta returns `1TH` — PROVES that TH
+# is literal-kept, not implemented as the ordinal
+# suffix.
+
+SELECT to_char(1, '9TH') AS th_literal_proof;
+
+--echo === Shape E: to_char(123, 'XXX') — hex format kept literally, returns 'XXX' instead of ' 7b' ===
+
+# Real PG: ' 7b' (hex 7B for decimal 123, lowercased
+# by default). zeta returns the literal `XXX` chars
+# unchanged — no hex conversion happens.
+
+SELECT to_char(123, 'XXX') AS xxx_hex_kept_literal;
+
+--echo === Shape F: to_char(1234.5678, '999.99') — width overflow returns '###.##' instead of '1234.57' (CORRUPTION) ===
+
+# Real PG: '1234.57' (PG widens the field rather
+# than emitting `#` overflow chars; the `.99` slot
+# count is a HINT to the rounding behavior, not a
+# hard cap on the integer side). zeta emits three
+# `#` chars on the integer side — apps that ported
+# `to_char(num, '999.99')` from PG get unreadable
+# output.
+
+SELECT to_char(1234.5678, '999.99') AS overflow_hash_chars;
+
+--echo === Shape F2: to_char(1.5e10, '9.99EEEE') — EEEE not implemented + overflow combine, returns '#.##' ===
+
+# Real PG: '  1.50e+10' (scientific notation via
+# the EEEE spec). zeta: combined fault — EEEE is
+# stripped (not literal-kept here, inconsistent
+# with the kept-literal behavior of other codes),
+# AND the 1-digit integer slot overflows, so the
+# output is `#.##`. THREE inconsistencies stack:
+# (1) EEEE silently ignored not literal-kept,
+# (2) overflow chars `#` emitted, (3) the resulting
+# string has no resemblance to either a scientific
+# notation OR a literal.
+
+SELECT to_char(1.5e10, '9.99EEEE') AS eeee_combined_fault;
+
+--echo === Shape G: to_char(DATE '2024-03-15', 'Day, DD Month YYYY') — Day/Month kept literally (HEADLINE date corruption) ===
+
+# Real PG: 'Friday   , 15 March      2024' (padded
+# weekday and month names). zeta: 'Day, 15 Month
+# 2024' — the `Day` and `Month` full-name specs
+# are kept LITERALLY. DD and YYYY (implemented)
+# work correctly. Report templates emit the
+# literal strings `Day` and `Month` instead of
+# weekday/month names — silent garbage in PDFs,
+# CSVs, audit logs.
+
+SELECT to_char(DATE '2024-03-15', 'Day, DD Month YYYY') AS day_month_kept;
+
+--echo === Shape H: to_char(TIMESTAMP, 'HH12:MI:SS AM') — HH12 digits run together + AM kept literally ===
+
+# Real PG: '02:25:30 AM' (for a 02:25:30 input).
+# zeta: '0212:25:30 AM' — two separate faults: the
+# HH12 spec emits `02` but the `:` separator is
+# consumed by the parser attempting `MI` (which
+# also matches later), so the digits run together
+# producing `0212`; AND the `AM` period marker is
+# kept LITERALLY. See Shape H2 for proof of the
+# AM literal-kept mechanism.
+
+SELECT to_char(TIMESTAMP '2024-03-15 02:25:30', 'HH12:MI:SS AM') AS hh12_am_combined;
+
+--echo === Shape H2: to_char(TIMESTAMP afternoon, 'AM') — AM kept literally, returns 'AM' for a PM time (PROOF) ===
+
+# Real PG: 'PM' (14:25:30 is afternoon, so the
+# period marker is PM). zeta returns the literal
+# `AM` chars unchanged — PROVES the period marker
+# is literal-kept, not implemented as the AM/PM
+# resolver.
+
+SELECT to_char(TIMESTAMP '2024-03-15 14:25:30', 'AM') AS am_literal_proof;
+
+--echo === Shape I: to_char(TIMESTAMP, 'IYYY-IW-ID') — ISO week-year family kept literally with bizarre partial parse ===
+
+# Real PG: '2024-11-5' (ISO week-year 2024, ISO
+# week 11, ISO day-of-week 5). zeta: 'I24Y-IW-ID'
+# — particularly bizarre output. The parser
+# matches the bare `Y` after `I` as a year spec
+# (returning `24`), then leaves the surrounding
+# `I` and `Y` literals in place. The remaining
+# `IW` and `ID` specs are kept entirely literal.
+# Result: a string that mixes a correctly-parsed
+# year fragment with literal spec chars.
+
+SELECT to_char(TIMESTAMP '2024-03-15 14:25:30', 'IYYY-IW-ID') AS iyyy_partial_parse;
+
+--echo === Shape Z: to_char(NULL, 'YYYY') — NULL passthrough (well-behaved, matches PG) ===
+
+# The one shape in the function that matches PG
+# semantics. Pin it as the support case so any
+# future regression that ALSO breaks NULL handling
+# is caught alongside the partial-impl drift.
+
+SELECT to_char(NULL, 'YYYY') IS NULL AS null_input_returns_null;

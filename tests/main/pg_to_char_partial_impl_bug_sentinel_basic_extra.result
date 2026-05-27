@@ -1,0 +1,60 @@
+=== Shape W1: to_char(1234.5678, '0000.0000') — works (digit-and-zero pattern) ===
+SELECT to_char(1234.5678, '0000.0000') AS works_zero_pattern;
+works_zero_pattern
+1234.5678
+=== Shape W2: to_char(DATE '2024-03-15', 'YYYY-MM-DD') — works (basic date format) ===
+SELECT to_char(DATE '2024-03-15', 'YYYY-MM-DD') AS works_basic_date;
+works_basic_date
+2024-03-15
+=== Shape A: to_char(1, 'RN') — Roman numeral kept literally, returns 'RN' instead of 'I' (CORRUPTION) ===
+SELECT to_char(1, 'RN') AS rn_kept_literal;
+rn_kept_literal
+RN
+=== Shape B: to_char(1234.5678, 'B99999') — B modifier kept literally, returns 'B 1234' instead of ' 1234' ===
+SELECT to_char(1234.5678, 'B99999') AS b_modifier_kept;
+b_modifier_kept
+B 1234
+=== Shape C: to_char(1234.5678, 'FM999G999D99') — FM modifier kept literally, returns 'FM  1,234.56' ===
+SELECT to_char(1234.5678, 'FM999G999D99') AS fm_modifier_kept;
+fm_modifier_kept
+FM  1,234.56
+=== Shape D: to_char(1234, '9999TH') — TH kept literally, accidentally matches PG output for digit 4 ===
+SELECT to_char(1234, '9999TH') AS th_accidental_match;
+th_accidental_match
+1234TH
+=== Shape D2: to_char(1, '9TH') — TH kept literally, returns '1TH' instead of '1ST' (PROOF) ===
+SELECT to_char(1, '9TH') AS th_literal_proof;
+th_literal_proof
+1TH
+=== Shape E: to_char(123, 'XXX') — hex format kept literally, returns 'XXX' instead of ' 7b' ===
+SELECT to_char(123, 'XXX') AS xxx_hex_kept_literal;
+xxx_hex_kept_literal
+XXX
+=== Shape F: to_char(1234.5678, '999.99') — width overflow returns '###.##' instead of '1234.57' (CORRUPTION) ===
+SELECT to_char(1234.5678, '999.99') AS overflow_hash_chars;
+overflow_hash_chars
+###.##
+=== Shape F2: to_char(1.5e10, '9.99EEEE') — EEEE not implemented + overflow combine, returns '#.##' ===
+SELECT to_char(1.5e10, '9.99EEEE') AS eeee_combined_fault;
+eeee_combined_fault
+#.##
+=== Shape G: to_char(DATE '2024-03-15', 'Day, DD Month YYYY') — Day/Month kept literally (HEADLINE date corruption) ===
+SELECT to_char(DATE '2024-03-15', 'Day, DD Month YYYY') AS day_month_kept;
+day_month_kept
+Day, 15 Month 2024
+=== Shape H: to_char(TIMESTAMP, 'HH12:MI:SS AM') — HH12 digits run together + AM kept literally ===
+SELECT to_char(TIMESTAMP '2024-03-15 02:25:30', 'HH12:MI:SS AM') AS hh12_am_combined;
+hh12_am_combined
+0212:25:30 AM
+=== Shape H2: to_char(TIMESTAMP afternoon, 'AM') — AM kept literally, returns 'AM' for a PM time (PROOF) ===
+SELECT to_char(TIMESTAMP '2024-03-15 14:25:30', 'AM') AS am_literal_proof;
+am_literal_proof
+AM
+=== Shape I: to_char(TIMESTAMP, 'IYYY-IW-ID') — ISO week-year family kept literally with bizarre partial parse ===
+SELECT to_char(TIMESTAMP '2024-03-15 14:25:30', 'IYYY-IW-ID') AS iyyy_partial_parse;
+iyyy_partial_parse
+I24Y-IW-ID
+=== Shape Z: to_char(NULL, 'YYYY') — NULL passthrough (well-behaved, matches PG) ===
+SELECT to_char(NULL, 'YYYY') IS NULL AS null_input_returns_null;
+null_input_returns_null
+1
