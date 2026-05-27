@@ -1,0 +1,203 @@
+# Independently authored PG WINDOW frame EXCLUDE
+# clause sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/ or PG's regress.
+#
+# Existing coverage (do NOT duplicate):
+#   - EXCLUDE CURRENT ROW: pinned at one probe each
+#     in window_frame_basic_extra (line 152) and
+#     window_func_basic_extra (line 97). Both use
+#     the single shape "EXCLUDE CURRENT ROW".
+#   - EXCLUDE GROUP / EXCLUDE TIES / EXCLUDE NO
+#     OTHERS: ZERO prior coverage — mentioned only
+#     in a comment line at window_frame_basic_extra
+#     :66 ("KNOWN GAP — EXCLUDE clauses ...") but
+#     never exercised as a probe. Grep'd all of
+#     tests/main/*.test for the literal substrings
+#     "EXCLUDE GROUP", "EXCLUDE TIES", "EXCLUDE NO
+#     OTHERS" — only that one comment hit.
+#
+# This slice pins all four EXCLUDE shapes side-by-
+# side so the uniform parse-reject fingerprint is
+# locked down per-shape, not just at one
+# representative.
+#
+# Pre-existing rejection shape patterns:
+#   - "Expected: ), found: <KW> at Line: 1, Column:
+#     N" — pre-existing sqlparser-rs shape for
+#     trailing tokens inside an OVER (...) clause
+#     after the frame bound is consumed. The
+#     existing CURRENT ROW probe uses col 94 with a
+#     different prefix (UNBOUNDED PRECEDING AND
+#     UNBOUNDED FOLLOWING); here we use a shorter
+#     `1 PRECEDING AND 1 FOLLOWING` frame so all 4
+#     probes share the same prefix length and the
+#     col index is identical (78) across all four
+#     EXCLUDE keywords, demonstrating the reject is
+#     keyword-agnostic.
+#
+# This slice pins:
+#
+#   Baseline (works) — `ROWS BETWEEN 1 PRECEDING AND
+#   1 FOLLOWING` rolling sum on a 5-row table. Used
+#   to confirm the frame surface works without
+#   EXCLUDE, so the per-shape rejects below isolate
+#   EXCLUDE as the sole gap.
+#
+#   EXCLUDE CURRENT ROW — uniform "Expected: ),
+#   found: EXCLUDE at Line: 1, Column: 78".
+#     PG/Oracle: drop the current row from the frame
+#     before the aggregate is applied. Useful for
+#     "rolling average excluding self" patterns.
+#
+#   EXCLUDE GROUP — same fingerprint, same col.
+#     PG: exclude all rows that share an ORDER BY
+#     peer-group with the current row (including
+#     current).
+#
+#   EXCLUDE TIES — same fingerprint, same col.
+#     PG: exclude all peers EXCEPT the current row
+#     itself. Complement of EXCLUDE GROUP.
+#
+#   EXCLUDE NO OTHERS — same fingerprint, same col.
+#     PG: SQL-standard explicit form of the default
+#     (no exclusion). Even the no-op form parse-
+#     rejects, confirming the EXCLUDE keyword
+#     itself is what the grammar can't consume —
+#     not any specific exclusion mode.
+#
+#   Working PG-portability rewrite — express the
+#   "exclude current row" semantic as `SUM(v) OVER
+#   (...) - v` (subtract the current row's value).
+#   Demonstrates a copy-paste substitute for the
+#   most common EXCLUDE use case.
+#
+# Big-picture finding:
+#
+#   PG/Oracle SQL:2003-standard WINDOW frame EXCLUDE
+#   clauses are entirely unreachable on zeta. The
+#   sqlparser-rs frame-clause sub-grammar terminates
+#   at the `BETWEEN ... AND ...` bound and does not
+#   accept any of the four EXCLUDE keywords after
+#   it. All four shapes give an identical parse-
+#   reject with the same column position (the
+#   keyword-agnostic shape demonstrates the gap is
+#   at the grammar level, not at any per-keyword
+#   handler). Apps porting analytical SQL from
+#   PG/Oracle that uses EXCLUDE — common in rolling-
+#   average-excluding-self queries, anti-self-join-
+#   style aggregates, and peer-aware ranking — must
+#   rewrite. The most common case (EXCLUDE CURRENT
+#   ROW with an additive aggregate) rewrites to
+#   `agg(v) OVER (...) - v`; non-additive aggregates
+#   (MIN/MAX/FIRST/LAST/NTH) and the GROUP/TIES
+#   peer-based forms have no clean local rewrite
+#   and need either a CASE expression in the
+#   aggregate input or a CTE that materializes
+#   peer-groups.
+#
+# INCIDENTAL FINDING (not the main subject of this
+# slice — pinned in baseline only): the OVER (...)
+# column header renders as `__window_<N>` instead
+# of the function name (e.g. `sum`). This is an
+# internal-name leak. PG renders the function name
+# (`sum`) when no AS alias is given. Not pinned
+# further here — would need a dedicated
+# wire-divergence slice on header rendering to
+# capture the full surface.
+#
+# Wire divergence check: the existing CURRENT ROW
+# probe at window_frame_basic_extra:152 was probed
+# on mysqlwire. The grammar lives in sqlparser-rs
+# which is shared by both wires, so pgwire is
+# expected to give the same fingerprint. (Not
+# separately probed here — the existing CURRENT
+# ROW coverage establishes the shared-grammar
+# baseline; this slice extends per-shape on the
+# mysqlwire path.)
+#
+# Adaptation notes:
+#   # zeta-adapt: BASELINE — `SUM(v) OVER (ORDER BY
+#     id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING)`
+#     works; rolling 3-row sum. EXCLUDE-less frame
+#     surface is correct.
+#   # zeta-adapt: KNOWN GAP — EXCLUDE CURRENT ROW
+#     parse-rejects with "Expected: ), found:
+#     EXCLUDE at Line: 1, Column: 78". Rewrite as
+#     `SUM(v) OVER (...) - v` for additive
+#     aggregates.
+#   # zeta-adapt: KNOWN GAP — EXCLUDE GROUP parse-
+#     rejects with the same fingerprint (same col).
+#     No clean local rewrite for peer-based
+#     exclusion; use a CTE.
+#   # zeta-adapt: KNOWN GAP — EXCLUDE TIES parse-
+#     rejects with the same fingerprint (same col).
+#     No clean local rewrite.
+#   # zeta-adapt: KNOWN GAP — EXCLUDE NO OTHERS
+#     (SQL-standard explicit no-op) parse-rejects
+#     with the same fingerprint (same col).
+#     Workaround: just omit the clause entirely
+#     (NO OTHERS is the default).
+#   # zeta-adapt: INCIDENTAL — un-aliased OVER (...)
+#     column renders as `__window_0` not `sum`.
+#     Always alias with `AS <name>` for portable
+#     header behavior.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS wf_excl;
+CREATE TABLE wf_excl (id INT, v INT);
+INSERT INTO wf_excl VALUES (1,10), (2,20), (3,30), (4,40), (5,50);
+
+--echo === Baseline (works): ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING — rolling sum ===
+
+# Confirms the frame surface works without EXCLUDE,
+# so the per-shape rejects below isolate EXCLUDE as
+# the sole gap.  Aliased as `s` for a stable column
+# header (un-aliased OVER would render as
+# `__window_0` — see INCIDENTAL FINDING in header).
+SELECT id, v, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS s FROM wf_excl ORDER BY id;
+
+--echo === EXCLUDE CURRENT ROW — "Expected: ), found: EXCLUDE at Line: 1, Column: 78" ===
+
+# sqlparser-rs's frame-clause sub-grammar terminates
+# at the BETWEEN ... AND ... bound; EXCLUDE is not
+# recognized after it.
+--error 1064
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE CURRENT ROW) FROM wf_excl;
+
+--echo === EXCLUDE GROUP — same fingerprint, same col ===
+
+# Demonstrates the reject is keyword-agnostic at
+# the EXCLUDE token itself.
+--error 1064
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE GROUP) FROM wf_excl;
+
+--echo === EXCLUDE TIES — same fingerprint, same col ===
+
+--error 1064
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE TIES) FROM wf_excl;
+
+--echo === EXCLUDE NO OTHERS — same fingerprint, same col (even the no-op SQL-standard explicit-default form rejects) ===
+
+# EXCLUDE NO OTHERS is the SQL-standard explicit
+# form of the default (no exclusion). Even this
+# no-op rejects, confirming the gap is at the
+# EXCLUDE token in the grammar — not at any per-
+# keyword handler. Workaround: just omit the
+# clause.
+--error 1064
+SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING EXCLUDE NO OTHERS) FROM wf_excl;
+
+--echo === PG-portability rewrite: `agg(v) OVER (...) - v` for additive aggregates ===
+
+# The most common EXCLUDE use case ("rolling sum
+# excluding self") rewrites cleanly for additive
+# aggregates by subtracting the current row.  This
+# is the working portable substitute.
+SELECT id, v,
+       SUM(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) - v AS s_excl_self
+  FROM wf_excl
+  ORDER BY id;
+
+DROP TABLE wf_excl;
