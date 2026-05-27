@@ -1,0 +1,237 @@
+# Independently authored PG CREATE INDEX advanced-option +
+# REINDEX sentinel slice for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Scope: pins zeta-MySQL-wire behavior for PG-specific
+# CREATE INDEX advanced options (opclass, INCLUDE, WITH
+# storage params, NULLS DISTINCT / NULLS NOT DISTINCT,
+# ON ONLY) AND for REINDEX in all its variant forms
+# (TABLE / INDEX / DATABASE / SCHEMA / CONCURRENTLY /
+# PG14+ option-list).
+#
+# Re-pin / expansion of prior coverage (do NOT count as
+# greenfield):
+#   - vacuum_analyze_basic_extra:24-26 first documented
+#     "REINDEX TABLE / INDEX / DATABASE all error 1064
+#     ... No REINDEX parser branch" as a SINGLE-LINE
+#     KNOWN GAP comment + 3 pinned variants at :79-94.
+#     This slice EXPANDS that one-line gap into the full
+#     6-variant pin matrix (adds SCHEMA, CONCURRENTLY,
+#     PG14+ option-list form) and identifies the
+#     statement-layer rejection as the uniform
+#     fingerprint across the entire REINDEX family.
+#   - index_options_basic_extra:153-158 already pinned
+#     CREATE INDEX ... INCLUDE (col) parses but covering
+#     col missing from SHOW INDEX as a single KNOWN BUG.
+#     This slice ACKNOWLEDGES that pin and adds the
+#     broader SILENT-ACCEPT family: opclass (with and
+#     without USING), WITH (...) storage params (known
+#     and UNKNOWN), and NULLS [NOT] DISTINCT — eight
+#     distinct silent-accept witnesses in one matrix.
+#   - pg_constraint_bugs_sentinel_basic_extra:129-132
+#     pinned UNIQUE table-level constraint NULLS NOT
+#     DISTINCT silent-drop. This slice pins the INDEX
+#     spelling — CREATE UNIQUE INDEX ... NULLS [NOT]
+#     DISTINCT — as a separate silent-accept witness.
+#
+# This slice pins (16 shapes):
+#
+#   SHAPE A — CORRUPTION-class SILENT-ACCEPT (8 BUGs).
+#   Every PG-specific CREATE INDEX advanced option is
+#   silently accepted by zeta with NO error and NO
+#   semantic enforcement. Witnesses:
+#     ix2  opclass (text_pattern_ops)         — accepted, dropped
+#     ix3  USING btree + opclass              — accepted, dropped
+#     ix4  INCLUDE (col)                      — accepted, covering col NOT in SHOW INDEX
+#     ix5  WITH (fillfactor = 70)             — accepted, dropped
+#     ix6  WITH (deduplicate_items = on)      — PG13+ btree dedup, accepted, dropped
+#     ix7  WITH (nosuchopt = 99)              — UNKNOWN option, accepted!
+#     ix8  UNIQUE … NULLS DISTINCT            — PG15+ modifier, accepted, dropped
+#     ix9  UNIQUE … NULLS NOT DISTINCT        — PG15+ modifier, accepted, dropped
+#
+#   The most damning member is ix7 — there is NO option-
+#   name validation registry whatsoever. Any arbitrary
+#   identifier is accepted inside the WITH (...) list.
+#   Real PG would error "unrecognized parameter" at parse;
+#   zeta accepts it and discards it. Apps that tune
+#   storage params (fillfactor, deduplicate_items,
+#   gin_pending_list_limit, etc.) will get plain unloaded
+#   defaults with NO indication their tuning was ignored.
+#
+#   SHAPE B — ON ONLY parse-reject. PG inheritance
+#   modifier `CREATE INDEX ... ON ONLY t (...)` fails
+#   with an unusual fingerprint at col 26 — sqlparser
+#   absorbs the ONLY token into the wrong grammar branch
+#   (likely treats `ON <ident>` as table-name + then
+#   parses ONLY as the table-name itself, then expects a
+#   paren-column-list but finds the actual table name
+#   `i`). This is a parse-layer rejection (sqlparser
+#   grammar), not a semantic check.
+#
+#   SHAPE C — REINDEX statement TYPE entirely unrecognized
+#   (6 variants, uniform col-1 fingerprint). The REINDEX
+#   keyword itself is not a recognized statement type at
+#   the sqlparser layer — so NO variant (TABLE / INDEX /
+#   DATABASE / SCHEMA / CONCURRENTLY / option-list)
+#   reaches grammar parsing. All six collapse to the same
+#   fingerprint "Expected: an SQL statement, found:
+#   REINDEX at Line: 1, Column: 1". This expands the
+#   3-variant pin at vacuum_analyze_basic_extra:79-94 to
+#   demonstrate the uniformity.
+#
+#   SHAPE D — boundary marker. Bare `CREATE INDEX ON i
+#   (id)` (no advanced options) succeeds — confirms the
+#   silent-accept family is gated on the *advanced-option*
+#   syntax, not on CREATE INDEX as a whole.
+#
+# Big-picture findings:
+#
+#   BUG-CLASS — CORRUPTION-class SILENT-ACCEPT of CREATE
+#   INDEX advanced options. Eight distinct PG-specific
+#   index-option forms are accepted with no error and no
+#   semantic enforcement. The standout is WITH (nosuchopt
+#   = 99) — sqlparser accepts ANY identifier inside the
+#   WITH (...) list with no validation registry. Real PG
+#   errors at parse for unknown storage params; zeta
+#   silently discards them. The corruption class is
+#   "tuning silently no-op" — apps that depend on these
+#   options for correctness (UNIQUE NULLS NOT DISTINCT)
+#   or performance (fillfactor / deduplicate_items) will
+#   not learn that their hint was ignored.
+#
+#   BUG-CLASS — REINDEX statement type entirely
+#   unrecognized at sqlparser layer. Uniform col-1
+#   fingerprint across all 6 variants — confirms the
+#   rejection is at the statement-dispatch step, before
+#   any per-variant grammar arm runs. Real PG apps that
+#   use REINDEX for bloat reclamation must rewrite as
+#   DROP + re-CREATE INDEX or rely on zeta's LSM
+#   compactor.
+#
+#   STRUCTURAL — statement-layer rejection (different
+#   from wire-layer rejection). The REINDEX rejection
+#   is at the sqlparser statement-dispatch layer (col 1
+#   — before the keyword itself is even classified).
+#   This is structurally distinct from the wire-layer
+#   rejection pattern documented in PR #448 for COPY
+#   FROM STDIN (where the mysqlwire input stream is
+#   unavailable for line-mode protocol). Both yield
+#   1064, but the rejection happens in different
+#   components: REINDEX is rejected by the SQL parser
+#   itself, COPY FROM STDIN is rejected by the
+#   wire-protocol shim before the parser sees the
+#   statement.
+#
+#   STRUCTURAL — parser-grammar "permissive option-list"
+#   anti-pattern. WITH (...) and opclass-position
+#   identifiers inside CREATE INDEX both accept arbitrary
+#   tokens that get silently dropped. This contrasts
+#   with sqlparser's strict allowed-list enforcement at
+#   ALTER / DROP / COMMENT ON (where unknown keywords
+#   error immediately). The two enforcement disciplines
+#   sit in the same parser but apply to different
+#   syntactic positions.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN BUG — CREATE INDEX ... (col
+#     <opclass>) (PG opclass annotation, with or without
+#     USING btree) silently accepts the opclass and
+#     discards it. SHOW INDEX shows only the column
+#     name. Apps that rely on text_pattern_ops /
+#     varchar_pattern_ops / etc. for LIKE 'prefix%'
+#     planning will get the default opclass.
+#   # zeta-adapt: KNOWN BUG — CREATE INDEX ... INCLUDE
+#     (col) silently accepts but the covering column is
+#     not honored. ALREADY pinned at
+#     index_options_basic_extra:153-158; re-pinned here
+#     in the silent-accept matrix for completeness.
+#   # zeta-adapt: KNOWN BUG — CREATE INDEX ... WITH
+#     (param = value) silently accepts any storage
+#     parameter, INCLUDING unknown identifiers. There is
+#     no option-name validation registry. Apps that tune
+#     storage params will get the unloaded defaults.
+#   # zeta-adapt: KNOWN BUG — CREATE UNIQUE INDEX ...
+#     NULLS [NOT] DISTINCT silently accepts the PG15+
+#     modifier and discards it. zeta's actual
+#     multiple-NULLs behavior in UNIQUE indexes is
+#     unspecified by these slices — but the modifier
+#     itself is unenforced.
+#   # zeta-adapt: KNOWN GAP — CREATE INDEX ... ON ONLY
+#     <table> (PG inheritance modifier) errors 1064 at
+#     col 26 with an unusual "Expected: a list of
+#     columns in parentheses, found: <table>" shape. No
+#     substitute — zeta has no table-inheritance.
+#   # zeta-adapt: KNOWN GAP — REINDEX TABLE / INDEX /
+#     DATABASE / SCHEMA / CONCURRENTLY / (option-list)
+#     all error 1064 at col 1 (statement-layer
+#     rejection — REINDEX is not a recognized statement
+#     type). Substitute: DROP + re-CREATE INDEX, or let
+#     the LSM compactor handle space reclamation.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS i;
+CREATE TABLE i (id INT PRIMARY KEY, v INT, txt TEXT);
+
+--echo === SHAPE D — SUPPORT: bare CREATE INDEX (boundary marker) ===
+
+CREATE INDEX ix0 ON i (id);
+
+--echo === SHAPE B — ON ONLY (PG inheritance modifier) parse-reject ===
+
+--error 1064
+CREATE INDEX ix1 ON ONLY i (id);
+
+--echo === SHAPE A — opclass silent-accept (text_pattern_ops) ===
+
+CREATE INDEX ix2 ON i (txt text_pattern_ops);
+SHOW INDEX FROM i;
+
+--echo === SHAPE A — USING + opclass silent-accept (varchar_pattern_ops) ===
+
+CREATE INDEX ix3 ON i USING btree (txt varchar_pattern_ops);
+SHOW INDEX FROM i;
+
+--echo === SHAPE A — INCLUDE (col) silent-accept (re-pin of index_options_basic_extra:153-158) ===
+
+CREATE INDEX ix4 ON i (id) INCLUDE (v);
+SHOW INDEX FROM i;
+
+--echo === SHAPE A — WITH (fillfactor = 70) silent-accept ===
+
+CREATE INDEX ix5 ON i (id) WITH (fillfactor = 70);
+
+--echo === SHAPE A — WITH (deduplicate_items = on) silent-accept (PG13+) ===
+
+CREATE INDEX ix6 ON i (id) WITH (deduplicate_items = on);
+
+--echo === SHAPE A — WITH (nosuchopt = 99) UNKNOWN option silent-accept (most damning — no validation registry) ===
+
+CREATE INDEX ix7 ON i (id) WITH (nosuchopt = 99);
+
+--echo === SHAPE A — UNIQUE … NULLS DISTINCT silent-accept (PG15+) ===
+
+CREATE UNIQUE INDEX ix8 ON i (id) NULLS DISTINCT;
+
+--echo === SHAPE A — UNIQUE … NULLS NOT DISTINCT silent-accept (PG15+) ===
+
+CREATE UNIQUE INDEX ix9 ON i (id) NULLS NOT DISTINCT;
+
+--echo === SHAPE C — REINDEX variants (uniform col-1 fingerprint) ===
+
+--error 1064
+REINDEX TABLE i;
+--error 1064
+REINDEX INDEX ix1;
+--error 1064
+REINDEX DATABASE idb;
+--error 1064
+REINDEX SCHEMA public;
+--error 1064
+REINDEX CONCURRENTLY TABLE i;
+--error 1064
+REINDEX (CONCURRENTLY, TABLESPACE x) TABLE i;
+
+--echo === Cleanup ===
+
+DROP TABLE i;
