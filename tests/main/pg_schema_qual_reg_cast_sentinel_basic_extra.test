@@ -1,0 +1,322 @@
+# Independently authored PG schema-qualified
+# function-call dispatch + ::reg* cast target
+# sentinel slice for the GPL MTR-format runner.
+# NOT copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - Schema-qualified function calls
+#     (`public.fn(...)`, `pg_catalog.fn(...)`,
+#     `nosuchschema.fn(...)`): ZERO prior
+#     executable coverage. Case-insensitive grep
+#     of ALL tests/main/*.test for
+#     `public\.[a-z]+\(`, `pg_catalog\.[a-z]+\(`
+#     returns NO executable hits — only comment
+#     references in the unrelated `to_regclass`
+#     family (text args of the form
+#     `'public.unknown_table'` inside string
+#     literals).
+#   - `::regclass` / `::regtype` / `::regnamespace`
+#     / `::regrole` / `::regprocedure` /
+#     `::regproc` / `::regoper` / `::regoperator`
+#     / `::regconfig` / `::regdictionary` cast
+#     targets: ZERO prior. Case-insensitive grep
+#     for `::reg(class|type|namespace|role|...)`
+#     returns nothing.
+#   - REGCLASS in uppercase appears in
+#     `pg_admin_introspection_sysfns_sentinel_basic_extra.test`
+#     and `pg_hypothetical_within_group_sentinel_basic_extra.test`,
+#     but ONLY as commentary about the
+#     `to_regclass(text)` FUNCTION (introspection
+#     helper) — NOT the `::regclass` CAST target
+#     surface. These are independent shapes:
+#       - `to_regclass(text)` is a function-name
+#         dispatch failure (unknown function).
+#       - `'tt'::regclass` is a cast-target lookup
+#         failure (unsupported CAST target type).
+#
+# Pre-existing rejection / behavior shape patterns:
+#   - "execution error: unknown function: <FN>" —
+#     pre-existing fingerprint (many slices). The
+#     novel observation here is that zeta's
+#     function dispatcher does NOT strip the
+#     schema prefix even for `pg_catalog.*` (the
+#     standard PG schema where built-ins live).
+#     The error preserves the FULL qualified name
+#     literally (`pg_catalog.length`, not just
+#     `length`). Same fingerprint, novel input
+#     shape AND novel structural finding about
+#     the dispatcher.
+#   - "execution error: unsupported CAST target
+#     type: <T>" — pre-existing shape for
+#     unsupported cast targets (cast_basic_extra,
+#     cast_target_type_aliases_basic_extra). The
+#     novel observation here is that the ENTIRE
+#     `::reg*` family is unsupported AND the
+#     error case-rendering is INCONSISTENT within
+#     the family.
+#
+# This slice pins:
+#
+#   Schema-qualified function calls — UNIFORM
+#   unknown-function failure with full qualified
+#   name preserved literally:
+#     - `public.length('hi')` → unknown function:
+#       public.length. Schema prefix NOT stripped.
+#     - `public.upper('hi')` → unknown function:
+#       public.upper.
+#     - `pg_catalog.length('hi')` → unknown
+#       function: pg_catalog.length. Even the
+#       STANDARD PG schema for built-ins fails —
+#       `pg_dump` output that qualifies calls
+#       (e.g. `pg_catalog.version()`) will fail
+#       at parse-time-after-lookup.
+#     - `pg_catalog.current_database()` → unknown
+#       function: pg_catalog.current_database.
+#       Zero-arg form, same shape.
+#     - `pg_catalog.now()` → unknown function:
+#       pg_catalog.now.
+#     - `pg_catalog.count(*)` → unknown function:
+#       pg_catalog.count. AGGREGATE
+#       qualification fails too (same dispatch
+#       path — aggregates go through the same
+#       resolver).
+#     - `nosuchschema.length('x')` → unknown
+#       function: nosuchschema.length. Confirms
+#       the dispatcher does NOT check whether the
+#       schema EXISTS — the qualified name is
+#       fed as a single dot-joined key into the
+#       resolver. Same fingerprint as the
+#       `pg_catalog.*` case — proving the schema
+#       prefix is NEVER stripped, regardless of
+#       what schema is named.
+#     - `foo.bar.length('x')` → unknown function:
+#       foo.bar.length. Triple-qualified form
+#       (database.schema.function in PG); zeta
+#       just dot-joins all parts and treats it
+#       as one opaque function name.
+#     - Control: `length('hi')` → `2` ✓,
+#       `version()` → `8.0.36-zeta` ✓. The
+#       unqualified forms WORK; only the
+#       qualified forms fail.
+#
+#   ::reg* cast target family — UNIFORM
+#   unsupported-CAST-target failure, with a
+#   STRUCTURAL ERROR-CASE INCONSISTENCY:
+#     - `'tt'::regclass` → unsupported CAST
+#       target type: REGCLASS. **UPPERCASE**.
+#     - `'public.tt'::regclass` → unsupported
+#       CAST target type: REGCLASS. UPPERCASE
+#       (the qualified text inside the literal
+#       does NOT affect the cast-target error;
+#       only the type name is rendered, and it
+#       is uppercased).
+#     - `'tt'::regtype` → unsupported CAST target
+#       type: regtype. **lowercase**.
+#     - `'public'::regnamespace` → unsupported
+#       CAST target type: regnamespace. lowercase.
+#     - `'postgres'::regrole` → unsupported CAST
+#       target type: regrole. lowercase.
+#     - `'tt'::regprocedure` → unsupported CAST
+#       target type: regprocedure. lowercase.
+#     - `'tt'::regproc` → unsupported CAST target
+#       type: regproc. lowercase.
+#     - `'tt'::regoperator` → unsupported CAST
+#       target type: regoperator. lowercase.
+#     - `'tt'::pg_catalog.regclass` → unsupported
+#       CAST target type: pg_catalog.regclass.
+#       Qualified type-name in cast preserves the
+#       FULL qualified spelling AND drops the
+#       uppercasing (`pg_catalog.regclass`, not
+#       `pg_catalog.REGCLASS` and not just
+#       `REGCLASS`). Confirms the uppercasing is
+#       specific to the BARE `regclass` token
+#       path, and the qualified path goes through
+#       a generic stringifier.
+#
+# Big-picture finding:
+#
+#   Two related but distinct PG-introspection
+#   surface failures, both relevant for porting
+#   PG tooling (pg_dump output, ORM-generated raw
+#   SQL, introspection queries):
+#
+#     STRUCTURAL FINDING (1) — Schema-qualified
+#     function-call dispatch: zeta's function
+#     resolver does NOT strip a schema prefix
+#     before lookup. Even `pg_catalog.fn(...)`
+#     (the canonical safe-qualification idiom
+#     emitted by pg_dump) fails. The full
+#     dot-joined name is fed to the resolver as
+#     an opaque key, so neither known schemas
+#     (`public`, `pg_catalog`) nor unknown
+#     (`nosuchschema`, `foo.bar`) get the prefix
+#     stripped — uniform failure shape, no
+#     "schema not found" distinction. Aggregate
+#     calls (`pg_catalog.count(*)`) go through
+#     the same path; they fail identically.
+#
+#     STRUCTURAL FINDING (2) — ::reg* cast-target
+#     error-case inconsistency: `regclass` (the
+#     most common ::reg* target, used in
+#     introspection like `'tbl'::regclass`)
+#     uppercases the type name in the error
+#     (`REGCLASS`); EVERY OTHER ::reg* sibling
+#     (`regtype`, `regnamespace`, `regrole`,
+#     `regprocedure`, `regproc`, `regoperator`)
+#     lowercases it. This suggests `regclass` is
+#     a built-in alias entry with explicit
+#     canonical-name uppercase formatting,
+#     whereas the others fall through a generic
+#     "unsupported target type: <raw token>"
+#     branch that preserves the source casing.
+#     The fully-qualified `pg_catalog.regclass`
+#     form ALSO bypasses the uppercase path,
+#     confirming the uppercasing is gated on
+#     the BARE-token recognizer specifically.
+#
+#   PG porters affected:
+#     - pg_dump output (qualifies calls with
+#       `pg_catalog.`): rewrite to strip the
+#       schema prefix.
+#     - ORM-emitted introspection queries
+#       (often use `'tbl'::regclass` to get an
+#       OID from a relation name): no
+#       replacement — the ::reg* family is
+#       entirely unsupported. Use
+#       `information_schema.tables` instead.
+#     - Hand-written PG SQL that qualifies
+#       built-ins for namespace safety: drop the
+#       qualification.
+#
+# Wire divergence check: per
+# [[feedback_wire_path_divergence_check]], both
+# wires (pgwire and mysqlwire) were probed.
+# Identical behavior on every shape — these
+# failures are in the function dispatcher and
+# the cast-target resolver, BOTH downstream of
+# either wire's parser/intercept layer.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — ANY schema-
+#     qualified function call (`public.fn(...)`,
+#     `pg_catalog.fn(...)`,
+#     `nosuchschema.fn(...)`,
+#     `foo.bar.fn(...)`) errors with
+#     "unknown function: <full.qualified.name>".
+#     Schema prefix is NEVER stripped. Even
+#     `pg_catalog.*` (the PG standard for
+#     namespace-safe built-in calls, used by
+#     pg_dump) fails. Strip the schema prefix
+#     when porting PG SQL.
+#   # zeta-adapt: KNOWN GAP — The entire ::reg*
+#     cast-target family is unsupported
+#     (regclass, regtype, regnamespace, regrole,
+#     regprocedure, regproc, regoperator,
+#     regconfig, regdictionary). Errors with
+#     "unsupported CAST target type: <T>".
+#     Note: `regclass` is rendered UPPERCASE in
+#     the error while siblings are lowercase —
+#     a benign rendering inconsistency, but the
+#     dispatch outcome is identical.
+#     Replacement: query
+#     `information_schema.tables` /
+#     `information_schema.routines` for OID-like
+#     lookups.
+
+--echo === Schema-qualified function call — `public.fn(...)` (scalar) ===
+
+# Schema prefix NOT stripped; error preserves
+# full qualified name `public.length`.
+--error 1105
+SELECT public.length('hi');
+--error 1105
+SELECT public.upper('hi');
+
+--echo === Schema-qualified function call — `pg_catalog.fn(...)` (PG's standard built-in schema) ===
+
+# pg_dump output qualifies built-ins with
+# `pg_catalog.` for namespace safety. zeta
+# rejects all of these — pg_dump output is not
+# round-trippable.
+--error 1105
+SELECT pg_catalog.length('hi');
+--error 1105
+SELECT pg_catalog.current_database();
+--error 1105
+SELECT pg_catalog.now();
+--error 1105
+SELECT pg_catalog.version();
+
+--echo === Schema-qualified AGGREGATE call — same dispatch path, same failure ===
+
+# Proves aggregates share the dispatcher: the
+# qualified name flows through the same resolver
+# and produces the same `unknown function:
+# <qualified>` shape.
+CREATE TABLE sq_qtbl (i INT);
+INSERT INTO sq_qtbl VALUES (1),(2),(3);
+--error 1105
+SELECT pg_catalog.count(*) FROM sq_qtbl;
+--error 1105
+SELECT public.sum(i) FROM sq_qtbl;
+DROP TABLE sq_qtbl;
+
+--echo === Schema-qualified `nosuchschema.fn(...)` — schema-existence NOT checked ===
+
+# Confirms STRUCTURAL FINDING (1): the resolver
+# treats the qualified name as one opaque key.
+# Same fingerprint whether the schema exists
+# (`public`, `pg_catalog`) or NOT
+# (`nosuchschema`, `foo.bar`).
+--error 1105
+SELECT nosuchschema.length('x');
+--error 1105
+SELECT foo.bar.length('x');
+
+--echo === Control: unqualified forms WORK — only qualification breaks dispatch ===
+
+SELECT length('hi');
+SELECT upper('hi');
+
+--echo === ::regclass cast target — UPPERCASE in error (the casing-inconsistency witness) ===
+
+# Bare-token `regclass` goes through a path that
+# UPPERCASES the type name in the error.
+--error 1105
+SELECT 'tt'::regclass;
+# Qualified text inside the literal is irrelevant
+# — only the cast-target type name is rendered.
+# Still UPPERCASE.
+--error 1105
+SELECT 'public.tt'::regclass;
+
+--echo === ::reg* siblings — lowercase in error (the rest of the family) ===
+
+# All siblings render the type name LOWERCASE.
+# Same `unsupported CAST target type:` shape;
+# different casing from `regclass` alone.
+--error 1105
+SELECT 'tt'::regtype;
+--error 1105
+SELECT 'public'::regnamespace;
+--error 1105
+SELECT 'postgres'::regrole;
+--error 1105
+SELECT 'tt'::regprocedure;
+--error 1105
+SELECT 'tt'::regproc;
+--error 1105
+SELECT 'tt'::regoperator;
+
+--echo === ::pg_catalog.regclass — qualified type bypasses the uppercase path ===
+
+# Fully-qualified type name in the cast: the
+# error preserves the FULL qualified spelling
+# `pg_catalog.regclass` (NOT uppercased,
+# despite ending in `regclass`). Confirms the
+# uppercasing is gated on the bare-token
+# recognizer specifically, while the qualified
+# path falls through a generic stringifier that
+# preserves source casing.
+--error 1105
+SELECT 'tt'::pg_catalog.regclass;

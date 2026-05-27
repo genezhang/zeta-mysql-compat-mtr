@@ -1,0 +1,55 @@
+=== Schema-qualified function call — `public.fn(...)` (scalar) ===
+SELECT public.length('hi');
+ERROR 1105: execution error: unknown function: public.length
+SELECT public.upper('hi');
+ERROR 1105: execution error: unknown function: public.upper
+=== Schema-qualified function call — `pg_catalog.fn(...)` (PG's standard built-in schema) ===
+SELECT pg_catalog.length('hi');
+ERROR 1105: execution error: unknown function: pg_catalog.length
+SELECT pg_catalog.current_database();
+ERROR 1105: execution error: unknown function: pg_catalog.current_database
+SELECT pg_catalog.now();
+ERROR 1105: execution error: unknown function: pg_catalog.now
+SELECT pg_catalog.version();
+ERROR 1105: execution error: unknown function: pg_catalog.version
+=== Schema-qualified AGGREGATE call — same dispatch path, same failure ===
+CREATE TABLE sq_qtbl (i INT);
+INSERT INTO sq_qtbl VALUES (1),(2),(3);
+SELECT pg_catalog.count(*) FROM sq_qtbl;
+ERROR 1105: execution error: unknown function: pg_catalog.count
+SELECT public.sum(i) FROM sq_qtbl;
+ERROR 1105: execution error: unknown function: public.sum
+DROP TABLE sq_qtbl;
+=== Schema-qualified `nosuchschema.fn(...)` — schema-existence NOT checked ===
+SELECT nosuchschema.length('x');
+ERROR 1105: execution error: unknown function: nosuchschema.length
+SELECT foo.bar.length('x');
+ERROR 1105: execution error: unknown function: foo.bar.length
+=== Control: unqualified forms WORK — only qualification breaks dispatch ===
+SELECT length('hi');
+length
+2
+SELECT upper('hi');
+upper
+HI
+=== ::regclass cast target — UPPERCASE in error (the casing-inconsistency witness) ===
+SELECT 'tt'::regclass;
+ERROR 1105: execution error: unsupported CAST target type: REGCLASS
+SELECT 'public.tt'::regclass;
+ERROR 1105: execution error: unsupported CAST target type: REGCLASS
+=== ::reg* siblings — lowercase in error (the rest of the family) ===
+SELECT 'tt'::regtype;
+ERROR 1105: execution error: unsupported CAST target type: regtype
+SELECT 'public'::regnamespace;
+ERROR 1105: execution error: unsupported CAST target type: regnamespace
+SELECT 'postgres'::regrole;
+ERROR 1105: execution error: unsupported CAST target type: regrole
+SELECT 'tt'::regprocedure;
+ERROR 1105: execution error: unsupported CAST target type: regprocedure
+SELECT 'tt'::regproc;
+ERROR 1105: execution error: unsupported CAST target type: regproc
+SELECT 'tt'::regoperator;
+ERROR 1105: execution error: unsupported CAST target type: regoperator
+=== ::pg_catalog.regclass — qualified type bypasses the uppercase path ===
+SELECT 'tt'::pg_catalog.regclass;
+ERROR 1105: execution error: unsupported CAST target type: pg_catalog.regclass
