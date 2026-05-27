@@ -1,0 +1,303 @@
+# Independently authored PG constraint-whitelist-
+# asymmetry sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# 4th in the dialect/whitelist series:
+#   - PR #452: ALTER TABLE Hive/Spark leak
+#   - PR #454: ALTER COLUMN Pattern-XY rejection
+#     (file: pg_alter_column_pattern_xy_sentinel_basic_extra.test)
+#   - PR #455: DROP 3-stratum Hive/Snowflake leak
+#   - THIS: PG constraint-type whitelist asymmetry +
+#     ALTER CONSTRAINT cross-whitelist fallthrough +
+#     VALIDATE / DROP CONSTRAINT CASCADE semantics
+#
+# This slice pins FIVE structural findings on the
+# constraint surface that no prior slice covers as a
+# unified asymmetry observation:
+#
+# Existing coverage (do NOT duplicate; this slice
+# RE-pins as SUPPORT/cross-witness):
+#   - ADD CONSTRAINT CHECK reject: pinned at
+#     alter_table_basic.test line 136 (KNOWN
+#     DIVERGENCE; substitute via inline CREATE).
+#   - Inline CHECK at CREATE + INSERT-rejection: pinned
+#     at constraint_basic.test line 110-113.
+#   - EXCLUDE constraint 5-path missing: pinned at
+#     pg_create_table_like_exclude_sentinel_basic_extra
+#     .test rows 168-182 (SHAPE C/D/E there cover
+#     CREATE TABLE + ALTER TABLE inline-EXCLUDE).
+#   - VALIDATE CONSTRAINT reject: pinned at
+#     pg_alter_table_pg_ops_sentinel_basic_extra.test
+#     line 173 (one of N grammar-gap-list entries).
+#   - DROP CONSTRAINT IF EXISTS silent-on-missing:
+#     pinned at alter_table_basic_extra.test line 144.
+#   - DROP CONSTRAINT <fk_name> supported: pinned at
+#     alter_table_basic_extra.test line 153.
+#
+# This slice adds NEW pins for asymmetries that
+# emerge when the above surfaces are juxtaposed:
+#
+#   FINDING 1 — CHECK whitelist-LIE on ALTER TABLE ADD:
+#     The ADD CONSTRAINT type whitelist string in
+#     sqlparser lists `PRIMARY, UNIQUE, FOREIGN, or
+#     CHECK` (visible in row 5 below as the EXCLUDE
+#     reject fingerprint), but zeta's
+#     `unsupported ALTER TABLE ADD CONSTRAINT type`
+#     dispatcher reject (row 1) fires for CHECK
+#     despite the whitelist string listing it.
+#     Meanwhile CHECK on CREATE TABLE (inline,
+#     unnamed, named, table-level, column-level)
+#     all WORK and the constraint enforces at INSERT
+#     (1105 "new row violates check constraint").
+#     ASYMMETRY: CREATE TABLE path implements CHECK;
+#     ALTER TABLE ADD path does not. Whitelist
+#     string LIES about ALTER ADD support.
+#
+#   FINDING 2 — EXCLUDE constraint absent in 4
+#   distinct syntax paths, each producing a different
+#   wrong-grammar fingerprint:
+#     Path A: `ALTER TABLE ... ADD CONSTRAINT cx
+#       EXCLUDE USING gist (col WITH =)` →
+#       "PRIMARY, UNIQUE, FOREIGN, or CHECK, found:
+#       EXCLUDE at <constraint-keyword col>"
+#       (constraint-type whitelist reject).
+#     Path B: `ALTER TABLE ... ADD CONSTRAINT cx
+#       EXCLUDE (col WITH =)` (no USING) →
+#       SAME constraint-type whitelist reject at
+#       SAME column (rejection happens BEFORE the
+#       parser ever sees USING vs no-USING).
+#     Path C: `ALTER TABLE ... ADD EXCLUDE USING gist
+#       (col WITH =)` (no CONSTRAINT keyword) →
+#       DIFFERENT path: "Expected: end of statement,
+#       found: gist" (parser absorbs EXCLUDE as
+#       identifier and treats statement as done after
+#       ADD <ident>; chokes on `gist`).
+#     Path D: `CREATE TABLE c (..., CONSTRAINT cx
+#       EXCLUDE USING gist (...))` → SAME whitelist
+#       reject pattern as Path A, at the inline-
+#       CONSTRAINT column offset (later in the line).
+#
+#   FINDING 3 — Constraint-type whitelist SHARED
+#   between ALTER TABLE ADD CONSTRAINT and CREATE
+#   TABLE inline-CONSTRAINT paths (good design):
+#     Both ALTER ADD CONSTRAINT (Path A) and CREATE
+#     TABLE inline-CONSTRAINT (Path D) produce the
+#     IDENTICAL error message "PRIMARY, UNIQUE,
+#     FOREIGN, or CHECK, found: EXCLUDE" — only the
+#     column offset differs. This proves a single
+#     sqlparser sub-grammar serves both paths. Good
+#     reuse; means a fix lifts both paths.
+#
+#   FINDING 4 — ALTER CONSTRAINT cross-whitelist
+#   fallthrough BUG (parser bug):
+#     `ALTER TABLE t ALTER CONSTRAINT cx NOT VALID`
+#     parses as if the `CONSTRAINT` keyword were
+#     `COLUMN`, throwing the ALTER COLUMN whitelist
+#     error: "Expected: SET/DROP NOT NULL, SET
+#     DEFAULT, SET DATA TYPE, or ADD GENERATED after
+#     ALTER COLUMN, found: cx at Line: 1, Column: 33".
+#     The error STRING says "ALTER COLUMN" even though
+#     the statement was `ALTER CONSTRAINT`. Same
+#     fingerprint with `DEFERRABLE` modifier. This
+#     wrong-statement-type error message echoes the
+#     PR #454 ALTER COLUMN whitelist string verbatim,
+#     proving the parser routed ALTER CONSTRAINT
+#     through the ALTER COLUMN sub-grammar.
+#
+#   FINDING 5 — VALIDATE CONSTRAINT parses but
+#   dispatcher rejects (Pattern X style):
+#     `ALTER TABLE t VALIDATE CONSTRAINT cx` parses
+#     past sqlparser and lands in zeta's ALTER TABLE
+#     dispatcher, which throws
+#     "unsupported ALTER TABLE operation: VALIDATE
+#     CONSTRAINT cx" — a different reject shape from
+#     the whitelist-lookup errors above (this names
+#     the operation, not a whitelist). Distinct
+#     code path; pinned for completeness.
+#
+#   BONUS — DROP CONSTRAINT CASCADE on missing:
+#     `DROP CONSTRAINT cx CASCADE` (no IF EXISTS,
+#     constraint absent) errors with 1105 "constraint
+#     cx does not exist on table". CASCADE alone does
+#     NOT suppress the missing-constraint check; only
+#     IF EXISTS does. Pins the CASCADE/IF-EXISTS
+#     orthogonality.
+#
+# Big-picture finding:
+#
+#   The constraint-modifier surface has 3 distinct
+#   parse-time error patterns:
+#
+#   (1) Whitelist-LOOKUP reject — sqlparser sub-grammar
+#       allows only N kinds, names them all in the
+#       error. Examples: ADD CONSTRAINT (PRIMARY,
+#       UNIQUE, FOREIGN, CHECK), ALTER COLUMN
+#       (SET/DROP NOT NULL, SET DEFAULT, SET DATA
+#       TYPE, ADD GENERATED).
+#
+#   (2) Dispatcher-REJECT — sqlparser accepts the
+#       grammar, zeta's executor refuses with
+#       "unsupported ALTER TABLE ... type" or
+#       "unsupported ALTER TABLE operation: ...".
+#       Examples: ADD CONSTRAINT CHECK,
+#       VALIDATE CONSTRAINT.
+#
+#   (3) Cross-whitelist FALLTHROUGH — sqlparser misroutes
+#       to a sibling sub-grammar; the user-visible error
+#       names the WRONG statement type. Example:
+#       ALTER CONSTRAINT → ALTER COLUMN whitelist.
+#
+#   The ASYMMETRIC implementation case is when one path
+#   for a feature works (CREATE TABLE inline CHECK)
+#   and another path for the SAME feature does not
+#   (ALTER TABLE ADD CONSTRAINT CHECK), AND the
+#   whitelist string suggests both should work.
+#   Apps reading the whitelist STRING to plan
+#   capability detection will be misled.
+#
+# Wire divergence check: probed via mysqlwire (MTR
+# canonical, port 3307). sqlparser is wire-shared;
+# the ALTER TABLE convert and dispatcher live in
+# parser-shared layer. Pgwire path would produce
+# the same fingerprints (modulo SQLSTATE vs MySQL
+# errno mapping).
+#
+# Adaptation notes:
+#   # zeta-adapt: WHITELIST-LIE — ALTER TABLE ADD
+#     CONSTRAINT CHECK is rejected DESPITE the
+#     whitelist string listing CHECK. Move CHECK to
+#     CREATE TABLE inline; cannot add post-hoc.
+#   # zeta-adapt: KNOWN GAP — EXCLUDE constraint
+#     unsupported in 4 syntax paths. PG canonical
+#     EXCLUDE USING gist temporal-no-overlap idiom
+#     has no migration path; rewrite to a CHECK
+#     trigger or app-level enforcement.
+#   # zeta-adapt: PARSER BUG — ALTER TABLE ALTER
+#     CONSTRAINT misroutes to ALTER COLUMN whitelist;
+#     the error message names the WRONG statement
+#     type. No semantic fix needed by the app since
+#     the statement is rejected; but expect confusing
+#     error messages when porting PG.
+#   # zeta-adapt: KNOWN GAP — VALIDATE CONSTRAINT
+#     unsupported; zeta auto-validates at constraint
+#     ADD time, so the statement is largely redundant
+#     for OLTP migration anyway.
+#   # zeta-adapt: SEMANTIC PIN — DROP CONSTRAINT
+#     CASCADE on missing-constraint errors; CASCADE
+#     does NOT swallow the missing check. Only
+#     IF EXISTS swallows.
+
+--echo === SHAPE A — CHECK whitelist-LIE on ALTER TABLE ADD (asymmetric impl) ===
+
+DROP TABLE IF EXISTS chk_alt;
+CREATE TABLE chk_alt (id INT, v INT);
+
+--echo === REJECT: ALTER TABLE ADD CONSTRAINT cx CHECK → dispatcher-reject DESPITE whitelist listing CHECK ===
+
+--error 1064
+ALTER TABLE chk_alt ADD CONSTRAINT cx CHECK (v > 0);
+
+--echo === SUPPORT pin: CREATE TABLE (col CHECK (...)) — inline column-level CHECK works ===
+
+DROP TABLE IF EXISTS chk_inline_col;
+CREATE TABLE chk_inline_col (id INT, v INT CHECK (v > 0));
+
+--echo === SUPPORT pin: CREATE TABLE (col, CHECK (...)) — inline table-level unnamed CHECK works ===
+
+DROP TABLE IF EXISTS chk_inline_tbl;
+CREATE TABLE chk_inline_tbl (id INT, v INT, CHECK (v > 0));
+
+--echo === SUPPORT pin: CREATE TABLE (col, CONSTRAINT cx CHECK (...)) — inline table-level NAMED CHECK works ===
+
+DROP TABLE IF EXISTS chk_inline_named;
+CREATE TABLE chk_inline_named (id INT, v INT, CONSTRAINT cx CHECK (v > 0));
+
+--echo === ENFORCEMENT pin: INSERT into inline-CHECK table — runtime rejects with 1105 (asymmetry: enforcement works, just not addable via ALTER) ===
+
+INSERT INTO chk_inline_col VALUES (1, 5);
+--error 1105
+INSERT INTO chk_inline_col VALUES (2, -5);
+SELECT id, v FROM chk_inline_col ORDER BY id;
+
+DROP TABLE chk_inline_col;
+DROP TABLE chk_inline_tbl;
+DROP TABLE chk_inline_named;
+DROP TABLE chk_alt;
+
+--echo === SHAPE B — EXCLUDE constraint absent across 4 distinct syntax paths ===
+
+DROP TABLE IF EXISTS exc_alt;
+CREATE TABLE exc_alt (id INT, v INT);
+
+--echo === Path A: ALTER TABLE ADD CONSTRAINT cx EXCLUDE USING gist → constraint-type whitelist reject (witness: "PRIMARY, UNIQUE, FOREIGN, or CHECK, found: EXCLUDE") ===
+
+--error 1064
+ALTER TABLE exc_alt ADD CONSTRAINT cx EXCLUDE USING gist (v WITH =);
+
+--echo === Path B: ALTER TABLE ADD CONSTRAINT cx EXCLUDE (no USING) → SAME whitelist reject (USING absence doesn't matter; rejection happens before USING token) ===
+
+--error 1064
+ALTER TABLE exc_alt ADD CONSTRAINT cx EXCLUDE (v WITH =);
+
+--echo === Path C: ALTER TABLE ADD EXCLUDE USING gist (no CONSTRAINT keyword) → DIFFERENT path: parser absorbs EXCLUDE as identifier, chokes on "gist" ===
+
+--error 1064
+ALTER TABLE exc_alt ADD EXCLUDE USING gist (v WITH =);
+
+--echo === Path D: CREATE TABLE c (..., CONSTRAINT cx EXCLUDE USING gist (...)) → same whitelist reject as Path A (shared sub-grammar; only column offset differs) ===
+
+--error 1064
+CREATE TABLE exc_create (id INT, v INT, CONSTRAINT cx EXCLUDE USING gist (v WITH =));
+
+DROP TABLE exc_alt;
+
+--echo === SHAPE C — ALTER CONSTRAINT cross-whitelist fallthrough BUG ===
+
+DROP TABLE IF EXISTS alt_con;
+CREATE TABLE alt_con (id INT, v INT);
+
+--echo === Bug: ALTER TABLE t ALTER CONSTRAINT cx NOT VALID → error message names "ALTER COLUMN" (wrong statement type) — parser misroutes ===
+
+--error 1064
+ALTER TABLE alt_con ALTER CONSTRAINT cx NOT VALID;
+
+--echo === Same fingerprint with DEFERRABLE modifier — ALTER CONSTRAINT always misroutes to ALTER COLUMN whitelist ===
+
+--error 1064
+ALTER TABLE alt_con ALTER CONSTRAINT cx DEFERRABLE;
+
+DROP TABLE alt_con;
+
+--echo === SHAPE D — VALIDATE CONSTRAINT dispatcher-reject (Pattern X style) ===
+
+DROP TABLE IF EXISTS val_con;
+CREATE TABLE val_con (id INT, v INT);
+
+--echo === VALIDATE CONSTRAINT parses past sqlparser; zeta dispatcher rejects with "unsupported ALTER TABLE operation: VALIDATE CONSTRAINT cx" ===
+
+--error 1064
+ALTER TABLE val_con VALIDATE CONSTRAINT cx;
+
+DROP TABLE val_con;
+
+--echo === SHAPE E — DROP CONSTRAINT CASCADE on missing — CASCADE does NOT swallow ===
+
+DROP TABLE IF EXISTS drop_con;
+CREATE TABLE drop_con (id INT, v INT);
+
+--echo === Baseline: DROP CONSTRAINT cx (no IF EXISTS, no CASCADE) — errors 1105 on missing (correct) ===
+
+--error 1105
+ALTER TABLE drop_con DROP CONSTRAINT cx;
+
+--echo === CASCADE alone: DROP CONSTRAINT cx CASCADE — still errors 1105; CASCADE does NOT suppress missing-check ===
+
+--error 1105
+ALTER TABLE drop_con DROP CONSTRAINT cx CASCADE;
+
+--echo === IF EXISTS swallows: DROP CONSTRAINT IF EXISTS cx CASCADE — silent (re-pin of pre-existing alter_table_basic_extra.test coverage for orthogonality witness) ===
+
+ALTER TABLE drop_con DROP CONSTRAINT IF EXISTS cx CASCADE;
+
+DROP TABLE drop_con;

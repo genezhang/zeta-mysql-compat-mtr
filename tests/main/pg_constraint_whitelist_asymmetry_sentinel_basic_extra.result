@@ -1,0 +1,71 @@
+=== SHAPE A — CHECK whitelist-LIE on ALTER TABLE ADD (asymmetric impl) ===
+DROP TABLE IF EXISTS chk_alt;
+CREATE TABLE chk_alt (id INT, v INT);
+=== REJECT: ALTER TABLE ADD CONSTRAINT cx CHECK → dispatcher-reject DESPITE whitelist listing CHECK ===
+ALTER TABLE chk_alt ADD CONSTRAINT cx CHECK (v > 0);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE ADD CONSTRAINT type
+=== SUPPORT pin: CREATE TABLE (col CHECK (...)) — inline column-level CHECK works ===
+DROP TABLE IF EXISTS chk_inline_col;
+CREATE TABLE chk_inline_col (id INT, v INT CHECK (v > 0));
+=== SUPPORT pin: CREATE TABLE (col, CHECK (...)) — inline table-level unnamed CHECK works ===
+DROP TABLE IF EXISTS chk_inline_tbl;
+CREATE TABLE chk_inline_tbl (id INT, v INT, CHECK (v > 0));
+=== SUPPORT pin: CREATE TABLE (col, CONSTRAINT cx CHECK (...)) — inline table-level NAMED CHECK works ===
+DROP TABLE IF EXISTS chk_inline_named;
+CREATE TABLE chk_inline_named (id INT, v INT, CONSTRAINT cx CHECK (v > 0));
+=== ENFORCEMENT pin: INSERT into inline-CHECK table — runtime rejects with 1105 (asymmetry: enforcement works, just not addable via ALTER) ===
+INSERT INTO chk_inline_col VALUES (1, 5);
+INSERT INTO chk_inline_col VALUES (2, -5);
+ERROR 1105: execution error: new row violates check constraint "test.public.chk_inline_col_check1"
+SELECT id, v FROM chk_inline_col ORDER BY id;
+id	v
+1	5
+DROP TABLE chk_inline_col;
+DROP TABLE chk_inline_tbl;
+DROP TABLE chk_inline_named;
+DROP TABLE chk_alt;
+=== SHAPE B — EXCLUDE constraint absent across 4 distinct syntax paths ===
+DROP TABLE IF EXISTS exc_alt;
+CREATE TABLE exc_alt (id INT, v INT);
+=== Path A: ALTER TABLE ADD CONSTRAINT cx EXCLUDE USING gist → constraint-type whitelist reject (witness: "PRIMARY, UNIQUE, FOREIGN, or CHECK, found: EXCLUDE") ===
+ALTER TABLE exc_alt ADD CONSTRAINT cx EXCLUDE USING gist (v WITH =);
+ERROR 1064: SQL parse error: sql parser error: Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK, found: EXCLUDE at Line: 1, Column: 39
+=== Path B: ALTER TABLE ADD CONSTRAINT cx EXCLUDE (no USING) → SAME whitelist reject (USING absence doesn't matter; rejection happens before USING token) ===
+ALTER TABLE exc_alt ADD CONSTRAINT cx EXCLUDE (v WITH =);
+ERROR 1064: SQL parse error: sql parser error: Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK, found: EXCLUDE at Line: 1, Column: 39
+=== Path C: ALTER TABLE ADD EXCLUDE USING gist (no CONSTRAINT keyword) → DIFFERENT path: parser absorbs EXCLUDE as identifier, chokes on "gist" ===
+ALTER TABLE exc_alt ADD EXCLUDE USING gist (v WITH =);
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: gist at Line: 1, Column: 39
+=== Path D: CREATE TABLE c (..., CONSTRAINT cx EXCLUDE USING gist (...)) → same whitelist reject as Path A (shared sub-grammar; only column offset differs) ===
+CREATE TABLE exc_create (id INT, v INT, CONSTRAINT cx EXCLUDE USING gist (v WITH =));
+ERROR 1064: SQL parse error: sql parser error: Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK, found: EXCLUDE at Line: 1, Column: 55
+DROP TABLE exc_alt;
+=== SHAPE C — ALTER CONSTRAINT cross-whitelist fallthrough BUG ===
+DROP TABLE IF EXISTS alt_con;
+CREATE TABLE alt_con (id INT, v INT);
+=== Bug: ALTER TABLE t ALTER CONSTRAINT cx NOT VALID → error message names "ALTER COLUMN" (wrong statement type) — parser misroutes ===
+ALTER TABLE alt_con ALTER CONSTRAINT cx NOT VALID;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET/DROP NOT NULL, SET DEFAULT, SET DATA TYPE, or ADD GENERATED after ALTER COLUMN, found: cx at Line: 1, Column: 38
+=== Same fingerprint with DEFERRABLE modifier — ALTER CONSTRAINT always misroutes to ALTER COLUMN whitelist ===
+ALTER TABLE alt_con ALTER CONSTRAINT cx DEFERRABLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET/DROP NOT NULL, SET DEFAULT, SET DATA TYPE, or ADD GENERATED after ALTER COLUMN, found: cx at Line: 1, Column: 38
+DROP TABLE alt_con;
+=== SHAPE D — VALIDATE CONSTRAINT dispatcher-reject (Pattern X style) ===
+DROP TABLE IF EXISTS val_con;
+CREATE TABLE val_con (id INT, v INT);
+=== VALIDATE CONSTRAINT parses past sqlparser; zeta dispatcher rejects with "unsupported ALTER TABLE operation: VALIDATE CONSTRAINT cx" ===
+ALTER TABLE val_con VALIDATE CONSTRAINT cx;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: VALIDATE CONSTRAINT cx
+DROP TABLE val_con;
+=== SHAPE E — DROP CONSTRAINT CASCADE on missing — CASCADE does NOT swallow ===
+DROP TABLE IF EXISTS drop_con;
+CREATE TABLE drop_con (id INT, v INT);
+=== Baseline: DROP CONSTRAINT cx (no IF EXISTS, no CASCADE) — errors 1105 on missing (correct) ===
+ALTER TABLE drop_con DROP CONSTRAINT cx;
+ERROR 1105: execution error: constraint "cx" does not exist on table "test.public.drop_con"
+=== CASCADE alone: DROP CONSTRAINT cx CASCADE — still errors 1105; CASCADE does NOT suppress missing-check ===
+ALTER TABLE drop_con DROP CONSTRAINT cx CASCADE;
+ERROR 1105: execution error: constraint "cx" does not exist on table "test.public.drop_con"
+=== IF EXISTS swallows: DROP CONSTRAINT IF EXISTS cx CASCADE — silent (re-pin of pre-existing alter_table_basic_extra.test coverage for orthogonality witness) ===
+ALTER TABLE drop_con DROP CONSTRAINT IF EXISTS cx CASCADE;
+DROP TABLE drop_con;
