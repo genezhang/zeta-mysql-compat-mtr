@@ -1,0 +1,453 @@
+# Independently authored PG COPY-options silent-accept
+# CORRUPTION-class sentinel slice for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/
+# or PG regress.
+#
+# Existing coverage (read carefully — DO NOT duplicate):
+#   - copy_basic_extra.test (lines 65-107) pins the
+#     "silent no-op" surface for the basic / well-formed
+#     option set: FORMAT CSV / FORMAT BINARY / FORMAT
+#     TEXT, DELIMITER ',', NULL '\N', HEADER true bundled
+#     with FORMAT CSV, COPY (SELECT ...) TO STDOUT, the
+#     column-list form, the legacy WITH CSV spelling, and
+#     COPY t TO '<file path>'. It also pins (lines 109-117)
+#     the FROM STDIN parse-reject for the BARE form and
+#     the LEGACY `WITH CSV` form. THIS slice extends
+#     coverage to the EXOTIC option set NOT covered there:
+#     FORCE_QUOTE, FORCE_NULL, FREEZE, ENCODING, QUOTE,
+#     HEADER alone (without FORMAT CSV), the legacy
+#     single-keyword `WITH BINARY` form, HEADER MATCH
+#     (PG 14+), OIDS (PG ≤ 11 removed), FORCE_QUOTE *
+#     shorthand, the MODERN-paren FROM STDIN WITH (...)
+#     form, and an option-only FROM STDIN shape with a
+#     TO-side option keyword (FORCE_QUOTE).
+#   - pg_copy_program_noop_sentinel_basic_extra.test pins
+#     COPY ... TO/FROM PROGRAM '<cmd>' (the server-side
+#     process-pipe variant — a DISTINCT statement variant,
+#     not an option). Orthogonal to this slice.
+#
+# Pre-existing pattern fingerprints this slice joins:
+#   - CORRUPTION-class family: PR #421 (DEFAULT subquery
+#     stored as text), PR #432 (TIMESTAMP(n) precision
+#     silent-drop), pg_explain_format_silent_drop_bug_
+#     sentinel (FORMAT JSON / ANALYZE TRUE silently
+#     dropped), pg_view_options_silent_accept_sentinel
+#     (CREATE VIEW WITH (any_opt) silent-accept). Shared
+#     mechanism: the modifier parses (no error, no
+#     warning); the IR-conversion / dispatcher layer
+#     never reads the field; the statement executes with
+#     default behavior. zeta-parser/src/convert.rs:425
+#     classifies sp::Statement::Copy as ZetaStatement::
+#     NoOp ("COPY is handled at the pgwire layer, not
+#     the parser") — so EVERY parser-accepted COPY
+#     option list is dropped on the floor at the
+#     conversion site, before any executor sees it. The
+#     PG-style copy executor that would honor FORCE_QUOTE
+#     etc. does not exist in zeta.
+#   - "Expected: ;, found: EOF" — appears in
+#     copy_basic_extra:111-117 for the BARE and LEGACY
+#     FROM-STDIN shapes. THIS slice extends the
+#     fingerprint to the MODERN-paren shapes (WITH
+#     (FORMAT CSV) and WITH (FORCE_QUOTE (v))) — proving
+#     the EOF rejection is WIRE-LAYER (mysqlwire cannot
+#     deliver in-band STDIN bytes), NOT option-grammar.
+#     ALL FROM-side option grammar is unreachable via
+#     the MySQL wire regardless of what the option list
+#     contains — the EOF cutoff fires before option
+#     evaluation.
+#   - "Expected: option, found: <KW>" — NEW fingerprint
+#     at this slice for the COPY option-name registry.
+#     Two witnesses: OIDS (removed in PG 12; not in
+#     zeta's option set) and `nosuchopt` (arbitrary
+#     unknown). The COPY option-name registry IS strict
+#     (unlike VIEW's WITH (...) which silently accepts
+#     anything) — but only for tokens that survive the
+#     option-keyword phase. Tokens that pass the
+#     keyword whitelist (FORCE_QUOTE, FORCE_NULL,
+#     FREEZE, HEADER, ENCODING, QUOTE, BINARY) drop
+#     silently at the convert.rs:425 NoOp gate.
+#   - "Expect a char, found <quoted>" — NEW fingerprint
+#     for COPY's char-typed option values (DELIMITER,
+#     ESCAPE, QUOTE expect exactly 1 char). Two
+#     witnesses: a multichar DELIMITER, and an escaped
+#     backslash ESCAPE. PG also rejects multichar
+#     delimiters but with a different error message
+#     ("COPY delimiter must be a single one-byte
+#     character"); zeta's sqlparser rejects EARLIER, at
+#     the lexer/option-value layer.
+#   - "Expected: a list of columns in parentheses,
+#     found: *" — NEW fingerprint for the PG
+#     FORCE_QUOTE * shorthand (means "quote every
+#     column"). zeta's sqlparser only accepts the
+#     parenthesised column-list form.
+#   - "Expected: ), found: MATCH" — NEW fingerprint for
+#     HEADER MATCH (PG 14+ feature: match column names
+#     in CSV header against the table). zeta's sqlparser
+#     does not include the MATCH branch; the parser
+#     expects the option list to close after
+#     `HEADER true/false`.
+#
+# This slice pins (NINETEEN shapes — nine silent-accept
+# BUGs, six distinct 1064 parse-reject fingerprints,
+# three FROM-STDIN wire-divergence pins, one boundary
+# SUPPORT pin):
+#
+#   CORRUPTION-class BUGs — TO-side options accepted at
+#   parse, silently dropped at convert.rs:425 NoOp gate:
+#
+#     Shape A1 — `COPY t TO STDOUT WITH (FORCE_QUOTE
+#     (v))`: SUCCESS. Real PG would emit the v column
+#       wrapped in the QUOTE character even when the
+#       value contains no DELIMITER/QUOTE/newline. zeta
+#       silently drops the option AND emits no rows at
+#       all on the MySQL wire (the underlying COPY ...
+#       TO STDOUT is itself a silent no-op on this wire
+#       per copy_basic_extra). The HEADLINE: an app
+#       that defends a downstream CSV consumer by
+#       force-quoting the join-key column gets zero
+#       diagnostic if the option is silently dropped.
+#
+#     Shape A2 — `COPY t TO STDOUT WITH BINARY` (legacy
+#     single-keyword form): SUCCESS. Real PG would emit
+#       PostgreSQL's binary COPY format (binary signature
+#       + length-prefixed tuples). zeta silently drops
+#       and emits nothing. Note: `WITH (FORMAT BINARY)`
+#       (the modern paren form) is ALREADY pinned at
+#       copy_basic_extra:87 — THIS pin covers the
+#       LEGACY single-keyword spelling, a separate
+#       grammar branch in sqlparser.
+#
+#     Shape A3 — `COPY t TO STDOUT WITH (HEADER true)`
+#       (no FORMAT specifier, so HEADER would apply to
+#       the default TEXT format): SUCCESS. Real PG
+#       errors `HEADER specified more than once` if
+#       you also pass FORMAT TEXT, or applies a header
+#       line for CSV. zeta silently accepts and emits
+#       nothing. Note: `WITH (FORMAT CSV, HEADER true)`
+#       is pinned at copy_basic_extra:79 — THIS pin
+#       covers the HEADER-without-FORMAT shape, a
+#       different option-validation path.
+#
+#     Shape A4 — `COPY t TO STDOUT WITH (ENCODING
+#     'UTF8')`: SUCCESS. Real PG would emit data in
+#       the specified encoding. zeta silently drops
+#       — the option is parser-recognised, executor-
+#       absent.
+#
+#     Shape A5 — `COPY t TO STDOUT WITH (QUOTE '|')`:
+#       SUCCESS. Real PG would use `|` as the field-
+#       quote character (typically combined with
+#       FORMAT CSV). zeta silently drops; if it
+#       emitted any rows over this wire the default
+#       quote behavior would be unchanged.
+#
+#     Shape A6 — `COPY t TO STDOUT WITH (DELIMITER
+#     ',', HEADER true, NULL 'N/A')`: SUCCESS. Three-
+#       option chain combining a well-formed PG triple.
+#       Silently accepted; zero-row output. This shape
+#       is included to prove the silent-accept gate is
+#       multi-option-list-aware (the parser doesn't
+#       trip on the second or third entry).
+#
+#   WRONG-SIDE / INVALID-COMBO silent-accept BUGs —
+#   options that PG itself REJECTS for this direction
+#   or this format pairing:
+#
+#     Shape B1 — `COPY t TO STDOUT WITH (FORCE_NULL
+#     (v))`: SUCCESS. PG: FORCE_NULL is FROM-side ONLY
+#       (it converts the QUOTE-wrapped NULL spelling
+#       back to SQL NULL on input). On TO PG errors
+#       `COPY FORCE_NULL cannot be used with COPY TO`.
+#       zeta silently accepts. The absence of a
+#       direction-side validator is structural —
+#       confirms the entire option-side-table is
+#       missing.
+#
+#     Shape B2 — `COPY t TO STDOUT WITH (FREEZE)`:
+#       SUCCESS. PG: FREEZE is an INSERT-side bulk-
+#       load hint that requires same-transaction
+#       table creation AND only applies to COPY FROM.
+#       On TO PG errors `cannot perform COPY FREEZE
+#       on this table`. zeta silently accepts. Same
+#       structural finding as B1.
+#
+#   INVALID-FORMAT-COMBO silent-accept BUG:
+#
+#     Shape C1 — `COPY t TO STDOUT WITH (FORMAT TEXT,
+#     HEADER true)`: SUCCESS. PG: HEADER is CSV-only;
+#       on the TEXT format PG errors `COPY HEADER
+#       available only in CSV mode`. zeta silently
+#       accepts the invalid combination. Confirms
+#       there is no option-pair validator either.
+#
+#   Distinct 1064 parse-reject fingerprints — SIX
+#   different code paths in the sqlparser COPY-options
+#   grammar:
+#
+#     Shape D1 — `COPY t TO STDOUT WITH (FORCE_QUOTE
+#     *)`: 1064 "Expected: a list of columns in
+#       parentheses, found: *". PG's `*` shorthand
+#       ("quote every column") is unsupported. The
+#       parenthesised-column-list path is the only
+#       FORCE_QUOTE shape that survives the parser
+#       (and once accepted, silently drops at A1).
+#
+#     Shape D2 — `COPY t TO STDOUT WITH (HEADER
+#     MATCH)`: 1064 "Expected: ), found: MATCH". PG
+#       14+ added the MATCH variant (validate header
+#       row matches column names). zeta's sqlparser
+#       does not carry the MATCH branch; the parser
+#       expects the option list to close after
+#       HEADER's value.
+#
+#     Shape D3 — `COPY t TO STDOUT WITH (OIDS)`:
+#       1064 "Expected: option, found: OIDS". OIDS
+#       was removed from PG in version 12 along with
+#       the system-OID column. zeta's option-name
+#       registry does not include it.
+#
+#     Shape D4 — `COPY t TO STDOUT WITH (FORMAT CSV,
+#     ESCAPE '\\')` (the .test source uses two
+#       backslashes): 1064 "Expect a char, found
+#       \"\\\\\"". ESCAPE expects a single character;
+#       the lexed value reaches the option-value
+#       validator as a 2-char string and rejects.
+#       (Note: PG accepts `ESCAPE E'\\'` via the
+#       PG-extension E'' string syntax; zeta does
+#       not.)
+#
+#     Shape D5 — `COPY t TO STDOUT WITH (DELIMITER
+#     'ABC')`: 1064 "Expect a char, found \"ABC\"".
+#       Multichar delimiter is rejected by the same
+#       "Expect a char" validator as D4. PG also
+#       rejects this, but with a different message
+#       ("COPY delimiter must be a single one-byte
+#       character"). Same gate, different message —
+#       both correct, fingerprint pins zeta's spelling.
+#
+#     Shape D6 — `COPY t TO STDOUT WITH (nosuchopt
+#     'x')`: 1064 "Expected: option, found:
+#       nosuchopt". Arbitrary unknown identifier
+#       rejects at the option-keyword whitelist. The
+#       COPY option registry IS strict on
+#       option-NAMES (unlike VIEW's WITH (...) which
+#       silently accepts anything — see
+#       pg_view_options_silent_accept_sentinel). But
+#       tokens that ARE in the whitelist (FORCE_QUOTE,
+#       FORCE_NULL, HEADER, ENCODING, QUOTE, FREEZE,
+#       BINARY) then silently drop at the
+#       convert.rs:425 NoOp gate. Two-stage:
+#       option-NAME registry is strict;
+#       option-SEMANTICS layer is absent.
+#
+#   WIRE-DIVERGENCE structural finding — FROM-STDIN
+#   unreachable via mysqlwire (cross-link this
+#   pattern to the per-wire dispatcher divergence
+#   noted by `feedback_wire_path_divergence_check`):
+#
+#     Shape E1 — `COPY t FROM STDIN`: 1064 "Expected:
+#       ;, found: EOF". The bare form is ALREADY
+#       pinned at copy_basic_extra:112 — re-pinned
+#       here as the BASELINE of the E-shape family.
+#
+#     Shape E2 — `COPY t FROM STDIN WITH (FORMAT
+#     CSV)`: 1064 "Expected: ;, found: EOF". The
+#       MODERN-paren option form. Note:
+#       copy_basic_extra:117 pinned only the LEGACY
+#       `WITH CSV` form. The fingerprint is IDENTICAL
+#       — the parser tokenises `FROM STDIN`, then
+#       the next phase tries to consume what the
+#       PG-wire COPY-IN protocol would deliver, hits
+#       EOF, and rejects. The option list never
+#       evaluates.
+#
+#     Shape E3 — `COPY t FROM STDIN WITH (FORCE_QUOTE
+#     (v))`: 1064 "Expected: ;, found: EOF". A
+#       deliberately-invalid TO-side option (FORCE_
+#       QUOTE only makes sense on TO). PG would
+#       reject with `COPY FORCE_QUOTE cannot be used
+#       with COPY FROM` AT THE SEMANTIC LAYER; zeta
+#       rejects with the SAME EOF fingerprint as E1/
+#       E2 — proving the rejection is wire-layer
+#       (the option-list phase is unreachable). The
+#       three E-shapes collapse to the same
+#       fingerprint regardless of option list
+#       contents. This is the structural finding:
+#       all FROM-side option-grammar behavior is
+#       unreachable via mysqlwire.
+#
+#   BOUNDARY support pin:
+#
+#     Shape F — `COPY t TO STDOUT`: bare, no
+#       options, no error. Already covered by
+#       copy_basic_extra:65 — repeated here as the
+#       baseline that proves the silent-accept
+#       BUGs above are option-scoped, not a
+#       COPY-wide regression.
+#
+# Adaptation notes:
+#   # zeta-adapt: CORRUPTION-class BUG — `COPY t TO
+#     STDOUT WITH (<opt>)` silently accepts FORCE_QUOTE,
+#     FORCE_NULL (on TO, wrong side), FREEZE (on TO,
+#     wrong side), HEADER (without FORMAT CSV),
+#     ENCODING, QUOTE, the legacy `WITH BINARY` form,
+#     and the invalid TEXT+HEADER combo. Underlying
+#     mechanism: zeta-parser/src/convert.rs:425
+#     classifies sp::Statement::Copy as
+#     ZetaStatement::NoOp; the entire option list is
+#     dropped at conversion. PLUS: the COPY ... TO
+#     STDOUT row-stream itself is a silent no-op on
+#     the MySQL wire (copy_basic_extra) — so even
+#     "honored" options would produce no
+#     wire-observable side-effect. The pin here is
+#     "no error" not "verified honored" for options
+#     whose side-effect requires output bytes (QUOTE,
+#     ENCODING, FORCE_QUOTE on values that don't
+#     normally need quoting). The CORRUPTION is the
+#     missing error, not the missing bytes.
+#     Substitute: validate COPY options out-of-band
+#     against PG documentation before sending; do NOT
+#     trust silent success as evidence of option
+#     applicability.
+#   # zeta-adapt: KNOWN GAP — FORCE_QUOTE *, HEADER
+#     MATCH, OIDS, multichar DELIMITER, escaped
+#     ESCAPE, and unknown option names all error 1064
+#     at parse with six distinct messages. The option
+#     NAME registry is strict; the option SEMANTICS
+#     layer is absent (see CORRUPTION pin above).
+#     Substitute: stick to the option-name subset
+#     pinned in copy_basic_extra as "parser-accepted"
+#     and treat the others as unsupported.
+#   # zeta-adapt: WIRE-DIVERGENCE — every `COPY t
+#     FROM STDIN [WITH (...)]` shape errors 1064
+#     "Expected: ;, found: EOF" REGARDLESS of option
+#     list contents (FORMAT CSV, FORCE_QUOTE, junk —
+#     same fingerprint). The mysqlwire dispatcher
+#     cannot deliver the in-band STDIN bytes that
+#     the PG-style COPY-IN protocol expects; the
+#     EOF cutoff fires at the wire layer BEFORE
+#     option grammar evaluation. ALL FROM-side
+#     option-grammar behavior is therefore
+#     unreachable via mysqlwire. Substitute over
+#     mysqlwire: INSERT (single-row or
+#     multi-VALUES). Substitute via pgwire: psql's
+#     \\COPY FROM STDIN delivers the bytes
+#     correctly via the PG wire.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS cp;
+CREATE TABLE cp (id INT PRIMARY KEY, v TEXT);
+INSERT INTO cp VALUES (1, 'alpha'), (2, 'beta');
+
+--echo === SHAPE A — TO-side option silent-accept BUGs (six pins) ===
+
+--echo === Shape A1: COPY t TO STDOUT WITH (FORCE_QUOTE (v)) — silent-accept; output bytes NOT verified quoted (no rows on mysqlwire) ===
+
+# Pin "no error" not "verified honored": COPY ... TO
+# STDOUT does not stream rows over mysqlwire (per
+# copy_basic_extra), so the visible side-effect of
+# FORCE_QUOTE (the QUOTE-wrapped value bytes) is
+# wire-unobservable here. The CORRUPTION is the missing
+# error for an option the engine has no way to honor.
+COPY cp TO STDOUT WITH (FORCE_QUOTE (v));
+
+--echo === Shape A2: COPY t TO STDOUT WITH BINARY — legacy single-keyword form; silent-accept; output is NOT actually binary ===
+
+# The legacy `WITH BINARY` spelling is a SEPARATE
+# parser branch from `WITH (FORMAT BINARY)` (pinned
+# at copy_basic_extra:87). Both silently accept.
+COPY cp TO STDOUT WITH BINARY;
+
+--echo === Shape A3: COPY t TO STDOUT WITH (HEADER true) — silent-accept; no header row in output ===
+
+# HEADER without FORMAT CSV. PG errors "COPY HEADER
+# available only in CSV mode" (see also Shape C1 for
+# the explicit FORMAT TEXT + HEADER combo). zeta
+# silently accepts.
+COPY cp TO STDOUT WITH (HEADER true);
+
+--echo === Shape A4: COPY t TO STDOUT WITH (ENCODING 'UTF8') — silent-accept ===
+
+COPY cp TO STDOUT WITH (ENCODING 'UTF8');
+
+--echo === Shape A5: COPY t TO STDOUT WITH (QUOTE '|') — silent-accept; default quote behavior unchanged (wire-unobservable here) ===
+
+COPY cp TO STDOUT WITH (QUOTE '|');
+
+--echo === Shape A6: COPY t TO STDOUT WITH (DELIMITER ',', HEADER true, NULL 'N/A') — multi-option chain; silent-accept ===
+
+COPY cp TO STDOUT WITH (DELIMITER ',', HEADER true, NULL 'N/A');
+
+--echo === SHAPE B — wrong-side option silent-accept BUGs (FORCE_NULL and FREEZE on TO) ===
+
+--echo === Shape B1: COPY t TO STDOUT WITH (FORCE_NULL (v)) — FORCE_NULL is FROM-side only in PG; zeta silently accepts on TO ===
+
+COPY cp TO STDOUT WITH (FORCE_NULL (v));
+
+--echo === Shape B2: COPY t TO STDOUT WITH (FREEZE) — FREEZE is INSERT-side bulk-load hint; meaningless on TO; silently accepted ===
+
+COPY cp TO STDOUT WITH (FREEZE);
+
+--echo === SHAPE C — invalid-format-combo silent-accept BUG (HEADER + FORMAT TEXT) ===
+
+--echo === Shape C1: COPY t TO STDOUT WITH (FORMAT TEXT, HEADER true) — HEADER is CSV-only in PG; combo silently accepted ===
+
+COPY cp TO STDOUT WITH (FORMAT TEXT, HEADER true);
+
+--echo === SHAPE D — distinct 1064 parse-reject fingerprints (six code paths) ===
+
+--echo === Shape D1: COPY t TO STDOUT WITH (FORCE_QUOTE *) — "Expected: a list of columns in parentheses, found: *" ===
+
+--error 1064
+COPY cp TO STDOUT WITH (FORCE_QUOTE *);
+
+--echo === Shape D2: COPY t TO STDOUT WITH (HEADER MATCH) — "Expected: ), found: MATCH" (PG 14+ syntax) ===
+
+--error 1064
+COPY cp TO STDOUT WITH (HEADER MATCH);
+
+--echo === Shape D3: COPY t TO STDOUT WITH (OIDS) — "Expected: option, found: OIDS" (removed in PG 12) ===
+
+--error 1064
+COPY cp TO STDOUT WITH (OIDS);
+
+--echo === Shape D4: COPY t TO STDOUT WITH (FORMAT CSV, ESCAPE '\\') — "Expect a char, found \"\\\\\"" (2-char escape rejected) ===
+
+--error 1064
+COPY cp TO STDOUT WITH (FORMAT CSV, ESCAPE '\\');
+
+--echo === Shape D5: COPY t TO STDOUT WITH (DELIMITER 'ABC') — "Expect a char, found \"ABC\"" (multichar delimiter rejected) ===
+
+--error 1064
+COPY cp TO STDOUT WITH (DELIMITER 'ABC');
+
+--echo === Shape D6: COPY t TO STDOUT WITH (nosuchopt 'x') — "Expected: option, found: nosuchopt" (unknown option) ===
+
+--error 1064
+COPY cp TO STDOUT WITH (nosuchopt 'x');
+
+--echo === SHAPE E — FROM-STDIN wire-divergence: three pins, all collapse to "Expected: ;, found: EOF" regardless of option list ===
+
+--echo === Shape E1: COPY t FROM STDIN — bare, no options (BASELINE; previously pinned at copy_basic_extra:112, re-pinned for self-contained narrative) ===
+
+--error 1064
+COPY cp FROM STDIN;
+
+--echo === Shape E2: COPY t FROM STDIN WITH (FORMAT CSV) — modern paren form (legacy WITH CSV pinned at copy_basic_extra:117; modern paren form is novel here) ===
+
+--error 1064
+COPY cp FROM STDIN WITH (FORMAT CSV);
+
+--echo === Shape E3: COPY t FROM STDIN WITH (FORCE_QUOTE (v)) — junk TO-side option; SAME EOF fingerprint proves option list never evaluates ===
+
+--error 1064
+COPY cp FROM STDIN WITH (FORCE_QUOTE (v));
+
+--echo === SHAPE F — boundary SUPPORT pin: bare COPY t TO STDOUT succeeds (already covered at copy_basic_extra:65; pinned here to anchor the silent-accept BUGs as option-scoped) ===
+
+COPY cp TO STDOUT;
+
+--echo === Cleanup ===
+
+DROP TABLE cp;
