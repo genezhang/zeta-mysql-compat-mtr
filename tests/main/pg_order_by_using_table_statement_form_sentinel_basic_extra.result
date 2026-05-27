@@ -1,0 +1,15 @@
+CREATE TABLE pm (id INT, v INT);
+INSERT INTO pm VALUES (1, 10), (2, 20), (3, 30);
+=== SHAPE A: ORDER BY ... USING < — sqlparser whitelist gap at ORDER-BY-element acceptor ===
+SELECT v FROM pm ORDER BY v USING <;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: USING at Line: 1, Column: 29
+=== SHAPE A.2: ORDER BY ... USING > — same fingerprint ===
+SELECT v FROM pm ORDER BY v USING >;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: USING at Line: 1, Column: 29
+=== SHAPE A.3: ORDER BY ... USING OPERATOR(public.<) — operator-qualified, same fingerprint ===
+SELECT v FROM pm ORDER BY v USING OPERATOR(public.<);
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: USING at Line: 1, Column: 29
+=== SHAPE B: TABLE foo — statement-form acceptor reject (different whitelist from SHAPE A) ===
+TABLE pm;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: TABLE at Line: 1, Column: 1
+DROP TABLE pm;
