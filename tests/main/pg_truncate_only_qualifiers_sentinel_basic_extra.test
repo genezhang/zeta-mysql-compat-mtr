@@ -1,0 +1,217 @@
+# Independently authored TRUNCATE PG-qualifier sentinel
+# slice for the GPL MTR-format runner. NOT copied or
+# adapted from MySQL's mysql-test/.
+#
+# Scope: PG-specific TRUNCATE qualifiers (ONLY,
+# RESTRICT, table-name asterisk wildcard, and qualifier
+# ordering). Complements but does NOT duplicate the
+# existing baseline TRUNCATE coverage:
+#
+# Existing coverage (do NOT duplicate):
+#   - TRUNCATE TABLE (bare): pinned at delete_basic_
+#     extra.test:73-76 and delete_options_basic_extra.
+#     test:69-71.
+#   - TRUNCATE (no TABLE keyword): pinned at delete_
+#     options_basic_extra.test:73-76.
+#   - TRUNCATE TABLE t RESTART IDENTITY: pinned at
+#     delete_basic_extra.test:78-86 and delete_options_
+#     basic_extra.test:78-86.
+#   - TRUNCATE CONTINUE IDENTITY: pinned at pg_set_
+#     truncate_vacuum_sentinel_basic_extra.test:155-164.
+#   - TRUNCATE CASCADE (bare): pinned at delete_options_
+#     basic_extra.test:88-94 ("silently accepted").
+#
+# Net-new shapes (ZERO prior coverage in tests/main):
+#   verified via:
+#     grep -liE 'TRUNCATE ONLY|TRUNCATE.*RESTRICT|
+#       TRUNCATE.*\*' tests/main/*.test
+#   → only hit is event_use_partition_sentinel_basic_
+#     extra.test:32 (a markdown ** in a comment header,
+#     different topic — TRUNCATE PARTITION).
+#
+# This slice pins TWO bug-class findings:
+#
+#   FINDING 1 — SILENT-ACCEPT OF PG SEMANTIC MODIFIERS
+#   (ONLY, RESTRICT, t* wildcard):
+#     - `TRUNCATE ONLY t` → silently succeeds (PG: "do
+#       not cascade to inheritance children"). Zeta has
+#       no inheritance, but silently accepting ONLY
+#       means a portability test cannot distinguish
+#       "ONLY honored" from "ONLY ignored". CORRUPTION-
+#       class if an app assumes ONLY is enforced (e.g.,
+#       a migration relying on per-table targeting).
+#     - `TRUNCATE TABLE t RESTRICT` → silently succeeds
+#       (PG: "fail if any FK references this table").
+#       Zeta does NOT enforce — if a real FK reference
+#       exists, zeta still truncates. SAFETY-class
+#       silent-accept.
+#     - `TRUNCATE TABLE t*` → silently succeeds (PG: "t
+#       and all its inheritance children", inverse of
+#       ONLY). Zeta has no inheritance, but silent
+#       acceptance hides the semantic gap.
+#     - All three accept compound qualifiers (e.g.,
+#       `TRUNCATE ONLY t RESTART IDENTITY CASCADE`) and
+#       multi-table forms (per-table ONLY mix:
+#       `TRUNCATE t1, ONLY t2`). The parse path is
+#       fully permissive — it consumes the PG keywords
+#       and proceeds with the standard TRUNCATE
+#       semantics.
+#
+#   FINDING 2 — QUALIFIER-ORDER STRICTNESS in
+#   sqlparser grammar (CASCADE must come LAST):
+#     - `TRUNCATE t RESTART IDENTITY CASCADE` → OK
+#     - `TRUNCATE t CASCADE RESTART IDENTITY` → 1064
+#       "Expected: end of statement, found: RESTART at
+#       Line: 1, Column: 25 — col reflects identifier length"
+#     - `TRUNCATE t CONTINUE IDENTITY CASCADE` → OK
+#     - `TRUNCATE t CASCADE CONTINUE IDENTITY` → 1064
+#       "Expected: end of statement, found: CONTINUE at
+#       Line: 1, Column: 25 — col reflects identifier length"
+#     - PostgreSQL accepts EITHER order; the grammar
+#       defines them as independent option clauses.
+#       Zeta's sqlparser fork pins CASCADE as the final
+#       token. Apps porting PG SQL that emits CASCADE
+#       before RESTART/CONTINUE IDENTITY will get a
+#       1064 parse-reject.
+#
+#   SUPPORT pin — TRUNCATE ONLY noexist_t reaches the
+#   same table-not-found pipeline as plain TRUNCATE:
+#     - ERROR 1146 "table not found: test.public.
+#       <name>" — confirms the ONLY parse path is fully
+#       wired (not a special-cased no-op) and the table
+#       lookup happens AFTER ONLY is consumed.
+#
+# Big-picture finding:
+#
+#   Zeta's MySQL wire accepts PG-specific TRUNCATE
+#   modifiers (ONLY, RESTRICT, t*) silently without
+#   enforcing their PG semantics. This is a corruption-
+#   class divergence: a PG app ported to zeta that
+#   relies on `ONLY` to prevent inheritance descent, or
+#   `RESTRICT` to block truncation when an FK exists,
+#   will get the OPPOSITE behavior with no warning.
+#   The sqlparser also pins qualifier order (CASCADE
+#   last) — PG accepts either order.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN BUG — TRUNCATE ONLY / TRUNCATE
+#     TABLE t RESTRICT / TRUNCATE TABLE t* all silently
+#     succeed without enforcing PG semantics. NEVER
+#     rely on ONLY (inheritance descent prevention),
+#     RESTRICT (FK reference check), or t* (inheritance
+#     descent) when porting from PG. Use explicit
+#     pre-checks instead.
+#   # zeta-adapt: KNOWN GAP — TRUNCATE qualifier order
+#     is strict: CASCADE must follow RESTART/CONTINUE
+#     IDENTITY. Reverse order rejects with 1064.
+#     Rewrite PG-emitted SQL to put CASCADE last.
+
+--echo === SHAPE A1 — TRUNCATE ONLY t (BUG: PG semantic modifier silently dropped) ===
+
+DROP TABLE IF EXISTS t_only;
+DROP TABLE IF EXISTS t_only2;
+CREATE TABLE t_only (id INT PRIMARY KEY);
+INSERT INTO t_only VALUES (1), (2), (3);
+TRUNCATE ONLY t_only;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE A2 — TRUNCATE TABLE ONLY t (TABLE keyword + ONLY) ===
+
+INSERT INTO t_only VALUES (1), (2);
+TRUNCATE TABLE ONLY t_only;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE A3 — TRUNCATE ONLY t RESTART IDENTITY CASCADE (ONLY + cascade qualifiers) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE ONLY t_only RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE A4 — TRUNCATE ONLY t1, t2 (multi-table global ONLY) ===
+
+CREATE TABLE t_only2 (id INT PRIMARY KEY);
+INSERT INTO t_only VALUES (1);
+INSERT INTO t_only2 VALUES (1);
+TRUNCATE ONLY t_only, t_only2;
+SELECT COUNT(*) AS c1 FROM t_only;
+SELECT COUNT(*) AS c2 FROM t_only2;
+
+--echo === SHAPE A5 — TRUNCATE t1, ONLY t2 (per-table ONLY mix) ===
+
+INSERT INTO t_only VALUES (1);
+INSERT INTO t_only2 VALUES (1);
+TRUNCATE t_only, ONLY t_only2;
+SELECT COUNT(*) AS c1 FROM t_only;
+SELECT COUNT(*) AS c2 FROM t_only2;
+
+--echo === SHAPE B1 — TRUNCATE TABLE t RESTRICT (BUG: PG FK-check modifier silently dropped) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only RESTRICT;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE B2 — TRUNCATE t RESTRICT (no TABLE keyword) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only RESTRICT;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE B3 — TRUNCATE TABLE t RESTART IDENTITY RESTRICT (RESTRICT + RESTART) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only RESTART IDENTITY RESTRICT;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE C1 — TRUNCATE TABLE t* (BUG: PG inheritance-descend wildcard silently dropped) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only*;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE C2 — TRUNCATE TABLE t* RESTART IDENTITY CASCADE (wildcard + cascade qualifiers) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE TABLE t_only* RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE D1 — TRUNCATE t RESTART IDENTITY CASCADE (canonical order — OK) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE D2 — TRUNCATE t CASCADE RESTART IDENTITY (BUG: CASCADE-first rejected; PG accepts) ===
+
+INSERT INTO t_only VALUES (1);
+--error 1064
+TRUNCATE t_only CASCADE RESTART IDENTITY;
+# Cleanup: D2's parse-reject left (1) in the table.
+TRUNCATE t_only;
+
+--echo === SHAPE D3 — TRUNCATE t CONTINUE IDENTITY CASCADE (canonical order — OK) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only CONTINUE IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+
+--echo === SHAPE D4 — TRUNCATE t CASCADE CONTINUE IDENTITY (BUG: CASCADE-first rejected; PG accepts) ===
+
+INSERT INTO t_only VALUES (1);
+--error 1064
+TRUNCATE t_only CASCADE CONTINUE IDENTITY;
+# Cleanup: D4's parse-reject left (1) in the table.
+TRUNCATE t_only;
+
+--echo === SHAPE E — TRUNCATE ONLY noexist_t (1146 — confirms ONLY parse path reaches lookup) ===
+
+--error 1146
+TRUNCATE ONLY noexist_table_xyz;
+
+--echo === SHAPE F — TRUNCATE t RESTART IDENTITY CASCADE (canonical SUPPORT pin) ===
+
+INSERT INTO t_only VALUES (1);
+TRUNCATE t_only RESTART IDENTITY CASCADE;
+SELECT COUNT(*) AS c FROM t_only;
+
+DROP TABLE t_only;
+DROP TABLE t_only2;
