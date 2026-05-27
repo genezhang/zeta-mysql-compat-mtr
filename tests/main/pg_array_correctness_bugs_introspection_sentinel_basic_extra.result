@@ -1,0 +1,38 @@
+=== CONTROL — cardinality 1D works (accidentally — outer-dim == total when ndims=1) ===
+SELECT cardinality(ARRAY[1, 2, 3]) AS c_1d;
+c_1d
+3
+=== BUG #1 (CORRUPTION) — cardinality 2D returns OUTER-dim count, not total elements ===
+SELECT cardinality(ARRAY[[1, 2], [3, 4], [5, 6]]) AS c_2d_3x2;
+c_2d_3x2
+3
+SELECT cardinality(ARRAY[[1, 2, 3], [4, 5, 6]]) AS c_2d_2x3;
+c_2d_2x3
+2
+SELECT cardinality(ARRAY[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]) AS c_3d_2x2x2;
+c_3d_2x2x2
+2
+=== CONTROL — array_length 1D works (and dim=2 correctly returns NULL) ===
+SELECT array_length(ARRAY[1, 2, 3, 4, 5], 1) AS al_1d_dim1;
+al_1d_dim1
+5
+SELECT array_length(ARRAY[1, 2, 3, 4, 5], 2) AS al_1d_dim2_correct_null;
+al_1d_dim2_correct_null
+NULL
+=== BUG #2 (CORRUPTION, same root cause) — array_length(multi_dim, dim>=2) returns NULL despite inner axis existing ===
+SELECT array_length(ARRAY[[1, 2], [3, 4]], 1) AS al_2d_dim1_ok,
+       array_length(ARRAY[[1, 2], [3, 4]], 2) AS al_2d_dim2_wrong_null;
+al_2d_dim1_ok	al_2d_dim2_wrong_null
+2	NULL
+SELECT array_length(ARRAY[[1, 2, 3], [4, 5, 6]], 2) AS al_2d_dim2_wrong_null_3;
+al_2d_dim2_wrong_null_3
+NULL
+SELECT array_upper(ARRAY[[1, 2], [3, 4]], 2) AS au_2d_dim2_wrong_null,
+       array_lower(ARRAY[[1, 2], [3, 4]], 2) AS al_2d_dim2_lower_wrong_null;
+au_2d_dim2_wrong_null	al_2d_dim2_lower_wrong_null
+NULL	NULL
+=== GAP (two-fingerprint) — generate_subscripts(arr, dim) ===
+SELECT * FROM generate_subscripts(ARRAY['a', 'b', 'c'], 1) AS g(i);
+ERROR 1105: plan error: unknown set-returning function: GENERATE_SUBSCRIPTS
+SELECT generate_subscripts(ARRAY[10, 20, 30], 1) AS s;
+ERROR 1105: execution error: unknown function: generate_subscripts
