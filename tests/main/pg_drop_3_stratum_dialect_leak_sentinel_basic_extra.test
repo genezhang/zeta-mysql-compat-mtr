@@ -1,0 +1,207 @@
+# DROP statement 3-stratum grammar leak + Hive/Snowflake
+# dialect contamination + DROP TABLESPACE silent-accept anomaly.
+#
+# This slice is the DROP counterpart to the prior CREATE / ALTER
+# dialect-leak slices and forms the third witness in the
+# multi-dialect-vocabulary trilogy:
+#   - PR #452 (ALTER TABLE SET): noticed Hive/Spark identifiers
+#     leaked into ALTER TABLE storage-parameter parser.
+#   - PR #454 (ALTER COLUMN): pinned the bare ALTER restricted-list
+#     "Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or
+#     POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR"
+#     — CONNECTOR (Hive) + ICEBERG (Iceberg) already in ALTER list.
+#   - THIS slice: the DROP restricted-list leaks CONNECTOR (Hive),
+#     SECRET (Snowflake), STAGE (Snowflake) into PG-targeted DROP.
+#
+# STRUCTURAL FINDINGS (4):
+#   1. 3-STRATUM DROP rejection — zeta's DROP grammar exposes
+#      19 known object types via the parser whitelist string
+#      ("Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION,
+#      INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET,
+#      SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED
+#      VIEW or USER after DROP"). 15 PG-standard DROP types are
+#      MISSING from this list and hit the same fingerprint at
+#      column 6. 3 in-whitelist types (CONNECTOR, SECRET, STAGE)
+#      PARSE successfully but DISPATCH-REJECT with TWO sub-shapes
+#      (shape (c) catch-all for CONNECTOR + SECRET, dedicated
+#      reject message for STAGE).
+#   2. Hive + Snowflake dialect contamination at PARSE layer —
+#      CONNECTOR (Hive), SECRET (Snowflake), STAGE (Snowflake)
+#      are all in the PG-targeted DROP whitelist. zeta's sqlparser
+#      fork carries multi-dialect vocabulary, not just PG. This
+#      is the THIRD pin in the trilogy (ALTER TABLE PR #452,
+#      ALTER COLUMN PR #454, DROP THIS slice).
+#   3. OPERATOR CLASS / OPERATOR FAMILY composite reject path —
+#      bare OPERATOR is in the whitelist, but `DROP OPERATOR
+#      CLASS <n> USING <method>` and `DROP OPERATOR FAMILY <n>
+#      USING <method>` composite forms hit shape (c) catch-all
+#      "unsupported statement: sqlparser::ast::Statement" — not
+#      the whitelist reject. Two different layers (parse vs
+#      dispatch) handle bare-OPERATOR vs OPERATOR-modifier.
+#   4. DROP TABLESPACE silent-accept ANOMALY — TABLESPACE is
+#      NOT in the leaked whitelist, yet `DROP TABLESPACE <n>`
+#      silently succeeds with no output and no error.
+#      Contradicts the strict whitelist enforcement implied by
+#      stratum 1; the parser must route TABLESPACE via a
+#      side-path. Pre-existing pin in
+#      pg_ddl_tablespace_conversion_group_sentinel_basic_extra
+#      (line 173) labels both CREATE and DROP TABLESPACE as
+#      "DOCUMENTED INTENTIONAL pg_dump compat no-op" with
+#      reference to zeta-parser/src/lib.rs:119-120 ("no-op for
+#      Zeta, but pg_dump emits them"). This slice re-pins as
+#      ANOMALY because in the context of the 3-STRATUM
+#      whitelist structure it is informative: the whitelist
+#      message is misleading, TABLESPACE has a side-path that
+#      none of the other 18 listed/unlisted types have.
+#
+# RELATED PRIOR SLICES (DROP rows already pinned individually):
+#   - pg_event_trigger_large_object_sentinel: DROP EVENT TRIGGER
+#     (3 forms incl. IF EXISTS / CASCADE) + DROP LARGE OBJECT.
+#   - pg_maint_session_ownership_sentinel: DROP OWNED BY (2 forms).
+#   - pg_misc_ddl_sentinel: DROP TEXT SEARCH (2 forms) + DROP
+#     CONVERSION + CREATE OPERATOR CLASS / FAMILY (shape c).
+#   - pg_pubsub_replication_sentinel: DROP PUBLICATION,
+#     DROP SUBSCRIPTION.
+#   - pg_ddl_tablespace_conversion_group_sentinel: DROP TABLESPACE
+#     as "DOCUMENTED no-op" + DROP CONVERSION (re-pin).
+#
+# DEDUP NOTE: rows for DROP EVENT TRIGGER, DROP OWNED BY,
+# DROP TEXT SEARCH DICTIONARY, DROP CONVERSION, DROP PUBLICATION,
+# DROP SUBSCRIPTION, and DROP TABLESPACE are individually covered
+# by the prior slices listed above. They are INTENTIONALLY re-pinned
+# in this slice — the STRUCTURAL finding (3-stratum organization +
+# Hive/Snowflake whitelist leak + composite-form reject path) is
+# only visible when the 22 shapes are grouped into the 4-section
+# layout. The individual-row tests do not assert the uniform
+# fingerprint nor compare the whitelist content; this slice does.
+#
+# NOVEL rows (not in any prior slice, the headline coverage):
+#   STRATUM 1: DROP AGGREGATE, DROP CAST, DROP COLLATION,
+#     DROP FOREIGN DATA WRAPPER, DROP FOREIGN TABLE, DROP LANGUAGE,
+#     DROP RULE, DROP STATISTICS, DROP TRANSFORM (9 new).
+#   STRATUM 2 (Hive/Snowflake dialect contamination, headline):
+#     DROP CONNECTOR, DROP SECRET, DROP STAGE (3 new).
+#   STRATUM 3: DROP OPERATOR CLASS, DROP OPERATOR FAMILY (2 new).
+#
+# Cross-references: [[project_two_layer_type_recognition_pattern]]
+# (parser vs dispatcher fingerprint divergence — the 3-stratum
+# pattern is a triple-layer extension of the two-layer pattern);
+# [[feedback_wire_path_divergence_check]] (probe via mysqlwire,
+# the MTR canonical wire); [[project_function_arms_gap_closed]]
+# (shape (c) "unsupported statement: sqlparser::ast::Statement"
+# catch-all dispatcher taxonomy).
+#
+# Probe wire: mysqlwire (MTR canonical).
+#
+# All 22 shapes observed on current zeta; this slice records
+# them as MTR baseline. If zeta either (a) adds full implementation
+# for any DROP variant, or (b) re-routes any of the 3 strata to
+# a different rejection path, or (c) starts erroring on
+# DROP TABLESPACE, MTR will flag the divergence here.
+
+--echo === STRATUM 1 — 15 PG-standard DROP types not in whitelist ===
+
+# All 15 share the IDENTICAL whitelist-reject fingerprint
+# (uniform "Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION,
+# INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET,
+# SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW
+# or USER after DROP, found: <KW> at Line: 1, Column: 6")
+# differing only in the unexpected token. Witnesses the leaked
+# whitelist string verbatim, including Hive (CONNECTOR) and
+# Snowflake (SECRET, STAGE) terms in PG-targeted DROP grammar.
+
+--error 1064
+DROP AGGREGATE nope(INT);
+--error 1064
+DROP CAST (INT AS TEXT);
+--error 1064
+DROP COLLATION nope;
+--error 1064
+DROP CONVERSION nope;
+--error 1064
+DROP EVENT TRIGGER nope;
+--error 1064
+DROP FOREIGN DATA WRAPPER nope;
+--error 1064
+DROP FOREIGN TABLE nope;
+--error 1064
+DROP LANGUAGE nope;
+--error 1064
+DROP OWNED BY u1;
+--error 1064
+DROP PUBLICATION nope;
+--error 1064
+DROP SUBSCRIPTION nope;
+--error 1064
+DROP RULE nope ON nope;
+--error 1064
+DROP STATISTICS nope;
+--error 1064
+DROP TEXT SEARCH DICTIONARY nope;
+--error 1064
+DROP TRANSFORM FOR INT LANGUAGE sql;
+
+--echo === STRATUM 2 — in-whitelist parse-accept dispatch-reject ===
+
+# CONNECTOR (Hive), SECRET (Snowflake), STAGE (Snowflake) appear
+# in the leaked whitelist string above — proving they PARSE.
+# But the dispatcher has no executor arm for these statements:
+#   - DROP CONNECTOR + DROP SECRET hit shape (c) catch-all:
+#     "unsupported statement: sqlparser::ast::Statement" (the
+#     Debug repr of the AST variant; per
+#     [[project_function_arms_gap_closed]]).
+#   - DROP STAGE hits a DEDICATED reject message,
+#     "unsupported DROP STAGE statement" — confirming the
+#     dispatcher has at least 3 sub-strata: catch-all (c),
+#     STAGE-specific reject, and (in stratum 1 above) the
+#     parse-layer whitelist reject.
+
+--error 1064
+DROP CONNECTOR nope;
+--error 1064
+DROP SECRET nope;
+--error 1064
+DROP STAGE nope;
+
+--echo === STRATUM 3 — OPERATOR CLASS / FAMILY composite ===
+
+# Bare `OPERATOR` is in the DROP whitelist (presumably for
+# DROP OPERATOR <name> (<args>)). But the PG composite forms
+# `OPERATOR CLASS <n> USING <method>` and `OPERATOR FAMILY <n>
+# USING <method>` PARSE into a different sqlparser AST variant
+# that has no zeta executor arm — they hit shape (c) catch-all,
+# NOT the whitelist reject. Two-layer divergence per
+# [[project_two_layer_type_recognition_pattern]]: bare OPERATOR
+# vs OPERATOR-modifier composite go through different parse
+# arms but converge in the dispatcher gap.
+
+--error 1064
+DROP OPERATOR CLASS nope USING btree;
+--error 1064
+DROP OPERATOR FAMILY nope USING btree;
+
+--echo === ANOMALY — DROP TABLESPACE silent-accept ===
+
+# TABLESPACE is NOT in the leaked DROP whitelist (search the
+# stratum-1 fingerprints above — no TABLESPACE). Yet the
+# statement silently succeeds with no output and no error.
+# Per pg_ddl_tablespace_conversion_group_sentinel_basic_extra
+# (line 167-173), this is a DOCUMENTED INTENTIONAL pg_dump
+# compat no-op (zeta-parser/src/lib.rs:119-120: "no-op for
+# Zeta, but pg_dump emits them"). Re-pinned here as ANOMALY
+# because in the 3-stratum context the silent-accept reveals
+# that TABLESPACE has a parser side-path the whitelist
+# message hides — the whitelist string is misleading about
+# zeta's true DROP grammar coverage.
+
+DROP TABLESPACE nope;
+
+--echo === SUPPORT baseline — DROP TABLE round-trip ===
+
+# Bounds the slice with a TABLE-targeted DROP that fully
+# round-trips. TABLE is in the whitelist (stratum 0: known
+# fully-supported DROP type). If this regresses, the slice
+# is meaningless.
+
+CREATE TABLE droptable_baseline (id INT);
+DROP TABLE droptable_baseline;
