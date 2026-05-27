@@ -1,0 +1,57 @@
+=== Setup ===
+DROP TABLE IF EXISTS i;
+CREATE TABLE i (id INT PRIMARY KEY, v INT, txt TEXT);
+=== SHAPE D — SUPPORT: bare CREATE INDEX (boundary marker) ===
+CREATE INDEX ix0 ON i (id);
+=== SHAPE B — ON ONLY (PG inheritance modifier) parse-reject ===
+CREATE INDEX ix1 ON ONLY i (id);
+ERROR 1064: SQL parse error: sql parser error: Expected: a list of columns in parentheses, found: i at Line: 1, Column: 26
+=== SHAPE A — opclass silent-accept (text_pattern_ops) ===
+CREATE INDEX ix2 ON i (txt text_pattern_ops);
+SHOW INDEX FROM i;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+i	0	PRIMARY	1	id	BTREE
+i	1	ix0	1	id	BTREE
+i	1	ix2	1	txt	BTREE
+=== SHAPE A — USING + opclass silent-accept (varchar_pattern_ops) ===
+CREATE INDEX ix3 ON i USING btree (txt varchar_pattern_ops);
+SHOW INDEX FROM i;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+i	0	PRIMARY	1	id	BTREE
+i	1	ix0	1	id	BTREE
+i	1	ix2	1	txt	BTREE
+i	1	ix3	1	txt	BTREE
+=== SHAPE A — INCLUDE (col) silent-accept (re-pin of index_options_basic_extra:153-158) ===
+CREATE INDEX ix4 ON i (id) INCLUDE (v);
+SHOW INDEX FROM i;
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
+i	0	PRIMARY	1	id	BTREE
+i	1	ix0	1	id	BTREE
+i	1	ix2	1	txt	BTREE
+i	1	ix3	1	txt	BTREE
+i	1	ix4	1	id	BTREE
+=== SHAPE A — WITH (fillfactor = 70) silent-accept ===
+CREATE INDEX ix5 ON i (id) WITH (fillfactor = 70);
+=== SHAPE A — WITH (deduplicate_items = on) silent-accept (PG13+) ===
+CREATE INDEX ix6 ON i (id) WITH (deduplicate_items = on);
+=== SHAPE A — WITH (nosuchopt = 99) UNKNOWN option silent-accept (most damning — no validation registry) ===
+CREATE INDEX ix7 ON i (id) WITH (nosuchopt = 99);
+=== SHAPE A — UNIQUE … NULLS DISTINCT silent-accept (PG15+) ===
+CREATE UNIQUE INDEX ix8 ON i (id) NULLS DISTINCT;
+=== SHAPE A — UNIQUE … NULLS NOT DISTINCT silent-accept (PG15+) ===
+CREATE UNIQUE INDEX ix9 ON i (id) NULLS NOT DISTINCT;
+=== SHAPE C — REINDEX variants (uniform col-1 fingerprint) ===
+REINDEX TABLE i;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+REINDEX INDEX ix1;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+REINDEX DATABASE idb;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+REINDEX SCHEMA public;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+REINDEX CONCURRENTLY TABLE i;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+REINDEX (CONCURRENTLY, TABLESPACE x) TABLE i;
+ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: REINDEX at Line: 1, Column: 1
+=== Cleanup ===
+DROP TABLE i;
