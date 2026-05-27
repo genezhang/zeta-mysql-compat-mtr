@@ -1,0 +1,29 @@
+CREATE TABLE r (a INT, b INT, c TEXT);
+INSERT INTO r VALUES (1, 2, 'x'), (1, 3, 'y'), (2, 2, 'z');
+=== Finding 1 — Shape A: WHERE ROW(a,b) = ROW(1,2) → 1105 unknown function: ROW ===
+SELECT a, b, c FROM r WHERE ROW(a, b) = ROW(1, 2);
+ERROR 1105: execution error: unknown function: ROW
+=== Finding 1 — Shape B: WHERE ROW(a,b) < ROW(2,0) (lex inequality) → 1105 unknown function: ROW ===
+SELECT a, b, c FROM r WHERE ROW(a, b) < ROW(2, 0);
+ERROR 1105: execution error: unknown function: ROW
+=== Finding 1 — Shape C: WHERE ROW(a,b) IS DISTINCT FROM ROW(2,0) → 1105 unknown function: ROW ===
+SELECT a, b, c FROM r WHERE ROW(a, b) IS DISTINCT FROM ROW(2, 0);
+ERROR 1105: execution error: unknown function: ROW
+=== Finding 1 — Control: bare-tuple (a,b) IN (...) in WHERE → SUPPORTED ===
+SELECT a, b, c FROM r WHERE (a, b) IN ((1, 2), (1, 3)) ORDER BY a, b, c;
+a	b	c
+1	2	x
+1	3	y
+DROP TABLE r;
+CREATE TABLE oc (id INT, v INT, CONSTRAINT oc_pk PRIMARY KEY (id));
+INSERT INTO oc VALUES (1, 10);
+=== Finding 2 — Shape A: ON CONFLICT ON CONSTRAINT ... DO UPDATE → generic sqlparser error (DO UPDATE arm masks helpful hint) ===
+INSERT INTO oc VALUES (1, 20) ON CONFLICT ON CONSTRAINT oc_pk DO UPDATE SET v = EXCLUDED.v;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET, found: ( at Line: 1, Column: 73
+=== Finding 2 — Shape B: ON CONFLICT ON CONSTRAINT ... DO NOTHING → helpful zeta hint ===
+INSERT INTO oc VALUES (1, 30) ON CONFLICT ON CONSTRAINT oc_pk DO NOTHING;
+ERROR 1064: SQL parse error: ON CONFLICT ON CONSTRAINT is not supported; use column list instead
+=== Finding 2 — Cross-check: ON CONFLICT (col) DO UPDATE → same generic sqlparser error (DO UPDATE is the universally-failing arm) ===
+INSERT INTO oc VALUES (1, 99) ON CONFLICT (id) DO UPDATE SET v = EXCLUDED.v;
+ERROR 1064: SQL parse error: sql parser error: Expected: SET, found: ( at Line: 1, Column: 58
+DROP TABLE oc;
