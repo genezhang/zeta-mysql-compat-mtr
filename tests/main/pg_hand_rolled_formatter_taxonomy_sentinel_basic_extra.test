@@ -1,0 +1,388 @@
+# META-SLICE — hand-rolled error-formatter taxonomy.
+# Every row in this slice is a RE-PIN of an existing
+# hand-rolled formatter site. The slice's NOVELTY is
+# the structural taxonomy: 8 distinct message-shape
+# patterns spanning the parser, validator, and runtime
+# layers of zeta's reject surface.
+#
+# Cross-link: [[project_hand_rolled_error_formatters]].
+# This is the meta-slice promised after the 5+ witness
+# threshold (now 6+ witnesses recorded). The cluster
+# memory will be UPDATED after this slice merges to
+# enumerate the 22 call-sites pinned here.
+#
+# DISTINCTIVE MARKER for a hand-rolled formatter (vs
+# sqlparser's standard whitelist branch):
+#   - LACK of `at Line: N, Column: M` suffix
+#     (sqlparser-standard branches always include
+#      position info via Located<Token>)
+#   - bespoke verb: `unsupported X`, `cannot Y`,
+#     `<feature> not supported`, `Expecting Z`,
+#     `<X> requires <Y>`
+#   - in some cases the literal text of the offending
+#     token is ECHOED into the message (P1) — a tell
+#     that the formatter is being assembled by
+#     concatenation rather than going through
+#     sqlparser's Diagnostic machinery.
+#
+# Prior pins re-pinned by this slice (8 PR-merged
+# slices + 2 older sites, 10 sources total):
+#
+#   PR #416 / pg_alter_table_pg_ops_sentinel_basic_
+#     extra: REPLICA IDENTITY {DEFAULT,FULL,NOTHING,
+#     USING INDEX}, VALIDATE CONSTRAINT (P1)
+#   PR #452 / pg_alter_table_set_storage_sentinel_
+#     basic_extra: SET (autovacuum_enabled = false),
+#     SET (fillfactor = 70) (P1)
+#   PR #454 / pg_alter_column_pattern_xy_sentinel_
+#     basic_extra: ADD GENERATED ALWAYS AS IDENTITY (P1)
+#   PR #455 / pg_drop_3_stratum_dialect_leak_sentinel_
+#     basic_extra: DROP STAGE (P2)
+#   PR #456 / pg_constraint_whitelist_asymmetry_
+#     sentinel_basic_extra: ALTER TABLE ADD CONSTRAINT
+#     CHECK (P1 fixed-message variant)
+#   PR #457 / pg_create_table_modifiers_sentinel_basic_
+#     extra: ON COMMIT smushed-typo (P6)
+#   PR #458 / pg_create_function_language_params_
+#     sentinel_basic_extra: CREATE FUNCTION requires a
+#     function body (P5)
+#   PR #460 / pg_user_role_grammar_leak_sentinel_basic_
+#     extra + auth_basic_extra: DROP ROLE, DROP USER
+#     (P2)
+#   PR #461 / pg_cast_time_identifier_gaps_sentinel_
+#     basic_extra: cannot cast to TIMESTAMP (P8 — the
+#     6th witness)
+#   pg_materialized_view_refresh_bug_sentinel_basic_
+#     extra: DROP MATERIALIZED VIEW (P2)
+#   pg_row_ctor_on_conflict_constraint_sentinel_basic_
+#     extra: ON CONFLICT ON CONSTRAINT (P3)
+#   delete_basic / limit_offset_edges_basic_extra:
+#     DELETE … LIMIT, DELETE … ORDER BY (P3)
+#   subquery_edges_basic_extra: = ALL(subquery) (P3)
+#   window_func_edges_basic_extra: FILTER clause on
+#     window aggregate, aggregate cannot contain
+#     window function calls (P4, P7)
+#   group_by_edges_basic_extra: GROUP BY ALL (P4)
+#   array_subscript_anyall_basic_extra: subquery
+#     function arguments (P4)
+#   pg_create_trigger_pg_modifiers_sentinel_basic_
+#     extra: trigger must specify BEFORE or AFTER (P5)
+#   do_block_basic_extra: DO block body must be dollar-
+#     quoted (P5)
+#   window_frame_basic_extra: frame bound must be a
+#     literal number (P5)
+#
+# Pre-author dedup: This slice DELIBERATELY re-pins
+# existing rows. The dedup work was to CITE every
+# prior pin in the header above — rows are NOT dropped
+# for being dups. Verified each cited prior pin exists
+# at the claimed location via grep on tests/main/*.
+# result.
+#
+# THE 8-PATTERN TAXONOMY:
+#
+#   P1 — literal-echo template
+#        `unsupported ALTER X operation: <literal>`
+#        Verb: `unsupported`. The offending token text
+#        is ECHOED verbatim into the message — strong
+#        evidence the formatter is assembled by
+#        `format!("…: {op}")` rather than going through
+#        a structured Diagnostic.
+#   P2 — dedicated per-type
+#        `unsupported DROP X statement`
+#        Verb: `unsupported`. No echo; one hard-coded
+#        message per drop-target type. The complement
+#        to P1's echo template.
+#   P3 — helpful-hint
+#        `<feature> is not supported … (use Y instead)`
+#        Verb: `not supported`, with a parenthesized
+#        REMEDY clause. Most user-friendly of the 8.
+#        The `(…)` suffix is a stylistic tell.
+#   P4 — terse not-[yet]-supported
+#        `<feature> not [yet] supported`
+#        Verb: `not supported` (or `not yet supported`).
+#        No remedy clause. Terser cousin of P3.
+#   P5 — requires-Y semantic-check
+#        `<X> requires <Y>` / `<X> must <Y>`
+#        Verb: `requires` or `must`. Encodes a
+#        semantic post-parse validation rather than
+#        a grammar reject.
+#   P6 — bespoke whitelist with smushed-token TYPO
+#        `Expecting A, B or DROP<TOKEN>`
+#        Verb: `Expecting`. Hand-assembled enumeration
+#        of accepted values; smushed-token typo bug
+#        (whitelist value `DROP` concatenated to the
+#        offending token with no separator).
+#   P7 — cannot-contain constraint-violation
+#        `<X> cannot contain <Y>`
+#        Verb: `cannot contain`. Semantic relationship
+#        violation between two parse-tree nodes.
+#   P8 — runtime value-CAST dispatcher (1105 errno)
+#        `cannot cast to <TYPE>`
+#        Verb: `cannot cast`. The only pattern that
+#        lives in the RUNTIME layer (errno 1105)
+#        rather than the parse/DDL-dispatcher layer
+#        (errno 1064). Echoes the TARGET type but not
+#        the SOURCE type.
+#
+# STRUCTURAL FINDINGS (the META):
+#
+#   1. AT LEAST 22 distinct hand-rolled formatter
+#      call-sites are pinned here, distributed across
+#      the 8 patterns. A wider grep of tests/main/*.
+#      result shows ~100 distinct 1064 hand-rolled
+#      messages and ~hundreds more on the 1105
+#      runtime side — this 22-site enumeration is the
+#      MINIMUM, not the maximum.
+#
+#   2. NONE of the hand-rolled formatters carry the
+#      `at Line: N, Column: M` suffix that sqlparser-
+#      standard whitelist branches always include.
+#      This is the bright-line distinction between
+#      hand-rolled vs upstream-default messages.
+#
+#   3. LAYER distribution: P1-P7 are parser /
+#      validator layer (errno 1064); P8 is runtime /
+#      value-CAST dispatcher (errno 1105). The
+#      hand-rolled-formatter pattern spans MULTIPLE
+#      engine layers — not just the parser. Anyone
+#      auditing this surface needs to look at:
+#        - sqlparser dispatch shims (P1, P2, P6)
+#        - feature-gate rejects (P3, P4)
+#        - semantic validators (P5, P7)
+#        - runtime CAST dispatcher (P8)
+#
+#   4. The HELPFUL-HINT P3 is the most user-friendly
+#      pattern. The parenthesized `(use Y instead)` /
+#      `(would silently …; remove the …)` suffix is
+#      the stylistic tell distinguishing P3 from the
+#      others. Migrating all rejects to this style
+#      would substantially improve UX, at the cost of
+#      ~80 message-string changes.
+#
+#   5. The TYPO BUG in P6 (`DROPNOSUCHOPT` smushing)
+#      exists ONLY in zeta's bespoke ON COMMIT
+#      formatter — not in any other Expecting-list
+#      message in the suite. Likely fixable with a
+#      single space-separator insertion in the
+#      formatter code. PR #457 has the full proof
+#      chain.
+#
+# PROBE WIRE: MTR runner (mysqlwire) canonical. Per
+# [[feedback_probe_wire_match_slice_wire]] all
+# fingerprints reproduced via the runner, NOT via
+# psql/pgwire which can show different fingerprints
+# on the same statement.
+
+--echo === PATTERN P1 — literal-echo template `unsupported ALTER X operation: <literal>` ===
+
+# Setup table for P1 probes
+DROP TABLE IF EXISTS hrf_p1;
+CREATE TABLE hrf_p1 (id INT PRIMARY KEY, v INT);
+
+# P1.1 — SET (autovacuum_enabled = false): the
+# storage-option literal is ECHOED verbatim into the
+# message. Re-pin from PR #452.
+--error 1064
+ALTER TABLE hrf_p1 SET (autovacuum_enabled = false);
+
+# P1.2 — REPLICA IDENTITY FULL: the modifier keyword
+# is ECHOED into the message. Re-pin from PR #416.
+--error 1064
+ALTER TABLE hrf_p1 REPLICA IDENTITY FULL;
+
+# P1.3 — ALTER COLUMN ADD GENERATED ALWAYS AS
+# IDENTITY: NOTE the formatter says "ALTER COLUMN"
+# not "ALTER TABLE" — sub-grammar gets its own echo
+# template (same P1 shape, different prefix). Re-pin
+# from PR #454.
+--error 1064
+ALTER TABLE hrf_p1 ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY;
+
+# P1.4 — ADD CONSTRAINT CHECK: SIMILAR to P1.1-3 but
+# the message is a FIXED string (no echo of the
+# constraint name or expression). This is the P1
+# template's terser sibling — same `unsupported …`
+# verb, different argument-handling. Re-pin from PR
+# #456.
+--error 1064
+ALTER TABLE hrf_p1 ADD CONSTRAINT hrf_p1_chk CHECK (v > 0);
+
+DROP TABLE hrf_p1;
+
+--echo === PATTERN P2 — dedicated per-type `unsupported DROP X statement` ===
+
+# P2.1 — DROP STAGE (Snowflake dialect token, no PG
+# equivalent). Hand-rolled, dedicated message. Re-pin
+# from PR #455.
+--error 1064
+DROP STAGE nope;
+
+# P2.2 — DROP ROLE: hand-rolled formatter at the
+# Statement::Drop dispatcher. Re-pin from PR #460 /
+# auth_basic_extra.
+--error 1064
+DROP ROLE hrf_role_x;
+
+# P2.3 — DROP USER: parallel arm to DROP ROLE, same
+# dedicated-message pattern. Re-pin from PR #460 /
+# auth_basic_extra.
+--error 1064
+DROP USER hrf_user_x;
+
+# P2.4 — DROP MATERIALIZED VIEW: yet another DROP-
+# subtype arm, same dedicated-message pattern. Re-pin
+# from pg_materialized_view_refresh_bug_sentinel /
+# view_options_basic_extra.
+--error 1064
+DROP MATERIALIZED VIEW hrf_mv_nope;
+
+--echo === PATTERN P3 — helpful-hint `<feature> is not supported … (use Y instead)` ===
+
+# Setup table for P3 probes
+DROP TABLE IF EXISTS hrf_p3;
+CREATE TABLE hrf_p3 (id INT PRIMARY KEY, v INT);
+INSERT INTO hrf_p3 VALUES (1, 10), (2, 20), (3, 30);
+
+# P3.1 — DELETE … LIMIT: helpful-hint message
+# explains the DANGER (would silently delete all
+# matching rows) and the FIX (remove the LIMIT
+# clause). Re-pin from delete_basic / limit_offset_
+# edges_basic_extra.
+--error 1064
+DELETE FROM hrf_p3 LIMIT 5;
+
+# P3.2 — DELETE … ORDER BY: parallel helpful-hint to
+# P3.1, with its own DANGER + FIX phrasing. Re-pin
+# from delete_basic.
+--error 1064
+DELETE FROM hrf_p3 ORDER BY id;
+
+# P3.3 — = ALL(subquery): helpful-hint suggests
+# = ANY(subquery) or IN (subquery) instead. Re-pin
+# from subquery_edges_basic_extra.
+--error 1064
+SELECT 1 = ALL(SELECT v FROM hrf_p3);
+
+# P3.4 — ON CONFLICT ON CONSTRAINT: helpful-hint
+# suggests `column list instead`. Re-pin from
+# pg_row_ctor_on_conflict_constraint_sentinel.
+--error 1064
+INSERT INTO hrf_p3 VALUES (1, 99) ON CONFLICT ON CONSTRAINT hrf_p3_pkey DO NOTHING;
+
+DROP TABLE hrf_p3;
+
+--echo === PATTERN P4 — terse `<feature> not [yet] supported` ===
+
+# Setup table for P4 probes
+DROP TABLE IF EXISTS hrf_p4;
+CREATE TABLE hrf_p4 (region TEXT, n INT);
+INSERT INTO hrf_p4 VALUES ('a', 1), ('b', 2);
+
+# P4.1 — FILTER clause on window aggregate: terse
+# `not yet supported`, with the aggregate function
+# name echoed in backticks. Re-pin from window_func_
+# edges_basic_extra.
+--error 1064
+SELECT region, SUM(n) FILTER (WHERE n > 0) OVER () FROM hrf_p4;
+
+# P4.2 — GROUP BY ALL: terse `not supported` (no
+# "yet"). Spark / SQL Server dialect leak. Re-pin
+# from group_by_edges_basic_extra.
+--error 1064
+SELECT region, COUNT(*) FROM hrf_p4 GROUP BY ALL;
+
+# P4.3 — subquery function arguments: terse `not
+# supported`. The ARRAY(SELECT …) subquery-as-
+# function-arg shape is rejected at expression-
+# dispatch time. Re-pin from array_subscript_anyall_
+# basic_extra.
+--error 1064
+SELECT ARRAY(SELECT n FROM hrf_p4);
+
+DROP TABLE hrf_p4;
+
+--echo === PATTERN P5 — `<X> requires <Y>` / `<X> must <Y>` semantic-check ===
+
+# P5.1 — CREATE FUNCTION requires a function body:
+# `requires` verb, with the FIX in parens (`AS $$ ...
+# $$`). The slash between `requires` and `must` is
+# subtle — both verbs are present in this family.
+# Re-pin from PR #458 / pg_create_function_language_
+# params_sentinel.
+--error 1064
+CREATE FUNCTION hrf_f5_1() RETURNS INT LANGUAGE plpgsql;
+
+# P5.2 — trigger must specify BEFORE or AFTER: `must`
+# verb. The INSTEAD OF trigger arm (PG view-trigger)
+# is rejected here. Re-pin from pg_create_trigger_
+# pg_modifiers_sentinel.
+DROP TABLE IF EXISTS hrf_p5_t;
+CREATE TABLE hrf_p5_t (id INT PRIMARY KEY);
+--error 1064
+CREATE TRIGGER hrf_p5_trg INSTEAD OF INSERT ON hrf_p5_t FOR EACH ROW EXECUTE FUNCTION pg_catalog.pg_notify();
+DROP TABLE hrf_p5_t;
+
+# P5.3 — DO block body must be dollar-quoted: `must`
+# verb. Single-quoted body is the canonical violator.
+# Re-pin from do_block_basic_extra.
+--error 1064
+DO 'BEGIN END' LANGUAGE plpgsql;
+
+# P5.4 — frame bound must be a literal number: `must`
+# verb. Variable expressions in window frame bounds
+# are rejected post-parse. Re-pin from window_frame_
+# basic_extra.
+DROP TABLE IF EXISTS hrf_p5_w;
+CREATE TABLE hrf_p5_w (id INT, v INT);
+INSERT INTO hrf_p5_w VALUES (1, 10), (2, 20);
+--error 1064
+SELECT SUM(v) OVER (ORDER BY id ROWS BETWEEN id PRECEDING AND CURRENT ROW) FROM hrf_p5_w;
+DROP TABLE hrf_p5_w;
+
+--echo === PATTERN P6 — bespoke `Expecting A, B or DROPNOSUCHOPT` whitelist (SMUSHED-TOKEN TYPO) ===
+
+# P6.1 — ON COMMIT unknown option: the formatter
+# enumerates the accepted values (`DELETE ROWS`,
+# `PRESERVE ROWS`, `DROP`) but smushes `DROP` against
+# the offending token with NO SEPARATOR, producing
+# the typo `DROPNOSUCHOPT`. The only smushed-typo
+# Expecting-list message in the suite. Re-pin from
+# PR #457 / pg_create_table_modifiers_sentinel.
+--error 1064
+CREATE TEMP TABLE hrf_p6 (id INT) ON COMMIT NOSUCHOPT;
+
+--echo === PATTERN P7 — `<X> cannot contain <Y>` constraint-violation ===
+
+# P7.1 — aggregate function cannot contain window
+# function calls: semantic relationship violation
+# between two parse-tree nodes (an aggregate function
+# wrapping a window function). The aggregate function
+# name is echoed in backticks (same convention as
+# P4.1's FILTER message). Re-pin from window_func_
+# edges_basic_extra.
+DROP TABLE IF EXISTS hrf_p7;
+CREATE TABLE hrf_p7 (id INT, v INT);
+INSERT INTO hrf_p7 VALUES (1, 10), (2, 20);
+--error 1064
+SELECT SUM(ROW_NUMBER() OVER ()) FROM hrf_p7;
+DROP TABLE hrf_p7;
+
+--echo === PATTERN P8 — runtime value-CAST dispatcher `cannot cast to <TYPE>` (errno 1105) ===
+
+# P8.1 — CAST('+infinity'::float8 AS TIMESTAMP): the
+# target TIMESTAMP IS in the CAST registry, but the
+# runtime dispatcher rejects the SOURCE value type
+# (float8) with the bespoke message `cannot cast to
+# TIMESTAMP`. Fingerprints:
+#   (a) target type ECHOED (TIMESTAMP)
+#   (b) source type NOT echoed (no `float8`)
+#   (c) NO `at Line: N, Column: M` suffix
+#   (d) verb `cannot cast` (vs `unsupported`)
+# This is the ONLY pattern in the 8 that lives in
+# the RUNTIME layer (errno 1105) — proves the hand-
+# rolled-formatter pattern is not parser-only. The
+# 6th witness, just merged in PR #461. Re-pin from
+# pg_cast_time_identifier_gaps_sentinel.
+--error 1105
+SELECT CAST('+infinity'::float8 AS TIMESTAMP);
