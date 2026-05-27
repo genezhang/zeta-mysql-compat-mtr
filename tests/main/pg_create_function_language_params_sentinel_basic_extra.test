@@ -1,0 +1,189 @@
+# Independently authored PG CREATE FUNCTION LANGUAGE +
+# parameter-mode + signature-shape sentinel slice for the
+# GPL MTR-format runner. NOT copied or adapted from
+# MySQL's mysql-test/ or PG regress.
+#
+# Adjacent companion slices (do NOT duplicate):
+#   - pg_create_function_attributes_sentinel (PR #451)
+#     pins the ATTRIBUTE-keyword family (IMMUTABLE,
+#     STABLE, VOLATILE, STRICT, PARALLEL *, SECURITY
+#     DEFINER/INVOKER, SET = / SET TO, LEAKPROOF, COST,
+#     TRANSFORM, WINDOW). Does NOT cover the LANGUAGE
+#     tag, parameter modes, or signature shapes.
+#   - pg_create_function_non_trigger_sentinel pins the
+#     `RETURNS TABLE(...)` silent-CREATE + SRF unknown-
+#     fn dispatch fingerprint and the `RETURNS SETOF
+#     <type>` parse-reject for the scalar-type variant
+#     (`SETOF int` → 1064 at the int token). Does NOT
+#     cover `SETOF RECORD` (same fingerprint shape, NEW
+#     token position) or other RETURNS variants.
+#   - pg_alter_mv_begin_atomic_sentinel pins the
+#     `LANGUAGE SQL BEGIN ATOMIC ... END` body-form
+#     parse-reject. Does NOT cover the LANGUAGE tag
+#     registry (it always uses `LANGUAGE SQL`).
+#
+#   Pre-author dedup grep on tests/main/*.test for
+#   LANGUAGE C, LANGUAGE INTERNAL, LANGUAGE plpython,
+#   LANGUAGE plperl, LANGUAGE plv8, LANGUAGE plr,
+#   VARIADIC ...[], EXTERNAL NAME, RETURNS RECORD,
+#   RETURNS SETOF RECORD, OUT/INOUT INT, and
+#   "requires a function body": ZERO meaningful hits.
+#   The `CREATE TRUSTED LANGUAGE plperl` hit in
+#   pg_specific_ddl_sentinel is a STANDALONE LANGUAGE
+#   definition, NOT `CREATE FUNCTION ... LANGUAGE`.
+#   The LANGUAGE + parameter-mode + signature family is
+#   greenfield.
+#
+# This slice pins THREE structural findings:
+#
+#   FINDING 1 — NO PG LANGUAGE REGISTRY. The CREATE
+#   FUNCTION attribute registry from PR #451 (which
+#   recognizes IMMUTABLE/STABLE/STRICT/SECURITY DEFINER/
+#   etc.) has NO LANGUAGE-tag analog. zeta silently
+#   accepts ANY LANGUAGE tag — LANGUAGE C, LANGUAGE
+#   INTERNAL, LANGUAGE plpython3u, LANGUAGE plperl,
+#   LANGUAGE plv8, LANGUAGE plr, and — the headline —
+#   LANGUAGE nosuchlang (a fabricated identifier that
+#   does not exist in PG itself). The parser does not
+#   consult any per-tag registry; the LANGUAGE token is
+#   absorbed as a free-form identifier and dropped.
+#   CORRUPTION-class for pg_dump output that loads C-
+#   bound or PL-language functions: the CREATE appears
+#   to succeed, the function appears in catalogs, but
+#   any call dispatches into the SRF-unknown-fn path
+#   from pg_create_function_non_trigger_sentinel (or
+#   simply errors at call time with an unrelated
+#   message). This is the MOST DAMNING finding in the
+#   slice — `LANGUAGE nosuchlang AS 'whatever'` accepts
+#   silently with no error and no warning.
+#
+#   FINDING 2 — OUT / INOUT / RECORD silent-accept.
+#   PG parameter modes OUT and INOUT (which change the
+#   function's call signature — INOUT parameters are
+#   both input and output, OUT parameters become an
+#   implicit RECORD return) parse silently. RETURNS
+#   RECORD (the catch-all anonymous record-type return)
+#   also parses silently. No semantic check binds the
+#   parameter mode to a column-list signature or to a
+#   RECORD return type. Migration risk: stored
+#   procedures that rely on OUT/INOUT param mechanics
+#   for multi-value return will silently degrade.
+#
+#   FINDING 3 — HAND-ROLLED "requires a function body"
+#   FORMATTER. The error message `CREATE FUNCTION
+#   requires a function body (AS $$ ... $$)` is a
+#   bespoke formatter — note the absence of the usual
+#   `at Line: N, Column: M` suffix that sqlparser
+#   appends to its whitelist errors. This is a
+#   companion to PR #457's `Expecting DELETE ROWS,
+#   PRESERVE ROWS or DROPNOSUCHOPT` smushed-typo for
+#   ON COMMIT: BOTH error paths bypass the standard
+#   sqlparser error formatter, suggesting MULTIPLE
+#   hand-rolled error paths beyond the standard
+#   formatter that may carry their own typos / drift /
+#   formatting inconsistencies.
+#
+# Big-picture finding:
+#
+#   The CREATE FUNCTION parser has a layered design.
+#   PR #451 documented the ATTRIBUTE registry: 13
+#   keywords recognized, 5 missing. This slice
+#   documents that the LANGUAGE registry is ENTIRELY
+#   ABSENT (any tag accepted) and the PARAMETER-MODE
+#   registry is ALSO ENTIRELY ABSENT (any mode kw
+#   accepted). The signature-shape parser has a small
+#   blocklist (SETOF RECORD, VARIADIC arrays, EXTERNAL
+#   NAME all 1064 at distinct column positions). And a
+#   separate hand-rolled error path catches missing
+#   bodies with a bespoke formatter. Four distinct
+#   parser sub-systems, three separate behavior
+#   classes.
+#
+#   Cross-link: [[project_two_layer_type_recognition_
+#   pattern]] — same two-layer divergence as the type-
+#   parser vs CAST-dispatcher split (PR #427). Here
+#   the LANGUAGE tag is accepted at one layer (parser-
+#   accept) without a corresponding executor-attach
+#   layer (no LANGUAGE registry to consult).
+#
+# Wire divergence check: probed via mysqlwire (MTR
+# canonical, dynamic port reservation). Per memory
+# [[feedback_probe_wire_match_slice_wire]], pgwire was
+# NOT separately probed — pgwire shares the same
+# sqlparser layer for CREATE FUNCTION, so fingerprints
+# should match, but this is a mysqlwire-only pin.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-ACCEPT BUG — ANY LANGUAGE tag
+#     accepts silently. LANGUAGE C, INTERNAL,
+#     plpython3u, plperl, plv8, plr, and even a
+#     fabricated `LANGUAGE nosuchlang` all parse with
+#     no error and no warning. Do NOT rely on the
+#     CREATE succeeding to mean the function is
+#     dispatchable. Strip non-SQL LANGUAGE clauses
+#     from migration scripts or expect call-time
+#     failures.
+#   # zeta-adapt: SILENT-ACCEPT BUG — OUT / INOUT
+#     parameter modes and RETURNS RECORD parse
+#     silently with no semantic enforcement. Functions
+#     that rely on OUT/INOUT for multi-value return
+#     will silently degrade. Rewrite as RETURNS TABLE
+#     or to use composite-type returns.
+#   # zeta-adapt: KNOWN GAP — RETURNS SETOF RECORD,
+#     VARIADIC arrays in parameter lists, and PG C-
+#     function `EXTERNAL NAME 'lib.so'` binding all
+#     parse-reject at distinct column positions with
+#     the sqlparser "Expected: ..." family. Strip
+#     these forms from migration scripts.
+#   # zeta-adapt: HAND-ROLLED ERROR PATH — a bare
+#     `CREATE FUNCTION ... LANGUAGE plpgsql` (no body)
+#     errors with the bespoke message `CREATE FUNCTION
+#     requires a function body (AS $$ ... $$)` —
+#     note the absence of `at Line: N, Column: M`
+#     which is present on sqlparser whitelist errors.
+#     Error-string matchers that key off the standard
+#     suffix will NOT match this error.
+
+--echo === SHAPE A — LANGUAGE tag registry ABSENT: ANY tag silent-accepts (7 forms) ===
+
+DROP FUNCTION IF EXISTS fc;
+CREATE FUNCTION fc() RETURNS INT LANGUAGE C AS 'libfoo','foo';
+DROP FUNCTION IF EXISTS fi;
+CREATE FUNCTION fi() RETURNS INT LANGUAGE INTERNAL AS 'pg_version';
+DROP FUNCTION IF EXISTS fp;
+CREATE FUNCTION fp() RETURNS INT LANGUAGE plpython3u AS 'return 1';
+DROP FUNCTION IF EXISTS fpl;
+CREATE FUNCTION fpl() RETURNS INT LANGUAGE plperl AS 'return 1';
+DROP FUNCTION IF EXISTS fv;
+CREATE FUNCTION fv() RETURNS INT LANGUAGE plv8 AS 'return 1';
+DROP FUNCTION IF EXISTS fr;
+CREATE FUNCTION fr() RETURNS INT LANGUAGE plr AS 'return 1';
+DROP FUNCTION IF EXISTS fnosuch;
+CREATE FUNCTION fnosuch() RETURNS INT LANGUAGE nosuchlang AS 'whatever';
+
+--echo === SHAPE B — parameter-mode + RECORD-return registry ABSENT: silent-accept (3 forms) ===
+
+DROP FUNCTION IF EXISTS fout;
+CREATE FUNCTION fout(OUT a INT) LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS finout;
+CREATE FUNCTION finout(INOUT a INT) LANGUAGE SQL AS 'SELECT $1';
+DROP FUNCTION IF EXISTS frec;
+CREATE FUNCTION frec() RETURNS RECORD LANGUAGE SQL AS 'SELECT 1, 2';
+
+--echo === SHAPE C — signature-shape parse-rejects: 1064 at distinct column positions (3 forms) ===
+
+DROP FUNCTION IF EXISTS fsrec;
+--error 1064
+CREATE FUNCTION fsrec() RETURNS SETOF RECORD LANGUAGE SQL AS 'SELECT 1, 2';
+DROP FUNCTION IF EXISTS fvariadic;
+--error 1064
+CREATE FUNCTION fvariadic(VARIADIC a INT[]) RETURNS INT LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS fext;
+--error 1064
+CREATE FUNCTION fext() RETURNS INT EXTERNAL NAME 'foo.dll';
+
+--echo === SHAPE D — hand-rolled "requires a function body" formatter (no Line/Column suffix) ===
+
+DROP FUNCTION IF EXISTS fnobody;
+--error 1064
+CREATE FUNCTION fnobody() RETURNS INT LANGUAGE plpgsql;

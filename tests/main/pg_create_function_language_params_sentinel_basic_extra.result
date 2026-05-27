@@ -1,0 +1,36 @@
+=== SHAPE A — LANGUAGE tag registry ABSENT: ANY tag silent-accepts (7 forms) ===
+DROP FUNCTION IF EXISTS fc;
+CREATE FUNCTION fc() RETURNS INT LANGUAGE C AS 'libfoo','foo';
+DROP FUNCTION IF EXISTS fi;
+CREATE FUNCTION fi() RETURNS INT LANGUAGE INTERNAL AS 'pg_version';
+DROP FUNCTION IF EXISTS fp;
+CREATE FUNCTION fp() RETURNS INT LANGUAGE plpython3u AS 'return 1';
+DROP FUNCTION IF EXISTS fpl;
+CREATE FUNCTION fpl() RETURNS INT LANGUAGE plperl AS 'return 1';
+DROP FUNCTION IF EXISTS fv;
+CREATE FUNCTION fv() RETURNS INT LANGUAGE plv8 AS 'return 1';
+DROP FUNCTION IF EXISTS fr;
+CREATE FUNCTION fr() RETURNS INT LANGUAGE plr AS 'return 1';
+DROP FUNCTION IF EXISTS fnosuch;
+CREATE FUNCTION fnosuch() RETURNS INT LANGUAGE nosuchlang AS 'whatever';
+=== SHAPE B — parameter-mode + RECORD-return registry ABSENT: silent-accept (3 forms) ===
+DROP FUNCTION IF EXISTS fout;
+CREATE FUNCTION fout(OUT a INT) LANGUAGE SQL AS 'SELECT 1';
+DROP FUNCTION IF EXISTS finout;
+CREATE FUNCTION finout(INOUT a INT) LANGUAGE SQL AS 'SELECT $1';
+DROP FUNCTION IF EXISTS frec;
+CREATE FUNCTION frec() RETURNS RECORD LANGUAGE SQL AS 'SELECT 1, 2';
+=== SHAPE C — signature-shape parse-rejects: 1064 at distinct column positions (3 forms) ===
+DROP FUNCTION IF EXISTS fsrec;
+CREATE FUNCTION fsrec() RETURNS SETOF RECORD LANGUAGE SQL AS 'SELECT 1, 2';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: RECORD at Line: 1, Column: 39
+DROP FUNCTION IF EXISTS fvariadic;
+CREATE FUNCTION fvariadic(VARIADIC a INT[]) RETURNS INT LANGUAGE SQL AS 'SELECT 1';
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: INT at Line: 1, Column: 38
+DROP FUNCTION IF EXISTS fext;
+CREATE FUNCTION fext() RETURNS INT EXTERNAL NAME 'foo.dll';
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: EXTERNAL at Line: 1, Column: 36
+=== SHAPE D — hand-rolled "requires a function body" formatter (no Line/Column suffix) ===
+DROP FUNCTION IF EXISTS fnobody;
+CREATE FUNCTION fnobody() RETURNS INT LANGUAGE plpgsql;
+ERROR 1064: SQL parse error: CREATE FUNCTION requires a function body (AS $$ ... $$)
