@@ -1,0 +1,20 @@
+=== SHAPE A — SET LOCAL / SESSION CHARACTERISTICS (PG transaction-scope variants) — silent ===
+SET LOCAL search_path = 'public';
+SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;
+SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+=== SHAPE B — SET ROLE variants (HEADLINE: nonexistent role silent-accept) ===
+SET ROLE NONE;
+SET ROLE 'postgres';
+=== SHAPE C — SET runtime-config variants (PG GUCs with no zeta backing) — silent ===
+SET SEED 0.5;
+SET XML OPTION CONTENT;
+SET XML OPTION DOCUMENT;
+SET escape_string_warning = 'on';
+SET standard_conforming_strings = 'on';
+=== SHAPE D — SET search_path TO DEFAULT / = DEFAULT (reset-to-default reserved token) — silent ===
+SET search_path TO DEFAULT;
+SET search_path = DEFAULT;
+=== SHAPE E — SHOW for PG GUCs + reserved-word phrase — succeeds (mysqlwire EmptyShow catch-all) ===
+SHOW DEFAULT_TRANSACTION_ISOLATION;
+SHOW server_version_num;
+SHOW TRANSACTION ISOLATION LEVEL;

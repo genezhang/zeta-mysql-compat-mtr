@@ -1,0 +1,203 @@
+# Independently authored PG SET / SHOW no-validation
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/ or PG
+# regress.
+#
+# Adjacent companion slices (do NOT duplicate):
+#   - pg_set_truncate_vacuum_sentinel_basic_extra
+#     (PR #399) pins:
+#         SET TIME ZONE 'UTC' / 'America/Los_Angeles'
+#         SET TIME ZONE INTERVAL '+05:30' HOUR TO MINUTE
+#         SET TIME ZONE LOCAL
+#         SET TIME ZONE DEFAULT
+#         SET CONSTRAINTS ALL DEFERRED / IMMEDIATE
+#         SET CONSTRAINTS my_fk DEFERRED
+#         SET SESSION AUTHORIZATION 'alice' / DEFAULT
+#     as MYSQL-WIRE-ONLY silent no-ops via
+#     `zeta-mysqlwire/src/shim.rs:2048-2080`
+#     `q_lower.strip_prefix("set ")` catch-all. SET
+#     TIME ZONE LOCAL / DEFAULT are NOT re-pinned here.
+#   - pg_alter_system_show_sentinel_basic_extra
+#     (PR #405) pins ALTER SYSTEM SET / RESET / RESET
+#     ALL parse-reject + SHOW work_mem /
+#     statement_timeout / search_path / ALL as
+#     mysqlwire EmptyShow catch-all. SHOW
+#     search_path is NOT re-pinned here.
+#   - show_pg_gucs_wire_divergence_basic_extra pins
+#     SHOW TRANSACTION_ISOLATION (the underscore GUC
+#     form) and SELECT @@search_path / etc. The
+#     space-form SHOW TRANSACTION ISOLATION LEVEL is
+#     a distinct parser fingerprint (reserved-word
+#     phrase, not GUC lookup) and IS pinned here.
+#   - auth_basic_extra pins SET ROLE r1 (bare
+#     identifier). SET ROLE NONE and SET ROLE
+#     '<quoted-nonexistent>' are distinct AST forms
+#     (Statement::SetRole with role={Identifier/None/
+#     Some(Ident)}) and are net-new here. SET ROLE
+#     'postgres' silent-accept of a nonexistent role
+#     is the HEADLINE finding.
+#   - schema_basic_extra:141,144 pins SET search_path
+#     TO public / TO sp,public (literal identifier).
+#     SET search_path TO DEFAULT / = DEFAULT use the
+#     reserved DEFAULT token (sqlparser distinct
+#     value variant) — net-new here.
+#   - variable_basic_extra:79 pins SET LOCAL
+#     my_param = 1 (unknown identifier var). SET LOCAL
+#     search_path = 'public' (KNOWN GUC name with
+#     LOCAL scope qualifier) is net-new — important
+#     because PG semantically restricts LOCAL to the
+#     current transaction; zeta ignores the scope.
+#   - hlc_watermark_basic_extra:90-92 pins SET LOCAL
+#     zeta.hlc_watermark (a zeta-namespace var). Not
+#     a PG-GUC fingerprint, distinct from this slice.
+#
+# Pre-author dedup grep on tests/main/*.test for SET
+# LOCAL / SET SESSION CHARACTERISTICS / SET ROLE /
+# SET SEED / SET XML OPTION / SET search_path
+# TO|= DEFAULT / SHOW server_version_num / SHOW
+# DEFAULT_TRANSACTION_ISOLATION / SHOW TRANSACTION
+# ISOLATION LEVEL: NONE of these 15 specific
+# fingerprints are pinned anywhere. The TIME ZONE
+# DEFAULT/LOCAL pair was dropped per dedup.
+#
+# This slice pins TWO structural findings:
+#
+#   FINDING 1 (HEADLINE) — SET ROLE '<nonexistent>'
+#   silent-accept. `SET ROLE 'postgres'` succeeds
+#   even though no `postgres` role exists in the
+#   catalog (zeta runs in trust-auth mode per
+#   `auth_basic_extra` header; there are no role
+#   tuples to validate against). PG, in contrast,
+#   raises `ERROR: role "postgres" does not exist`
+#   at SET time when the role is missing. Apps
+#   porting PG security code that issue `SET ROLE`
+#   to drop privileges will silently get NO privilege
+#   change on zeta. This compounds the silent SET
+#   SESSION AUTHORIZATION gap pinned in PR #399
+#   (pg_set_truncate_vacuum_sentinel header lines
+#   54-59) — BOTH PG role-switch mechanisms silently
+#   no-op without validation, a SILENT SECURITY GAP.
+#   SET ROLE NONE (the PG "reset to login role"
+#   form) likewise silent — no validation that the
+#   session even has a role context to reset.
+#
+#   FINDING 2 — NO PG-GUC REGISTRY. zeta silently
+#   accepts EVERY PG runtime-config variable name
+#   passed to SET, regardless of whether zeta has
+#   any backing implementation for it. Pinned here:
+#       SET LOCAL search_path = 'public'         (KNOWN GUC, LOCAL scope ignored)
+#       SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY
+#       SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE
+#       SET SEED 0.5                              (PG random-seed primitive)
+#       SET XML OPTION CONTENT / DOCUMENT         (PG xmloption GUC)
+#       SET escape_string_warning = 'on'          (PG GUC)
+#       SET standard_conforming_strings = 'on'    (PG GUC)
+#       SET search_path TO DEFAULT                (reset-to-default token)
+#       SET search_path = DEFAULT                 (equals-form)
+#   And on the SHOW side:
+#       SHOW DEFAULT_TRANSACTION_ISOLATION        (PG GUC)
+#       SHOW server_version_num                   (PG GUC)
+#       SHOW TRANSACTION ISOLATION LEVEL          (reserved-word phrase form)
+#   None of these consult a per-variable registry;
+#   the parser accepts and the dispatcher silently
+#   no-ops (SET) or returns EmptyShow (SHOW). This
+#   is the **4th "no registry" structural witness**
+#   for the broader pattern joining:
+#       PR #458 — LANGUAGE no-registry for CREATE FUNCTION
+#       PR #459 — DATABASE no-registry for CREATE / ALTER DATABASE
+#       PR #464 — EXPLAIN no-option-registry for paren-options
+#       (this) — SET / SHOW no-GUC-registry
+#   All four share the same shape: a syntactic family
+#   admits arbitrary identifiers without consulting a
+#   spec-defined whitelist, and unknown identifiers
+#   silently succeed instead of erroring at parse or
+#   validation time. Apps porting PG code that
+#   depends on side effects of these statements
+#   (search_path mutation, random seed, xmloption,
+#   string-handling GUCs, transaction characteristics)
+#   will run without the expected effects and
+#   without warning.
+#
+# Cross-link memories:
+#   - [[project_option_registry_split]] (4th witness)
+#   - [[project_function_arms_gap_closed]] (silent-
+#     accept pattern in the SET-statement family).
+#
+# Adaptation notes:
+#   # zeta-adapt: NEW BUG — SET ROLE '<nonexistent>'
+#     silent-accept (SECURITY-RELEVANT). PG raises
+#     `role "..." does not exist`; zeta absorbs the
+#     statement without checking. Companion to the
+#     PR #399 SET SESSION AUTHORIZATION silent no-op;
+#     BOTH role-switch mechanisms silent.
+#   # zeta-adapt: NEW BUG — SET ROLE NONE silent.
+#     No validation that a session role even exists
+#     to reset.
+#   # zeta-adapt: NEW BUG — No PG-GUC registry. SET
+#     LOCAL search_path / SET SESSION CHARACTERISTICS
+#     / SET SEED / SET XML OPTION / SET
+#     escape_string_warning / SET
+#     standard_conforming_strings / SET search_path
+#     TO DEFAULT / SET search_path = DEFAULT all
+#     silent-accept. Apps relying on side effects
+#     will run without them.
+#   # zeta-adapt: NEW BUG — SHOW DEFAULT_TRANSACTION_
+#     ISOLATION / SHOW server_version_num / SHOW
+#     TRANSACTION ISOLATION LEVEL silent-succeed on
+#     mysqlwire (EmptyShow per PR #405 catch-all).
+#     Apps cannot probe these GUCs via the MySQL wire.
+
+--echo === SHAPE A — SET LOCAL / SESSION CHARACTERISTICS (PG transaction-scope variants) — silent ===
+
+SET LOCAL search_path = 'public';
+SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY;
+SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+
+--echo === SHAPE B — SET ROLE variants (HEADLINE: nonexistent role silent-accept) ===
+
+# SET ROLE NONE — PG's "reset to login role" form.
+# No validation that a session role context exists.
+SET ROLE NONE;
+# HEADLINE: nonexistent role 'postgres' silent-
+# accepts. PG raises ERROR `role "postgres" does not
+# exist`. Companion to PR #399 silent SET SESSION
+# AUTHORIZATION — both role-switch mechanisms silent.
+SET ROLE 'postgres';
+
+--echo === SHAPE C — SET runtime-config variants (PG GUCs with no zeta backing) — silent ===
+
+SET SEED 0.5;
+SET XML OPTION CONTENT;
+SET XML OPTION DOCUMENT;
+SET escape_string_warning = 'on';
+SET standard_conforming_strings = 'on';
+
+--echo === SHAPE D — SET search_path TO DEFAULT / = DEFAULT (reset-to-default reserved token) — silent ===
+
+# Distinct parser fingerprint from the literal
+# identifier form pinned at schema_basic_extra:141,144
+# (SET search_path TO public). DEFAULT is a reserved
+# keyword routed through sqlparser's distinct value
+# variant.
+SET search_path TO DEFAULT;
+SET search_path = DEFAULT;
+
+--echo === SHAPE E — SHOW for PG GUCs + reserved-word phrase — succeeds (mysqlwire EmptyShow catch-all) ===
+
+# Per PR #405 (pg_alter_system_show_sentinel header
+# lines 41-57): the mysqlwire SHOW prefix-intercept
+# (zeta-mysqlwire/src/shim.rs:1904) returns EmptyShow
+# for any unrecognized sub-pattern. Three distinct
+# fingerprints pinned here:
+#   - PG GUC name (DEFAULT_TRANSACTION_ISOLATION)
+#   - PG GUC name (server_version_num)
+#   - reserved-word phrase form (TRANSACTION ISOLATION
+#     LEVEL), structurally distinct from the underscore
+#     GUC form (TRANSACTION_ISOLATION) pinned at
+#     show_pg_gucs_wire_divergence_basic_extra:91.
+# Per [[feedback_probe_wire_match_slice_wire]] no
+# claim is made about specific output values; only
+# that none of these error.
+SHOW DEFAULT_TRANSACTION_ISOLATION;
+SHOW server_version_num;
+SHOW TRANSACTION ISOLATION LEVEL;
