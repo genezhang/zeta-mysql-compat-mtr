@@ -1,0 +1,43 @@
+DROP TABLE IF EXISTS pt;
+CREATE TABLE pt (id INT PRIMARY KEY, v INT);
+INSERT INTO pt VALUES (1, 10);
+=== SHAPE A — TRIGGER advanced PG features parser-accepted; reach executor with "function does not exist" ===
+=== A1 — BEFORE INSERT OR UPDATE (multi-event 2-way) silently-accepted ===
+CREATE TRIGGER tr1 BEFORE INSERT OR UPDATE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+=== A2 — AFTER INSERT OR DELETE (multi-event 2-way) silently-accepted ===
+CREATE TRIGGER tr2 AFTER INSERT OR DELETE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+=== A3 — BEFORE INSERT OR UPDATE OR DELETE (3-way) silently-accepted ===
+CREATE TRIGGER tr3 BEFORE INSERT OR UPDATE OR DELETE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+=== A4 — BEFORE UPDATE OF v (column-specific) silently-accepted ===
+CREATE TRIGGER tr4 BEFORE UPDATE OF v ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+=== A5 — BEFORE UPDATE OF id, v (multi-column) silently-accepted ===
+CREATE TRIGGER tr5 BEFORE UPDATE OF id, v ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+=== A6 — BEFORE UPDATE ... WHEN (NEW.v > 10) silently-accepted (DATA-INTEGRITY RISK) ===
+CREATE TRIGGER tr6 BEFORE UPDATE ON pt FOR EACH ROW WHEN (NEW.v > 10) EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+=== A7 — BEFORE INSERT ... WHEN (true) trivial WHEN silently-accepted ===
+CREATE TRIGGER tr7 BEFORE INSERT ON pt FOR EACH ROW WHEN (true) EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+=== SHAPE B — DML ONLY-keyword IDENTIFIER-GOBBLING (mysqlwire pin only) ===
+=== B1 — DELETE FROM ONLY pt: ONLY parsed as table name → 1146 table not found ===
+DELETE FROM ONLY pt WHERE id = 1;
+ERROR 1146: table not found: test.public.only
+=== B2 — UPDATE ONLY pt: ONLY parsed as table name → 1146 table not found ===
+UPDATE ONLY pt SET v = 1 WHERE id = 1;
+ERROR 1146: table not found: test.public.only
+=== SHAPE C — INSERT OVERRIDING SYSTEM/USER VALUE uniform parse-reject at col 16 ===
+=== C1 — INSERT ... OVERRIDING SYSTEM VALUE parse-reject ===
+INSERT INTO pt OVERRIDING SYSTEM VALUE VALUES (1, 2);
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: OVERRIDING at Line: 1, Column: 16
+=== C2 — INSERT ... OVERRIDING USER VALUE parse-reject (same fingerprint) ===
+INSERT INTO pt OVERRIDING USER VALUE VALUES (3, 4);
+ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: OVERRIDING at Line: 1, Column: 16
+=== SHAPE D — SUPPORT baseline: bare CREATE TRIGGER same "function does not exist" fingerprint ===
+CREATE TRIGGER baseline BEFORE INSERT ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+ERROR 1105: execution error: function "trg_fn" does not exist
+DROP TABLE pt;

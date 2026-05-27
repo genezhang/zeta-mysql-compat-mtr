@@ -1,0 +1,273 @@
+# Independently authored PG TRIGGER multi-event /
+# WHEN / UPDATE OF + DML ONLY-keyword + INSERT
+# OVERRIDING VALUE sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE TRIGGER basic (BEFORE/AFTER on
+#     INSERT/UPDATE/DELETE with FOR EACH ROW):
+#     pinned at trigger_basic_extra.
+#   - DROP TRIGGER: pinned at trigger_basic_extra.
+#   - CREATE OR REPLACE TRIGGER, CREATE CONSTRAINT
+#     TRIGGER, REFERENCING NEW/OLD TABLE, REFERENCING
+#     NEW/OLD ROW, INSTEAD OF, CONSTRAINT TRIGGER +
+#     DEFERRABLE: pinned at
+#     pg_create_trigger_pg_modifiers_sentinel_basic_extra.
+#   - OVERRIDING SYSTEM/USER VALUE INSIDE an identity
+#     scenario (GENERATED ALWAYS AS IDENTITY table):
+#     pinned at pg_identity_generated_sentinel_basic_extra.
+#     This slice re-pins OVERRIDING on a plain table
+#     (no IDENTITY column) to isolate the parser
+#     fingerprint from the identity-wiring context;
+#     the failure mode is parser-level (sqlparser's
+#     INSERT grammar) and therefore independent of
+#     the destination column's identity status.
+#
+# This slice pins three NEW shape classes the prior
+# trigger and identity slices do NOT cover:
+#
+#   SHAPE A — TRIGGER advanced PG features that
+#   are parser-ACCEPTED and reach the executor with
+#   the same "function does not exist" fingerprint
+#   as a plain CREATE TRIGGER on a missing fn. The
+#   evidence of silent-accept is identical to the
+#   pre-existing pg_create_trigger_pg_modifiers
+#   pattern (PR-link in big-picture below): the
+#   sqlparser AST carries the multi-event list /
+#   WHEN clause / UPDATE OF column list, but
+#   convert_create_trigger in zeta-parser/src/
+#   convert.rs reads only timing + first event +
+#   when_clause (and ignores UPDATE OF column list
+#   entirely). The trigger fn doesn't exist so the
+#   semantic effect cannot be observed at fire-time
+#   via the MTR runner; the silent-drop is SOURCE-
+#   LEVEL — convert.rs field-ignore — which mirrors
+#   the OR REPLACE / CONSTRAINT / REFERENCING drops
+#   pinned at the sibling slice.
+#
+#     A1: BEFORE INSERT OR UPDATE — multi-event 2-way
+#     A2: AFTER INSERT OR DELETE — multi-event 2-way
+#     A3: BEFORE INSERT OR UPDATE OR DELETE — 3-way
+#     A4: BEFORE UPDATE OF v — column-specific
+#     A5: BEFORE UPDATE OF id, v — multi-column
+#     A6: BEFORE UPDATE ... WHEN (NEW.v > 10) —
+#         row-condition WHEN clause
+#     A7: BEFORE INSERT ... WHEN (true) — trivial WHEN
+#
+#   SHAPE B — DML statements with PG-only ONLY
+#   inheritance modifier: IDENTIFIER-GOBBLING. The
+#   parser does NOT recognise ONLY as a PG modifier;
+#   it consumes the keyword as the table name and
+#   the actual table name as something else. Both
+#   DELETE FROM ONLY and UPDATE ONLY fail with
+#   "table not found: <db>.public.only" — proving
+#   ONLY was eaten as an identifier. This is the
+#   same IDENTIFIER-GOBBLING bug-class as
+#   PR #430 VACUUM (FULL) where a PG modifier
+#   keyword was swallowed as a table name. See
+#   [[feedback_wire_path_divergence_check]] —
+#   this slice pins the mysqlwire fingerprint
+#   only; pgwire MAY diverge (pgwire's statement
+#   intercept layer differs from mysqlwire's, and
+#   the sqlparser ONLY path may resolve before
+#   reaching the executor on pgwire). Do not
+#   extrapolate the table-name-eating fingerprint
+#   to pgwire without an independent probe.
+#
+#     B1: DELETE FROM ONLY pt WHERE ...
+#     B2: UPDATE ONLY pt SET ...
+#
+#   SHAPE C — INSERT ... OVERRIDING SYSTEM/USER
+#   VALUE parse-reject. sqlparser's INSERT grammar
+#   does not include the PG OVERRIDING clause
+#   between the table and VALUES. Both SYSTEM and
+#   USER forms collapse to the same parser
+#   fingerprint at column 16 ("OVERRIDING"
+#   keyword position). Cross-reference the
+#   identity sentinel slice for the same parse-
+#   reject inside an IDENTITY context; this slice
+#   pins on a plain table to confirm the failure
+#   is parser-level (independent of the column's
+#   identity status).
+#
+#     C1: INSERT INTO pt OVERRIDING SYSTEM VALUE ...
+#     C2: INSERT INTO pt OVERRIDING USER VALUE ...
+#
+#   SHAPE D — SUPPORT baseline. A bare CREATE
+#   TRIGGER on the same table reaches the executor
+#   with the same "function does not exist"
+#   fingerprint as all A1-A7 shapes, proving the
+#   error code in Shape A is not a side-effect of
+#   the modifier syntax but the universal "trigger-
+#   function-missing" path. Without this control,
+#   one could not distinguish silent-accept of the
+#   modifier from a parser-side reject that
+#   happens to also emit 1105.
+#
+# STRUCTURAL FINDINGS (the THREE big-picture
+# headlines):
+#
+#   FINDING 1 — CORRUPTION-class TRIGGER silent-
+#   accept of advanced PG features. multi-event
+#   lists (INSERT OR UPDATE, etc.), UPDATE OF
+#   column lists, and WHEN row-conditions are all
+#   parser-accepted but the convert.rs field-
+#   ignore means the trigger will fire on the
+#   wrong events / for the wrong column updates /
+#   without honouring the WHEN condition. The
+#   WHEN-condition silent-drop is the most
+#   damning: a user porting a PG trigger with
+#   `WHEN (NEW.status = 'active')` will see the
+#   trigger fire on EVERY update, not only when
+#   status flips to active — a SILENT loss of the
+#   trigger condition is a DATA-INTEGRITY risk
+#   (e.g., a side-effect intended for only the
+#   active-status transition will fire on every
+#   touch of the row). UPDATE OF column-list drop
+#   has a similar but milder effect: a trigger
+#   intended to fire only on UPDATE OF salary
+#   fires on UPDATE OF any column. Multi-event
+#   drop means a trigger on INSERT OR UPDATE
+#   either fires only on INSERT (first event in
+#   list) or only on UPDATE (last) — the convert.rs
+#   source-level evidence is needed to know which.
+#
+#   FINDING 2 — ONLY-keyword IDENTIFIER-GOBBLING
+#   in DELETE FROM / UPDATE. Parallel to PR #430
+#   VACUUM (FULL) gobbling. The keyword ONLY is
+#   not part of MySQL DML grammar but IS a PG
+#   inheritance modifier ("operate on this table
+#   only, not on its inherited children"). zeta's
+#   mysqlwire DML parser eats ONLY as the table
+#   name, then re-parses the actual table name as
+#   ... something. The 1146 fingerprint mentions
+#   "<db>.public.only" — proving the eat-as-table-
+#   name path. See
+#   [[feedback_wire_path_divergence_check]]; this
+#   slice pins the mysqlwire fingerprint only.
+#
+#   FINDING 3 — INSERT ... OVERRIDING SYSTEM/USER
+#   VALUE uniform reject at sqlparser. The PG-
+#   standard ALWAYS-bypass clause is not present
+#   in sqlparser's INSERT grammar. Both SYSTEM and
+#   USER forms collapse to the same column-16
+#   "OVERRIDING" fingerprint. Effect: PG apps
+#   doing restore/import workflows (dump-and-load
+#   into an identity-keyed table with explicit ids)
+#   cannot use the PG-standard mechanism even on a
+#   plain (non-identity) target table — the parser
+#   rejects the clause regardless of column type.
+#   Cross-link [[project_two_layer_type_recognition_pattern]]:
+#   IDENTITY/OVERRIDING is a two-layer feature
+#   (parser-side OVERRIDING clause + planner-side
+#   ALWAYS enforcement); both layers are
+#   independently broken.
+#
+# Wire divergence check: this slice probes via
+# mysqlwire (MTR canonical). For shapes A and C
+# the parse path is wire-shared (sqlparser is
+# called by both wires) so pgwire is expected to
+# emit the same fingerprints — but the
+# IDENTIFIER-GOBBLING in Shape B is observed on
+# mysqlwire and may resolve differently on pgwire
+# because pgwire's DML statement-intercept layer
+# diverges from mysqlwire's. The "1146 table not
+# found: <db>.public.only" fingerprint is a
+# mysqlwire-only pin. See
+# [[feedback_wire_path_divergence_check]] —
+# pinning mysqlwire here is correct (MTR canonical
+# wire) but the pgwire shape is left explicitly
+# un-pinned.
+#
+# Cross-links:
+#   [[feedback_wire_path_divergence_check]] —
+#     pgwire and mysqlwire intercept DML
+#     differently; the ONLY-gobbling fingerprint
+#     here is mysqlwire-only.
+#   [[project_two_layer_type_recognition_pattern]] —
+#     OVERRIDING is the parser layer of a two-
+#     layer feature; the planner-side ALWAYS
+#     enforcement is independently broken (pinned
+#     at the identity sentinel slice).
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-ACCEPT — multi-event
+#     trigger lists (INSERT OR UPDATE, etc.), UPDATE
+#     OF column-lists, and WHEN row-conditions are
+#     all parser-accepted but the advanced-feature
+#     semantics are dropped at convert.rs. The
+#     WHEN-condition drop is a data-integrity risk:
+#     triggers fire on every event, not only when
+#     the condition is true.
+#   # zeta-adapt: KNOWN BUG (mysqlwire) —
+#     DELETE FROM ONLY t / UPDATE ONLY t treat ONLY
+#     as the table name; use plain DELETE FROM t /
+#     UPDATE t (zeta has no table inheritance, so
+#     ONLY has no semantic effect anyway).
+#   # zeta-adapt: KNOWN GAP — INSERT ... OVERRIDING
+#     SYSTEM/USER VALUE parse-rejected regardless
+#     of target column's identity status. Drop the
+#     OVERRIDING clause; rely on application-side
+#     id-write enforcement.
+
+DROP TABLE IF EXISTS pt;
+CREATE TABLE pt (id INT PRIMARY KEY, v INT);
+INSERT INTO pt VALUES (1, 10);
+
+--echo === SHAPE A — TRIGGER advanced PG features parser-accepted; reach executor with "function does not exist" ===
+
+--echo === A1 — BEFORE INSERT OR UPDATE (multi-event 2-way) silently-accepted ===
+--error 1105
+CREATE TRIGGER tr1 BEFORE INSERT OR UPDATE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+
+--echo === A2 — AFTER INSERT OR DELETE (multi-event 2-way) silently-accepted ===
+--error 1105
+CREATE TRIGGER tr2 AFTER INSERT OR DELETE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+
+--echo === A3 — BEFORE INSERT OR UPDATE OR DELETE (3-way) silently-accepted ===
+--error 1105
+CREATE TRIGGER tr3 BEFORE INSERT OR UPDATE OR DELETE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+
+--echo === A4 — BEFORE UPDATE OF v (column-specific) silently-accepted ===
+--error 1105
+CREATE TRIGGER tr4 BEFORE UPDATE OF v ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+
+--echo === A5 — BEFORE UPDATE OF id, v (multi-column) silently-accepted ===
+--error 1105
+CREATE TRIGGER tr5 BEFORE UPDATE OF id, v ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+
+--echo === A6 — BEFORE UPDATE ... WHEN (NEW.v > 10) silently-accepted (DATA-INTEGRITY RISK) ===
+--error 1105
+CREATE TRIGGER tr6 BEFORE UPDATE ON pt FOR EACH ROW WHEN (NEW.v > 10) EXECUTE FUNCTION trg_fn();
+
+--echo === A7 — BEFORE INSERT ... WHEN (true) trivial WHEN silently-accepted ===
+--error 1105
+CREATE TRIGGER tr7 BEFORE INSERT ON pt FOR EACH ROW WHEN (true) EXECUTE FUNCTION trg_fn();
+
+--echo === SHAPE B — DML ONLY-keyword IDENTIFIER-GOBBLING (mysqlwire pin only) ===
+
+--echo === B1 — DELETE FROM ONLY pt: ONLY parsed as table name → 1146 table not found ===
+--error 1146
+DELETE FROM ONLY pt WHERE id = 1;
+
+--echo === B2 — UPDATE ONLY pt: ONLY parsed as table name → 1146 table not found ===
+--error 1146
+UPDATE ONLY pt SET v = 1 WHERE id = 1;
+
+--echo === SHAPE C — INSERT OVERRIDING SYSTEM/USER VALUE uniform parse-reject at col 16 ===
+
+--echo === C1 — INSERT ... OVERRIDING SYSTEM VALUE parse-reject ===
+--error 1064
+INSERT INTO pt OVERRIDING SYSTEM VALUE VALUES (1, 2);
+
+--echo === C2 — INSERT ... OVERRIDING USER VALUE parse-reject (same fingerprint) ===
+--error 1064
+INSERT INTO pt OVERRIDING USER VALUE VALUES (3, 4);
+
+--echo === SHAPE D — SUPPORT baseline: bare CREATE TRIGGER same "function does not exist" fingerprint ===
+
+--error 1105
+CREATE TRIGGER baseline BEFORE INSERT ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn();
+
+DROP TABLE pt;
