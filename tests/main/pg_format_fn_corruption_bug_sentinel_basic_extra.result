@@ -1,0 +1,47 @@
+=== Shape A: format('hi %s', 'world') — returns '0' instead of 'hi world' (CORRUPTION) ===
+SELECT format('hi %s', 'world') AS basic_s;
+basic_s
+0
+=== Shape B: format('val=%I', 'my_ident') — quote_ident dropped, returns '0' ===
+SELECT format('val=%I', 'my_ident') AS quote_ident_spec;
+quote_ident_spec
+0
+=== Shape C: format('val=%L', 'literal') — quote_literal dropped, returns '0' ===
+SELECT format('val=%L', 'literal') AS quote_literal_spec;
+quote_literal_spec
+0
+=== Shape D: format('val=%s, num=%s', 'x', 42) — multi-arg %s, returns '0' ===
+SELECT format('val=%s, num=%s', 'x', 42) AS two_args_mixed;
+two_args_mixed
+0
+=== Shape E: format('SELECT * FROM %I WHERE c = %L', 'users', 'alice') — dynamic SQL, returns '0' (CORRUPTION HEADLINE) ===
+SELECT format('SELECT * FROM %I WHERE c = %L', 'users', 'alice') AS dynamic_sql_idiom;
+dynamic_sql_idiom
+0
+=== Shape F: format('%I.%I', 'public', 'users') — qualified identifier, returns '0' ===
+SELECT format('%I.%I', 'public', 'users') AS qualified_ident;
+qualified_ident
+0
+=== Shape G: format('%1$s-%1$s', 'x') — positional reference, returns '0' ===
+SELECT format('%1$s-%1$s', 'x') AS positional_ref;
+positional_ref
+0
+=== Shape H: format('%s', 'only') — minimal printf shape, returns '0' ===
+SELECT format('%s', 'only') AS minimal_printf;
+minimal_printf
+0
+=== Shape M1: format(0, 0) — mechanism proof, returns '0' ===
+SELECT format(0, 0) AS numeric_zero_zero;
+numeric_zero_zero
+0
+=== Shape M2: format(1234.5678, 2) — mechanism proof, '1,234.57' (MySQL numeric FORMAT fingerprint) ===
+SELECT format(1234.5678, 2) AS numeric_decimal_proof;
+numeric_decimal_proof
+1,234.57
+=== Shape P1: format('plain string') single-arg — errors 1105 with MySQL message ===
+SELECT format('plain string');
+ERROR 1105: execution error: FORMAT requires 2 or 3 arguments (number, decimals[, locale])
+=== Shape P2: format('%s', NULL) — returns SQL NULL (not '0', not '<NULL>' literal) ===
+SELECT format('%s', NULL) AS fmt_spec_with_null_arg;
+fmt_spec_with_null_arg
+NULL
