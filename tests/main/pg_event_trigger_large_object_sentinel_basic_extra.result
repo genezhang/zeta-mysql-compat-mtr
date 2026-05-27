@@ -1,0 +1,59 @@
+=== CREATE EVENT TRIGGER (3 forms) — "found: EVENT" at col 8 (duplicate kw witness, new statement family) ===
+CREATE EVENT TRIGGER et ON ddl_command_start EXECUTE FUNCTION fn();
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: EVENT at Line: 1, Column: 8
+CREATE EVENT TRIGGER et ON ddl_command_end EXECUTE PROCEDURE fn();
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: EVENT at Line: 1, Column: 8
+CREATE EVENT TRIGGER et ON sql_drop WHEN TAG IN ('DROP TABLE') EXECUTE FUNCTION fn();
+ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: EVENT at Line: 1, Column: 8
+=== ALTER EVENT TRIGGER (5 forms) — ALTER restricted-list "found: EVENT" at col 7 ===
+ALTER EVENT TRIGGER et DISABLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: EVENT at Line: 1, Column: 7
+ALTER EVENT TRIGGER et ENABLE;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: EVENT at Line: 1, Column: 7
+ALTER EVENT TRIGGER et ENABLE REPLICA;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: EVENT at Line: 1, Column: 7
+ALTER EVENT TRIGGER et OWNER TO postgres;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: EVENT at Line: 1, Column: 7
+ALTER EVENT TRIGGER et RENAME TO et2;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: EVENT at Line: 1, Column: 7
+=== DROP EVENT TRIGGER (3 forms) — DROP allowed-list "found: EVENT" at col 6 ===
+DROP EVENT TRIGGER et;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: EVENT at Line: 1, Column: 6
+DROP EVENT TRIGGER IF EXISTS et;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: EVENT at Line: 1, Column: 6
+DROP EVENT TRIGGER et CASCADE;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: EVENT at Line: 1, Column: 6
+=== ALTER LARGE OBJECT — NEW kw witness LARGE for ALTER restricted-list at col 7 ===
+ALTER LARGE OBJECT 12345 OWNER TO postgres;
+ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: LARGE at Line: 1, Column: 7
+=== DROP LARGE OBJECT — NEW kw witness LARGE for DROP allowed-list at col 6 ===
+DROP LARGE OBJECT 12345;
+ERROR 1064: SQL parse error: sql parser error: Expected: CONNECTOR, DATABASE, EXTENSION, FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE, ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE, TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER after DROP, found: LARGE at Line: 1, Column: 6
+=== COMMENT ON LARGE OBJECT — NEW kw witness LARGE for comment object_type at col 12 ===
+COMMENT ON LARGE OBJECT 12345 IS 'classified blob';
+ERROR 1064: SQL parse error: sql parser error: Expected: comment object_type, found: LARGE at Line: 1, Column: 12
+=== GRANT ON LARGE OBJECT — NEW SHAPE "Expected: TO, found: OBJECT" at col 23 ===
+GRANT SELECT ON LARGE OBJECT 12345 TO postgres;
+ERROR 1064: SQL parse error: sql parser error: Expected: TO, found: OBJECT at Line: 1, Column: 23
+=== REVOKE ON LARGE OBJECT — NEW SHAPE "Expected: FROM, found: OBJECT" at col 24 ===
+REVOKE SELECT ON LARGE OBJECT 12345 FROM postgres;
+ERROR 1064: SQL parse error: sql parser error: Expected: FROM, found: OBJECT at Line: 1, Column: 24
+=== lo_* I/O fns — extends unknown-function bucket (9 new lo_* members) ===
+SELECT lo_lseek(0, 0, 0);
+ERROR 1105: execution error: unknown function: lo_lseek
+SELECT lo_tell(0);
+ERROR 1105: execution error: unknown function: lo_tell
+SELECT lo_truncate(0, 100);
+ERROR 1105: execution error: unknown function: lo_truncate
+SELECT lo_put(12345, 0, 'data');
+ERROR 1105: execution error: unknown function: lo_put
+SELECT lo_get(12345);
+ERROR 1105: execution error: unknown function: lo_get
+SELECT lo_from_bytea(0, 'data'::bytea);
+ERROR 1105: execution error: unknown function: lo_from_bytea
+SELECT loread(0, 100);
+ERROR 1105: execution error: unknown function: loread
+SELECT lowrite(0, 'data'::bytea);
+ERROR 1105: execution error: unknown function: lowrite
+SELECT lo_compat_privileges();
+ERROR 1105: execution error: unknown function: lo_compat_privileges

@@ -1,0 +1,268 @@
+# Independently authored PG EVENT TRIGGER + LARGE OBJECT
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - CREATE/ALTER/DROP EVENT TRIGGER — ZERO prior
+#     coverage as a STATEMENT family. The kw `EVENT` IS
+#     pre-existing at event_use_partition_sentinel:96/
+#     101/110 (MySQL's `CREATE/ALTER/DROP EVENT`
+#     scheduler DDL — different statement family, same
+#     leading kw).
+#   - CREATE/ALTER/DROP LARGE OBJECT — ZERO prior
+#     coverage. kw `LARGE` is also a ZERO-prior witness
+#     for both ALTER restricted-list and DROP allowed-
+#     list.
+#   - COMMENT ON LARGE OBJECT — ZERO prior. kw `LARGE`
+#     joins the comment object_type bucket alongside
+#     INDEX/FUNCTION/SEQUENCE (comment_on_basic_extra:
+#     109/114/119).
+#   - GRANT/REVOKE ON LARGE OBJECT — ZERO prior. NEW
+#     shape "Expected: TO/FROM, found: OBJECT".
+#   - lo_lseek / lo_tell / lo_truncate / lo_put / lo_get
+#     / lo_from_bytea / loread / lowrite /
+#     lo_compat_privileges — ZERO prior. Joins the lo_*
+#     unknown-function bucket alongside lo_create /
+#     lo_open / lo_unlink (PR #391,
+#     pg_fdw_inherits_sentinel:209-213) and lo_import /
+#     lo_export (pg_alter_func_proc_lo_io_sentinel:
+#     102-106).
+#
+# Pre-existing rejection shape patterns (per
+# fingerprint-dedup discipline):
+#   - "Expected: an object type after CREATE, found:
+#     <KW>" — pre-existing at multiple sites. kw EVENT
+#     is pre-existing (event_use_partition_sentinel:96
+#     MySQL CREATE EVENT). DUPLICATE FINGERPRINT —
+#     pinned here for PG STATEMENT-FAMILY completeness.
+#   - "Expected: one of VIEW or TYPE or TABLE or INDEX
+#     or ROLE or POLICY or CONNECTOR or ICEBERG or
+#     SCHEMA or USER or OPERATOR, found: <KW>" —
+#     pre-existing at event_use_partition_sentinel:101
+#     (EVENT), pg_alter_func_proc_lo_io_sentinel
+#     (FUNCTION, PROCEDURE), pg_ddl_tablespace_
+#     conversion_group_sentinel (GROUP), PR #395
+#     (DEFAULT). DUPLICATE for ALTER EVENT TRIGGER (kw
+#     EVENT); NEW WITNESS for ALTER LARGE OBJECT (kw
+#     LARGE).
+#   - "Expected: CONNECTOR, DATABASE, EXTENSION,
+#     FUNCTION, INDEX, OPERATOR, POLICY, PROCEDURE,
+#     ROLE, SCHEMA, SECRET, SEQUENCE, STAGE, TABLE,
+#     TRIGGER, TYPE, VIEW, MATERIALIZED VIEW or USER
+#     after DROP, found: <KW>" — pre-existing at
+#     event_use_partition_sentinel:110 (EVENT) and
+#     pg_ddl_tablespace_conversion_group_sentinel
+#     (CONVERSION). DUPLICATE for DROP EVENT TRIGGER
+#     (kw EVENT); NEW WITNESS for DROP LARGE OBJECT
+#     (kw LARGE).
+#   - "Expected: comment object_type, found: <KW>" —
+#     pre-existing at comment_on_basic_extra:109/114/
+#     119 (INDEX/FUNCTION/SEQUENCE). NEW WITNESS for
+#     COMMENT ON LARGE OBJECT (kw LARGE).
+#   - "Expected: TO, found: OBJECT" / "Expected: FROM,
+#     found: OBJECT" — NEW SHAPES from this slice.
+#     sqlparser's GRANT/REVOKE object-list grammar
+#     accepts `LARGE` as the privilege-target name,
+#     then chokes on the second token `OBJECT`. Both
+#     GRANT and REVOKE expose mirrored shapes (TO vs
+#     FROM at the trailing position).
+#   - "unknown function: lo_<X>" — pre-existing at PR
+#     #391 (lo_create/lo_open/lo_unlink) and
+#     pg_alter_func_proc_lo_io_sentinel (lo_import,
+#     lo_export). NEW members: lo_lseek, lo_tell,
+#     lo_truncate, lo_put, lo_get, lo_from_bytea,
+#     loread, lowrite, lo_compat_privileges.
+#
+# This slice pins:
+#
+#   CREATE/ALTER/DROP EVENT TRIGGER (PG event-trigger
+#   DDL family — fires SQL functions on DDL events).
+#   All variants reject at the `EVENT` token, BEFORE
+#   the parser sees `TRIGGER` and recognises this is
+#   the PG event-trigger surface — so the rejection
+#   keyword does not distinguish it from MySQL's
+#   `EVENT` scheduler DDL even though the statement
+#   bodies (`ON ddl_command_start EXECUTE FUNCTION`)
+#   are entirely different grammars.
+#
+#   ALTER LARGE OBJECT <oid> OWNER TO <role> — only
+#   form of ALTER on the lo surface. NEW kw witness
+#   `LARGE` for the ALTER restricted-list shape.
+#
+#   DROP LARGE OBJECT <oid> — NEW kw witness `LARGE`
+#   for the DROP allowed-list shape.
+#
+#   COMMENT ON LARGE OBJECT <oid> IS '<text>' — NEW
+#   kw witness `LARGE` for the comment object_type
+#   shape (alongside INDEX/FUNCTION/SEQUENCE).
+#
+#   GRANT SELECT ON LARGE OBJECT <oid> TO <role> —
+#   NEW shape "Expected: TO, found: OBJECT" at col
+#   23. sqlparser's GRANT grammar accepts arbitrary
+#   identifiers as privilege-target names, so it
+#   reads `LARGE` as a name and then expects the
+#   trailing `TO` clause — fails when the next token
+#   is `OBJECT`, not `TO`.
+#
+#   REVOKE SELECT ON LARGE OBJECT <oid> FROM <role>
+#   — symmetric: "Expected: FROM, found: OBJECT" at
+#   col 24.
+#
+#   lo_lseek / lo_tell / lo_truncate / lo_put /
+#   lo_get / lo_from_bytea / loread / lowrite /
+#   lo_compat_privileges — extends the lo_* unknown-
+#   function bucket to cover the full PG large-object
+#   I/O API surface. Apps porting PG blob-storage
+#   code that uses lo_* for streaming I/O must
+#   rewrite to BYTEA + app-side I/O.
+#
+# Big-picture findings:
+#
+#   STRUCTURAL — "shared ALTER allowed-list" sentinel:
+#   sqlparser's ALTER dispatcher accepts only an
+#   11-keyword whitelist (VIEW / TYPE / TABLE / INDEX
+#   / ROLE / POLICY / CONNECTOR / ICEBERG / SCHEMA /
+#   USER / OPERATOR). Every PG-specific or PG-extension
+#   keyword that follows ALTER triggers the same error
+#   shape with only the keyword differing. This slice
+#   contributes TWO new witnesses (kw EVENT — duplicate;
+#   kw LARGE — new), bringing the documented count of
+#   ALTER-restricted-list keywords to: EVENT, DEFAULT,
+#   FUNCTION, PROCEDURE, GROUP, LARGE (this PR). The
+#   real-world impact: every PG-only ALTER variant is
+#   unreachable through this gate, regardless of the
+#   downstream clause (OWNER TO / RENAME TO / SET / …).
+#
+#   STRUCTURAL — "shared DROP allowed-list" sentinel:
+#   the symmetric DROP dispatcher exposes the same
+#   pattern at col 6. Witnesses so far: EVENT,
+#   CONVERSION, LARGE (this PR).
+#
+#   PG EVENT TRIGGER and LARGE OBJECT are entirely
+#   unreachable in zeta — every DDL statement form
+#   parse-rejects. Real PG apps that use EVENT TRIGGER
+#   for DDL auditing (ddl_command_start /
+#   ddl_command_end / table_rewrite / sql_drop) have NO
+#   substitute in zeta; same for the lo_* large-object
+#   I/O API. Both subsystems are PG-specific and
+#   intentionally out-of-scope for the MySQL-compat
+#   wire.
+#
+#   GRANT/REVOKE ON LARGE OBJECT exposes a NEW
+#   parser-shape pair ("Expected: TO/FROM, found:
+#   OBJECT"). This is the first slice to document
+#   sqlparser's behavior of accepting `LARGE` as a
+#   one-token privilege-target name and then choking
+#   on the second `OBJECT` token. The same shape
+#   would apply to any other PG GRANT-target that
+#   uses a two-token spelling (FOREIGN DATA WRAPPER,
+#   FOREIGN SERVER, etc.) — a future slice could
+#   confirm and pin those.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — CREATE/ALTER/DROP EVENT
+#     TRIGGER all error 1064 at the `EVENT` keyword.
+#     zeta has no DDL-event hook surface. Apps using
+#     PG EVENT TRIGGER for DDL auditing must instead
+#     wrap DDL in application-level logging or use the
+#     zeta logical-replication stream to observe
+#     schema changes after the fact.
+#   # zeta-adapt: KNOWN GAP — ALTER LARGE OBJECT (only
+#     form: OWNER TO) errors 1064 at the `LARGE`
+#     keyword (ALTER restricted-list). No substitute.
+#   # zeta-adapt: KNOWN GAP — DROP LARGE OBJECT errors
+#     1064 at the `LARGE` keyword (DROP allowed-list).
+#     PG large-object storage is unreachable; apps
+#     should not generate this statement.
+#   # zeta-adapt: KNOWN GAP — COMMENT ON LARGE OBJECT
+#     errors 1064 (comment object_type allowed-list
+#     does not include LARGE).
+#   # zeta-adapt: KNOWN GAP — GRANT/REVOKE … ON LARGE
+#     OBJECT … error 1064 with a confusing shape that
+#     points at the `OBJECT` token; the underlying
+#     reason is the lo_* surface as a whole.
+#   # zeta-adapt: KNOWN GAP — every PG large-object
+#     I/O function (lo_lseek / lo_tell / lo_truncate /
+#     lo_put / lo_get / lo_from_bytea / loread /
+#     lowrite / lo_compat_privileges, plus the
+#     pre-existing lo_create / lo_open / lo_unlink /
+#     lo_import / lo_export) errors 1105 "unknown
+#     function". Use BYTEA columns + app-side
+#     streaming I/O instead.
+
+--echo === CREATE EVENT TRIGGER (3 forms) — "found: EVENT" at col 8 (duplicate kw witness, new statement family) ===
+
+--error 1064
+CREATE EVENT TRIGGER et ON ddl_command_start EXECUTE FUNCTION fn();
+--error 1064
+CREATE EVENT TRIGGER et ON ddl_command_end EXECUTE PROCEDURE fn();
+--error 1064
+CREATE EVENT TRIGGER et ON sql_drop WHEN TAG IN ('DROP TABLE') EXECUTE FUNCTION fn();
+
+--echo === ALTER EVENT TRIGGER (5 forms) — ALTER restricted-list "found: EVENT" at col 7 ===
+
+--error 1064
+ALTER EVENT TRIGGER et DISABLE;
+--error 1064
+ALTER EVENT TRIGGER et ENABLE;
+--error 1064
+ALTER EVENT TRIGGER et ENABLE REPLICA;
+--error 1064
+ALTER EVENT TRIGGER et OWNER TO postgres;
+--error 1064
+ALTER EVENT TRIGGER et RENAME TO et2;
+
+--echo === DROP EVENT TRIGGER (3 forms) — DROP allowed-list "found: EVENT" at col 6 ===
+
+--error 1064
+DROP EVENT TRIGGER et;
+--error 1064
+DROP EVENT TRIGGER IF EXISTS et;
+--error 1064
+DROP EVENT TRIGGER et CASCADE;
+
+--echo === ALTER LARGE OBJECT — NEW kw witness LARGE for ALTER restricted-list at col 7 ===
+
+--error 1064
+ALTER LARGE OBJECT 12345 OWNER TO postgres;
+
+--echo === DROP LARGE OBJECT — NEW kw witness LARGE for DROP allowed-list at col 6 ===
+
+--error 1064
+DROP LARGE OBJECT 12345;
+
+--echo === COMMENT ON LARGE OBJECT — NEW kw witness LARGE for comment object_type at col 12 ===
+
+--error 1064
+COMMENT ON LARGE OBJECT 12345 IS 'classified blob';
+
+--echo === GRANT ON LARGE OBJECT — NEW SHAPE "Expected: TO, found: OBJECT" at col 23 ===
+
+--error 1064
+GRANT SELECT ON LARGE OBJECT 12345 TO postgres;
+
+--echo === REVOKE ON LARGE OBJECT — NEW SHAPE "Expected: FROM, found: OBJECT" at col 24 ===
+
+--error 1064
+REVOKE SELECT ON LARGE OBJECT 12345 FROM postgres;
+
+--echo === lo_* I/O fns — extends unknown-function bucket (9 new lo_* members) ===
+
+--error 1105
+SELECT lo_lseek(0, 0, 0);
+--error 1105
+SELECT lo_tell(0);
+--error 1105
+SELECT lo_truncate(0, 100);
+--error 1105
+SELECT lo_put(12345, 0, 'data');
+--error 1105
+SELECT lo_get(12345);
+--error 1105
+SELECT lo_from_bytea(0, 'data'::bytea);
+--error 1105
+SELECT loread(0, 100);
+--error 1105
+SELECT lowrite(0, 'data'::bytea);
+--error 1105
+SELECT lo_compat_privileges();
