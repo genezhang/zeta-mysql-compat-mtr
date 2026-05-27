@@ -1,0 +1,275 @@
+# Independently authored CREATE EXTENSION WITH-clause
+# CORRUPTION-class silent-drop + uuid-ossp self-
+# contradictory dash-reject sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/ or PG regress.
+#
+# Adjacent companion slices (do NOT duplicate):
+#   - create_extension_basic_extra.test:79-119 +
+#     .result:11-17 pins the BARE-form whitelist:
+#     `CREATE EXTENSION citext` (and the five other
+#     whitelisted names, including the QUOTED
+#     `"uuid-ossp"` form) silently succeeds. Unknown
+#     names error 1105 with the hand-rolled em-dash
+#     formatter. IF NOT EXISTS swallows the unknown
+#     1105. DROP EXTENSION is ALWAYS a no-op. NONE of
+#     those shapes carry a WITH clause; the bare-form
+#     slice never probes SCHEMA / VERSION / CASCADE
+#     against a WHITELISTED extension.
+#   - pg_fdw_extension_grammar_sentinel_basic_extra
+#     (PR #465) pins the WITH-keyword grammar
+#     bifurcation against an UNKNOWN extension
+#     (`CREATE EXTENSION foo SCHEMA s1` → 1064 at
+#     parser; `CREATE EXTENSION foo WITH SCHEMA s1
+#     VERSION '1.0' CASCADE` → 1105 at dispatcher
+#     because `foo` is not whitelisted). This slice
+#     does NOT re-pin either; the novel evidence is
+#     what happens when the WITH-prefix branch
+#     consumes the option list AND the extension
+#     name IS whitelisted — the dispatcher returns
+#     OK and the options are SILENTLY DROPPED.
+#     PR #465 proved the WITH-form parses; this PR
+#     proves the WITH-form CORRUPTS.
+#   - uuid_basic_extra / uuid_generate_v1_basic_extra
+#     pin uuid-ossp FUNCTIONS (UUID_GENERATE_V*) but
+#     not the `CREATE EXTENSION uuid-ossp` statement
+#     itself (the bare slice uses the QUOTED
+#     `"uuid-ossp"` form, never the unquoted form).
+#
+#   Pre-author dedup grep on tests/main/*.test for
+#   `CREATE EXTENSION.*(WITH|SCHEMA|VERSION|CASCADE)|
+#   CREATE EXTENSION citext|CREATE EXTENSION pgcrypto|
+#   CREATE EXTENSION uuid|IF NOT EXISTS.*citext`:
+#   THREE hits — create_extension_basic_extra (bare
+#   whitelist), pg_fdw_extension_grammar_sentinel
+#   (WITH-clause against UNKNOWN name), uuid_basic /
+#   zero_arg_constants (uuid-ossp FUNCTIONS). NONE
+#   probe WITH-clauses against a WHITELISTED
+#   extension; NONE probe the unquoted dash-form
+#   `CREATE EXTENSION uuid-ossp`. Per
+#   [[feedback_gap_scan_must_grep_all_files]] the wide
+#   case-insensitive grep was the full population.
+#
+# This slice pins THREE structural findings:
+#
+#   FINDING 1 — CORRUPTION-class silent-drop of
+#   WITH-clauses against whitelisted extensions. Zeta
+#   has no `CREATE EXTENSION` option semantics at all
+#   (the dispatcher does not honor SCHEMA, VERSION, or
+#   CASCADE — confirmed by impl comment "Accepted
+#   silently so migration scripts (Rails, Django,
+#   Alembic) work"). PR #465 proved the WITH-form
+#   parses against an UNKNOWN extension (1105 at
+#   dispatcher); this slice proves the WITH-form
+#   SILENTLY DROPS the entire option list when the
+#   extension IS whitelisted. The DAMNING evidence
+#   that no validation occurs:
+#     * `WITH VERSION '99.99'` (a nonsense version
+#       for citext, which has no 99.99 release) →
+#       silent OK.
+#     * `WITH SCHEMA NOSUCHSCHEMA` (a schema that
+#       does not exist in the catalog) → silent OK.
+#       Migration scripts that emit
+#       `CREATE EXTENSION pgcrypto WITH SCHEMA
+#       NOSUCHSCHEMA` get NO indication that the
+#       schema-relocation request was ignored AND
+#       that the schema does not exist. zeta
+#       neither honors the schema target nor
+#       validates that it is real.
+#   This is the textbook CORRUPTION-class pattern: the
+#   client believes the server accepted a constraint
+#   (schema, version, dependency-cascade) that the
+#   server has no machinery to enforce. zeta's bare-
+#   form whitelist gives a useful silent-ack semantic
+#   for migration scripts (`extension already supplied,
+#   nothing to do`); the WITH-form silent-drop
+#   extends that contract into territory the client
+#   should NOT be silently acked over.
+#
+#   FINDING 2 — Self-contradictory help-text vs
+#   parser for `uuid-ossp`. Zeta's OWN unknown-
+#   extension help-text (pinned at
+#   create_extension_basic_extra.result:13) names
+#   `uuid-ossp` (with the dash) among the natively-
+#   supported set. But the canonical PG spelling
+#   `CREATE EXTENSION uuid-ossp` (unquoted, with
+#   embedded dash) errors 1064 at the parser layer
+#   (`Expected: end of statement, found: - at
+#   Line: 1, Column: 22`) — the parser treats `-`
+#   as a binary operator after the `uuid` token,
+#   never reaching the dispatcher. The dash-
+#   containing name is parseable ONLY in the quoted
+#   form `"uuid-ossp"` (as
+#   create_extension_basic_extra:82 uses). zeta's
+#   help-text is therefore self-contradictory: it
+#   advertises a name that its own parser refuses
+#   to accept in the spelling apps actually use.
+#   PG accepts BOTH `CREATE EXTENSION uuid-ossp`
+#   AND `CREATE EXTENSION "uuid-ossp"` (the dash
+#   is a legal identifier character in PG's
+#   extension-name lexer, distinct from the
+#   subtraction operator). Migration scripts and
+#   pg_dump output use the UNQUOTED dash form; the
+#   QUOTED form is a zeta-only workaround that is
+#   undocumented in zeta's own help-text.
+#
+#   FINDING 3 — Companion to PR #465's bare-form
+#   grammar bifurcation. PR #465 (FDW slice) +
+#   create_extension_basic_extra together establish
+#   that zeta has THREE distinct CREATE EXTENSION
+#   surfaces:
+#     1. bare form, whitelisted name → silent OK
+#     2. bare form, unknown name → 1105 dispatcher
+#     3. bare form + trailing option WITHOUT WITH
+#        → 1064 parser (any token, any extension
+#        name)
+#   This slice adds the FOURTH and FIFTH surfaces:
+#     4. WITH form, whitelisted name, ANY options
+#        (including nonsense) → silent OK; options
+#        SILENTLY DROPPED.
+#     5. unquoted dash-name form (`uuid-ossp`) →
+#        1064 parser, even though the same name
+#        appears in zeta's own help-text and works
+#        in the quoted form.
+#   Combined with PR #465's surface 6 (WITH form,
+#   unknown name → 1105 dispatcher), zeta exposes
+#   FIVE distinct failure-vs-dispatch surfaces for
+#   a single PG statement. Apps porting from PG
+#   that emit any of {bare-unknown, bare-with-
+#   trailing-opt, WITH-with-options-they-care-
+#   about, unquoted-dash-name} get DIFFERENT
+#   error fingerprints — or worse, SILENT
+#   CORRUPTION — for SYNTACTICALLY-EQUIVALENT or
+#   SEMANTICALLY-IMPORTANT spellings.
+#
+# Big-picture finding:
+#
+#   zeta has NO CREATE EXTENSION option semantics. The
+#   bare-form whitelist is a useful silent-ack for
+#   migration scripts; the WITH-form silent-drop is
+#   a CORRUPTION-class extension of that contract
+#   into option territory where the silent-ack
+#   semantics are no longer safe. Combined with the
+#   uuid-ossp parser self-contradiction, this is the
+#   parser-and-dispatcher-layer analog of
+#   [[project_two_layer_type_recognition_pattern]]:
+#   the same name is fingerprinted differently
+#   depending on quoting and option-list spelling,
+#   with the corrupting branch being the one apps
+#   most commonly emit. See also
+#   [[project_option_registry_split]] and
+#   [[project_function_arms_gap_closed]] — the
+#   option-arm coverage gap is wide open for DDL
+#   options.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN BUG (CORRUPTION-class) — for
+#     whitelisted extensions, `CREATE EXTENSION
+#     <name> WITH SCHEMA s VERSION 'v' CASCADE`
+#     silently drops the ENTIRE option list. The
+#     SCHEMA target is NOT honored AND is NOT
+#     validated (NOSUCHSCHEMA is accepted). The
+#     VERSION pin is NOT honored AND is NOT
+#     validated (`'99.99'` for citext is accepted).
+#     CASCADE has no dependencies to act on (zeta
+#     never loads extensions). Do not rely on any
+#     of those clauses; assume the install was
+#     bare-form.
+#   # zeta-adapt: KNOWN GAP — `CREATE EXTENSION
+#     uuid-ossp` (unquoted, with embedded dash)
+#     errors 1064 at parser. Use the quoted form
+#     `CREATE EXTENSION "uuid-ossp"` — the
+#     quoted form is the only spelling zeta's
+#     parser accepts for dash-containing
+#     extension names. zeta's own help-text
+#     names `uuid-ossp` without warning that
+#     quoting is required.
+
+--echo === SHAPE A — WITH-clause silent-drop against WHITELISTED extension (CORRUPTION) ===
+
+# Baseline — bare-form whitelisted silent OK is
+# already pinned at create_extension_basic_extra:85.
+# Replayed here ONLY to anchor the contrast with the
+# WITH-form variants below.
+CREATE EXTENSION citext;
+
+# Each WITH-clause variant SILENTLY succeeds — the
+# SCHEMA / VERSION / CASCADE options are dropped on
+# the way through the dispatcher. The dispatcher
+# returns OK because the extension name IS in the
+# whitelist; the option list never reaches any
+# validator (there is none).
+CREATE EXTENSION citext WITH SCHEMA pg_catalog;
+CREATE EXTENSION citext WITH VERSION '1.0';
+CREATE EXTENSION citext WITH CASCADE;
+
+# DAMNING — nonsense VERSION accepted. citext has no
+# 99.99 release; PG would reject with
+# `ERROR: extension "citext" has no version "99.99"`.
+# zeta drops the clause and returns OK.
+CREATE EXTENSION citext WITH VERSION '99.99';
+
+# Three-option chain — SAME silent drop.
+CREATE EXTENSION citext WITH SCHEMA pg_catalog VERSION '1.0' CASCADE;
+
+--echo === SHAPE B — WITH SCHEMA against a NONEXISTENT schema (HEADLINE CORRUPTION) ===
+
+# The MOST damning evidence that zeta does no option
+# validation at all. The schema NOSUCHSCHEMA is not
+# in the catalog; PG would reject with
+# `ERROR: schema "nosuchschema" does not exist`.
+# zeta accepts the statement silently — the
+# migration script believes pgcrypto was relocated
+# to a schema that does not exist. Combined with
+# Shape A's nonsense-VERSION acceptance, this
+# establishes that zeta has ZERO option-validation
+# machinery for CREATE EXTENSION.
+CREATE EXTENSION pgcrypto WITH SCHEMA NOSUCHSCHEMA;
+
+--echo === SHAPE C — IF NOT EXISTS variants (same WITH-clause silent-drop) ===
+
+# IF NOT EXISTS is orthogonal to the WITH-clause
+# silent-drop. The bare-form IF NOT EXISTS swallow
+# is pinned at create_extension_basic_extra:90-91;
+# the novel evidence here is that adding a WITH
+# clause to an IF NOT EXISTS variant does NOT
+# change the behavior — still silent, still drops
+# the options.
+CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA pg_catalog;
+
+--echo === SHAPE D — Self-contradictory uuid-ossp parser-reject (unquoted dash form) ===
+
+# zeta's OWN unknown-extension help-text (pinned at
+# create_extension_basic_extra.result:13) names
+# `uuid-ossp` with the dash among the natively-
+# supported set. But the canonical PG spelling
+# `CREATE EXTENSION uuid-ossp` (unquoted) errors
+# 1064 at the parser — the dash is treated as a
+# binary operator after the `uuid` token. The
+# parser never reaches the dispatcher; the
+# help-text's claim that `uuid-ossp` is supported
+# is contradicted by the parser's refusal to
+# accept the canonical spelling.
+--error 1064
+CREATE EXTENSION uuid-ossp;
+
+# The quoted-identifier workaround DOES parse and
+# DOES reach the dispatcher's whitelist — pinned
+# at create_extension_basic_extra:82. Replayed here
+# ONLY to anchor the contrast: the SAME name, in
+# QUOTED form, silently succeeds. zeta's quoting
+# is the only escape hatch for dash-containing
+# extension names.
+CREATE EXTENSION "uuid-ossp";
+
+--echo === SHAPE E — DROP EXTENSION baseline (already pinned, anchor only) ===
+
+# DROP EXTENSION is ALWAYS a no-op — pinned at
+# create_extension_basic_extra:125-129. Replayed
+# once here ONLY to leave the test environment
+# clean and to anchor that the WITH-clause
+# silent-drop is on the CREATE side; DROP has no
+# WITH-clause grammar at all in PG, so there is no
+# analogous DROP shape to pin.
+DROP EXTENSION citext;
