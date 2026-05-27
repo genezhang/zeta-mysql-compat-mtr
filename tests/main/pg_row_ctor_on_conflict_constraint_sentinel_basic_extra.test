@@ -1,0 +1,190 @@
+# Independently authored sentinel slice combining
+# ROW(...) constructor in WHERE clause and INSERT ...
+# ON CONFLICT ON CONSTRAINT for the GPL MTR-format
+# runner. NOT copied or adapted from MySQL's mysql-test/
+# or PG regress.
+#
+# Existing coverage we are extending (not duplicating):
+#   - row_constructor_comparison_basic_extra pins
+#     ROW(...) function-mis-dispatch in SELECT-projection
+#     and top-level comparison contexts (`SELECT ROW(1,2)`,
+#     `SELECT ROW(1,2) = ROW(1,2)`). This slice adds the
+#     orthogonal WHERE-clause shape: does the SAME function-
+#     mis-dispatch fire when the ROW(...) is buried inside
+#     a WHERE predicate, or does the predicate context
+#     somehow route differently? Answer (pinned here): no
+#     — WHERE context has NO effect on the dispatch path;
+#     the function-lookup miss fires regardless.
+#   - insert_options_basic_extra acknowledges ON CONFLICT
+#     ON CONSTRAINT as a known gap in PROSE (lines 60-65)
+#     but explicitly defers byte-for-byte pinning ("not
+#     pinned byte-for-byte here due to runner adjacent-
+#     error coalescing"). This slice pins it byte-for-
+#     byte AND reveals a previously-undocumented wire-
+#     path divergence between the DO UPDATE and DO
+#     NOTHING arms.
+#
+# Wide-grep of tests/main/*.test for `WHERE.*ROW(` and
+# `ON CONFLICT ON CONSTRAINT` confirms NO prior byte-
+# level coverage of either combination.
+#
+# This slice pins TWO structural findings:
+#
+#   Finding 1 — ROW(...) function-mis-dispatch is context-
+#   independent (WHERE doesn't help):
+#     - `SELECT * FROM r WHERE ROW(a,b) = ROW(1,2)`,
+#       `WHERE ROW(a,b) < ROW(2,0)`, and `WHERE ROW(a,b)
+#       IS DISTINCT FROM ROW(2,0)` all error 1105 with
+#       the identical message "execution error: unknown
+#       function: ROW".
+#     - sqlparser routes `ROW(...)` through the regular
+#       Function AST node regardless of the surrounding
+#       expression context (projection / WHERE / HAVING /
+#       JOIN ON would all look the same). Zeta's
+#       expression dispatcher has no Expr::Row arm, so
+#       it falls through to function-name lookup, and
+#       "ROW" is not a registered function — hence the
+#       1105 catch-all from eval_function.
+#     - Even the IS DISTINCT FROM operator (which IS
+#       supported for scalar operands — see boolean_logic_
+#       basic_extra line 90, null_handling_basic_extra
+#       line 56) cannot save the ROW(...) form because
+#       the operand evaluation fails first.
+#     - CONTROL: bare-tuple `(a, b) IN ((1,2), (1,3))`
+#       in WHERE works — that's the supported PG-compat
+#       path via parse-rewrite (already pinned in
+#       subquery_basic:141-144).
+#
+#   Finding 2 — ON CONFLICT ON CONSTRAINT wire-path
+#   divergence between DO UPDATE and DO NOTHING:
+#     - `ON CONFLICT ON CONSTRAINT <name> DO NOTHING`
+#       errors 1064 with the HELPFUL zeta-side rewrite
+#       hint: "ON CONFLICT ON CONSTRAINT is not supported;
+#       use column list instead". This message points the
+#       user to the supported `ON CONFLICT (col) DO
+#       NOTHING` form (pinned in insert_options_basic_
+#       extra:80).
+#     - `ON CONFLICT ON CONSTRAINT <name> DO UPDATE SET
+#       ...` errors 1064 with a GENERIC sqlparser failure:
+#       "sql parser error: Expected: SET, found: ( at
+#       Line: 1, Column: 73". The helpful zeta-side hint
+#       NEVER FIRES because sqlparser rejects DO UPDATE
+#       SET BEFORE zeta's conflict-target validator runs.
+#       (Cross-check: `ON CONFLICT (id) DO UPDATE SET ...`
+#       fails with the SAME generic sqlparser shape at a
+#       different column, confirming DO UPDATE is the
+#       universally-failing arm.)
+#     - This is a wire-path divergence: the error-quality
+#       gap between the two forms is NOT intentional —
+#       it's an emergent property of the parse-order. To
+#       get the helpful message for DO UPDATE, the
+#       sqlparser DO UPDATE arm would need to be
+#       supported (it isn't), OR the helpful check would
+#       need to be hoisted earlier in the pipeline.
+#     - Positive contrast: the DO NOTHING form IS a
+#     positive example of error-message quality —
+#     telling the user exactly what to do — UNTIL you
+#     combine it with DO UPDATE, at which point the
+#     helpful message is masked.
+#
+# Big-picture finding:
+#
+#   Both PG idioms covered here (ROW(...) constructor in
+#   WHERE; named-constraint ON CONFLICT) fail. The ROW
+#   path fails uniformly with the same dispatch error
+#   regardless of context — an honest "unsupported" path.
+#   The ON CONFLICT path has a wire-divergence quirk
+#   where the helpful error-message is only reachable
+#   via the DO NOTHING arm; the DO UPDATE arm fails
+#   upstream with a generic parser shape.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — `ROW(...)` constructor in
+#     WHERE clause errors 1105 "unknown function: ROW".
+#     Same dispatch path as ROW(...) in SELECT (pinned
+#     in row_constructor_comparison_basic_extra). The
+#     WHERE context provides NO routing protection.
+#     Substitute by expanding to conjunctions:
+#     `ROW(a,b) = ROW(c,d)` → `a = c AND b = d`;
+#     `ROW(a,b) < ROW(c,d)` → `a < c OR (a = c AND b < d)`;
+#     `ROW(a,b) IS DISTINCT FROM ROW(c,d)` → `(a IS
+#     DISTINCT FROM c) OR (b IS DISTINCT FROM d)`.
+#   # zeta-adapt: SUPPORTED — bare-tuple `(a, b) IN
+#     ((v1,v2), (v3,v4))` in WHERE clause via the
+#     parse-rewrite path. Use this for tuple-equality
+#     enumeration in lieu of ROW(...) comparisons.
+#   # zeta-adapt: WIRE-DIVERGENCE — `ON CONFLICT ON
+#     CONSTRAINT <name> DO NOTHING` errors 1064 with a
+#     helpful zeta-side hint pointing to the column-list
+#     form. But `ON CONFLICT ON CONSTRAINT <name> DO
+#     UPDATE SET ...` errors 1064 with a generic
+#     sqlparser failure because the DO UPDATE arm is
+#     rejected BEFORE the helpful check fires. Use
+#     `ON CONFLICT (col) DO NOTHING` (supported) or
+#     MySQL `ON DUPLICATE KEY UPDATE` (already pinned
+#     in insert_basic) instead of the ON CONFLICT
+#     ON CONSTRAINT form.
+
+CREATE TABLE r (a INT, b INT, c TEXT);
+INSERT INTO r VALUES (1, 2, 'x'), (1, 3, 'y'), (2, 2, 'z');
+
+--echo === Finding 1 — Shape A: WHERE ROW(a,b) = ROW(1,2) → 1105 unknown function: ROW ===
+
+--error 1105
+SELECT a, b, c FROM r WHERE ROW(a, b) = ROW(1, 2);
+
+--echo === Finding 1 — Shape B: WHERE ROW(a,b) < ROW(2,0) (lex inequality) → 1105 unknown function: ROW ===
+
+--error 1105
+SELECT a, b, c FROM r WHERE ROW(a, b) < ROW(2, 0);
+
+--echo === Finding 1 — Shape C: WHERE ROW(a,b) IS DISTINCT FROM ROW(2,0) → 1105 unknown function: ROW ===
+
+# IS DISTINCT FROM is supported for scalars (see
+# null_handling_basic_extra:56) but the ROW(...) operand
+# evaluation fails first, so the operator never runs.
+--error 1105
+SELECT a, b, c FROM r WHERE ROW(a, b) IS DISTINCT FROM ROW(2, 0);
+
+--echo === Finding 1 — Control: bare-tuple (a,b) IN (...) in WHERE → SUPPORTED ===
+
+# Demonstrates the supported PG-compat path via parse-
+# rewrite. Two rows match the literal tuples.
+SELECT a, b, c FROM r WHERE (a, b) IN ((1, 2), (1, 3)) ORDER BY a, b, c;
+
+DROP TABLE r;
+
+CREATE TABLE oc (id INT, v INT, CONSTRAINT oc_pk PRIMARY KEY (id));
+INSERT INTO oc VALUES (1, 10);
+
+--echo === Finding 2 — Shape A: ON CONFLICT ON CONSTRAINT ... DO UPDATE → generic sqlparser error (DO UPDATE arm masks helpful hint) ===
+
+# sqlparser rejects `DO UPDATE` BEFORE zeta's
+# conflict-target validator can fire its helpful
+# message. Column 73 is the `(` of `EXCLUDED.v`'s
+# qualifier — sqlparser expected `SET` and got the
+# wrong token while parsing the unsupported DO UPDATE
+# arm.
+--error 1064
+INSERT INTO oc VALUES (1, 20) ON CONFLICT ON CONSTRAINT oc_pk DO UPDATE SET v = EXCLUDED.v;
+
+--echo === Finding 2 — Shape B: ON CONFLICT ON CONSTRAINT ... DO NOTHING → helpful zeta hint ===
+
+# The helpful zeta-side check fires here because DO
+# NOTHING parses cleanly through sqlparser, reaching
+# zeta's conflict-target validator which rejects the
+# named-constraint form with a workaround pointer.
+--error 1064
+INSERT INTO oc VALUES (1, 30) ON CONFLICT ON CONSTRAINT oc_pk DO NOTHING;
+
+--echo === Finding 2 — Cross-check: ON CONFLICT (col) DO UPDATE → same generic sqlparser error (DO UPDATE is the universally-failing arm) ===
+
+# Same sqlparser shape at a different column (58 vs 73)
+# — the constraint-target form is irrelevant; DO UPDATE
+# itself is unsupported across the board. Confirms
+# Shape A's failure is the DO UPDATE arm, not the
+# constraint-target arm.
+--error 1064
+INSERT INTO oc VALUES (1, 99) ON CONFLICT (id) DO UPDATE SET v = EXCLUDED.v;
+
+DROP TABLE oc;
