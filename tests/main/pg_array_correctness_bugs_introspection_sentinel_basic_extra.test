@@ -1,0 +1,293 @@
+# Independently authored PG ARRAY multi-dim shape-
+# tracking CORRUPTION-class sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/.
+#
+# Existing coverage (read carefully — DO NOT duplicate):
+#   - 1D `cardinality(ARRAY[1,2,3])` and
+#     `cardinality(ARRAY[]::INT[])`: pinned at
+#     array_type_basic_extra.test:135-138 / .result:80-86.
+#     ONLY 1D shapes. The multi-dim shape (where the bug
+#     surfaces) is genuinely ZERO prior.
+#   - 1D `array_length(arr, 1)` shapes: pinned across
+#     array_type_basic_extra (via `ARRAY_LENGTH(...,1)`
+#     idiom at lines 2-12) and array_subscript_anyall_
+#     basic_extra. NO prior coverage of `array_length(arr,
+#     dim>1)` on a multi-dim literal — the shape that
+#     would reveal the missing inner-axis tracking.
+#   - 1D `array_dims(ARRAY[1,2,3])` and
+#     `array_ndims(ARRAY[1,2,3])`: pinned as "unknown
+#     function" at array_subscript_anyall_basic_extra.
+#     test:115-117 / .result:21-25. The 1D shape ERRORS
+#     at name lookup before arg evaluation, so multi-dim
+#     versions of those two calls collapse to the
+#     IDENTICAL "unknown function" fingerprint — NOT
+#     re-pinned here (would be a same-fingerprint
+#     duplicate per the gap-scan rule).
+#   - `generate_subscripts(arr, dim)` set-returning
+#     function: ZERO prior across `tests/main/*.test`.
+#     This slice pins it.
+#   - `= ANY(ARRAY[...])` match + no-match shapes:
+#     INT-not-found (`9 = ANY(...)` → 0), TEXT-not-found
+#     (`'z' = ANY(...)` → 0), NULL-handling, `= ALL`
+#     match/no-match: ALL pinned at array_type_basic_
+#     extra.test:80-90 and array_subscript_anyall_basic_
+#     extra.test:92-95. A stale probe note suggested
+#     `5 = ANY(ARRAY[1,2,3])` errored; re-probed via
+#     mysqlwire — it returns `0` correctly, MATCHING the
+#     `9 = ANY` pin already in place. NO new bug to
+#     pin on the ANY path. (Per the don't-fabricate
+#     rule: a stale finding that doesn't reproduce is
+#     dropped, not pinned as fake.)
+#
+# Genuinely ZERO prior coverage on these shapes (grep
+# verified across `tests/main/*.test` for `cardinality\(`,
+# `array_length\(.*, *[2-9]\)`, `generate_subscripts`):
+#   - `cardinality(arr)` on a multi-dim literal (2D, 3D).
+#   - `array_length(multi_dim, 2+)` — querying the size
+#     of any axis OTHER than dim=1.
+#   - `array_upper(multi_dim, 2+)` / `array_lower(multi_
+#     dim, 2+)` — same axis-shape introspection family.
+#   - `generate_subscripts(arr, dim)` in EITHER FROM-
+#     clause (SRF) or SELECT-scalar position.
+#
+# Pre-existing pattern fingerprints this slice joins:
+#   - CORRUPTION-class family (silent wrong result, no
+#     error, no warning, output structurally a valid
+#     INTEGER): PR #421 (DEFAULT subquery stored as text
+#     literal), PR #432 (TIMESTAMP(n) precision silent-
+#     drop), PR #438 (EXPLAIN option modifiers FORMAT/
+#     ANALYZE/BUFFERS silent-drop), PR #440 (PG printf-
+#     style `format()` silently re-routed to MySQL
+#     numeric FORMAT), PR #441 (`to_char()` partial-
+#     impl format codes kept LITERALLY). Shared
+#     mechanism: the wire reports success, the value
+#     LOOKS LIKE a plausible answer, but the content is
+#     wrong against PG semantics. Particularly hard to
+#     catch in eyeballed test runs because the 1D case
+#     accidentally produces the right number.
+#   - Two-fingerprint SRF-vs-scalar dispatch family:
+#     PR #423 (`pg_get_keywords()`) and PR #435 (MySQL
+#     @var/@@sysvar SET-vs-SELECT paths). `generate_
+#     subscripts` joins this family: in FROM position
+#     the SRF dispatcher errors UPPER-cased
+#     ("GENERATE_SUBSCRIPTS"); in SELECT scalar
+#     position the regular scalar dispatcher errors
+#     lower-cased ("generate_subscripts"). Two error
+#     paths, two normalization conventions, one
+#     missing implementation.
+#
+# THE ROOT-CAUSE BUG (CORRUPTION class):
+#
+#   PG arrays preserve full multi-dimensional shape:
+#   `ARRAY[[1,2],[3,4]]` is a 2x2 array of INT with
+#   `array_dims` = `[1:2][1:2]`, `array_ndims` = 2,
+#   `cardinality` = 4 (TOTAL element count across all
+#   dimensions), `array_length(arr, 1)` = 2,
+#   `array_length(arr, 2)` = 2.
+#
+#   In zeta, multi-dim ARRAY literals appear to parse
+#   and store as nested-array values (the
+#   `pg_named_window_multidim_array_support_sentinel`
+#   slice pins that the constructor accepts them and
+#   the wire renders the nested Debug repr), BUT the
+#   axis-shape metadata is NOT tracked as PG semantics
+#   would require:
+#
+#     (a) `cardinality()` returns the OUTER-dimension
+#         length only — NOT the total element count.
+#         For `ARRAY[[1,2],[3,4],[5,6]]`: PG → 6, zeta
+#         → 3. The 1D case (`cardinality(ARRAY[1,2,3])`
+#         = 3) accidentally produces the right number
+#         because total-elements == outer-dim-length
+#         when ndims=1.
+#
+#     (b) `array_length(arr, dim)` returns NULL for
+#         dim>1 regardless of whether the input is
+#         actually multi-dim. The 1D output `NULL` for
+#         `array_length(ARRAY[1,2,3], 2)` matches PG
+#         (a 1D array has no second axis). The 2D
+#         output `NULL` for `array_length(ARRAY[[1,2],
+#         [3,4]], 2)` DOES NOT match PG (PG → 2). One
+#         shape-fingerprint, two semantic meanings —
+#         the OK-on-1D pin masks the WRONG-on-2D bug.
+#         Same root cause: the inner-axis metadata is
+#         absent from the stored value.
+#
+#     (c) `array_upper(arr, 2)` / `array_lower(arr, 2)`
+#         on a 2D literal exhibit the same NULL-on-
+#         dim>1 behavior. Same root cause.
+#
+#   The shape-tracking gap is uniform: a multi-dim
+#   literal is stored as a nested Array Value with
+#   element-type Array(T), but the introspection
+#   functions only inspect the outer Vec length. Inner
+#   axis sizes are never computed or stored. The bug
+#   class is CORRUPTION (silent-wrong-result, not gap
+#   error) because the OUTPUT TYPE is INTEGER (the same
+#   type PG returns), so downstream type-aware code
+#   accepts it without complaint.
+#
+#   Apps affected: any port from PG that uses
+#   `cardinality(multi_dim)` to compute total element
+#   counts (very common in array-storage analytics);
+#   any code that uses `array_length(arr, 2)` /
+#   `array_upper(arr, 2)` to iterate the inner axis
+#   of a 2D matrix/grid. Silent wrong counts get
+#   propagated into report templates, loop bounds,
+#   buffer-allocation sizes — anywhere the 1D pin
+#   happened to "look right" in eyeballed testing.
+#
+# THE INTROSPECTION GAP (UNKNOWN-FN class):
+#
+#   `generate_subscripts(arr, dim)` is the PG set-
+#   returning function that yields each valid
+#   subscript value for the given axis. It is the
+#   canonical PG idiom for iterating an array with
+#   the index in scope:
+#
+#     SELECT i, arr[i] FROM generate_subscripts(arr, 1) g(i);
+#
+#   In zeta it dispatches through two distinct error
+#   paths depending on call-site position:
+#
+#     (i) FROM-clause SRF call:
+#         `FROM generate_subscripts(ARRAY['a','b','c'], 1)`
+#         → "plan error: unknown set-returning function:
+#         GENERATE_SUBSCRIPTS" (UPPER-cased — the SRF
+#         dispatcher normalizes the name).
+#
+#     (ii) SELECT-scalar call:
+#         `SELECT generate_subscripts(ARRAY[10,20,30], 1)`
+#         → "execution error: unknown function:
+#         generate_subscripts" (lower-cased — the scalar
+#         dispatcher preserves the source casing).
+#
+#   Two error paths, two normalization conventions,
+#   one missing implementation. Same two-fingerprint
+#   dispatch witness as PR #423 (`pg_get_keywords`)
+#   and PR #435 (MySQL `@var`/`@@sysvar`).
+#
+# Adaptation notes:
+#   # zeta-adapt: BUG — `cardinality(multi_dim)` returns
+#     OUTER-dim length, not total element count. The 1D
+#     case (`cardinality(ARRAY[1,2,3])` = 3) accidentally
+#     works because outer-dim == total when ndims=1.
+#     Substitute (until fixed): for 2D arrays, compute
+#     `array_length(arr,1) * array_length(arr,2)` —
+#     except this ALSO fails (see next note). The only
+#     reliable substitute is to track total counts
+#     out-of-band at insertion time.
+#   # zeta-adapt: BUG — `array_length(multi_dim, dim>=2)`
+#     returns NULL regardless of whether the inner axis
+#     exists. Same root cause: inner-axis metadata
+#     absent. No reliable substitute in pure SQL;
+#     iterate the OUTER axis and treat each row's inner
+#     array as a separate 1D array
+#     (`array_length(arr[i], 1)`).
+#   # zeta-adapt: BUG — `array_upper(multi_dim, dim>=2)`
+#     / `array_lower(multi_dim, dim>=2)` exhibit the same
+#     NULL-on-inner-axis behavior. Same substitute as
+#     `array_length`.
+#   # zeta-adapt: GAP — `generate_subscripts(arr, dim)`
+#     unimplemented in both FROM and SELECT positions.
+#     Substitute: `FROM generate_series(1, array_length(
+#     arr, 1)) g(i)` — gives 1-based subscripts for the
+#     OUTER axis; combine with `arr[i]` for value
+#     access. Note: this substitute uses
+#     `array_length(arr, 1)` which IS correct for the
+#     outer axis (the bug only affects dim>=2).
+#
+# Wire divergence check: probed both wires. Both
+# `cardinality()` and `array_length()` are scalar
+# functions resolved in the planner (wire-independent);
+# both wires return identical numeric output (and
+# identical wrong output). The `generate_subscripts`
+# dispatch error originates in the planner SRF
+# resolver and scalar resolver, also wire-independent.
+# Pinning on the mysqlwire path is sufficient.
+
+--echo === CONTROL — cardinality 1D works (accidentally — outer-dim == total when ndims=1) ===
+
+# Pinned at array_type_basic_extra.test:137 already.
+# Re-asserted here as the IMMEDIATE control adjacent
+# to the multi-dim BUG pin, so the regression diff
+# shows "1D OK, 2D wrong" side-by-side on a single
+# screen.
+SELECT cardinality(ARRAY[1, 2, 3]) AS c_1d;
+
+--echo === BUG #1 (CORRUPTION) — cardinality 2D returns OUTER-dim count, not total elements ===
+
+# PG: 6 (3 rows * 2 cols = 6 total elements).
+# zeta: 3 (outer-dim length only — the inner [1,2]
+# / [3,4] / [5,6] sub-arrays are treated as opaque
+# elements). Silent wrong result; output type is
+# INTEGER, downstream type-aware code accepts it.
+SELECT cardinality(ARRAY[[1, 2], [3, 4], [5, 6]]) AS c_2d_3x2;
+
+# PG: 6 (2 rows * 3 cols = 6).
+# zeta: 2 (outer-dim length only).
+# Confirms the bug is "outer-dim length" not "first
+# inner length" — the orientation swap (2x3 vs 3x2)
+# changes the wrong answer in the predictable way.
+SELECT cardinality(ARRAY[[1, 2, 3], [4, 5, 6]]) AS c_2d_2x3;
+
+# PG: 8 (2 * 2 * 2 = 8 total).
+# zeta: 2 (outermost length only). Confirms the bug
+# scales to higher dimensions — only the outermost
+# Vec length is read.
+SELECT cardinality(ARRAY[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]) AS c_3d_2x2x2;
+
+--echo === CONTROL — array_length 1D works (and dim=2 correctly returns NULL) ===
+
+# 1D, axis=1: 5. CORRECT (matches PG).
+SELECT array_length(ARRAY[1, 2, 3, 4, 5], 1) AS al_1d_dim1;
+
+# 1D, axis=2: NULL. CORRECT (matches PG — a 1D array
+# has no second axis). Same observable as the 2D-dim-2
+# BUG below, but here it is the CORRECT answer. The
+# bug only surfaces when the input HAS a second axis
+# yet zeta still returns NULL — see next block.
+SELECT array_length(ARRAY[1, 2, 3, 4, 5], 2) AS al_1d_dim2_correct_null;
+
+--echo === BUG #2 (CORRUPTION, same root cause) — array_length(multi_dim, dim>=2) returns NULL despite inner axis existing ===
+
+# 2D, axis=1: 2 (outer-dim length). CORRECT.
+# 2D, axis=2: NULL. WRONG — PG returns 2 (each row
+# has 2 elements). zeta does not track inner-axis
+# metadata, so dim>=2 collapses to NULL regardless of
+# whether the inner axis actually exists.
+SELECT array_length(ARRAY[[1, 2], [3, 4]], 1) AS al_2d_dim1_ok,
+       array_length(ARRAY[[1, 2], [3, 4]], 2) AS al_2d_dim2_wrong_null;
+
+# 2D, axis=2 on a 2x3 shape: zeta NULL, PG 3.
+# Same fingerprint, different inner-axis size to
+# confirm the bug is not "always returns NULL when
+# dim=2 even if true axis size happens to be NULL".
+SELECT array_length(ARRAY[[1, 2, 3], [4, 5, 6]], 2) AS al_2d_dim2_wrong_null_3;
+
+# array_upper / array_lower on dim=2 exhibit the
+# same NULL-on-inner-axis behavior — confirming the
+# root cause is shared across the axis-introspection
+# family (one shape-tracking gap surfaces in three
+# different functions).
+SELECT array_upper(ARRAY[[1, 2], [3, 4]], 2) AS au_2d_dim2_wrong_null,
+       array_lower(ARRAY[[1, 2], [3, 4]], 2) AS al_2d_dim2_lower_wrong_null;
+
+--echo === GAP (two-fingerprint) — generate_subscripts(arr, dim) ===
+
+# FROM-clause SRF: planner SRF dispatcher errors with
+# the name UPPER-cased ("GENERATE_SUBSCRIPTS"). Same
+# normalization convention as the
+# pg_create_function_non_trigger_sentinel SRF pin
+# ("SRF") and PR #423 (pg_get_keywords).
+--error 1105
+SELECT * FROM generate_subscripts(ARRAY['a', 'b', 'c'], 1) AS g(i);
+
+# SELECT scalar position: scalar dispatcher errors
+# with the name LOWER-cased ("generate_subscripts").
+# Different error path, different normalization
+# convention, same missing implementation. Two-
+# fingerprint pattern witness (PR #423, PR #435).
+--error 1105
+SELECT generate_subscripts(ARRAY[10, 20, 30], 1) AS s;
