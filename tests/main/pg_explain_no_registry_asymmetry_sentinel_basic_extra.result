@@ -1,0 +1,74 @@
+=== Setup ===
+DROP TABLE IF EXISTS e;
+CREATE TABLE e (id INT PRIMARY KEY, v INT);
+INSERT INTO e VALUES (1, 10), (2, 20);
+=== SHAPE A — parenthesized EXPLAIN: ANY option silently accepted (no registry) ===
+=== Shape A1: (GENERIC_PLAN) — PG16+ option silently accepted ===
+EXPLAIN (GENERIC_PLAN) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A2: (GENERIC_PLAN TRUE) — boolean-arg form silently accepted ===
+EXPLAIN (GENERIC_PLAN TRUE) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A3: (MEMORY) — PG17+ option silently accepted ===
+EXPLAIN (MEMORY) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A4: (SUMMARY) — PG13+ option silently accepted ===
+EXPLAIN (SUMMARY) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A5: (SUMMARY TRUE) — boolean-arg form silently accepted ===
+EXPLAIN (SUMMARY TRUE) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A6: (TIMING) — PG13+ option silently accepted ===
+EXPLAIN (TIMING) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A7: (WAL) — PG13+ option silently accepted ===
+EXPLAIN (WAL) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A8: (WAL, ANALYZE) — multi-option list silently accepted ===
+EXPLAIN (WAL, ANALYZE) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A9: (FORMAT YAML, MEMORY ON) — FORMAT + PG17+ option silently accepted ===
+EXPLAIN (FORMAT YAML, MEMORY ON) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A10: (NOSUCHOPT) — HEADLINE: fabricated option name silently accepted ===
+EXPLAIN (NOSUCHOPT) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Shape A11: 6-option chain — every real PG option silently accepted ===
+EXPLAIN (ANALYZE, BUFFERS, VERBOSE, COSTS OFF, SUMMARY, TIMING) SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== SHAPE B — top-level (no parens) form: grammar asymmetry, strict whitelist ===
+=== Shape B1: top-level GENERIC_PLAN — 1064 at SELECT (Column 30) ===
+EXPLAIN ANALYZE GENERIC_PLAN SELECT * FROM e;
+ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: SELECT at Line: 1, Column: 30
+=== Shape B2: top-level comma — 1064 at comma (Column 16) ===
+EXPLAIN ANALYZE, BUFFERS SELECT * FROM e;
+ERROR 1064: SQL parse error: sql parser error: Expected: identifier, found: , at Line: 1, Column: 16
+=== SHAPE C — SUPPORT: bare EXPLAIN baseline (re-pin from explain_basic_extra) ===
+EXPLAIN SELECT * FROM e;
+QUERY PLAN
+SeqScan (e) [id, v]
+  (cost=1.00 rows=0)
+=== Cleanup ===
+DROP TABLE e;

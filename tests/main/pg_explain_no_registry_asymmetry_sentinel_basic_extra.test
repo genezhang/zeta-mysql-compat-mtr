@@ -1,0 +1,269 @@
+# Independently authored PG EXPLAIN no-option-registry +
+# parens-vs-top-level grammar asymmetry sentinel slice
+# for the GPL MTR-format runner. NOT copied or adapted
+# from MySQL's mysql-test/ or PG regress.
+#
+# THIRD "no registry" witness in the series:
+#   - PR #458 — pg_create_function_language_params_sentinel
+#     pinned that CREATE FUNCTION accepts ANY LANGUAGE tag
+#     including `LANGUAGE nosuchlang`. No per-tag registry.
+#   - PR #459 — pg_database_no_option_registry_sentinel
+#     pinned that CREATE/ALTER DATABASE accepts EVERY option
+#     keyword including `NOSUCHOPT` and the entire fabricated
+#     option set. No per-option registry.
+#   - THIS SLICE — EXPLAIN's parenthesized option list
+#     accepts EVERY option name including `NOSUCHOPT`,
+#     ALL PG13+/16+/17+ options, and arbitrary 6-option
+#     chains. No per-option registry. The third witness
+#     confirms a STRUCTURAL pattern, not a one-off oversight.
+#
+# Adjacent EXPLAIN coverage (do NOT duplicate):
+#   - explain_basic_extra (PR earlier) — pins SeqScan /
+#     HashJoin / UPDATE / DELETE plan-tree shapes, PG-style
+#     `EXPLAIN (VERBOSE)` no-op stability, and the MySQL
+#     `EXPLAIN FORMAT=JSON` no-op stability. Does NOT cover
+#     PG13+/16+/17+ options or the no-registry headline.
+#   - explain_format_basic_extra — pins `(FORMAT YAML)`,
+#     `(FORMAT XML)`, `(FORMAT JUNK)`, `(ANALYZE, BUFFERS)`,
+#     `(BUFFERS)`, `(COSTS OFF)`, `(SETTINGS)`, plus the
+#     `EXPLAIN ANALYZE INSERT/UPDATE/DELETE` 1105 errno path.
+#     `(FORMAT JUNK)` is the closest prior witness to
+#     "arbitrary option name accepted" — BUT it only proves
+#     that the FORMAT-arg slot is unvalidated, not that the
+#     option-keyword slot itself is registry-less.
+#   - pg_explain_format_silent_drop_bug_sentinel — pins the
+#     CORRUPTION-class angle: `(FORMAT JSON)` returns TEXT
+#     plan, not JSON. Different finding — that's a SILENT-
+#     DROP of a valid option, not a no-registry accept of
+#     an INVALID option name.
+#
+# Pre-author dedup grep on tests/main/*.test for
+# `EXPLAIN.*\(.*(GENERIC_PLAN|MEMORY|SUMMARY|TIMING|WAL|
+# NOSUCHOPT)|EXPLAIN ANALYZE GENERIC|EXPLAIN ANALYZE,`:
+# ZERO hits. Greenfield slice.
+#
+# This slice pins THREE structural findings:
+#
+#   FINDING 1 — THIRD NO-REGISTRY WITNESS. EXPLAIN's
+#   parenthesized option list silently accepts ANY
+#   identifier as an option name, including the fabricated
+#   `NOSUCHOPT` (Shape A10 — the headline). This is the
+#   exact same mechanism witnessed in PR #458 (LANGUAGE
+#   tag) and PR #459 (CREATE/ALTER DATABASE options): the
+#   parser absorbs the identifier into the AST as a free-
+#   form token and the IR-conversion layer never consults
+#   a per-option registry. Three independent statement
+#   types (CREATE FUNCTION, CREATE/ALTER DATABASE, EXPLAIN)
+#   share the same no-registry shape — this is a
+#   structural pattern in zeta's parser, not a per-
+#   statement oversight. Apps that rely on PG's strict
+#   option-name validation (e.g., tooling that
+#   programmatically generates EXPLAIN options based on
+#   user input) will silently see the bad option NOT
+#   error, but ALSO not take effect — see Finding 2.
+#
+#   FINDING 2 — PG13+/16+/17+ FEATURE VISIBILITY GAP.
+#   Five real PG options that were added in PG13 or
+#   later — GENERIC_PLAN (PG16+), MEMORY (PG17+), SUMMARY
+#   (PG13+), TIMING (PG13+), WAL (PG13+) — all silently
+#   accept WITHOUT producing the metrics the user
+#   requested. Output is the same `SeqScan (e) [id, v]` +
+#   cost row that bare EXPLAIN emits (Shape C). For PG
+#   users porting tooling that relies on SUMMARY/TIMING/
+#   MEMORY/WAL metrics for performance triage (the entire
+#   reason those options were added), the queries return
+#   NO error and NO data — a CORRUPTION-class failure
+#   mode for performance-tuning workflows. Shape A11
+#   (6-option chain `ANALYZE, BUFFERS, VERBOSE, COSTS
+#   OFF, SUMMARY, TIMING`) demonstrates that even
+#   real-world combinations from PG documentation
+#   examples silently degrade to bare-EXPLAIN output.
+#
+#   FINDING 3 — PARENS-vs-TOP-LEVEL GRAMMAR ASYMMETRY.
+#   The top-level (no parens) EXPLAIN form has a STRICT
+#   whitelist limited to ANALYZE and VERBOSE keywords;
+#   any other keyword and any comma-separator triggers a
+#   1064 parse error. Shape B1 (`EXPLAIN ANALYZE
+#   GENERIC_PLAN SELECT * FROM e`) errors at Column 30
+#   — `GENERIC_PLAN` is absorbed as an identifier after
+#   `EXPLAIN ANALYZE`, then SELECT chokes at the next
+#   token. Shape B2 (`EXPLAIN ANALYZE, BUFFERS SELECT *
+#   FROM e`) errors at Column 16 — the comma after
+#   ANALYZE is not allowed at top level (commas are
+#   parens-only). TWO DIFFERENT PARSER CODE PATHS for
+#   the same EXPLAIN feature: the parens form has no
+#   registry at all (accepts everything), the top-level
+#   form has a tight whitelist (rejects everything but
+#   ANALYZE/VERBOSE). This asymmetry pairs with
+#   pre-existing patterns like
+#   `[[project_two_layer_type_recognition_pattern]]` (the
+#   type parser and CAST dispatcher are out of sync) —
+#   same feature, different fingerprints, different
+#   paths.
+#
+# Big-picture finding:
+#
+#   The "no registry" pattern is now confirmed across
+#   THREE independent statement families. zeta's parser
+#   has a consistent design choice (or oversight) of
+#   absorbing optional keyword lists as free-form
+#   identifiers without per-keyword validation. Combined
+#   with PR #458, PR #459 and this slice, the pattern is
+#   structural: any future statement that takes a
+#   parenthesized option list should be assumed to have
+#   no registry until proven otherwise.
+#
+#   The parens-vs-top-level asymmetry in EXPLAIN adds a
+#   second axis: even WITHIN a single statement type,
+#   different syntactic shapes for the same feature can
+#   take entirely different parser paths with entirely
+#   different validation policies. PG porting tools that
+#   verify "EXPLAIN works" by probing the top-level form
+#   will get a STRICTER answer than reality — apps
+#   actually use the parens form (the only form PG
+#   recommends since 9.0), which has zero validation.
+#
+# Wire-divergence check:
+#   This slice is mysqlwire-canonical (the MTR runner is
+#   the only probe). The EXPLAIN-option-list parser sits
+#   in the shared statement parser, so pgwire is
+#   expected to exhibit the same no-registry behavior;
+#   not independently confirmed here.
+#
+# Adaptation notes:
+#   # zeta-adapt: NO EXPLAIN OPTION REGISTRY — the
+#     parenthesized `EXPLAIN (...)` option list silently
+#     accepts ANY identifier as an option name, including
+#     `NOSUCHOPT` and all PG13+/16+/17+ options
+#     (GENERIC_PLAN, MEMORY, SUMMARY, TIMING, WAL). The
+#     options have no effect — output is identical to
+#     bare `EXPLAIN`. NO error, NO warning. Apps relying
+#     on PG's strict option validation MUST validate
+#     option names themselves before issuing against
+#     zeta. THIRD "no registry" witness after PR #458
+#     (LANGUAGE tag) and PR #459 (DATABASE options).
+#   # zeta-adapt: PARENS-vs-TOP-LEVEL ASYMMETRY — the
+#     top-level (no parens) EXPLAIN form has a strict
+#     whitelist (ANALYZE, VERBOSE only). Other keywords
+#     and commas at top level error 1064. The parens
+#     form has no whitelist at all. Two parser paths,
+#     two validation policies, one feature.
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS e;
+CREATE TABLE e (id INT PRIMARY KEY, v INT);
+INSERT INTO e VALUES (1, 10), (2, 20);
+
+--echo === SHAPE A — parenthesized EXPLAIN: ANY option silently accepted (no registry) ===
+
+# All 11 rows return the SAME `SeqScan (e) [id, v]` +
+# cost row that bare EXPLAIN emits (see Shape C). The
+# parenthesized option lists are evaluated as a noop —
+# the actual plan output is unchanged from the baseline.
+
+--echo === Shape A1: (GENERIC_PLAN) — PG16+ option silently accepted ===
+
+EXPLAIN (GENERIC_PLAN) SELECT * FROM e;
+
+--echo === Shape A2: (GENERIC_PLAN TRUE) — boolean-arg form silently accepted ===
+
+EXPLAIN (GENERIC_PLAN TRUE) SELECT * FROM e;
+
+--echo === Shape A3: (MEMORY) — PG17+ option silently accepted ===
+
+EXPLAIN (MEMORY) SELECT * FROM e;
+
+--echo === Shape A4: (SUMMARY) — PG13+ option silently accepted ===
+
+EXPLAIN (SUMMARY) SELECT * FROM e;
+
+--echo === Shape A5: (SUMMARY TRUE) — boolean-arg form silently accepted ===
+
+EXPLAIN (SUMMARY TRUE) SELECT * FROM e;
+
+--echo === Shape A6: (TIMING) — PG13+ option silently accepted ===
+
+EXPLAIN (TIMING) SELECT * FROM e;
+
+--echo === Shape A7: (WAL) — PG13+ option silently accepted ===
+
+EXPLAIN (WAL) SELECT * FROM e;
+
+--echo === Shape A8: (WAL, ANALYZE) — multi-option list silently accepted ===
+
+EXPLAIN (WAL, ANALYZE) SELECT * FROM e;
+
+--echo === Shape A9: (FORMAT YAML, MEMORY ON) — FORMAT + PG17+ option silently accepted ===
+
+EXPLAIN (FORMAT YAML, MEMORY ON) SELECT * FROM e;
+
+--echo === Shape A10: (NOSUCHOPT) — HEADLINE: fabricated option name silently accepted ===
+
+# The MOST DAMNING shape in the slice — `NOSUCHOPT` is
+# a fabricated identifier that does not exist in any PG
+# version. zeta accepts it without error. PROOF that no
+# per-option registry exists; the parser absorbs the
+# token as a free-form identifier and the IR-conversion
+# layer never reads the field. This is the third
+# "NOSUCHOPT silently accepted" finding in the series
+# after PR #458 (LANGUAGE nosuchlang) and PR #459
+# (DATABASE NOSUCHOPT).
+
+EXPLAIN (NOSUCHOPT) SELECT * FROM e;
+
+--echo === Shape A11: 6-option chain — every real PG option silently accepted ===
+
+# Real-world PG documentation example shape. ALL SIX
+# options silently noop. Output identical to bare
+# EXPLAIN — no ANALYZE side-effect (query NOT executed),
+# no BUFFERS metrics, no VERBOSE detail, COSTS still
+# shown (not OFF), no SUMMARY footer, no TIMING column.
+# CORRUPTION-class for PG users porting performance-
+# triage workflows.
+
+EXPLAIN (ANALYZE, BUFFERS, VERBOSE, COSTS OFF, SUMMARY, TIMING) SELECT * FROM e;
+
+--echo === SHAPE B — top-level (no parens) form: grammar asymmetry, strict whitelist ===
+
+# The top-level form rejects every keyword and separator
+# that the parens form accepts. Two parser code paths,
+# two validation policies. Apps probing only the top-
+# level form get a STRICTER picture than the real one.
+
+--echo === Shape B1: top-level GENERIC_PLAN — 1064 at SELECT (Column 30) ===
+
+# `GENERIC_PLAN` (12 chars) is absorbed as an identifier
+# after `EXPLAIN ANALYZE ` (16 chars including space).
+# Position: 16 + 12 + 1 (space) = Column 29, SELECT at
+# Column 30. The next token (SELECT) chokes because the
+# top-level form is now in "expecting end-of-statement"
+# state after consuming the trailing identifier.
+
+--error 1064
+EXPLAIN ANALYZE GENERIC_PLAN SELECT * FROM e;
+
+--echo === Shape B2: top-level comma — 1064 at comma (Column 16) ===
+
+# Position: `EXPLAIN ANALYZE` is 15 chars, comma at
+# Column 16. The top-level parser is in "expecting
+# identifier" state after ANALYZE (probably trying to
+# parse a second top-level keyword like VERBOSE); the
+# comma is rejected because commas are valid ONLY
+# inside the parens form.
+
+--error 1064
+EXPLAIN ANALYZE, BUFFERS SELECT * FROM e;
+
+--echo === SHAPE C — SUPPORT: bare EXPLAIN baseline (re-pin from explain_basic_extra) ===
+
+# Re-pinned to make the no-registry story self-contained:
+# every Shape A row produces the EXACT SAME output as
+# this baseline. The option clauses are evaluated as a
+# pure noop.
+
+EXPLAIN SELECT * FROM e;
+
+--echo === Cleanup ===
+
+DROP TABLE e;
