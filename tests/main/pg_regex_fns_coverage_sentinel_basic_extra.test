@@ -1,0 +1,164 @@
+# Independently authored PG-flavor regex function
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# Existing coverage (do NOT duplicate):
+#   - regexp_matches / regexp_match: ZERO prior
+#     compat-mtr coverage. grep'd all tests/main/*.test
+#     — no hits.
+#   - regexp_split_to_array: ZERO prior coverage.
+#   - regexp_split_to_table: ZERO prior coverage.
+#   - regexp_family_basic_extra covers MySQL-flavor
+#     REGEXP_LIKE / REGEXP_INSTR / REGEXP_SUBSTR /
+#     REGEXP_REPLACE — DISJOINT from this slice's
+#     PG-flavor surface (regexp_match*, regexp_split_*).
+#   - like_regexp_edges_basic_extra covers LIKE +
+#     REGEXP operators, not function-form regex calls.
+#
+# Big-picture finding:
+#
+#   PG-flavor regex coverage in zeta has a hard SPLIT:
+#   - regexp_match / regexp_matches: SUPPORTED but
+#     SCALAR-only — never iterates beyond the first
+#     match, even when the 'g' flag is passed. In PG
+#     these are SET-returning (regexp_matches with 'g'
+#     returns one ROW per match); in zeta they always
+#     return a single array of capture groups for the
+#     first match, or NULL on no match. Documented at
+#     zeta-server/src/lib.rs:49048-49050.
+#   - regexp_split_to_array / regexp_split_to_table:
+#     both UNKNOWN function. PG split-by-regex has no
+#     zeta equivalent — apps must use STRING_TO_ARRAY
+#     (literal delimiter only) or roll their own.
+#
+#   GROUP-vs-WHOLE-MATCH RULE: regexp_matches returns
+#   an Array{element_type=Text}. If the pattern has
+#   capture groups (>0), the array elements are the
+#   GROUPS (not group 0 = whole match). If the pattern
+#   has NO capture groups, the array contains the
+#   single whole-match string. Witnessed by the impl
+#   at lib.rs:49076-49088 ("caps.len() > 1" branch).
+#
+#   FLAG SET: zeta honors only 'i' (case-insensitive).
+#   'g' is silently accepted (compiles, no error) but
+#   has NO effect — first-match-only behavior is
+#   structural, not flag-gated.
+#
+#   ARRAY WIRE-RENDER LEAK: Same as
+#   string_to_array_split_part slice — Array Value
+#   renders as Rust Debug `Array { element_type: Text,
+#   elements: [String("...")] }` over the MySQL wire
+#   (zeta-mysqlwire/src/shim.rs catch-all
+#   `_ => format!("{:?}", value)`). Pinned here as the
+#   wire-output shape for these tests.
+#
+# Adaptation notes:
+#   # zeta-adapt: regexp_matches('g' flag) — silently
+#     accepted but NO-OP; still returns first match
+#     only. PG's set-returning behavior is NOT
+#     reproduced.
+#   # zeta-adapt: regexp_matches with capture groups —
+#     array contains GROUPS only (whole match dropped).
+#     Without groups — array contains whole match.
+#   # zeta-adapt: regexp_matches no-match → NULL (NOT
+#     empty array, NOT zero rows).
+#   # zeta-adapt: KNOWN GAP — regexp_split_to_array
+#     unknown function. Substitute: STRING_TO_ARRAY for
+#     literal delimiters; no substitute for regex
+#     delimiters.
+#   # zeta-adapt: KNOWN GAP — regexp_split_to_table
+#     unknown function. Same set-returning gap as
+#     regexp_matches with 'g'.
+
+--echo === regexp_matches: basic 2-arg, no capture groups → array of whole match ===
+
+SELECT regexp_matches('hello world', 'world')              AS basic_match;
+SELECT regexp_matches('aaabbb', 'b+')                      AS quantifier_match;
+SELECT regexp_matches('hello world', '^hello')             AS anchored_start;
+SELECT regexp_matches('hello world', 'world$')             AS anchored_end;
+
+--echo === regexp_matches: with capture groups → array of GROUPS (whole match dropped) ===
+
+# Two groups → 2-element array; whole match (group 0)
+# is NOT included. Witness for the "caps.len() > 1"
+# branch at lib.rs:49076.
+SELECT regexp_matches('hello world', '(w)(orld)')          AS two_groups;
+SELECT regexp_matches('abc123', '([a-z]+)([0-9]+)')        AS alpha_num_groups;
+# Single group → 1-element array with just the group.
+SELECT regexp_matches('hello world', '(world)')            AS one_group;
+
+--echo === regexp_matches: no match → NULL (not empty array, not zero rows) ===
+
+SELECT regexp_matches('hello world', 'xyz')                AS no_match;
+SELECT regexp_matches('hello world', 'xyz') IS NULL        AS no_match_pred;
+SELECT regexp_matches('', 'a')                             AS empty_source_no_match;
+
+--echo === regexp_matches: 'g' flag SILENTLY ACCEPTED but NO-OP (first match only) ===
+
+# In PG, 'g' makes regexp_matches set-returning (one
+# row per match). zeta accepts 'g' without error but
+# still returns ONLY the first match — both branches
+# show this:
+#   - 'b+' on 'aaabbb' returns [bbb] regardless.
+#   - '[a-z][0-9]' on 'a1 b2 c3' returns [a1] only.
+SELECT regexp_matches('aaabbb', 'b+', 'g')                 AS g_flag_quantifier;
+SELECT regexp_matches('a1 b2 c3', '[a-z][0-9]', 'g')       AS g_flag_multi_token;
+# Without 'g', same result — confirms 'g' is a no-op.
+SELECT regexp_matches('a1 b2 c3', '[a-z][0-9]')            AS no_g_flag_same;
+
+--echo === regexp_matches: 'i' flag = case-insensitive (honored) ===
+
+# Without flag — strict, no match.
+SELECT regexp_matches('HELLO', 'hello')                    AS case_default_no_match;
+# With 'i' — match.
+SELECT regexp_matches('HELLO', 'hello', 'i')               AS case_insensitive_match;
+
+--echo === regexp_matches: NULL propagation on source or pattern ===
+
+SELECT regexp_matches(NULL, 'x')                           AS null_source;
+SELECT regexp_matches('foo', NULL)                         AS null_pattern;
+SELECT regexp_matches(NULL, 'x') IS NULL                   AS null_source_pred;
+
+--echo === regexp_matches: arity errors → 1105 ===
+
+# Impl rejects args.len() < 2 || > 3 at lib.rs:49051.
+--error 1105
+SELECT regexp_matches();
+--error 1105
+SELECT regexp_matches('foo');
+--error 1105
+SELECT regexp_matches('foo', 'o', 'g', 'x');
+
+--echo === regexp_matches: invalid regex → 1105 ===
+
+# Rust regex crate rejects unclosed character class.
+--error 1105
+SELECT regexp_matches('foo', '[unclosed');
+
+--echo === regexp_match (singular alias) — same impl arm as regexp_matches ===
+
+# REGEXP_MATCHES and REGEXP_MATCH share one arm at
+# lib.rs:49045. Behavior identical.
+SELECT regexp_match('hello world', 'world')                AS singular_basic;
+SELECT regexp_match('abc123', '([a-z]+)([0-9]+)')          AS singular_groups;
+
+--echo === regexp_split_to_array: KNOWN GAP — unknown function ===
+
+# PG split-by-regex with array result. No zeta
+# equivalent. Substitute: STRING_TO_ARRAY for literal
+# delimiters only.
+--error 1105
+SELECT regexp_split_to_array('a,b,c', ',');
+--error 1105
+SELECT regexp_split_to_array('a, b,  c', '[,\s]+');
+--error 1105
+SELECT regexp_split_to_array('aXbYcZd', '[XYZ]');
+
+--echo === regexp_split_to_table: KNOWN GAP — unknown function (set-returning sibling) ===
+
+# Set-returning version of regexp_split_to_array.
+# Same gap — no zeta equivalent.
+--error 1105
+SELECT regexp_split_to_table('a,b,c', ',');
+--error 1105
+SELECT regexp_split_to_table('a, b,  c', '[,\s]+');
