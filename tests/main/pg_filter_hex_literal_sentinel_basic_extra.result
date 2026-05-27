@@ -1,0 +1,66 @@
+=== Setup ===
+DROP TABLE IF EXISTS pfhl;
+CREATE TABLE pfhl (id INT PRIMARY KEY, v INT);
+INSERT INTO pfhl VALUES (1, 10), (2, 20), (3, 30), (4, NULL);
+=== Pin A1 — FILTER on regular aggregates (single agg per row) ===
+SELECT COUNT(*) FILTER (WHERE v > 15) AS c FROM pfhl;
+c
+2
+SELECT COUNT(v) FILTER (WHERE v > 15) AS c2 FROM pfhl;
+c2
+2
+SELECT SUM(v)   FILTER (WHERE v > 15) AS s FROM pfhl;
+s
+50
+SELECT AVG(v)   FILTER (WHERE v > 15) AS a FROM pfhl;
+a
+25
+SELECT MIN(v)   FILTER (WHERE v > 15) AS mn, MAX(v) FILTER (WHERE v > 15) AS mx FROM pfhl;
+mn	mx
+20	30
+=== Pin A2 — multi-FILTER, one row (different predicates per agg) ===
+SELECT COUNT(*) FILTER (WHERE v > 15) AS gt15,
+       COUNT(*) FILTER (WHERE v <= 15) AS le15
+FROM pfhl;
+gt15	le15
+2	1
+=== Pin A3 — empty-FILTER (predicate matches nothing) ===
+# COUNT returns 0, SUM returns NULL — matches PG/standard SQL.
+SELECT COUNT(*) FILTER (WHERE v > 1000) AS none,
+       SUM(v)   FILTER (WHERE v > 1000) AS s_none
+FROM pfhl;
+none	s_none
+0	NULL
+=== Pin A4 — GROUP BY + FILTER ===
+DROP TABLE IF EXISTS pfhl_g;
+CREATE TABLE pfhl_g (id INT PRIMARY KEY, bucket INT, v INT);
+INSERT INTO pfhl_g VALUES (1,0,10),(2,1,20),(3,0,30),(4,1,5);
+SELECT bucket, COUNT(*) FILTER (WHERE v > 15) AS c FROM pfhl_g GROUP BY bucket ORDER BY bucket;
+bucket	c
+0	1
+1	1
+SELECT bucket, SUM(v)   FILTER (WHERE v > 15) AS s FROM pfhl_g GROUP BY bucket ORDER BY bucket;
+bucket	s
+0	30
+1	20
+=== Pin A5 — FILTER on WINDOW aggregate is the BOUNDARY (already pinned at window_func_edges_basic_extra) ===
+# Cross-reference only. Window-FILTER errors 1064
+# "FILTER clause on window aggregate `<NAME>` not yet
+# supported" (PR #1215). NOT re-pinned here to avoid
+# duplicate coverage; this slice owns the regular-
+# aggregate side of the boundary.
+=== Pin B — `X'...'` hex-string literal: convert.rs catch-all leak (2nd witness) ===
+# sqlparser parses `X'AB'` as Value::HexStringLiteral;
+# zeta's value-converter has no arm for it and falls
+# through to a catch-all that leaks the AST variant
+# name verbatim. Same shape as PR #389's `B'...'`
+# leak (variant name SingleQuotedByteStringLiteral).
+SELECT X'AB';
+ERROR 1064: SQL parse error: unsupported value: HexStringLiteral("AB")
+SELECT X'CAFE';
+ERROR 1064: SQL parse error: unsupported value: HexStringLiteral("CAFE")
+=== Pin B2 — leak fires for ANY expression containing X'...' (literal evaluated first) ===
+SELECT length(X'CAFE');
+ERROR 1064: SQL parse error: unsupported value: HexStringLiteral("CAFE")
+SELECT X'AB' || X'CD';
+ERROR 1064: SQL parse error: unsupported value: HexStringLiteral("AB")
