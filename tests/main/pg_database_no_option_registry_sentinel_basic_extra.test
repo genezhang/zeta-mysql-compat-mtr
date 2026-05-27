@@ -1,0 +1,175 @@
+# Independently authored PG CREATE DATABASE / ALTER
+# DATABASE option-registry sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/ or PG regress.
+#
+# Adjacent companion slices (do NOT duplicate):
+#   - pg_maint_session_ownership_sentinel_basic_extra
+#     (PR #396) pins THREE existing `ALTER DATABASE`
+#     forms as INTENTIONAL COMPAT NO-OP:
+#         ALTER DATABASE myapp OWNER TO bob;
+#         ALTER DATABASE myapp RENAME TO renamed_target;
+#         ALTER DATABASE myapp SET search_path = public;
+#     citing the zeta-server handler at lib.rs:15199-
+#     15202 ("No-op for compatibility.") and the
+#     in-tree test `test_alter_database_noop`. Does
+#     NOT cover (a) the CREATE DATABASE option family,
+#     (b) `NOSUCHOPT` fabricated-option silent-accept
+#     for either CREATE or ALTER, (c) ALTER on
+#     nonexistent databases, or (d) the broader ALTER
+#     surface (SET TABLESPACE, REFRESH COLLATION
+#     VERSION, CONNECTION LIMIT, IS_TEMPLATE, RESET).
+#     Those three forms ARE dropped from this slice
+#     per dedup.
+#   - database_schema_basic_extra pins the
+#     DATABASE() / SCHEMA() FUNCTION (per-connection
+#     current-database accessor). Wholly unrelated to
+#     CREATE/ALTER DATABASE DDL.
+#
+# Pre-author dedup grep on tests/main/*.test for
+# CREATE DATABASE with each option keyword (OWNER,
+# TEMPLATE, ENCODING, LC_*, TABLESPACE, CONNECTION
+# LIMIT, IS_TEMPLATE) and for ALTER DATABASE: ZERO
+# meaningful CREATE DATABASE coverage and ONLY the 3
+# ALTER DATABASE forms above. The CREATE DATABASE
+# option family is GREENFIELD. The ALTER DATABASE
+# surface beyond the 3 dedup'd forms is GREENFIELD.
+#
+# This slice pins TWO structural findings:
+#
+#   FINDING 1 — NO CREATE DATABASE / ALTER DATABASE
+#   OPTION REGISTRY. zeta silently accepts EVERY
+#   option keyword in the PG CREATE DATABASE option
+#   family: OWNER (with and without `=`), TEMPLATE,
+#   ENCODING, LC_COLLATE, LC_CTYPE, LOCALE,
+#   ICU_LOCALE, LOCALE_PROVIDER, COLLATION_VERSION,
+#   TABLESPACE, ALLOW_CONNECTIONS, CONNECTION LIMIT,
+#   IS_TEMPLATE, OID, the multi-option chain, the
+#   `WITH OWNER ...` separator form, and — the
+#   HEADLINE — a fabricated `NOSUCHOPT 'x'`
+#   identifier that does not appear in PG's option
+#   list at all. The parser does not consult any
+#   per-option registry; option tokens are absorbed
+#   as free-form key/value pairs and dropped.
+#   The same ABSENT-REGISTRY pattern holds for ALTER
+#   DATABASE: SET TABLESPACE, REFRESH COLLATION
+#   VERSION, CONNECTION LIMIT, IS_TEMPLATE, RESET
+#   <var>, RESET ALL, and `NOSUCHOPT 'x'` all
+#   silent-accept. This is the 2nd witness of the
+#   "no-registry" structural pattern, paired with
+#   PR #458 / pg_create_function_language_params_
+#   sentinel (`LANGUAGE nosuchlang` silent-accept).
+#   STRONGER than GRANT/REVOKE (PR #450) where some
+#   options DID reject — here ALL silent-accept.
+#   CORRUPTION-class for pg_dump output that
+#   declares encoding, locale, or tablespace: the
+#   CREATE/ALTER appears to succeed, but the
+#   specified settings are silently ignored.
+#
+#   FINDING 2 — ALTER DATABASE ACCEPTS ON
+#   NONEXISTENT DATABASE. `ALTER DATABASE
+#   nonexist_db OWNER TO postgres` silent-accepts
+#   with NO existence check at dispatch. The no-op
+#   path is UNCONDITIONAL — it does not validate
+#   the target name. Apps relying on PG's standard
+#   `ERROR: database "nonexist_db" does not exist`
+#   for existence probing will get spurious
+#   success. This is independently striking even
+#   if FINDING 1's "no registry" pattern were
+#   fixed: the noop dispatch path doesn't gate on
+#   the target's existence.
+#
+# Big-picture finding:
+#
+#   The DATABASE DDL parser has a single, uniform,
+#   permissive behavior class: parse-and-drop.
+#   There is no option whitelist, no option value
+#   typecheck, no target-existence gate, no
+#   per-option dispatcher. The 18 CREATE shapes
+#   below + 8 unique ALTER shapes (after dedup of
+#   PR #396's 3 forms) all silent-accept and all
+#   are silently lossy.
+#
+#   Cross-link: [[project_two_layer_type_recognition_
+#   pattern]] — same parser-accept / executor-no-
+#   action divergence as the type-parser vs CAST-
+#   dispatcher split (PR #427). Here the OPTION
+#   tokens are accepted at the parser layer with
+#   no corresponding executor-attach layer (no
+#   per-option registry to consult, no target-
+#   existence check).
+#
+#   This is the 2nd "no-registry" witness in the
+#   suite. The 1st was PR #458 / pg_create_function_
+#   language_params_sentinel (LANGUAGE tag). The
+#   pattern is now corroborated across two
+#   independent DDL families (functions and
+#   databases) — there are likely more (CREATE
+#   TABLESPACE? CREATE EXTENSION?).
+#
+# Wire divergence check: probed via mysqlwire (MTR
+# canonical, dynamic port reservation). Per memory
+# [[feedback_probe_wire_match_slice_wire]], pgwire
+# was NOT separately probed — both wires share the
+# same sqlparser + dispatcher layers for
+# CREATE/ALTER DATABASE, so fingerprints should
+# match, but this is a mysqlwire-only pin.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-ACCEPT BUG — ANY CREATE
+#     DATABASE option silently accepts. ENCODING,
+#     LC_COLLATE, LC_CTYPE, LOCALE, TABLESPACE,
+#     OWNER, CONNECTION LIMIT, IS_TEMPLATE, OID,
+#     and even a fabricated NOSUCHOPT all parse
+#     with no error and no warning. Do NOT rely on
+#     the CREATE succeeding to mean the option
+#     took effect. Strip option clauses from
+#     migration scripts, or expect silent loss
+#     of encoding/locale/tablespace settings.
+#   # zeta-adapt: SILENT-ACCEPT BUG — ANY ALTER
+#     DATABASE form silent-accepts, including on
+#     NONEXISTENT databases. Do NOT use
+#     `ALTER DATABASE x OWNER TO y` as an
+#     existence probe — it will succeed regardless.
+#   # zeta-adapt: DROP DATABASE on a never-created
+#     database is NOT pinned here (separate path).
+#     Only baseline `CREATE DATABASE <name>` +
+#     `DROP DATABASE <name>` round-trips on the
+#     same name as a Shape C sanity baseline.
+
+--echo === SHAPE A — CREATE DATABASE option registry ABSENT: ANY option silent-accepts (18 forms) ===
+
+CREATE DATABASE db1 OWNER postgres;
+CREATE DATABASE db2 OWNER=postgres;
+CREATE DATABASE db3 TEMPLATE template0;
+CREATE DATABASE db4 ENCODING 'UTF8';
+CREATE DATABASE db5 LC_COLLATE 'en_US.UTF-8';
+CREATE DATABASE db6 LC_CTYPE 'en_US.UTF-8';
+CREATE DATABASE db7 LOCALE 'en_US.UTF-8';
+CREATE DATABASE db8 ICU_LOCALE 'en-US';
+CREATE DATABASE db9 LOCALE_PROVIDER icu;
+CREATE DATABASE db10 COLLATION_VERSION '153.97';
+CREATE DATABASE db11 TABLESPACE pg_default;
+CREATE DATABASE db12 ALLOW_CONNECTIONS false;
+CREATE DATABASE db13 CONNECTION LIMIT 50;
+CREATE DATABASE db14 IS_TEMPLATE true;
+CREATE DATABASE db15 OID 99999;
+CREATE DATABASE db16 OWNER postgres TEMPLATE template1 ENCODING 'UTF8' LC_COLLATE 'C' CONNECTION LIMIT 5;
+CREATE DATABASE db17 NOSUCHOPT 'x';
+CREATE DATABASE db18 WITH OWNER postgres;
+
+--echo === SHAPE B — ALTER DATABASE: 7 unique forms + NOSUCHOPT + nonexistent-db silent-accept (8 forms, PR #396 3 dup'd forms dropped) ===
+
+ALTER DATABASE db1 SET TABLESPACE pg_default;
+ALTER DATABASE db1 REFRESH COLLATION VERSION;
+ALTER DATABASE db1 CONNECTION LIMIT 100;
+ALTER DATABASE db1 IS_TEMPLATE true;
+ALTER DATABASE db1 RESET search_path;
+ALTER DATABASE db1 RESET ALL;
+ALTER DATABASE db1 NOSUCHOPT 'x';
+ALTER DATABASE nonexist_db OWNER TO postgres;
+
+--echo === SHAPE C — SUPPORT baseline: bare CREATE/DROP DATABASE round-trip (2 forms) ===
+
+CREATE DATABASE bare_db;
+DROP DATABASE bare_db;
