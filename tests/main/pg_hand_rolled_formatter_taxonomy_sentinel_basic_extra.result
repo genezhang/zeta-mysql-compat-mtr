@@ -1,0 +1,74 @@
+=== PATTERN P1 — literal-echo template `unsupported ALTER X operation: <literal>` ===
+DROP TABLE IF EXISTS hrf_p1;
+CREATE TABLE hrf_p1 (id INT PRIMARY KEY, v INT);
+ALTER TABLE hrf_p1 SET (autovacuum_enabled = false);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: SET (autovacuum_enabled = false)
+ALTER TABLE hrf_p1 REPLICA IDENTITY FULL;
+ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: REPLICA IDENTITY FULL
+ALTER TABLE hrf_p1 ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY;
+ERROR 1064: SQL parse error: unsupported ALTER COLUMN operation: ADD GENERATED ALWAYS AS IDENTITY
+ALTER TABLE hrf_p1 ADD CONSTRAINT hrf_p1_chk CHECK (v > 0);
+ERROR 1064: SQL parse error: unsupported ALTER TABLE ADD CONSTRAINT type
+DROP TABLE hrf_p1;
+=== PATTERN P2 — dedicated per-type `unsupported DROP X statement` ===
+DROP STAGE nope;
+ERROR 1064: SQL parse error: unsupported DROP STAGE statement
+DROP ROLE hrf_role_x;
+ERROR 1064: SQL parse error: unsupported DROP ROLE statement
+DROP USER hrf_user_x;
+ERROR 1064: SQL parse error: unsupported DROP USER statement
+DROP MATERIALIZED VIEW hrf_mv_nope;
+ERROR 1064: SQL parse error: unsupported DROP MATERIALIZED VIEW statement
+=== PATTERN P3 — helpful-hint `<feature> is not supported … (use Y instead)` ===
+DROP TABLE IF EXISTS hrf_p3;
+CREATE TABLE hrf_p3 (id INT PRIMARY KEY, v INT);
+INSERT INTO hrf_p3 VALUES (1, 10), (2, 20), (3, 30);
+DELETE FROM hrf_p3 LIMIT 5;
+ERROR 1064: SQL parse error: DELETE ... LIMIT is not supported (would silently delete all matching rows; remove the LIMIT clause)
+DELETE FROM hrf_p3 ORDER BY id;
+ERROR 1064: SQL parse error: DELETE ... ORDER BY is not supported (the ordering is dropped without LIMIT; remove the ORDER BY clause)
+SELECT 1 = ALL(SELECT v FROM hrf_p3);
+ERROR 1064: SQL parse error: = ALL(subquery) is not supported; use = ANY(subquery) or IN (subquery) instead
+INSERT INTO hrf_p3 VALUES (1, 99) ON CONFLICT ON CONSTRAINT hrf_p3_pkey DO NOTHING;
+ERROR 1064: SQL parse error: ON CONFLICT ON CONSTRAINT is not supported; use column list instead
+DROP TABLE hrf_p3;
+=== PATTERN P4 — terse `<feature> not [yet] supported` ===
+DROP TABLE IF EXISTS hrf_p4;
+CREATE TABLE hrf_p4 (region TEXT, n INT);
+INSERT INTO hrf_p4 VALUES ('a', 1), ('b', 2);
+SELECT region, SUM(n) FILTER (WHERE n > 0) OVER () FROM hrf_p4;
+ERROR 1064: SQL parse error: FILTER clause on window aggregate `SUM` not yet supported
+SELECT region, COUNT(*) FROM hrf_p4 GROUP BY ALL;
+ERROR 1064: SQL parse error: GROUP BY ALL not supported
+SELECT ARRAY(SELECT n FROM hrf_p4);
+ERROR 1064: SQL parse error: subquery function arguments not supported
+DROP TABLE hrf_p4;
+=== PATTERN P5 — `<X> requires <Y>` / `<X> must <Y>` semantic-check ===
+CREATE FUNCTION hrf_f5_1() RETURNS INT LANGUAGE plpgsql;
+ERROR 1064: SQL parse error: CREATE FUNCTION requires a function body (AS $$ ... $$)
+DROP TABLE IF EXISTS hrf_p5_t;
+CREATE TABLE hrf_p5_t (id INT PRIMARY KEY);
+CREATE TRIGGER hrf_p5_trg INSTEAD OF INSERT ON hrf_p5_t FOR EACH ROW EXECUTE FUNCTION pg_catalog.pg_notify();
+ERROR 1064: SQL parse error: trigger must specify BEFORE or AFTER
+DROP TABLE hrf_p5_t;
+DO 'BEGIN END' LANGUAGE plpgsql;
+ERROR 1064: SQL parse error: DO block body must be dollar-quoted
+DROP TABLE IF EXISTS hrf_p5_w;
+CREATE TABLE hrf_p5_w (id INT, v INT);
+INSERT INTO hrf_p5_w VALUES (1, 10), (2, 20);
+SELECT SUM(v) OVER (ORDER BY id ROWS BETWEEN id PRECEDING AND CURRENT ROW) FROM hrf_p5_w;
+ERROR 1064: SQL parse error: frame bound must be a literal number
+DROP TABLE hrf_p5_w;
+=== PATTERN P6 — bespoke `Expecting A, B or DROPNOSUCHOPT` whitelist (SMUSHED-TOKEN TYPO) ===
+CREATE TEMP TABLE hrf_p6 (id INT) ON COMMIT NOSUCHOPT;
+ERROR 1064: SQL parse error: sql parser error: Expecting DELETE ROWS, PRESERVE ROWS or DROPNOSUCHOPT
+=== PATTERN P7 — `<X> cannot contain <Y>` constraint-violation ===
+DROP TABLE IF EXISTS hrf_p7;
+CREATE TABLE hrf_p7 (id INT, v INT);
+INSERT INTO hrf_p7 VALUES (1, 10), (2, 20);
+SELECT SUM(ROW_NUMBER() OVER ()) FROM hrf_p7;
+ERROR 1064: SQL parse error: aggregate function `SUM` cannot contain window function calls
+DROP TABLE hrf_p7;
+=== PATTERN P8 — runtime value-CAST dispatcher `cannot cast to <TYPE>` (errno 1105) ===
+SELECT CAST('+infinity'::float8 AS TIMESTAMP);
+ERROR 1105: execution error: cannot cast to TIMESTAMP
