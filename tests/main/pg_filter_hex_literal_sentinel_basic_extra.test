@@ -1,0 +1,160 @@
+# Independently authored sentinel slice for the GPL MTR-
+# format runner. NOT copied or adapted from MySQL's
+# mysql-test/ or PG regress. Pins behavior on two
+# independent surfaces touched in the same slice because
+# both are small literal/expression-level fingerprints:
+#
+#   1. Aggregate `FILTER (WHERE ...)` clause on REGULAR
+#      (non-window) aggregates beyond COUNT(*).
+#   2. `X'...'` hex-string literal (sibling of the `B'...'`
+#      bit-string literal pinned at PR #389).
+#
+# Existing coverage acknowledged (do NOT duplicate):
+#   - COUNT(*) FILTER (WHERE pred) on a regular aggregate
+#     is pinned in agg_func_basic_extra.test (line 94) and
+#     boolean_logic_basic_extra.test (line 98).
+#   - FILTER on a WINDOW aggregate erroring 1064 ("FILTER
+#     clause on window aggregate `SUM` not yet supported")
+#     is pinned in window_func_edges_basic_extra.test (line
+#     115, fixed in zeta PR #1215).
+#   - `B'...'` bit-string literal leaking sqlparser's
+#     `SingleQuotedByteStringLiteral` variant name is
+#     pinned in pg_money_bit_types_sentinel_basic_extra
+#     (PR #389, line 142).
+#   - `X'...'` hex-string literal: wide-grep of
+#     `tests/main/*.test` for `X'[A-Fa-f0-9]+'` returns
+#     ZERO prior hits. The existing `bytea_blob_basic_extra`
+#     hex-literal coverage uses PG escape-string syntax
+#     (`'\xAB'`), a different parser path that produces a
+#     plain string literal — not the `X'AB'` standard-SQL
+#     variant routed through sqlparser's
+#     `Value::HexStringLiteral` arm.
+#
+# This slice adds:
+#
+#   Pin A — REGULAR-aggregate FILTER works on SUM, AVG,
+#   MIN, MAX, multi-FILTER one-row, and GROUP BY + FILTER.
+#   Previously only COUNT(*) FILTER was pinned, leaving an
+#   implicit gap: "does FILTER work on the value-bearing
+#   aggregates too?" — yes, all five do, and the boundary
+#   to "no" lives at WINDOW aggregates only. This makes the
+#   boundary CLEAN: FILTER is supported on every regular
+#   aggregate tested, unsupported (with explicit error,
+#   never silent) on window aggregates.
+#
+#   Pin B — `X'AB'` / `X'CAFE'` / `length(X'CAFE')` /
+#   `X'AB' || X'CD'` all error 1064 with:
+#     "unsupported value: HexStringLiteral(\"AB\")".
+#   This is the SECOND witness for the convert.rs catch-all
+#   pattern that leaks an internal sqlparser `Value` variant
+#   name into the user-facing error string. The first
+#   witness was `B'...'` at PR #389 (variant name
+#   `SingleQuotedByteStringLiteral`). Same code site, same
+#   shape, different sqlparser variant name — confirming
+#   the catch-all is generic to ANY "exotic literal" beyond
+#   the standard string/number/null arms, not specific to
+#   bit literals.
+#
+# Big-picture findings:
+#
+#   FILTER boundary: zeta's regular-aggregate FILTER
+#   handling is COMPLETE on COUNT, SUM, AVG, MIN, MAX
+#   (no observed gaps in value-bearing aggregates). The
+#   single explicit gap is FILTER-on-window-aggregate,
+#   which already errors loudly. Apps porting PG code that
+#   uses FILTER on regular aggregates need no rewrites; PG
+#   code using FILTER on window aggregates must rewrite to
+#   `SUM(CASE WHEN <pred> THEN v END) OVER (...)`.
+#
+#   Convert.rs literal-family catch-all: it leaks ANY
+#   sqlparser AST variant name it doesn't have an arm for.
+#   With two confirmed witnesses (B-literal at #389, X-
+#   literal here), this is no longer "a one-off oversight"
+#   but a recurring pattern in the value converter.
+#   Predicted future witnesses include any sqlparser
+#   `Value` variant zeta hasn't explicitly handled
+#   (national-string, dollar-quoted, escaped-string, etc.)
+#   — each new SQL dialect literal added to sqlparser will
+#   surface another leak unless the converter grows a
+#   uniform fallback message that hides the variant name.
+#
+# Adaptation notes:
+#   # zeta-adapt: FILTER (WHERE pred) is supported on
+#     COUNT(*), COUNT(col), SUM, AVG, MIN, MAX — single
+#     aggregate, multi-aggregate-one-row, and GROUP BY
+#     combinations.
+#   # zeta-adapt: FILTER predicate that matches no rows
+#     returns the empty-aggregate default: 0 for COUNT,
+#     NULL for SUM/AVG/MIN/MAX.
+#   # zeta-adapt: KNOWN BUG (2nd witness of convert.rs
+#     "exotic literal" catch-all leak; 1st was `B'...'`
+#     at PR #389) — `X'...'` hex-string literals error
+#     1064 with the message `unsupported value:
+#     HexStringLiteral("<digits>")`, leaking sqlparser's
+#     internal AST variant name. Fires for bare literal
+#     and for ANY expression that contains one (literal
+#     evaluated before the surrounding function or
+#     operator). Workaround: use `'\xAB'::BYTEA` PG
+#     escape-string syntax, or pass the bytes as decimal
+#     / via UNHEX('AB').
+
+--echo === Setup ===
+
+DROP TABLE IF EXISTS pfhl;
+CREATE TABLE pfhl (id INT PRIMARY KEY, v INT);
+INSERT INTO pfhl VALUES (1, 10), (2, 20), (3, 30), (4, NULL);
+
+--echo === Pin A1 — FILTER on regular aggregates (single agg per row) ===
+
+SELECT COUNT(*) FILTER (WHERE v > 15) AS c FROM pfhl;
+SELECT COUNT(v) FILTER (WHERE v > 15) AS c2 FROM pfhl;
+SELECT SUM(v)   FILTER (WHERE v > 15) AS s FROM pfhl;
+SELECT AVG(v)   FILTER (WHERE v > 15) AS a FROM pfhl;
+SELECT MIN(v)   FILTER (WHERE v > 15) AS mn, MAX(v) FILTER (WHERE v > 15) AS mx FROM pfhl;
+
+--echo === Pin A2 — multi-FILTER, one row (different predicates per agg) ===
+
+SELECT COUNT(*) FILTER (WHERE v > 15) AS gt15,
+       COUNT(*) FILTER (WHERE v <= 15) AS le15
+FROM pfhl;
+
+--echo === Pin A3 — empty-FILTER (predicate matches nothing) ===
+--echo # COUNT returns 0, SUM returns NULL — matches PG/standard SQL.
+
+SELECT COUNT(*) FILTER (WHERE v > 1000) AS none,
+       SUM(v)   FILTER (WHERE v > 1000) AS s_none
+FROM pfhl;
+
+--echo === Pin A4 — GROUP BY + FILTER ===
+
+DROP TABLE IF EXISTS pfhl_g;
+CREATE TABLE pfhl_g (id INT PRIMARY KEY, bucket INT, v INT);
+INSERT INTO pfhl_g VALUES (1,0,10),(2,1,20),(3,0,30),(4,1,5);
+SELECT bucket, COUNT(*) FILTER (WHERE v > 15) AS c FROM pfhl_g GROUP BY bucket ORDER BY bucket;
+SELECT bucket, SUM(v)   FILTER (WHERE v > 15) AS s FROM pfhl_g GROUP BY bucket ORDER BY bucket;
+
+--echo === Pin A5 — FILTER on WINDOW aggregate is the BOUNDARY (already pinned at window_func_edges_basic_extra) ===
+--echo # Cross-reference only. Window-FILTER errors 1064
+--echo # "FILTER clause on window aggregate `<NAME>` not yet
+--echo # supported" (PR #1215). NOT re-pinned here to avoid
+--echo # duplicate coverage; this slice owns the regular-
+--echo # aggregate side of the boundary.
+
+--echo === Pin B — `X'...'` hex-string literal: convert.rs catch-all leak (2nd witness) ===
+--echo # sqlparser parses `X'AB'` as Value::HexStringLiteral;
+--echo # zeta's value-converter has no arm for it and falls
+--echo # through to a catch-all that leaks the AST variant
+--echo # name verbatim. Same shape as PR #389's `B'...'`
+--echo # leak (variant name SingleQuotedByteStringLiteral).
+
+--error 1064
+SELECT X'AB';
+--error 1064
+SELECT X'CAFE';
+
+--echo === Pin B2 — leak fires for ANY expression containing X'...' (literal evaluated first) ===
+
+--error 1064
+SELECT length(X'CAFE');
+--error 1064
+SELECT X'AB' || X'CD';
