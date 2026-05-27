@@ -1,0 +1,44 @@
+=== MULTIRANGE column types — all five rejected at type-parser (1064) ===
+CREATE TABLE mr_int4 (id INT PRIMARY KEY, r INT4MULTIRANGE);
+ERROR 1064: SQL parse error: unsupported data type: int4multirange
+CREATE TABLE mr_int8 (id INT PRIMARY KEY, r INT8MULTIRANGE);
+ERROR 1064: SQL parse error: unsupported data type: int8multirange
+CREATE TABLE mr_num (id INT PRIMARY KEY, r NUMMULTIRANGE);
+ERROR 1064: SQL parse error: unsupported data type: nummultirange
+CREATE TABLE mr_date (id INT PRIMARY KEY, r DATEMULTIRANGE);
+ERROR 1064: SQL parse error: unsupported data type: datemultirange
+CREATE TABLE mr_ts (id INT PRIMARY KEY, r TSMULTIRANGE);
+ERROR 1064: SQL parse error: unsupported data type: tsmultirange
+CREATE TABLE mr_tstz (id INT PRIMARY KEY, r TSTZMULTIRANGE);
+ERROR 1064: SQL parse error: unsupported data type: tstzmultirange
+=== MULTIRANGE cast form — DIFFERENT error code (1105) ===
+# Cast-parsing and type-parsing are independent paths;
+# the cast form reaches the executor's CAST dispatcher.
+SELECT '{[1,5), [10,20)}'::INT4MULTIRANGE AS r;
+ERROR 1105: execution error: unsupported CAST target type: INT4MULTIRANGE
+=== MULTIRANGE constructor function — 1105 unknown function ===
+SELECT int4multirange('[1,5)'::INT4RANGE, '[10,20)'::INT4RANGE) AS r;
+ERROR 1105: execution error: unknown function: int4multirange
+=== TSTZRANGE cast form — 1105 (column form pinned at 1064 elsewhere) ===
+# range_type_basic_extra:170 pins the COLUMN form (1064).
+# Here we pin the CAST form (1105) — distinct code path.
+SELECT '[2024-01-01,2024-12-31)'::TSTZRANGE AS r;
+ERROR 1105: execution error: unsupported CAST target type: TSTZRANGE
+=== Range constructor family completeness — 1105 unknown function ===
+# range_type_basic_extra:154,159 pin INT4RANGE / NUMRANGE.
+# Here we extend the family pin to INT8 / DATE / TS / TSTZ.
+SELECT INT8RANGE(100, 200) AS r;
+ERROR 1105: execution error: unknown function: INT8RANGE
+SELECT DATERANGE(DATE '2024-01-01', DATE '2024-12-31') AS r;
+ERROR 1105: execution error: unknown function: DATERANGE
+SELECT TSRANGE(TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-02-01 00:00:00') AS r;
+ERROR 1105: execution error: unknown function: TSRANGE
+SELECT TSTZRANGE(TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-02-01 00:00:00') AS r;
+ERROR 1105: execution error: unknown function: TSTZRANGE
+=== Range utility functions — 1105 unknown function ===
+SELECT range_merge('[1,5)'::INT4RANGE, '[10,20)'::INT4RANGE) AS r;
+ERROR 1105: execution error: unknown function: range_merge
+SELECT range_length('[1,10)'::INT4RANGE) AS r;
+ERROR 1105: execution error: unknown function: range_length
+SELECT isfinite('[1,10)'::INT4RANGE) AS r;
+ERROR 1105: execution error: unknown function: isfinite

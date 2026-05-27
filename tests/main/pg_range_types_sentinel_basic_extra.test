@@ -1,0 +1,199 @@
+# Independently authored sentinel slice for PG range-types
+# surface. NOT copied or adapted from MySQL's mysql-test
+# (MySQL has no first-class RANGE type — this is PG-only
+# surface).
+#
+# Existing coverage (do NOT duplicate):
+#   - range_type_basic_extra pins: INT4RANGE/INT8RANGE/
+#     NUMRANGE/DATERANGE/TSRANGE column types; bracket
+#     literal `[a,b)`, `(a,b]`, `[a,b]`, `(a,b)`; `'empty'`
+#     literal; unbounded `(,10)` / `[1,)`; LOWER, UPPER,
+#     ISEMPTY, LOWER_INC, UPPER_INC, LOWER_INF, UPPER_INF;
+#     `@>` (range and element forms); `&&`; `<<`; range `=`
+#     and `<`; INT4-subtype inclusivity normalization; the
+#     KNOWN GAPs for `*` (intersect, line 138), `+` (union,
+#     line 143), `-|-` (adjacency, line 148), INT4RANGE(lo,
+#     hi) constructor (line 154), NUMRANGE(lo, hi) (line
+#     159), RANGE_AGG (line 164), TSTZRANGE *column type*
+#     (line 170 — 1064 at type-parser layer), and range::
+#     TEXT cast (line 175).
+#   - range_operators_basic_extra pins: `>>`, `<@` (range
+#     and element forms), `&<`/`&>` parse-reject 1064, and
+#     `-` execution-reject 1105 (re-pinning the `+`/`*`
+#     misroute shape).
+#
+# This slice covers the REMAINING uncovered surface (none of
+# which appears in either prior file):
+#
+#   1. **MULTIRANGE family** — entire feature is missing.
+#      MULTIRANGE was added in PG14 (int4multirange,
+#      int8multirange, nummultirange, datemultirange,
+#      tsmultirange, tstzmultirange). Zeta rejects ALL FIVE
+#      multirange COLUMN types uniformly at the type-parser
+#      layer with 1064 "unsupported data type: <subtype>
+#      multirange", AND rejects the corresponding cast form
+#      at the executor layer with 1105 "unsupported CAST
+#      target type". The multirange constructor function
+#      (`int4multirange(...)`) errors 1105 "unknown
+#      function" — same shape as the singular-range
+#      constructor gap, but multirange has no working cast
+#      substitute (since the type itself is missing), so
+#      the gap is total.
+#
+#   2. **TSTZRANGE *cast* target** — only the COLUMN type
+#      form is pinned in range_type_basic_extra (errors at
+#      the SQL-parser layer as 1064 "unsupported data type:
+#      tstzrange"). The CAST form `'…'::TSTZRANGE` takes a
+#      DIFFERENT path (sqlparser-rs parses the cast, the
+#      executor's CAST dispatcher does not have a TSTZRANGE
+#      arm) and errors 1105 "unsupported CAST target type:
+#      TSTZRANGE". Two distinct error codes / two distinct
+#      surfaces — the cast-form gap is a separate sentinel.
+#
+#   3. **Range constructor function family completeness**
+#      — range_type_basic_extra pins INT4RANGE(lo,hi) and
+#      NUMRANGE(lo,hi) only. We extend the family pin to
+#      INT8RANGE, DATERANGE, TSRANGE, TSTZRANGE. All
+#      uniformly error 1105 "unknown function: <NAME>" —
+#      confirming the entire range-constructor-function
+#      family is missing (substitute: bracket literal cast).
+#
+#   4. **Range utility functions** — range_merge,
+#      range_length, isfinite (range-form) are PG14+ range
+#      utilities, none covered. All error 1105 "unknown
+#      function: <name>".
+#
+# Big-picture finding (NEW: MULTIRANGE = TWO-LAYER GAP):
+#
+#   The MULTIRANGE feature is rejected at TWO distinct
+#   layers depending on entry path:
+#
+#     - **Type-parser layer (1064)**: when MULTIRANGE
+#       appears in a column-type position (CREATE TABLE …
+#       INT4MULTIRANGE), the SQL parser rejects with
+#       "unsupported data type". Symmetric across ALL five
+#       multirange subtypes — uniformly missing.
+#     - **CAST dispatcher layer (1105)**: when MULTIRANGE
+#       appears in a `'…'::INT4MULTIRANGE` cast, the
+#       parser ACCEPTS the cast token (sqlparser-rs treats
+#       it as an opaque type name) but the executor's CAST
+#       dispatcher has no arm → "unsupported CAST target
+#       type".
+#
+#   This MIRRORS the TSTZRANGE pattern (#2 above), where
+#   the COLUMN form errors at the type parser (1064) and
+#   the CAST form errors at the CAST dispatcher (1105).
+#   The lesson is structural: zeta's SQL-type surface has
+#   TWO independent recognition lists (type-parser
+#   accepted-types, CAST-dispatcher accepted-types) that
+#   are NOT in sync. TSTZRANGE is in NEITHER. INT4-/INT8-/
+#   NUM-/DATE-/TS-MULTIRANGE are in NEITHER. INT4RANGE
+#   (etc.) are in BOTH.
+#
+#   For apps depending on PG14+ MULTIRANGE, there is NO
+#   workaround — the type does not exist in any form.
+#   For TSTZRANGE specifically, neither column NOR cast
+#   forms work; the substitute is TSRANGE (timezone-naive).
+#
+# Wire-divergence note: range types and casts go through
+# sqlparser-rs and convert.rs, which is shared between the
+# MySQL wire (zeta-mysql-wire) and the PG wire
+# (zeta-pgwire). The error fingerprints should therefore be
+# IDENTICAL across both wires — only the wire-protocol
+# error envelope differs. This slice pins the MySQL-wire
+# fingerprint; the PG-wire fingerprint is expected to share
+# the same parser/executor error message text.
+#
+# Adaptation notes:
+#   # zeta-adapt: KNOWN GAP — INT4MULTIRANGE / INT8MULTI
+#     RANGE / NUMMULTIRANGE / DATEMULTIRANGE / TSMULTIRANGE
+#     / TSTZMULTIRANGE as COLUMN types — errno 1064
+#     "unsupported data type: <name>". No substitute (the
+#     multirange feature is unimplemented).
+#   # zeta-adapt: KNOWN GAP — `'…'::INT4MULTIRANGE` (cast
+#     form) — errno 1105 "unsupported CAST target type:
+#     INT4MULTIRANGE". DIFFERENT error code than the
+#     column-type form because cast-parsing and type-
+#     parsing follow independent paths.
+#   # zeta-adapt: KNOWN GAP — multirange constructor
+#     functions like `int4multirange(…)` — errno 1105
+#     "unknown function: int4multirange".
+#   # zeta-adapt: KNOWN GAP — `'…'::TSTZRANGE` (cast form)
+#     — errno 1105 "unsupported CAST target type:
+#     TSTZRANGE". DIFFERENT error code than the column-type
+#     form (1064) pinned in range_type_basic_extra.
+#     Substitute: cast to TSRANGE (timezone-naive).
+#   # zeta-adapt: KNOWN GAP — INT8RANGE(lo,hi),
+#     DATERANGE(lo,hi), TSRANGE(lo,hi), TSTZRANGE(lo,hi)
+#     constructor functions — errno 1105 "unknown
+#     function". Same shape as INT4RANGE/NUMRANGE (pinned
+#     in range_type_basic_extra). Substitute: bracket
+#     literal cast `'[lo,hi)'::TYPE`.
+#   # zeta-adapt: KNOWN GAP — range_merge, range_length,
+#     isfinite — errno 1105 "unknown function: <name>".
+
+--echo === MULTIRANGE column types — all five rejected at type-parser (1064) ===
+
+--error 1064
+CREATE TABLE mr_int4 (id INT PRIMARY KEY, r INT4MULTIRANGE);
+
+--error 1064
+CREATE TABLE mr_int8 (id INT PRIMARY KEY, r INT8MULTIRANGE);
+
+--error 1064
+CREATE TABLE mr_num (id INT PRIMARY KEY, r NUMMULTIRANGE);
+
+--error 1064
+CREATE TABLE mr_date (id INT PRIMARY KEY, r DATEMULTIRANGE);
+
+--error 1064
+CREATE TABLE mr_ts (id INT PRIMARY KEY, r TSMULTIRANGE);
+
+--error 1064
+CREATE TABLE mr_tstz (id INT PRIMARY KEY, r TSTZMULTIRANGE);
+
+--echo === MULTIRANGE cast form — DIFFERENT error code (1105) ===
+--echo # Cast-parsing and type-parsing are independent paths;
+--echo # the cast form reaches the executor's CAST dispatcher.
+
+--error 1105
+SELECT '{[1,5), [10,20)}'::INT4MULTIRANGE AS r;
+
+--echo === MULTIRANGE constructor function — 1105 unknown function ===
+
+--error 1105
+SELECT int4multirange('[1,5)'::INT4RANGE, '[10,20)'::INT4RANGE) AS r;
+
+--echo === TSTZRANGE cast form — 1105 (column form pinned at 1064 elsewhere) ===
+--echo # range_type_basic_extra:170 pins the COLUMN form (1064).
+--echo # Here we pin the CAST form (1105) — distinct code path.
+
+--error 1105
+SELECT '[2024-01-01,2024-12-31)'::TSTZRANGE AS r;
+
+--echo === Range constructor family completeness — 1105 unknown function ===
+--echo # range_type_basic_extra:154,159 pin INT4RANGE / NUMRANGE.
+--echo # Here we extend the family pin to INT8 / DATE / TS / TSTZ.
+
+--error 1105
+SELECT INT8RANGE(100, 200) AS r;
+
+--error 1105
+SELECT DATERANGE(DATE '2024-01-01', DATE '2024-12-31') AS r;
+
+--error 1105
+SELECT TSRANGE(TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-02-01 00:00:00') AS r;
+
+--error 1105
+SELECT TSTZRANGE(TIMESTAMP '2024-01-01 00:00:00', TIMESTAMP '2024-02-01 00:00:00') AS r;
+
+--echo === Range utility functions — 1105 unknown function ===
+
+--error 1105
+SELECT range_merge('[1,5)'::INT4RANGE, '[10,20)'::INT4RANGE) AS r;
+
+--error 1105
+SELECT range_length('[1,10)'::INT4RANGE) AS r;
+
+--error 1105
+SELECT isfinite('[1,10)'::INT4RANGE) AS r;
