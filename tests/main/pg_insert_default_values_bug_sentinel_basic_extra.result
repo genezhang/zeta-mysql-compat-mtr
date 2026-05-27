@@ -1,0 +1,34 @@
+=== Setup — INT column with literal DEFAULT, plain TEXT alongside ===
+DROP TABLE IF EXISTS def_t;
+CREATE TABLE def_t (id INT DEFAULT 99, v TEXT);
+=== BUG — INSERT INTO def_t DEFAULT VALUES silently inserts ZERO rows ===
+# PG semantics: one row inserted, id=99, v=NULL.
+# zeta: wire reports success, table stays empty.
+INSERT INTO def_t DEFAULT VALUES;
+INSERT INTO def_t DEFAULT VALUES;
+=== Falsifier — SELECT proves no rows materialized after two DEFAULT VALUES inserts ===
+SELECT COUNT(*) AS row_count_after_two_default_values FROM def_t;
+row_count_after_two_default_values
+0
+SELECT * FROM def_t;
+=== Support pin — DEFAULT keyword INSIDE an INSERT column list works (evaluates to 99) ===
+# Contrast with the bug above: when the DEFAULT keyword
+# is positioned per-column inside an explicit VALUES
+# list, the executor evaluates the column default. Only
+# the bare DEFAULT VALUES form silently no-ops.
+INSERT INTO def_t (id, v) VALUES (DEFAULT, 'hi');
+SELECT id, v FROM def_t ORDER BY v;
+id	v
+99	hi
+=== Parse-reject — VALUES (DEFAULT) as standalone statement: errno 1105 ===
+# The DEFAULT keyword is only legal inside an INSERT
+# column list. Top-level VALUES (DEFAULT) reaches the
+# executor and errors "unsupported expression: Default".
+VALUES (DEFAULT);
+ERROR 1105: execution error: unsupported expression: Default
+=== Parse-reject — INSERT INTO t () VALUES () empty-column-list: errno 1064 ===
+# PG accepts () VALUES () as a synonym for DEFAULT VALUES.
+# sqlparser rejects the empty column list at parse time.
+INSERT INTO def_t () VALUES ();
+ERROR 1064: SQL parse error: sql parser error: Expected: identifier, found: ) at Line: 1, Column: 20
+DROP TABLE def_t;

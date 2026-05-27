@@ -1,0 +1,137 @@
+# Independently authored PG INSERT DEFAULT VALUES bug
+# sentinel slice for the GPL MTR-format runner. NOT
+# copied or adapted from MySQL's mysql-test/.
+#
+# This slice pins ONE NEW SILENT-DROP BUG plus three
+# adjacent support pins clarifying the surrounding
+# DEFAULT-keyword grammar surface.
+#
+# Existing coverage (do NOT duplicate):
+#   - INSERT … DEFAULT VALUES on a SERIAL-keyed table:
+#     pinned at insert_basic_extra (silent no-op when
+#     all columns are SERIAL or defaulted; errors
+#     "column not found: id" for INT-keyed tables).
+#   - INSERT mixed default + explicit columns
+#     (omitting a defaulted column): pinned at
+#     insert_basic_extra.
+#   - DEFAULT (subquery) text-corruption: pinned at
+#     pg_constraint_bugs_sentinel (PR #421).
+#
+# Zero prior coverage for:
+#   - INSERT … DEFAULT VALUES on an INT-DEFAULT-literal
+#     table (no SERIAL, no PK, plain literal default).
+#     This shape is the canonical pg_dump / ORM-emitted
+#     form for "insert sentinel/config row using all
+#     defaults" and silently produces zero rows here.
+#   - VALUES (DEFAULT) standalone (no INSERT prefix) —
+#     PG-valid grammar, zeta error-rejects at the
+#     executor with "unsupported expression: Default".
+#   - INSERT INTO t () VALUES () empty-column-list form
+#     — PG-valid grammar (= INSERT … DEFAULT VALUES),
+#     zeta parse-rejects at sqlparser ("Expected:
+#     identifier, found: )").
+#   - DEFAULT keyword inside the column-position of an
+#     explicit VALUES list (INSERT t (id, v) VALUES
+#     (DEFAULT, 'hi')) — works, evaluates the default.
+#     Pinning as the contrast for the silent-drop bug.
+#
+# THE BUG (silent-drop class):
+#
+#   Setup: CREATE TABLE def_t (id INT DEFAULT 99,
+#          v TEXT);
+#
+#   INSERT INTO def_t DEFAULT VALUES;
+#
+#   --> wire reports success (0 rows affected,
+#       no error, no warning).
+#   --> SELECT * FROM def_t — table is EMPTY.
+#       PG semantics: ONE row inserted, id=99, v=NULL.
+#
+#   The DEFAULT VALUES form is silently a no-op. Every
+#   subsequent execution produces the same outcome.
+#
+# Why this matters (big picture):
+#
+#   pg_dump and ORM-generated SQL emit `INSERT INTO t
+#   DEFAULT VALUES` for tables where all columns are
+#   defaulted — trigger-populated tables, single-row
+#   config tables, sentinel-row inserts, audit-row
+#   stamps. Apps will see schema-load complete with
+#   no error, then no rows exist. Silent data loss
+#   that surfaces only when downstream reads fail to
+#   find the expected sentinel.
+#
+#   This is the same class as PR #421's DEFAULT
+#   (SELECT 7) corruption: the executor silently
+#   degrades semantics on a DEFAULT-keyword path that
+#   sqlparser accepts but convert.rs / the executor
+#   does not fully implement. PR #421 corrupted the
+#   stored value; this slice eliminates the row
+#   altogether. Adjacent witnesses: PR #391 (INHERITS
+#   silent-drop), PR #407 (SCHEMA AUTHORIZATION
+#   silent-drop), PR #408 (WITH ORDINALITY / FK MATCH
+#   FULL), PR #415 (SELECT INTO), PR #418 (TRIGGER
+#   modifier cluster).
+#
+# Wire divergence check: probed both wires (pgwire
+# port and mysqlwire port) — IDENTICAL. The DEFAULT
+# VALUES path lives in convert.rs / the executor,
+# both shared across wires.
+#
+# Adaptation notes:
+#   # zeta-adapt: SILENT-DROP BUG — INSERT INTO t
+#     DEFAULT VALUES against a literal-DEFAULT table
+#     reports success but inserts ZERO rows. Portable
+#     substitute: explicit DEFAULT keyword per column
+#     `INSERT INTO t (id, v) VALUES (DEFAULT, DEFAULT)`.
+#   # zeta-adapt: VALUES (DEFAULT) as a standalone
+#     top-level statement errors 1105 "unsupported
+#     expression: Default". The DEFAULT keyword is
+#     only meaningful inside an INSERT column list.
+#   # zeta-adapt: INSERT INTO t () VALUES () empty-
+#     column-list form errors 1064 at sqlparser. Use
+#     a non-empty column list (and accept the silent-
+#     drop on the all-defaults path).
+
+--echo === Setup — INT column with literal DEFAULT, plain TEXT alongside ===
+
+DROP TABLE IF EXISTS def_t;
+CREATE TABLE def_t (id INT DEFAULT 99, v TEXT);
+
+--echo === BUG — INSERT INTO def_t DEFAULT VALUES silently inserts ZERO rows ===
+--echo # PG semantics: one row inserted, id=99, v=NULL.
+--echo # zeta: wire reports success, table stays empty.
+
+INSERT INTO def_t DEFAULT VALUES;
+INSERT INTO def_t DEFAULT VALUES;
+
+--echo === Falsifier — SELECT proves no rows materialized after two DEFAULT VALUES inserts ===
+
+SELECT COUNT(*) AS row_count_after_two_default_values FROM def_t;
+SELECT * FROM def_t;
+
+--echo === Support pin — DEFAULT keyword INSIDE an INSERT column list works (evaluates to 99) ===
+--echo # Contrast with the bug above: when the DEFAULT keyword
+--echo # is positioned per-column inside an explicit VALUES
+--echo # list, the executor evaluates the column default. Only
+--echo # the bare DEFAULT VALUES form silently no-ops.
+
+INSERT INTO def_t (id, v) VALUES (DEFAULT, 'hi');
+SELECT id, v FROM def_t ORDER BY v;
+
+--echo === Parse-reject — VALUES (DEFAULT) as standalone statement: errno 1105 ===
+--echo # The DEFAULT keyword is only legal inside an INSERT
+--echo # column list. Top-level VALUES (DEFAULT) reaches the
+--echo # executor and errors "unsupported expression: Default".
+
+--error 1105
+VALUES (DEFAULT);
+
+--echo === Parse-reject — INSERT INTO t () VALUES () empty-column-list: errno 1064 ===
+--echo # PG accepts () VALUES () as a synonym for DEFAULT VALUES.
+--echo # sqlparser rejects the empty column list at parse time.
+
+--error 1064
+INSERT INTO def_t () VALUES ();
+
+DROP TABLE def_t;
