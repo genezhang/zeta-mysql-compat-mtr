@@ -1,0 +1,65 @@
+# === STRUCTURAL FINDINGS ===
+#
+# 1. ORDER BY ... USING <op> — sqlparser whitelist gap (zero prior
+#    coverage). PG's `ORDER BY col USING <operator>` lets you sort by
+#    a user-defined or non-default comparison operator (e.g.,
+#    `USING <`, `USING OPERATOR(public.<)`). zeta's sqlparser fork
+#    rejects at the USING token (col 29 for the test inputs) with
+#    the standard sqlparser fingerprint
+#    `Expected: end of statement, found: USING at Line: 1, Column: 29`
+#    (HAS Line/Column suffix — sqlparser-layer, not hand-rolled).
+#    Three variants reject identically: bare-operator (`<`, `>`) and
+#    operator-qualified (`OPERATOR(public.<)`). The reject point is
+#    the ORDER-BY-element acceptor (after the `BY v`).
+#
+# 2. TABLE foo — standalone-statement form (zero prior coverage). PG
+#    accepts `TABLE foo;` as a complete top-level query — shorthand
+#    for `SELECT * FROM foo`. zeta rejects at the statement-form
+#    whitelist (NOT the FROM-clause acceptor) with
+#    `Expected: an SQL statement, found: TABLE at Line: 1, Column: 1`.
+#    This is a DIFFERENT sqlparser whitelist from the one ORDER BY
+#    USING hits — col 1 (top-level) vs col 29 (ORDER-BY-element).
+#    The two-whitelist contrast is the structural angle of this slice.
+#
+# === PRIOR COVERAGE / CROSS-REFS ===
+#
+# The original probe had four shapes; two were dedup'd out:
+#   - JSON_TABLE FROM-clause gap: ALREADY PINNED at
+#     `json_path_basic_extra.test:134-137` (errno 1064, planner-layer
+#     `unsupported FROM clause (only table references, subqueries,
+#     and functions supported)` formatter).
+#   - XMLTABLE FROM-clause gap: ALREADY PINNED at
+#     `pg_xml_extended_sentinel_basic_extra.test:132-139` (same
+#     formatter, three sub-shapes).
+# Those FROM-clause gaps are DELIBERATELY out of scope here to avoid
+# duplication. This slice pins ONLY the two non-duplicate
+# sqlparser-layer whitelist gaps (both HAVE Line/Column suffix).
+#
+# === ZETA-ADAPTS ===
+#
+# PG idiomatic → zeta substitutes:
+#   - `ORDER BY col USING <op>` → `ORDER BY col ASC` / `ORDER BY col DESC`
+#     with explicit re-typing or expression rewrite if a non-default
+#     comparison is needed (zeta has no user-defined operator hook).
+#   - `TABLE foo` → `SELECT * FROM foo`.
+
+CREATE TABLE pm (id INT, v INT);
+INSERT INTO pm VALUES (1, 10), (2, 20), (3, 30);
+
+--echo === SHAPE A: ORDER BY ... USING < — sqlparser whitelist gap at ORDER-BY-element acceptor ===
+--error 1064
+SELECT v FROM pm ORDER BY v USING <;
+
+--echo === SHAPE A.2: ORDER BY ... USING > — same fingerprint ===
+--error 1064
+SELECT v FROM pm ORDER BY v USING >;
+
+--echo === SHAPE A.3: ORDER BY ... USING OPERATOR(public.<) — operator-qualified, same fingerprint ===
+--error 1064
+SELECT v FROM pm ORDER BY v USING OPERATOR(public.<);
+
+--echo === SHAPE B: TABLE foo — statement-form acceptor reject (different whitelist from SHAPE A) ===
+--error 1064
+TABLE pm;
+
+DROP TABLE pm;
