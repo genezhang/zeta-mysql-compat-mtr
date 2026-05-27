@@ -1,0 +1,58 @@
+=== Setup ===
+DROP TABLE IF EXISTS cp;
+CREATE TABLE cp (id INT PRIMARY KEY, v TEXT);
+INSERT INTO cp VALUES (1, 'alpha'), (2, 'beta');
+=== SHAPE A — TO-side option silent-accept BUGs (six pins) ===
+=== Shape A1: COPY t TO STDOUT WITH (FORCE_QUOTE (v)) — silent-accept; output bytes NOT verified quoted (no rows on mysqlwire) ===
+COPY cp TO STDOUT WITH (FORCE_QUOTE (v));
+=== Shape A2: COPY t TO STDOUT WITH BINARY — legacy single-keyword form; silent-accept; output is NOT actually binary ===
+COPY cp TO STDOUT WITH BINARY;
+=== Shape A3: COPY t TO STDOUT WITH (HEADER true) — silent-accept; no header row in output ===
+COPY cp TO STDOUT WITH (HEADER true);
+=== Shape A4: COPY t TO STDOUT WITH (ENCODING 'UTF8') — silent-accept ===
+COPY cp TO STDOUT WITH (ENCODING 'UTF8');
+=== Shape A5: COPY t TO STDOUT WITH (QUOTE '|') — silent-accept; default quote behavior unchanged (wire-unobservable here) ===
+COPY cp TO STDOUT WITH (QUOTE '|');
+=== Shape A6: COPY t TO STDOUT WITH (DELIMITER ',', HEADER true, NULL 'N/A') — multi-option chain; silent-accept ===
+COPY cp TO STDOUT WITH (DELIMITER ',', HEADER true, NULL 'N/A');
+=== SHAPE B — wrong-side option silent-accept BUGs (FORCE_NULL and FREEZE on TO) ===
+=== Shape B1: COPY t TO STDOUT WITH (FORCE_NULL (v)) — FORCE_NULL is FROM-side only in PG; zeta silently accepts on TO ===
+COPY cp TO STDOUT WITH (FORCE_NULL (v));
+=== Shape B2: COPY t TO STDOUT WITH (FREEZE) — FREEZE is INSERT-side bulk-load hint; meaningless on TO; silently accepted ===
+COPY cp TO STDOUT WITH (FREEZE);
+=== SHAPE C — invalid-format-combo silent-accept BUG (HEADER + FORMAT TEXT) ===
+=== Shape C1: COPY t TO STDOUT WITH (FORMAT TEXT, HEADER true) — HEADER is CSV-only in PG; combo silently accepted ===
+COPY cp TO STDOUT WITH (FORMAT TEXT, HEADER true);
+=== SHAPE D — distinct 1064 parse-reject fingerprints (six code paths) ===
+=== Shape D1: COPY t TO STDOUT WITH (FORCE_QUOTE *) — "Expected: a list of columns in parentheses, found: *" ===
+COPY cp TO STDOUT WITH (FORCE_QUOTE *);
+ERROR 1064: SQL parse error: sql parser error: Expected: a list of columns in parentheses, found: * at Line: 1, Column: 37
+=== Shape D2: COPY t TO STDOUT WITH (HEADER MATCH) — "Expected: ), found: MATCH" (PG 14+ syntax) ===
+COPY cp TO STDOUT WITH (HEADER MATCH);
+ERROR 1064: SQL parse error: sql parser error: Expected: ), found: MATCH at Line: 1, Column: 32
+=== Shape D3: COPY t TO STDOUT WITH (OIDS) — "Expected: option, found: OIDS" (removed in PG 12) ===
+COPY cp TO STDOUT WITH (OIDS);
+ERROR 1064: SQL parse error: sql parser error: Expected: option, found: OIDS at Line: 1, Column: 25
+=== Shape D4: COPY t TO STDOUT WITH (FORMAT CSV, ESCAPE '\\') — "Expect a char, found \"\\\\\"" (2-char escape rejected) ===
+COPY cp TO STDOUT WITH (FORMAT CSV, ESCAPE '\\');
+ERROR 1064: SQL parse error: sql parser error: Expect a char, found "\\\\" at Line: 1, Column: 44
+=== Shape D5: COPY t TO STDOUT WITH (DELIMITER 'ABC') — "Expect a char, found \"ABC\"" (multichar delimiter rejected) ===
+COPY cp TO STDOUT WITH (DELIMITER 'ABC');
+ERROR 1064: SQL parse error: sql parser error: Expect a char, found "ABC" at Line: 1, Column: 35
+=== Shape D6: COPY t TO STDOUT WITH (nosuchopt 'x') — "Expected: option, found: nosuchopt" (unknown option) ===
+COPY cp TO STDOUT WITH (nosuchopt 'x');
+ERROR 1064: SQL parse error: sql parser error: Expected: option, found: nosuchopt at Line: 1, Column: 25
+=== SHAPE E — FROM-STDIN wire-divergence: three pins, all collapse to "Expected: ;, found: EOF" regardless of option list ===
+=== Shape E1: COPY t FROM STDIN — bare, no options (BASELINE; previously pinned at copy_basic_extra:112, re-pinned for self-contained narrative) ===
+COPY cp FROM STDIN;
+ERROR 1064: SQL parse error: sql parser error: Expected: ;, found: EOF
+=== Shape E2: COPY t FROM STDIN WITH (FORMAT CSV) — modern paren form (legacy WITH CSV pinned at copy_basic_extra:117; modern paren form is novel here) ===
+COPY cp FROM STDIN WITH (FORMAT CSV);
+ERROR 1064: SQL parse error: sql parser error: Expected: ;, found: EOF
+=== Shape E3: COPY t FROM STDIN WITH (FORCE_QUOTE (v)) — junk TO-side option; SAME EOF fingerprint proves option list never evaluates ===
+COPY cp FROM STDIN WITH (FORCE_QUOTE (v));
+ERROR 1064: SQL parse error: sql parser error: Expected: ;, found: EOF
+=== SHAPE F — boundary SUPPORT pin: bare COPY t TO STDOUT succeeds (already covered at copy_basic_extra:65; pinned here to anchor the silent-accept BUGs as option-scoped) ===
+COPY cp TO STDOUT;
+=== Cleanup ===
+DROP TABLE cp;
