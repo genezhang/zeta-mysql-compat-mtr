@@ -42,11 +42,18 @@
 #     truncated at the `#` and errors 1064 on the next
 #     statement boundary. Substitute on MySQL wire: write
 #     `(a | b) - (a & b)` to express XOR.
-#   # zeta-adapt: KNOWN GAP — MySQL `XOR` infix operator
-#     errors 1064 "unsupported binary operator: XOR".
-#     Substitute: same workaround as above.
+#   # zeta-adapt: FIXED — MySQL `XOR` infix operator is now
+#     supported as BOOLEAN XOR (the correct MySQL semantics —
+#     XOR is logical, not bitwise). `6 XOR 3 = 0` because both
+#     operands are truthy, `TRUE XOR FALSE = 1`, `NULL XOR x =
+#     NULL`. The bitwise-XOR substitute below is still useful
+#     for cases where you actually want bitwise XOR semantics,
+#     since MySQL's bitwise XOR operator `^` is NOT supported
+#     in zeta (errno 1064 "unsupported binary operator: ^").
 #   # zeta-adapt: KNOWN GAP — `XOR(a, b)` function form
-#     errors 1105 "unknown function: XOR".
+#     errors 1105 "unknown function: XOR". MySQL has no
+#     XOR-as-function form either; this pin documents that
+#     the operator-only restriction matches MySQL semantics.
 #   # zeta-adapt: TO_HEX(int) — PG alias for HEX, supported
 #     since zeta #1205. Same single-arg semantics, uppercase
 #     output (matches HEX).
@@ -104,10 +111,24 @@ SELECT BIT_LENGTH(5) AS bl5, BIT_LENGTH(10) AS bl10;
 
 SELECT (6 | 3) - (6 & 3) AS xor_workaround;
 
---echo === KNOWN GAP: XOR infix — errno 1064 ===
+--echo === FIXED: XOR infix is now supported as BOOLEAN XOR (MySQL semantics) ===
+# `6 XOR 3 = 0` because both operands are truthy → TRUE XOR
+# TRUE → FALSE → 0. This is correct MySQL behavior; XOR is
+# the LOGICAL XOR operator, not bitwise. NULL propagates.
+
+SELECT 6 XOR 3 AS r;
+SELECT TRUE XOR FALSE AS r;
+SELECT TRUE XOR TRUE AS r;
+SELECT NULL XOR TRUE AS r;
+
+--echo === KNOWN GAP: ^ infix (MySQL BITWISE XOR) — errno 1064 ===
+# MySQL's actual bitwise-XOR operator is `^` (XOR is logical).
+# zeta rejects with hand-rolled "unsupported binary operator: ^"
+# (NO Line/Column — Pattern P4 from PR #462 META).
+# Substitute: (a | b) - (a & b), pinned above.
 
 --error 1064
-SELECT 6 XOR 3 AS r;
+SELECT 6 ^ 3 AS r;
 
 --echo === KNOWN GAP: XOR(a, b) function form — errno 1105 ===
 

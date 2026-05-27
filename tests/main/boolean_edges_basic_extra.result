@@ -49,10 +49,10 @@ r_lit	r_cmp
 SELECT 1 = TRUE AS one_eq_t, 0 = FALSE AS zero_eq_f;
 one_eq_t	zero_eq_f
 0	0
-=== KNOWN DIVERGENCE: 1 AND 0 returns NULL (MySQL: 0) ===
+=== FIXED: 1 AND 0 now returns 0 (correct MySQL coercion) ===
 SELECT 1 AND 0 AS and_int;
 and_int
-NULL
+0
 === KNOWN DIVERGENCE: WHERE on INT col — errno 1105 ===
 DROP TABLE IF EXISTS bi;
 CREATE TABLE bi (id INT, n INT);
@@ -62,7 +62,14 @@ ERROR 1105: execution error: predicate did not evaluate to boolean
 === KNOWN GAP: BOOL + INT arithmetic — errno 1105 ===
 SELECT TRUE + 1;
 ERROR 1105: execution error: arithmetic op requires numbers
-=== KNOWN GAP: XOR infix operator — errno 1064 ===
+=== FIXED: XOR infix is now supported (correct MySQL boolean XOR) ===
 SELECT TRUE XOR FALSE;
-ERROR 1064: SQL parse error: unsupported binary operator: XOR
+TRUE XOR FALSE
+1
+SELECT TRUE XOR TRUE;
+TRUE XOR TRUE
+0
+SELECT NULL XOR TRUE;
+NULL XOR TRUE
+NULL
 DROP TABLE bi;
