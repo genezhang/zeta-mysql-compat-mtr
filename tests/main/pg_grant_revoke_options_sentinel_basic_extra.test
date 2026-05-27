@@ -1,0 +1,309 @@
+# Independently authored PG GRANT/REVOKE option-clause
+# and object-type-registry sentinel slice for the GPL
+# MTR-format runner. NOT copied or adapted from MySQL's
+# mysql-test/t/grant.test or PG regress.
+#
+# Existing coverage (read carefully — DO NOT duplicate):
+#   - auth_basic_extra.test:60-68 pins ONLY the bare
+#     `GRANT ALL ON test.* TO <role>`, `GRANT USAGE ON
+#     SCHEMA public TO <role>`, and `REVOKE ALL ON
+#     test.* FROM <role>` shapes — silent no-ops because
+#     zeta runs in trust-auth mode. No option clauses
+#     (WITH GRANT OPTION, GRANTED BY, CASCADE, RESTRICT),
+#     no batch-grant forms (ON ALL TABLES/SEQUENCES/
+#     FUNCTIONS IN SCHEMA), no database-level / PUBLIC
+#     pseudo-role privileges, and no object-type-not-in-
+#     grammar rejections are pinned there.
+#   - pg_event_trigger_large_object_sentinel_basic_extra.
+#     test:242,247 pins `GRANT/REVOKE SELECT ON LARGE
+#     OBJECT <oid> TO/FROM <role>` as the "Expected: TO/
+#     FROM, found: OBJECT" rejection shape — orthogonal
+#     (object-type grammar gap at the `OBJECT` token,
+#     not the trailing-clause grammar this slice pins).
+#   - auth_basic_extra:117 already pins PG `CREATE USER
+#     u1` as a 1064 "unsupported statement" rejection,
+#     so this slice CANNOT set up real users. The pin
+#     here is the GRANT/REVOKE GRAMMAR acceptance —
+#     zeta's auth layer is a no-op regardless of whether
+#     the referenced user/role/database/schema exists,
+#     so dangling-reference statements still parse and
+#     return success (the BUG, not a workaround).
+#
+# STRUCTURAL FINDING (cross-link: see
+# [[project_two_layer_type_recognition_pattern]]) —
+# zeta's GRANT/REVOKE surface has the SAME drift pattern
+# as the type-recognition surface: two distinct layers
+# disagree on what is "supported".
+#
+#   Layer 1 — object types IN the grammar (table, schema,
+#   sequence, function, database, large object). All
+#   option-modifier clauses (WITH GRANT OPTION, GRANTED
+#   BY, CASCADE, RESTRICT, ALL TABLES IN SCHEMA, ALL
+#   SEQUENCES IN SCHEMA, ALL FUNCTIONS IN SCHEMA,
+#   TEMPORARY on DATABASE, PUBLIC pseudo-role) parse
+#   silently and silently noop — because zeta auth is
+#   noop, the statement appears to succeed. For any
+#   downstream deployment that ever flips auth ON, the
+#   grants-with-options will be silently DROPPED (the
+#   bare grant fires, but the WITH GRANT OPTION /
+#   GRANTED BY / CASCADE / RESTRICT modifier was never
+#   plumbed to an enforcement layer). This is the
+#   CORRUPTION-class shape — silent semantics drop.
+#
+#   Layer 2 — object types NOT in the grammar (LANGUAGE,
+#   TABLESPACE, role-membership grants, REVOKE GRANT
+#   OPTION FOR). sqlparser rejects with FOUR DISTINCT
+#   1064 fingerprints depending on WHICH token violates
+#   the grammar — even when two shapes share the same
+#   "Expected: a privilege keyword" prefix, the unexpected
+#   token and column differ, so the wire fingerprint that
+#   an ORM regex-matches against is different in each
+#   case. This is the FINGERPRINT-CATALOG shape — every
+#   PG-only object type has its own rejection signature.
+#
+# Pre-existing pattern fingerprints this slice joins:
+#   - Silent-accept CORRUPTION-class family: PR #421
+#     (DEFAULT subquery stored as text), PR #432
+#     (TIMESTAMP(n) precision silent-drop),
+#     pg_view_options_silent_accept_sentinel (WITH
+#     options clause silently dropped),
+#     pg_copy_options_silent_accept_sentinel (COPY
+#     OPTIONS silently dropped). This slice extends the
+#     family to GRANT/REVOKE option clauses (TEN new
+#     silent-accept shapes — A1-A4, B5-B7, C8-C10).
+#   - "Expected: a privilege keyword, found: <KW>" —
+#     NEW fingerprint at this slice. Witness tokens:
+#     `r1` at col 7 (role-membership GRANT, where the
+#     grammar expects a privilege-keyword like SELECT),
+#     and `GRANT` at col 8 (REVOKE GRANT OPTION FOR,
+#     where the grammar expects a privilege-keyword
+#     after REVOKE). Same fingerprint family, different
+#     unexpected-token+column.
+#   - "Expected: TO, found: <KW>" — NEW WITNESSES at
+#     this slice for object-types-not-in-grammar
+#     (LANGUAGE and TABLESPACE). The parser sees
+#     `ON LANGUAGE` / `ON TABLESPACE`, treats
+#     LANGUAGE / TABLESPACE as the object name (rather
+#     than an object-type keyword), then expects the
+#     next token to be `TO`. Different column from the
+#     LARGE OBJECT shape at
+#     pg_event_trigger_large_object_sentinel:242.
+#
+# This slice pins (SIXTEEN shapes — TEN silent-accept
+# BUGs, FOUR distinct 1064 parse-reject fingerprints,
+# TWO support baselines):
+#
+#   CORRUPTION-class BUG — option-clause silent-accept
+#   (headline #1, Shape A — 4 shapes):
+#
+#     A1 — `GRANT SELECT ON g TO u1 WITH GRANT OPTION`:
+#       SUCCESS, silent. The WITH GRANT OPTION modifier
+#       (which in PG would let `u1` re-grant SELECT on
+#       g to others) is parsed and dropped. Any future
+#       deployment with real auth will see the bare
+#       grant land but NOT the cascading authority.
+#
+#     A2 — `GRANT SELECT ON g TO u1 GRANTED BY postgres`:
+#       SUCCESS, silent. The GRANTED BY clause (PG 9.6+;
+#       records the grantor identity in pg_auth_members)
+#       is silently dropped. Audit trails relying on
+#       grantor identity will be empty.
+#
+#     A3 — `REVOKE SELECT ON g FROM u1 CASCADE`:
+#       SUCCESS, silent. CASCADE on REVOKE (which in PG
+#       would cascade the revocation through any grants
+#       u1 made onward) is silently dropped. Downstream
+#       grants persist past the revocation.
+#
+#     A4 — `REVOKE SELECT ON g FROM u1 RESTRICT`:
+#       SUCCESS, silent. RESTRICT on REVOKE (the
+#       opposite of CASCADE — refuses the revocation if
+#       any onward grants exist) is silently dropped. A
+#       guard intended to prevent accidental cascading
+#       removals does nothing.
+#
+#   CORRUPTION-class BUG — PG batch-grant silent-accept
+#   (headline #2, Shape B — 3 shapes):
+#
+#     B5 — `GRANT SELECT ON ALL TABLES IN SCHEMA public
+#       TO u1`: SUCCESS, silent. PG's plural-object
+#       form (grants the privilege on every existing
+#       table in the schema at the time of execution)
+#       is silently dropped. Apps that bulk-provision
+#       read-only roles get u1 with NO grants applied
+#       and NO diagnostic.
+#
+#     B6 — `GRANT SELECT ON ALL SEQUENCES IN SCHEMA
+#       public TO u1`: SUCCESS, silent. Same shape as
+#       B5 but for sequences. Apps that grant
+#       sequence-usage to a SERIAL-consuming role get
+#       NO grants.
+#
+#     B7 — `GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA
+#       public TO u1`: SUCCESS, silent. Function-call
+#       privileges — the batch grant pattern PG ORMs
+#       (Alembic, Liquibase) emit on schema setup —
+#       are silently dropped.
+#
+#   CORRUPTION-class BUG — database-level / PUBLIC
+#   silent-accept (headline #3, Shape C — 3 shapes):
+#
+#     C8 — `GRANT TEMPORARY ON DATABASE gdb TO u1`:
+#       SUCCESS, silent. TEMPORARY (alias TEMP) is a
+#       database-level PG privilege that controls
+#       whether a role can create temporary tables.
+#       Silently dropped.
+#
+#     C9 — `GRANT ALL PRIVILEGES ON DATABASE gdb TO u1`:
+#       SUCCESS, silent. DATABASE as an object-type
+#       (CONNECT + CREATE + TEMPORARY combined under
+#       ALL) is silently dropped. Per-database privilege
+#       separation is unenforced.
+#
+#     C10 — `GRANT SELECT ON g TO PUBLIC`: SUCCESS,
+#       silent. The PUBLIC pseudo-role (PG's name for
+#       "every role, including future ones") is silently
+#       accepted. Any "open this table to everyone"
+#       migration step appears to succeed but lands
+#       NOTHING.
+#
+#   4-SHAPE FINGERPRINT CATALOG — object-types-NOT-in-
+#   grammar parse-rejects (headline #4, Shape D — 4
+#   shapes, 4 DISTINCT 1064 fingerprints):
+#
+#     D11 — `GRANT r1 TO u1 WITH ADMIN OPTION`:
+#       "Expected: a privilege keyword, found: r1 at
+#       Line: 1, Column: 7". Role-membership grants
+#       (the GRANT <role> TO <role> form — no privilege
+#       keyword, the granted object IS the role) are
+#       not in zeta's grammar; the parser hits col 7
+#       expecting SELECT/INSERT/etc and finds the role
+#       name.
+#
+#     D12 — `GRANT USAGE ON LANGUAGE plpgsql TO u1`:
+#       "Expected: TO, found: plpgsql at Line: 1,
+#       Column: 25". LANGUAGE is not in the object-type
+#       grammar; the parser treats `LANGUAGE` as the
+#       object name and then expects TO immediately
+#       after — finds `plpgsql` instead.
+#
+#     D13 — `GRANT CREATE ON TABLESPACE pg_default
+#       TO u1`: "Expected: TO, found: pg_default at
+#       Line: 1, Column: 28". Mirror shape of D12 for
+#       TABLESPACE — same Expected: TO gate, different
+#       unexpected token + column. ORM regexes that
+#       fingerprint on column number distinguish these
+#       two.
+#
+#     D14 — `REVOKE GRANT OPTION FOR SELECT ON g FROM
+#       u1`: "Expected: a privilege keyword, found:
+#       GRANT at Line: 1, Column: 8". The
+#       REVOKE-GRANT-OPTION-FOR form (PG's way to drop
+#       the grant-onward authority without removing the
+#       base privilege) is not in the grammar; the
+#       parser at col 8 (after `REVOKE `) expects a
+#       privilege keyword and finds `GRANT`. Same
+#       "Expected: a privilege keyword" prefix as D11
+#       but at a different column with a different
+#       unexpected token.
+#
+#   SUPPORT BASELINES (Shape E — 2 shapes, bound the
+#   slice to existing coverage):
+#
+#     E15 — `GRANT ALL ON g TO u1`: SUCCESS. Re-pin of
+#       the auth_basic_extra:60 style without the
+#       db-qualifier — verifies the bare grant path
+#       still works on an unqualified relation name.
+#
+#     E16 — `GRANT USAGE ON SCHEMA public TO u1`:
+#       SUCCESS. Re-pin of auth_basic_extra:64 — the
+#       SCHEMA object-type baseline. Bounds the slice
+#       above: SCHEMA is in the grammar, so the bare
+#       form silently noops just like the table form.
+#
+# Pre-author dedup grep (run before authoring):
+#   grep -liE 'WITH GRANT OPTION|WITH ADMIN OPTION|
+#     GRANTED BY|ON ALL TABLES IN SCHEMA|ON ALL
+#     SEQUENCES|ON ALL FUNCTIONS|ON LANGUAGE|ON
+#     TABLESPACE|REVOKE GRANT OPTION FOR'
+#     tests/main/*.test
+# returned ZERO hits — every shape pinned here is
+# novel within the slice corpus.
+
+--echo === SHAPE A — option-clause silent-accept (4 shapes, CORRUPTION-class) ===
+
+--echo === A1 WITH GRANT OPTION — silent (cascading-authority modifier dropped) ===
+
+GRANT SELECT ON g TO u1 WITH GRANT OPTION;
+
+--echo === A2 GRANTED BY — silent (grantor-identity audit field dropped) ===
+
+GRANT SELECT ON g TO u1 GRANTED BY postgres;
+
+--echo === A3 REVOKE CASCADE — silent (cascading-revoke modifier dropped) ===
+
+REVOKE SELECT ON g FROM u1 CASCADE;
+
+--echo === A4 REVOKE RESTRICT — silent (revoke-only-if-safe guard dropped) ===
+
+REVOKE SELECT ON g FROM u1 RESTRICT;
+
+--echo === SHAPE B — PG batch-grant silent-accept (3 shapes, CORRUPTION-class) ===
+
+--echo === B5 GRANT ON ALL TABLES IN SCHEMA — silent (bulk-provision noop) ===
+
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO u1;
+
+--echo === B6 GRANT ON ALL SEQUENCES IN SCHEMA — silent (SERIAL-consumer setup noop) ===
+
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO u1;
+
+--echo === B7 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA — silent (ORM-migration noop) ===
+
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO u1;
+
+--echo === SHAPE C — database-level / PUBLIC silent-accept (3 shapes, CORRUPTION-class) ===
+
+--echo === C8 GRANT TEMPORARY ON DATABASE — silent (temp-table privilege dropped) ===
+
+GRANT TEMPORARY ON DATABASE gdb TO u1;
+
+--echo === C9 GRANT ALL PRIVILEGES ON DATABASE — silent (DATABASE object-type dropped) ===
+
+GRANT ALL PRIVILEGES ON DATABASE gdb TO u1;
+
+--echo === C10 GRANT SELECT TO PUBLIC — silent (PUBLIC pseudo-role dropped) ===
+
+GRANT SELECT ON g TO PUBLIC;
+
+--echo === SHAPE D — 4-shape fingerprint catalog (object-types NOT in grammar) ===
+
+--echo === D11 GRANT <role> TO <role> WITH ADMIN OPTION — "Expected: a privilege keyword, found: r1" at col 7 ===
+
+--error 1064
+GRANT r1 TO u1 WITH ADMIN OPTION;
+
+--echo === D12 GRANT ON LANGUAGE — "Expected: TO, found: plpgsql" at col 25 ===
+
+--error 1064
+GRANT USAGE ON LANGUAGE plpgsql TO u1;
+
+--echo === D13 GRANT ON TABLESPACE — "Expected: TO, found: pg_default" at col 28 (mirror of D12, different token+col) ===
+
+--error 1064
+GRANT CREATE ON TABLESPACE pg_default TO u1;
+
+--echo === D14 REVOKE GRANT OPTION FOR — "Expected: a privilege keyword, found: GRANT" at col 8 (mirror of D11, different token+col) ===
+
+--error 1064
+REVOKE GRANT OPTION FOR SELECT ON g FROM u1;
+
+--echo === SHAPE E — SUPPORT baselines (2 shapes, bound the slice) ===
+
+--echo === E15 GRANT ALL ON <table> — silent baseline (bare grant in-grammar) ===
+
+GRANT ALL ON g TO u1;
+
+--echo === E16 GRANT USAGE ON SCHEMA — silent baseline (re-pin of auth_basic_extra:64 form) ===
+
+GRANT USAGE ON SCHEMA public TO u1;
