@@ -86,10 +86,29 @@ SELECT COT(1) AS c;
 --error 1064
 SELECT 17 DIV 5;
 
---echo === KNOWN GAP: FORMAT 3-arg (locale) — errno 1105 ===
+--echo === KNOWN GAP: modulo operator `MOD` — errno 1064 ===
+# MySQL accepts both function form (MOD(a,b)) and infix
+# operator form (a MOD b). zeta accepts only the function
+# form. Distinct sqlparser fingerprint from the DIV gap above:
+# DIV emits "No infix parser for token Word", MOD emits
+# "Expected: end of statement" — different reject paths.
+# zeta-adapt: rewrite `a MOD b` as `MOD(a, b)` or `a % b`.
 
---error 1105
-SELECT FORMAT(1234567.891, 2, 'de_DE');
+--error 1064
+SELECT 10 MOD 3;
+
+--echo === PARTIAL FIX: FORMAT 3-arg arity accepted, locale silently ignored ===
+# Previously rejected with errno 1105 ("FORMAT requires 2
+# arguments"). zeta now accepts the 3-arg form, but the
+# locale parameter is silently dropped — output is the
+# en_US format regardless of the locale name.
+# Real MySQL output for 'de_DE' would be "1.234.567,89"
+# (dot thousands, comma decimal). zeta returns the en_US
+# "1,234,567.89" instead. Pinned as SILENT-DEGRADATION
+# so a follow-up fix that wires locale through is
+# detectable as a result diff.
+
+SELECT FORMAT(1234567.891, 2, 'de_DE') AS v;
 
 --echo === KNOWN DIVERGENCE: math domain errors — errno 1105 (MySQL returns NULL) ===
 
