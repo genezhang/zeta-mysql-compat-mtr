@@ -29,11 +29,12 @@
 #     "arithmetic op requires numbers". MySQL coerces TRUE→1
 #     and FALSE→0. Portable substitute: CAST(b AS INT) or
 #     CASE WHEN.
-#   # zeta-adapt: KNOWN DIVERGENCE — BIGINT overflow on +
-#     SILENTLY WRAPS to the negative bound (i64::MAX + 1 =
-#     i64::MIN). MySQL errors on overflow. Portable
-#     substitute: stay within BIGINT bounds, or promote to
-#     DECIMAL before arithmetic.
+#   # zeta-adapt: FIXED — BIGINT overflow on + now errors
+#     with 1105 "bigint out of range" (matches MySQL).
+#     Previously SILENTLY WRAPPED to the negative bound
+#     (i64::MAX + 1 = i64::MIN, data-corruption bug).
+#     Apps that relied on the wrap should promote to DECIMAL
+#     before arithmetic or stay within BIGINT bounds.
 #   # zeta-adapt: KNOWN DIVERGENCE — INT / INT division
 #     TRUNCATES to integer in zeta (`10 / 3` → 3). MySQL
 #     returns DECIMAL (`3.3333`). Portable substitute:
@@ -84,9 +85,11 @@ SELECT id FROM tc WHERE n = '42';
 --error 1105
 SELECT TRUE + 0;
 
---echo === KNOWN DIVERGENCE: BIGINT overflow silently wraps ===
---echo # i64::MAX + 1 wraps to i64::MIN (no overflow error).
+--echo === FIXED: BIGINT overflow now errors instead of silently wrapping ===
+# Previously i64::MAX + 1 wrapped to i64::MIN (silent data-corruption bug).
+# zeta now correctly rejects with 1105.
 
+--error 1105
 SELECT 9223372036854775807 + 1 AS wrap;
 
 --echo === KNOWN DIVERGENCE: INT / INT truncates to integer ===
