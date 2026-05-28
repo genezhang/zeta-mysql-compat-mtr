@@ -81,16 +81,16 @@ SELECT id, name, depth FROM org ORDER BY id;
 
 SELECT (WITH x AS (SELECT 1 AS v) SELECT v FROM x) AS r;
 
---echo === KNOWN DIVERGENCE: WITH-prefixed DML rejected (errno 1064) ===
---echo # MySQL 8.0+ accepts `WITH … INSERT/UPDATE/DELETE`; zeta does
---echo # not. Substitute: inline the CTE as a derived table inside
---echo # the DML statement.
+--echo === PARTIAL FIX: WITH+INSERT now works; WITH+UPDATE/DELETE still 1064 ===
+--echo # MySQL 8.0+ accepts `WITH … INSERT/UPDATE/DELETE`. zeta now
+--echo # supports the INSERT form (was 1064). UPDATE and DELETE still
+--echo # reject with a more helpful error pointing to the rewrite.
 
 DROP TABLE IF EXISTS dest;
 CREATE TABLE dest (v INT);
 
---error 1064
 WITH x AS (SELECT 42 AS v) INSERT INTO dest SELECT * FROM x;
+SELECT v FROM dest ORDER BY v;
 
 INSERT INTO dest VALUES (5);
 

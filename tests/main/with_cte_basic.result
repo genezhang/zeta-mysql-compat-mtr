@@ -64,19 +64,21 @@ id	name	depth
 SELECT (WITH x AS (SELECT 1 AS v) SELECT v FROM x) AS r;
 r
 1
-=== KNOWN DIVERGENCE: WITH-prefixed DML rejected (errno 1064) ===
-# MySQL 8.0+ accepts `WITH … INSERT/UPDATE/DELETE`; zeta does
-# not. Substitute: inline the CTE as a derived table inside
-# the DML statement.
+=== PARTIAL FIX: WITH+INSERT now works; WITH+UPDATE/DELETE still 1064 ===
+# MySQL 8.0+ accepts `WITH … INSERT/UPDATE/DELETE`. zeta now
+# supports the INSERT form (was 1064). UPDATE and DELETE still
+# reject with a more helpful error pointing to the rewrite.
 DROP TABLE IF EXISTS dest;
 CREATE TABLE dest (v INT);
 WITH x AS (SELECT 42 AS v) INSERT INTO dest SELECT * FROM x;
-ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+SELECT v FROM dest ORDER BY v;
+v
+42
 INSERT INTO dest VALUES (5);
 WITH y AS (SELECT 99 AS v) UPDATE dest SET v = (SELECT v FROM y);
-ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+ERROR 1064: SQL parse error: WITH … UPDATE/DELETE is not supported yet — move the CTE into a subquery, or split into a separate statement
 WITH y AS (SELECT 5 AS v) DELETE FROM dest WHERE v = (SELECT v FROM y);
-ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+ERROR 1064: SQL parse error: WITH … UPDATE/DELETE is not supported yet — move the CTE into a subquery, or split into a separate statement
 === Cleanup ===
 DROP TABLE emp;
 DROP TABLE dest;
