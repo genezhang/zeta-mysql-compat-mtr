@@ -16,11 +16,13 @@
 #     and a hierarchical org-chart traversal.
 #   # zeta-adapt: CTE inside a scalar subquery in SELECT-list —
 #     supported.
-#   # zeta-adapt: KNOWN DIVERGENCE — WITH-prefixed DML (`WITH … INSERT`,
-#     `WITH … UPDATE`, `WITH … DELETE`) REJECTED at parse with errno
-#     1064 "unsupported query form (only SELECT supported)". MySQL
-#     8.0+ accepts these. Substitute: declare the CTE in a derived
-#     table inside the DML statement instead. Pinned below.
+#   # zeta-adapt: PARTIAL FIX — `WITH … INSERT` is now supported
+#     (was 1064). `WITH … UPDATE` and `WITH … DELETE` still reject
+#     with errno 1064 but the message is now helpful: "WITH …
+#     UPDATE/DELETE is not supported yet — move the CTE into a
+#     subquery, or split into a separate statement". MySQL 8.0+
+#     accepts all three. For UPDATE/DELETE, substitute by inlining
+#     the CTE as a derived table inside the DML. Pinned below.
 
 --echo === Setup ===
 
