@@ -84,9 +84,10 @@ ERROR 1064: SQL parse error: sql parser error: Expected: ), found: SEPARATOR at 
 SELECT STD(n) AS sd FROM af;
 sd
 14.142135623730951
-=== KNOWN GAP: BIT_XOR — errno 1105 ===
-SELECT BIT_XOR(n) FROM af;
-ERROR 1105: execution error: unknown function: BIT_XOR
+=== FIXED: BIT_XOR aggregate now supported ===
+SELECT BIT_XOR(n) AS bx FROM af;
+bx
+26
 === Cleanup ===
 DROP TABLE af;
 DROP TABLE empty_af;

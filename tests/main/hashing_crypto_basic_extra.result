@@ -43,9 +43,10 @@ l_sha256
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha512'))) AS l_sha512;
 l_sha512
 128
-=== KNOWN GAP: RANDOM_BYTES (MySQL) — errno 1105 ===
-SELECT RANDOM_BYTES(16);
-ERROR 1105: execution error: unknown function: RANDOM_BYTES
+=== FIXED: RANDOM_BYTES (MySQL) now supported ===
+SELECT LENGTH(RANDOM_BYTES(16)) AS len16, LENGTH(RANDOM_BYTES(32)) AS len32;
+len16	len32
+16	32
 === KNOWN GAP: GEN_RANDOM_BYTES (PG pgcrypto) — errno 1105 ===
 SELECT GEN_RANDOM_BYTES(16);
 ERROR 1105: execution error: unknown function: GEN_RANDOM_BYTES
@@ -56,9 +57,13 @@ hello
 SELECT LENGTH(HEX(AES_ENCRYPT('plain', 'key'))) AS enc_hex_len;
 enc_hex_len
 64
-=== KNOWN GAP: COMPRESS (MySQL) — errno 1105 ===
-SELECT COMPRESS('hello');
-ERROR 1105: execution error: unknown function: COMPRESS
+=== FIXED: COMPRESS / UNCOMPRESS / UNCOMPRESSED_LENGTH (zlib) ===
+SELECT UNCOMPRESS(COMPRESS('hello')) AS round_trip;
+round_trip
+hello
+SELECT UNCOMPRESSED_LENGTH(COMPRESS('hello world')) AS orig_len;
+orig_len
+11
 === KNOWN GAP: PASSWORD (legacy MySQL) — errno 1105 ===
 SELECT PASSWORD('secret');
 ERROR 1105: execution error: unknown function: PASSWORD

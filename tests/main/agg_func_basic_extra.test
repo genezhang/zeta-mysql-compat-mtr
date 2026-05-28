@@ -44,9 +44,8 @@
 #     BOOL_AND / GROUP_CONCAT→STRING_AGG canonical-name
 #     family). Same Welford accumulator, POP (not SAMP)
 #     variance semantics.
-#   # zeta-adapt: KNOWN GAP — BIT_XOR(n) errors 1105 "unknown
-#     function: BIT_XOR". Portable substitute: SUM(n) % 2 over
-#     a 0/1 column, or fold via XOR in application code.
+#   # zeta-adapt: FIXED — BIT_XOR(n) aggregate is now supported.
+#     Computes the bitwise XOR of all non-NULL integer values.
 
 --echo === Setup ===
 
@@ -136,10 +135,9 @@ SELECT GROUP_CONCAT(product SEPARATOR '|') FROM af;
 
 SELECT STD(n) AS sd FROM af;
 
---echo === KNOWN GAP: BIT_XOR — errno 1105 ===
+--echo === FIXED: BIT_XOR aggregate now supported ===
 
---error 1105
-SELECT BIT_XOR(n) FROM af;
+SELECT BIT_XOR(n) AS bx FROM af;
 
 --echo === Cleanup ===
 

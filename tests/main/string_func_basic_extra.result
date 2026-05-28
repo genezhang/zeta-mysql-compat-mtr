@@ -64,14 +64,18 @@ nr
 === KNOWN GAP: CONVERT(str USING charset) — errno 1064 ===
 SELECT CONVERT('hello' USING utf8);
 ERROR 1064: SQL parse error: unsupported expression: CONVERT('hello' USING utf8)
-=== KNOWN GAP: WEIGHT_STRING — errno 1105 ===
-SELECT WEIGHT_STRING('hello');
-ERROR 1105: execution error: unknown function: WEIGHT_STRING
-=== KNOWN GAP: COMPRESS / UNCOMPRESS — errno 1105 ===
-SELECT COMPRESS('hello');
-ERROR 1105: execution error: unknown function: COMPRESS
-SELECT UNCOMPRESS('some-bytes');
-ERROR 1105: execution error: unknown function: UNCOMPRESS
-=== KNOWN GAP: EXPORT_SET — errno 1105 ===
-SELECT EXPORT_SET(5, 'Y', 'N', ',', 4);
-ERROR 1105: execution error: unknown function: EXPORT_SET
+=== FIXED: WEIGHT_STRING now supported ===
+SELECT HEX(WEIGHT_STRING('hello')) AS w;
+w
+68656C6C6F
+=== FIXED: COMPRESS / UNCOMPRESS / UNCOMPRESSED_LENGTH (zlib) ===
+SELECT UNCOMPRESS(COMPRESS('hello')) AS rt;
+rt
+hello
+SELECT UNCOMPRESS('some-bytes') AS invalid;
+invalid
+NULL
+=== FIXED: EXPORT_SET now supported ===
+SELECT EXPORT_SET(5, 'Y', 'N', ',', 4) AS e;
+e
+Y,N,Y,N

@@ -106,20 +106,24 @@ SELECT 'xyz'   NOT REGEXP 'l+' AS nr;
 --error 1064
 SELECT CONVERT('hello' USING utf8);
 
---echo === KNOWN GAP: WEIGHT_STRING — errno 1105 ===
+--echo === FIXED: WEIGHT_STRING now supported ===
+# Returns the input bytes (HEX-rendered here for stability).
+# MySQL would weight by collation; zeta's implementation is
+# a passthrough — pinned as-is, the collation weighting is a
+# follow-up gap.
 
---error 1105
-SELECT WEIGHT_STRING('hello');
+SELECT HEX(WEIGHT_STRING('hello')) AS w;
 
---echo === KNOWN GAP: COMPRESS / UNCOMPRESS — errno 1105 ===
+--echo === FIXED: COMPRESS / UNCOMPRESS / UNCOMPRESSED_LENGTH (zlib) ===
+# COMPRESS bytes are non-deterministic; pin via round-trip.
+# UNCOMPRESS on invalid bytes returns NULL (lenient — MySQL would
+# return NULL with a warning; zeta drops the warning).
 
---error 1105
-SELECT COMPRESS('hello');
+SELECT UNCOMPRESS(COMPRESS('hello')) AS rt;
+SELECT UNCOMPRESS('some-bytes') AS invalid;
 
---error 1105
-SELECT UNCOMPRESS('some-bytes');
+--echo === FIXED: EXPORT_SET now supported ===
+# EXPORT_SET(bits, on, off, sep, n) — bit-by-bit on/off render.
+# 5 = 0b101 → Y,N,Y,N (padded to n=4 bits).
 
---echo === KNOWN GAP: EXPORT_SET — errno 1105 ===
-
---error 1105
-SELECT EXPORT_SET(5, 'Y', 'N', ',', 4);
+SELECT EXPORT_SET(5, 'Y', 'N', ',', 4) AS e;

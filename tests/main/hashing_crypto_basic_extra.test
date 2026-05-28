@@ -88,10 +88,9 @@ SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha1'))) AS l_sha1;
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha256'))) AS l_sha256;
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha512'))) AS l_sha512;
 
---echo === KNOWN GAP: RANDOM_BYTES (MySQL) — errno 1105 ===
+--echo === FIXED: RANDOM_BYTES (MySQL) now supported ===
 
---error 1105
-SELECT RANDOM_BYTES(16);
+SELECT LENGTH(RANDOM_BYTES(16)) AS len16, LENGTH(RANDOM_BYTES(32)) AS len32;
 
 --echo === KNOWN GAP: GEN_RANDOM_BYTES (PG pgcrypto) — errno 1105 ===
 
@@ -103,10 +102,12 @@ SELECT GEN_RANDOM_BYTES(16);
 SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'mykey'), 'mykey') AS round_trip;
 SELECT LENGTH(HEX(AES_ENCRYPT('plain', 'key'))) AS enc_hex_len;
 
---echo === KNOWN GAP: COMPRESS (MySQL) — errno 1105 ===
+--echo === FIXED: COMPRESS / UNCOMPRESS / UNCOMPRESSED_LENGTH (zlib) ===
+# Pin via round-trip — the compressed bytes are non-deterministic
+# but the round-trip back to the original string must hold.
 
---error 1105
-SELECT COMPRESS('hello');
+SELECT UNCOMPRESS(COMPRESS('hello')) AS round_trip;
+SELECT UNCOMPRESSED_LENGTH(COMPRESS('hello world')) AS orig_len;
 
 --echo === KNOWN GAP: PASSWORD (legacy MySQL) — errno 1105 ===
 

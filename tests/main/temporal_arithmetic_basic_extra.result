@@ -79,12 +79,14 @@ in_future
 SELECT DATE_ADD(DATE '2024-01-01', INTERVAL 1 DAY) AS d_returns_ts;
 d_returns_ts
 2024-01-02 00:00:00
-=== KNOWN GAP: ADDTIME — errno 1105 ===
-SELECT ADDTIME(TIME '10:00:00', TIME '01:30:00');
-ERROR 1105: execution error: unknown function: ADDTIME
-=== KNOWN GAP: SUBTIME — errno 1105 ===
-SELECT SUBTIME(TIME '14:30:00', TIME '01:30:00');
-ERROR 1105: execution error: unknown function: SUBTIME
+=== FIXED: ADDTIME (TIME, TIME) now supported ===
+SELECT ADDTIME(TIME '10:00:00', TIME '01:30:00') AS r;
+r
+11:30:00
+=== FIXED: SUBTIME (TIME, TIME) now supported ===
+SELECT SUBTIME(TIME '14:30:00', TIME '01:30:00') AS r;
+r
+13:00:00
 === MAKETIME (MySQL) — works ===
 SELECT MAKETIME(14, 30, 45) AS t;
 t
