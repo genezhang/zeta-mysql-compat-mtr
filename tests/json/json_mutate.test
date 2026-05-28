@@ -38,38 +38,33 @@
 #     the M0 runner. Upstream coverage of these functions in
 #     json_functions.inc is dense and intermixed with directives the
 #     runner does not implement.
-#   # zeta-adapt: zeta has Postgres-flavored `jsonb_set` (takes a path
-#     array like `'{a,b}'`) but no MySQL `JSON_*` aliases for any of
-#     the four mutators here. All four currently surface as ERROR 1105
-#     unknown function and are pinned with `--error 1105`. Filed as
-#     part of zeta #1063 (broader function-alias gap).
-#   # zeta-adapt: .result is pinned to zeta's *observed* output. When a
-#     fix lands, drop the matching `--error` line; the next run will
-#     capture success output and the diff will document the upgrade.
+#   # zeta-adapt: FIXED — all four MySQL mutators (JSON_SET,
+#     JSON_INSERT, JSON_REPLACE, JSON_REMOVE) now implemented and
+#     match MySQL multi-path semantics. zeta also still has the
+#     Postgres-flavored `jsonb_set` (path-array form like `'{a,b}'`)
+#     as an alternate API.
+#   # zeta-adapt: .result is pinned to zeta's *observed* output.
+#     Outputs match MySQL semantics for the probed shapes.
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
 CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
 INSERT INTO t1 VALUES (1, '{"a": 1, "b": "two"}');
 
---echo # ---- JSON_SET — overwrite-or-create at path ----   zeta #1063
+--echo # ---- JSON_SET — overwrite-or-create at path ----   zeta #1063 — FIXED
 --echo # MySQL: returns {"a": 99, "b": "two", "c": "new"}
---error 1105
 SELECT JSON_SET(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
 
---echo # ---- JSON_INSERT — create-only-if-absent at path ----   zeta #1063
+--echo # ---- JSON_INSERT — create-only-if-absent at path ----   zeta #1063 — FIXED
 --echo # MySQL: returns {"a": 1, "b": "two", "c": "new"} (a unchanged)
---error 1105
 SELECT JSON_INSERT(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
 
---echo # ---- JSON_REPLACE — overwrite-only-if-present at path ----   zeta #1063
+--echo # ---- JSON_REPLACE — overwrite-only-if-present at path ----   zeta #1063 — FIXED
 --echo # MySQL: returns {"a": 99, "b": "two"} (c not added)
---error 1105
 SELECT JSON_REPLACE(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
 
---echo # ---- JSON_REMOVE — delete element at path ----   zeta #1063
+--echo # ---- JSON_REMOVE — delete element at path ----   zeta #1063 — FIXED
 --echo # MySQL: returns {"b": "two"}
---error 1105
 SELECT JSON_REMOVE(j, '$.a') AS out FROM t1 WHERE i = 1;
 
 DROP TABLE t1;

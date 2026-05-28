@@ -42,8 +42,9 @@
 #
 # zeta has `jsonb || jsonb` (Postgres-style), which is shallow PATCH-like
 # for objects and concat-like for arrays — not a 1:1 mapping to either
-# MySQL function. All three MySQL aliases currently surface as ERROR
-# 1105. Bundled under zeta #1063.
+# MySQL function. JSON_MERGE_PRESERVE and JSON_MERGE_PATCH are now
+# implemented and match MySQL semantics. JSON_MERGE (the deprecated
+# 8.0+ alias) is still unimplemented. Bundled under zeta #1063 — partial.
 #
 # Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
 #   # zeta-adapt: not a line-for-line copy; surface probe written to
@@ -57,29 +58,24 @@
 #   # zeta-adapt: .result is pinned to zeta's *observed* output.
 # ----------------------------------------------------------------------
 
---echo # ---- JSON_MERGE_PRESERVE — keep both values on collision ----   zeta #1063
+--echo # ---- JSON_MERGE_PRESERVE — keep both values on collision ----   zeta #1063 — FIXED
 --echo # MySQL: {"a": [1, 2], "b": 3}
---error 1105
 SELECT JSON_MERGE_PRESERVE('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
 
 --echo # MySQL: [1, 2, 3, 4]  (array + array → concat)
---error 1105
 SELECT JSON_MERGE_PRESERVE('[1, 2]', '[3, 4]') AS arr;
 
---echo # ---- JSON_MERGE_PATCH — RFC 7396 recursive patch, right-hand wins ----   zeta #1063
+--echo # ---- JSON_MERGE_PATCH — RFC 7396 recursive patch, right-hand wins ----   zeta #1063 — FIXED
 --echo # MySQL: {"a": 2, "b": 3}  (b wins for a)
---error 1105
 SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": 2}') AS merged;
 
 --echo # MySQL: {"b": 3}  (NULL deletes the key)
---error 1105
 SELECT JSON_MERGE_PATCH('{"a": 1, "b": 3}', '{"a": null}') AS deleted;
 
 --echo # MySQL: [3, 4]  (array replaces entirely, NOT concat)
---error 1105
 SELECT JSON_MERGE_PATCH('[1, 2]', '[3, 4]') AS arr;
 
---echo # ---- JSON_MERGE — deprecated alias for JSON_MERGE_PRESERVE ----   zeta #1063
+--echo # ---- JSON_MERGE — deprecated alias for JSON_MERGE_PRESERVE ----   zeta #1063 — STILL UNIMPL
 --echo # MySQL: {"a": [1, 2], "b": 3}  (same as PRESERVE)
 --echo # Kept because pre-5.7.22 apps emit it.
 --error 1105

@@ -3,18 +3,21 @@ CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
 INSERT INTO t1 VALUES
   (1, '{"a": "apple", "b": "banana", "nested": {"k": "apricot"}}'),
   (2, '["apple", "berry", "cherry"]');
-# ---- JSON_SEARCH one — first matching path ----   zeta #1063
+# ---- JSON_SEARCH one — first matching path ----   zeta #1063 — FIXED
 # MySQL: "$.a"
 SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 1;
-ERROR 1105: execution error: unknown function: JSON_SEARCH
-# ---- JSON_SEARCH all — JSON array of all matching paths ----   zeta #1063
+p
+"$.a"
+# ---- JSON_SEARCH all — JSON array of all matching paths ----   zeta #1063 — FIXED
 # MySQL: ["$.a", "$.nested.k"] (LIKE wildcard matches both `ap%`)
 SELECT JSON_SEARCH(j, 'all', 'ap%') AS p FROM t1 WHERE i = 1;
-ERROR 1105: execution error: unknown function: JSON_SEARCH
-# ---- JSON_SEARCH — array element match ----   zeta #1063
+p
+["$.a","$.nested.k"]
+# ---- JSON_SEARCH — array element match ----   zeta #1063 — FIXED
 # MySQL: "$[0]"
 SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 2;
-ERROR 1105: execution error: unknown function: JSON_SEARCH
+p
+"$[0]"
 # ---- JSON_VALID — well-formed JSON string returns 1 ----   zeta #1063 (JSON_VALID slice FIXED)
 # MySQL / zeta: 1
 SELECT JSON_VALID('{"a": 1}') AS v;

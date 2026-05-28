@@ -33,8 +33,10 @@
 #     is most useful as a CHECK-constraint predicate on TEXT columns
 #     that should hold JSON.)
 #
-# JSON_VALID is now implemented in zeta (zeta #1063, JSON_VALID slice
-# landed); JSON_SEARCH is still missing and stays bundled under #1063.
+# JSON_VALID and JSON_SEARCH are now both implemented in zeta
+# (zeta #1063). JSON_SEARCH supports 'one' / 'all' modes including
+# LIKE-wildcard patterns and array-element matching; paths are
+# returned as JSON-encoded strings matching MySQL semantics.
 #
 # Adaptation notes (per UPSTREAM.md rule 2; grep `zeta-adapt:` for hits):
 #   # zeta-adapt: not a line-for-line copy; surface probe written to
@@ -44,8 +46,9 @@
 #     zeta #1064 — implementations land together since the return
 #     value IS path strings.
 #   # zeta-adapt: .result is pinned to zeta's *observed* output —
-#     JSON_VALID rows now show the implemented success values
-#     (1 / 0 / NULL); the JSON_SEARCH rows remain ERROR 1105.
+#     both JSON_VALID and JSON_SEARCH now show implemented success
+#     values matching MySQL semantics (paths as JSON-encoded strings,
+#     wildcards via LIKE, 'one'/'all' modes).
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
@@ -54,19 +57,16 @@ INSERT INTO t1 VALUES
   (1, '{"a": "apple", "b": "banana", "nested": {"k": "apricot"}}'),
   (2, '["apple", "berry", "cherry"]');
 
---echo # ---- JSON_SEARCH one — first matching path ----   zeta #1063
+--echo # ---- JSON_SEARCH one — first matching path ----   zeta #1063 — FIXED
 --echo # MySQL: "$.a"
---error 1105
 SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 1;
 
---echo # ---- JSON_SEARCH all — JSON array of all matching paths ----   zeta #1063
+--echo # ---- JSON_SEARCH all — JSON array of all matching paths ----   zeta #1063 — FIXED
 --echo # MySQL: ["$.a", "$.nested.k"] (LIKE wildcard matches both `ap%`)
---error 1105
 SELECT JSON_SEARCH(j, 'all', 'ap%') AS p FROM t1 WHERE i = 1;
 
---echo # ---- JSON_SEARCH — array element match ----   zeta #1063
+--echo # ---- JSON_SEARCH — array element match ----   zeta #1063 — FIXED
 --echo # MySQL: "$[0]"
---error 1105
 SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 2;
 
 --echo # ---- JSON_VALID — well-formed JSON string returns 1 ----   zeta #1063 (JSON_VALID slice FIXED)
