@@ -97,12 +97,16 @@ WITH x AS () SELECT 1;
 
 WITH c(a, b) AS (SELECT 1) SELECT * FROM c;
 
---echo === KNOWN DIVERGENCE: data-modifying WITH errors 1064 ===
+--echo === PARTIAL FIX: WITH+INSERT now supported; WITH+DELETE/UPDATE still 1064 ===
+# zeta added support for `WITH ... INSERT INTO ...` since this
+# slice was authored. WITH+DELETE and WITH+UPDATE remain 1064
+# but now surface a more helpful error message that points to
+# the rewrite (subquery / split-statement).
 
 DROP TABLE IF EXISTS cti;
 CREATE TABLE cti (id INT, n INT);
---error 1064
 WITH src AS (SELECT 1 AS id, 10 AS n) INSERT INTO cti SELECT * FROM src;
+SELECT * FROM cti;
 --error 1064
 WITH src AS (SELECT 1 AS id) DELETE FROM cti WHERE id IN (SELECT id FROM src);
 --error 1064

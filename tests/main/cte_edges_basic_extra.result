@@ -31,15 +31,17 @@ ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a su
 WITH c(a, b) AS (SELECT 1) SELECT * FROM c;
 a
 1
-=== KNOWN DIVERGENCE: data-modifying WITH errors 1064 ===
+=== PARTIAL FIX: WITH+INSERT now supported; WITH+DELETE/UPDATE still 1064 ===
 DROP TABLE IF EXISTS cti;
 CREATE TABLE cti (id INT, n INT);
 WITH src AS (SELECT 1 AS id, 10 AS n) INSERT INTO cti SELECT * FROM src;
-ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+SELECT * FROM cti;
+id	n
+1	10
 WITH src AS (SELECT 1 AS id) DELETE FROM cti WHERE id IN (SELECT id FROM src);
-ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+ERROR 1064: SQL parse error: WITH … UPDATE/DELETE is not supported yet — move the CTE into a subquery, or split into a separate statement
 WITH src AS (SELECT 1 AS id) UPDATE cti SET n=99 WHERE id IN (SELECT id FROM src);
-ERROR 1064: SQL parse error: unsupported query form (only SELECT supported)
+ERROR 1064: SQL parse error: WITH … UPDATE/DELETE is not supported yet — move the CTE into a subquery, or split into a separate statement
 === KNOWN DIVERGENCE: duplicate CTE name silently uses last ===
 # PG/MySQL error 'WITH query name X specified more than once';
 # zeta returns row from the second definition (x=2).

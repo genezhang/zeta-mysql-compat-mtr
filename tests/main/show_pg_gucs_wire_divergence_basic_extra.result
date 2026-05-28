@@ -1,14 +1,14 @@
-=== SHOW search_path — silent empty (mysql-wire) ===
+=== SHOW search_path — silent empty on mysql wire ===
 SHOW search_path;
-=== SHOW STATEMENT_TIMEOUT — silent empty (mysql-wire) ===
+=== SHOW STATEMENT_TIMEOUT — silent empty on mysql wire ===
 SHOW STATEMENT_TIMEOUT;
-=== SHOW TRANSACTION_ISOLATION — silent empty (mysql-wire) ===
+=== SHOW TRANSACTION_ISOLATION — silent empty on mysql wire ===
 SHOW TRANSACTION_ISOLATION;
-=== SHOW SESSION_AUTHORIZATION — silent empty ===
+=== SHOW SESSION_AUTHORIZATION — silent empty on mysql wire ===
 SHOW SESSION_AUTHORIZATION;
-=== SHOW APPLICATION_NAME — silent empty ===
+=== SHOW APPLICATION_NAME — silent empty on mysql wire ===
 SHOW APPLICATION_NAME;
-=== SHOW client_encoding — silent empty ===
+=== SHOW client_encoding — silent empty on mysql wire ===
 SHOW client_encoding;
 === Cross-link: @@-syntax DOES work on mysql wire for these ===
 SELECT @@transaction_isolation;
