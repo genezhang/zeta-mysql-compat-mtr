@@ -45,16 +45,18 @@
 #     errors 1064 "unsupported expression". zeta is UTF-8
 #     throughout (no per-column charset). Portable substitute:
 #     no-op — strings are already UTF-8.
-#   # zeta-adapt: KNOWN GAP — WEIGHT_STRING(str) errors 1105
-#     "unknown function". MySQL-specific collation-byte
-#     accessor with no clean cross-database substitute.
-#   # zeta-adapt: KNOWN GAP — COMPRESS(s), UNCOMPRESS(b) error
-#     1105 "unknown function". MySQL-specific zlib wrappers;
-#     no portable substitute via SQL.
-#   # zeta-adapt: KNOWN GAP — EXPORT_SET(bits, on, off, sep, cnt)
-#     errors 1105 "unknown function". MySQL-specific bit-string
-#     formatter. Portable substitute: BIN(bits) + REPLACE for
-#     1/0-to-on/off.
+#   # zeta-adapt: PARTIAL FIX — WEIGHT_STRING(str) now executes
+#     but returns input bytes unchanged (no collation weighting).
+#     RISK: collation-comparison use cases (sort-key generation
+#     for case-insensitive ordering, etc.) will silently produce
+#     wrong-order results. Do NOT rely on WEIGHT_STRING for
+#     cross-collation ordering until zeta wires collation through.
+#   # zeta-adapt: FIXED — COMPRESS(s), UNCOMPRESS(b) (zlib)
+#     supported. UNCOMPRESS on invalid bytes returns NULL
+#     (MySQL emits a warning; zeta drops it). Pin via round-trip.
+#   # zeta-adapt: FIXED — EXPORT_SET(bits, on, off, sep, cnt)
+#     supported. Bit-by-bit on/off render with separator,
+#     LSB-first; truncated/padded to cnt bits.
 
 --echo === POSITION(substr IN str) — SQL-standard ===
 
@@ -106,11 +108,12 @@ SELECT 'xyz'   NOT REGEXP 'l+' AS nr;
 --error 1064
 SELECT CONVERT('hello' USING utf8);
 
---echo === FIXED: WEIGHT_STRING now supported ===
-# Returns the input bytes (HEX-rendered here for stability).
-# MySQL would weight by collation; zeta's implementation is
-# a passthrough — pinned as-is, the collation weighting is a
-# follow-up gap.
+--echo === PARTIAL FIX: WEIGHT_STRING executes but skips collation ===
+# Returns input bytes unchanged (HEX-rendered for stability).
+# RISK: MySQL apps that use WEIGHT_STRING for collation-based
+# sort-key generation (e.g. case-insensitive ordering) will
+# silently produce wrong-order results. Do NOT rely on
+# WEIGHT_STRING for cross-collation ordering on zeta.
 
 SELECT HEX(WEIGHT_STRING('hello')) AS w;
 

@@ -62,9 +62,11 @@
 #     (e.g. '2026-05-20 06:20:50.130430'). MySQL defaults
 #     to second precision unless an explicit precision arg
 #     is supplied. Pinned via relational predicate only.
-#   # zeta-adapt: KNOWN GAP — ADDTIME(t, dur) / SUBTIME(t,
-#     dur) error 1105 "unknown function: ADDTIME". Substitute
-#     via TIMESTAMP + INTERVAL.
+#   # zeta-adapt: FIXED — ADDTIME(t, dur) / SUBTIME(t, dur)
+#     now supported. For TIME-typed args zeta returns TIME
+#     (no epoch-date prefix). For string-args see
+#     date_time_basic_extra's note on the intentional
+#     TIMESTAMP-with-1970-01-01 divergence (zeta #1225).
 #   # zeta-adapt: MAKETIME(h, m, s) — supported. Returns
 #     TIME.
 #   # zeta-adapt: MAKE_DATE(y, m, d) / MAKE_TIME(h, m, s) —

@@ -64,7 +64,7 @@ nr
 === KNOWN GAP: CONVERT(str USING charset) — errno 1064 ===
 SELECT CONVERT('hello' USING utf8);
 ERROR 1064: SQL parse error: unsupported expression: CONVERT('hello' USING utf8)
-=== FIXED: WEIGHT_STRING now supported ===
+=== PARTIAL FIX: WEIGHT_STRING executes but skips collation ===
 SELECT HEX(WEIGHT_STRING('hello')) AS w;
 w
 68656C6C6F
