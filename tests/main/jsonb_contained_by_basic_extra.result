@@ -48,7 +48,7 @@ null_lhs_false
 SELECT 'null'::JSONB <@ 'null'::JSONB                         AS null_self_true;
 null_self_true
 1
-=== STRIKING: empty containers vacuously contained ===
+=== Empty containers vacuously contained (PG-compat: ∅ ⊆ X) ===
 SELECT '{}'::JSONB <@ '{"a":1}'::JSONB                        AS empty_obj_vacuously_true;
 empty_obj_vacuously_true
 1
