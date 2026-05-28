@@ -46,8 +46,9 @@
 #     zeta #1064 — implementations land together since the return
 #     value IS path strings.
 #   # zeta-adapt: .result is pinned to zeta's *observed* output —
-#     JSON_VALID rows now show the implemented success values
-#     (1 / 0 / NULL); the JSON_SEARCH rows remain ERROR 1105.
+#     both JSON_VALID and JSON_SEARCH now show implemented success
+#     values matching MySQL semantics (paths as JSON-encoded strings,
+#     wildcards via LIKE, 'one'/'all' modes).
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
