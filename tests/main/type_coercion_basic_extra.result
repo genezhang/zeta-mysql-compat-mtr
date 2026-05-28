@@ -39,11 +39,9 @@ SELECT id FROM tc WHERE n = '42';
 === KNOWN GAP: BOOL in arithmetic — errno 1105 ===
 SELECT TRUE + 0;
 ERROR 1105: execution error: arithmetic op requires numbers
-=== KNOWN DIVERGENCE: BIGINT overflow silently wraps ===
-# i64::MAX + 1 wraps to i64::MIN (no overflow error).
+=== FIXED: BIGINT overflow now errors instead of silently wrapping ===
 SELECT 9223372036854775807 + 1 AS wrap;
-wrap
--9223372036854775808
+ERROR 1105: execution error: bigint out of range
 === KNOWN DIVERGENCE: INT / INT truncates to integer ===
 # MySQL returns DECIMAL 3.3333; zeta returns 3.
 SELECT 10 / 3 AS trunc;

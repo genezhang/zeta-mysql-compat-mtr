@@ -5,8 +5,9 @@
 # DATE / BOOLEAN / TRY_CAST / float overflow / DECIMAL
 # truncation / BYTEA / UNSIGNED-via-CONVERT) by pinning the
 # EDGE behavior NOT covered there: TEXT→DATE/TIMESTAMP/TIME,
-# CAST narrow overflow rejection, BIGINT overflow silent-
-# clamp BUG, PG ::TYPE postfix, whitespace handling, FLOAT
+# CAST narrow overflow rejection, BIGINT overflow now-
+# correctly-rejects (was silent clamp BUG, fixed), PG ::TYPE
+# postfix, whitespace handling, FLOAT
 # → INT rounding divergence, INT → BOOL coercion, BOOL →
 # INT gap, ARRAY casts.
 #
@@ -20,10 +21,11 @@
 # works and can be chained. Whitespace is stripped for
 # numeric casts but preserved for TEXT cast.
 #
-# Three notable divergences/bugs: (a) CAST to BIGINT with
-# a value above i64::MAX silently CLAMPS to i64::MAX
-# without an error (parsing accepts the literal because
-# sqlparser allows arbitrarily-large integer literals). (b)
+# Three notable divergences (one previously-bug now-fixed):
+# (a) CAST to BIGINT with a value above i64::MAX now correctly
+# errors with 1105 "decimal out of range for BIGINT" (previously
+# silently CLAMPED to i64::MAX, a data-corruption bug — fixed).
+# (b)
 # CAST FLOAT → INT rounds half-away-from-zero (3.7 → 4,
 # -3.7 → -4) where PG TRUNCATES (3.7 → 3). (c) CAST BOOL
 # → INT errors 1105 — the reverse direction is supported
@@ -50,10 +52,11 @@
 #     value → true (matches MySQL / PG).
 #   # zeta-adapt: String → INT[] (PG array literal) —
 #     supported; parses '{1,2,3}' into Array.
-#   # zeta-adapt: KNOWN BUG — CAST <int_literal_above_i64::MAX>
-#     AS BIGINT silently CLAMPS to i64::MAX (9223372036854775807).
-#     Should error. Surfaces e.g. as
-#     `CAST(9223372036854775808 AS BIGINT) → 9223372036854775807`.
+#   # zeta-adapt: FIXED — CAST <int_literal_above_i64::MAX>
+#     AS BIGINT now correctly errors with 1105 "decimal out of
+#     range for BIGINT". Previously silently CLAMPED to i64::MAX
+#     (data-corruption bug). No app-side action needed; previously
+#     silent corruption is now a loud reject.
 #   # zeta-adapt: KNOWN GAP — `CAST(TRUE AS INT)` /
 #     `CAST(FALSE AS INT)` errors 1105 "cannot cast to
 #     INT". The reverse (INT → BOOL) works. Substitute
@@ -88,8 +91,11 @@ SELECT CAST(2147483648 AS INT);
 
 SELECT CAST(9223372036854775807 AS BIGINT) AS max_i64;
 
---echo === KNOWN BUG: CAST i64::MAX + 1 AS BIGINT silently clamps to i64::MAX ===
+--echo === FIXED: CAST i64::MAX + 1 AS BIGINT now errors instead of silent clamp ===
+# Previously silently clamped to i64::MAX (data-corruption bug).
+# zeta now correctly rejects with 1105.
 
+--error 1105
 SELECT CAST(9223372036854775808 AS BIGINT) AS overflow_clamp;
 
 --echo === PG ::TYPE postfix and chained casts ===

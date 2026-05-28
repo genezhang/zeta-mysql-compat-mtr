@@ -21,10 +21,9 @@ ERROR 1105: execution error: integer out of range for INT4: 2147483648
 SELECT CAST(9223372036854775807 AS BIGINT) AS max_i64;
 max_i64
 9223372036854775807
-=== KNOWN BUG: CAST i64::MAX + 1 AS BIGINT silently clamps to i64::MAX ===
+=== FIXED: CAST i64::MAX + 1 AS BIGINT now errors instead of silent clamp ===
 SELECT CAST(9223372036854775808 AS BIGINT) AS overflow_clamp;
-overflow_clamp
-9223372036854775807
+ERROR 1105: execution error: decimal out of range for BIGINT: 9223372036854775808
 === PG ::TYPE postfix and chained casts ===
 SELECT '42'::INT AS pg_cast, '2024-05-19'::DATE AS pg_date, 42::TEXT::INT AS chained;
 pg_cast	pg_date	chained
