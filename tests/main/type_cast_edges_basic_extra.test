@@ -21,10 +21,11 @@
 # works and can be chained. Whitespace is stripped for
 # numeric casts but preserved for TEXT cast.
 #
-# Three notable divergences/bugs: (a) CAST to BIGINT with
-# a value above i64::MAX silently CLAMPS to i64::MAX
-# without an error (parsing accepts the literal because
-# sqlparser allows arbitrarily-large integer literals). (b)
+# Three notable divergences (one previously-bug now-fixed):
+# (a) CAST to BIGINT with a value above i64::MAX now correctly
+# errors with 1105 "decimal out of range for BIGINT" (previously
+# silently CLAMPED to i64::MAX, a data-corruption bug — fixed).
+# (b)
 # CAST FLOAT → INT rounds half-away-from-zero (3.7 → 4,
 # -3.7 → -4) where PG TRUNCATES (3.7 → 3). (c) CAST BOOL
 # → INT errors 1105 — the reverse direction is supported
