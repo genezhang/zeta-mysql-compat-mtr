@@ -62,9 +62,11 @@
 #     (e.g. '2026-05-20 06:20:50.130430'). MySQL defaults
 #     to second precision unless an explicit precision arg
 #     is supplied. Pinned via relational predicate only.
-#   # zeta-adapt: KNOWN GAP — ADDTIME(t, dur) / SUBTIME(t,
-#     dur) error 1105 "unknown function: ADDTIME". Substitute
-#     via TIMESTAMP + INTERVAL.
+#   # zeta-adapt: FIXED — ADDTIME(t, dur) / SUBTIME(t, dur)
+#     now supported. For TIME-typed args zeta returns TIME
+#     (no epoch-date prefix). For string-args see
+#     date_time_basic_extra's note on the intentional
+#     TIMESTAMP-with-1970-01-01 divergence (zeta #1225).
 #   # zeta-adapt: MAKETIME(h, m, s) — supported. Returns
 #     TIME.
 #   # zeta-adapt: MAKE_DATE(y, m, d) / MAKE_TIME(h, m, s) —
@@ -137,15 +139,13 @@ SELECT NOW() > TIMESTAMP '2020-01-01 00:00:00' AS in_future;
 
 SELECT DATE_ADD(DATE '2024-01-01', INTERVAL 1 DAY) AS d_returns_ts;
 
---echo === KNOWN GAP: ADDTIME — errno 1105 ===
+--echo === FIXED: ADDTIME (TIME, TIME) now supported ===
 
---error 1105
-SELECT ADDTIME(TIME '10:00:00', TIME '01:30:00');
+SELECT ADDTIME(TIME '10:00:00', TIME '01:30:00') AS r;
 
---echo === KNOWN GAP: SUBTIME — errno 1105 ===
+--echo === FIXED: SUBTIME (TIME, TIME) now supported ===
 
---error 1105
-SELECT SUBTIME(TIME '14:30:00', TIME '01:30:00');
+SELECT SUBTIME(TIME '14:30:00', TIME '01:30:00') AS r;
 
 --echo === MAKETIME (MySQL) — works ===
 

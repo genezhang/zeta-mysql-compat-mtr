@@ -117,13 +117,16 @@ w
 SELECT MAKETIME(14, 30, 45) AS mt;
 mt
 14:30:45
-=== KNOWN GAP: ADDTIME / SUBTIME — errno 1105 ===
-SELECT ADDTIME('14:30:00', '1:30:00');
-ERROR 1105: execution error: unknown function: ADDTIME
-SELECT SUBTIME('14:30:00', '1:30:00');
-ERROR 1105: execution error: unknown function: SUBTIME
-=== KNOWN GAP: MAKEDATE (different signature than MAKE_DATE) — errno 1105 ===
-SELECT MAKEDATE(2024, 140);
-ERROR 1105: execution error: unknown function: MAKEDATE
+=== FIXED: ADDTIME / SUBTIME (string-string form) now supported ===
+SELECT ADDTIME('14:30:00', '1:30:00') AS r;
+r
+1970-01-01 16:00:00
+SELECT SUBTIME('14:30:00', '1:30:00') AS r;
+r
+1970-01-01 13:00:00
+=== FIXED: MAKEDATE (year, day-of-year) now supported ===
+SELECT MAKEDATE(2024, 140) AS d;
+d
+2024-05-19
 === Cleanup ===
 DROP TABLE dts;

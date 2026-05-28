@@ -35,18 +35,20 @@
 #   # zeta-adapt: HMAC(data, key, algorithm) — PG
 #     pgcrypto. Algorithm ∈ {md5, sha1, sha256, sha512,
 #     ...}. Returns Bytea; HEX() to see.
-#   # zeta-adapt: KNOWN GAP — RANDOM_BYTES(n) (MySQL) and
-#     GEN_RANDOM_BYTES(n) (PG pgcrypto) both error 1105
-#     "unknown function". No portable substitute exposed
-#     today.
+#   # zeta-adapt: FIXED — RANDOM_BYTES(n) (MySQL) now supported,
+#     returns n random bytes. GEN_RANDOM_BYTES(n) (PG pgcrypto)
+#     still errors 1105 — follow-up gap; substitute with
+#     RANDOM_BYTES on the MySQL wire.
 #   # zeta-adapt: AES_ENCRYPT(data, key) / AES_DECRYPT(...)
 #     — MySQL 2-arg shortcuts, supported since zeta #1209.
 #     Equivalent to ENCRYPT(data, key, 'aes') /
 #     DECRYPT(..., 'aes'). Returns BYTEA — wrap in HEX()
 #     to view; round-trip via AES_DECRYPT(AES_ENCRYPT(...)).
-#   # zeta-adapt: KNOWN GAP — COMPRESS / UNCOMPRESS
-#     (MySQL) error 1105. No compression surface exposed
-#     to SQL.
+#   # zeta-adapt: FIXED — COMPRESS / UNCOMPRESS (zlib) now
+#     supported. UNCOMPRESS on invalid bytes returns NULL
+#     (MySQL emits a warning; zeta drops it). Pin via
+#     round-trip UNCOMPRESS(COMPRESS(s)) since COMPRESS
+#     bytes are non-deterministic.
 #   # zeta-adapt: KNOWN GAP — PASSWORD (legacy MySQL
 #     password-hash function) errors 1105. Substitute via
 #     SHA2 or the proper auth path.
@@ -88,10 +90,9 @@ SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha1'))) AS l_sha1;
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha256'))) AS l_sha256;
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha512'))) AS l_sha512;
 
---echo === KNOWN GAP: RANDOM_BYTES (MySQL) — errno 1105 ===
+--echo === FIXED: RANDOM_BYTES (MySQL) now supported ===
 
---error 1105
-SELECT RANDOM_BYTES(16);
+SELECT LENGTH(RANDOM_BYTES(16)) AS len16, LENGTH(RANDOM_BYTES(32)) AS len32;
 
 --echo === KNOWN GAP: GEN_RANDOM_BYTES (PG pgcrypto) — errno 1105 ===
 
@@ -103,10 +104,12 @@ SELECT GEN_RANDOM_BYTES(16);
 SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'mykey'), 'mykey') AS round_trip;
 SELECT LENGTH(HEX(AES_ENCRYPT('plain', 'key'))) AS enc_hex_len;
 
---echo === KNOWN GAP: COMPRESS (MySQL) — errno 1105 ===
+--echo === FIXED: COMPRESS / UNCOMPRESS / UNCOMPRESSED_LENGTH (zlib) ===
+# Pin via round-trip — the compressed bytes are non-deterministic
+# but the round-trip back to the original string must hold.
 
---error 1105
-SELECT COMPRESS('hello');
+SELECT UNCOMPRESS(COMPRESS('hello')) AS round_trip;
+SELECT UNCOMPRESSED_LENGTH(COMPRESS('hello world')) AS orig_len;
 
 --echo === KNOWN GAP: PASSWORD (legacy MySQL) — errno 1105 ===
 
