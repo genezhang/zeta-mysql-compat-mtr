@@ -1,4 +1,4 @@
-=== JSON_OBJECT — empty + key alphabetic sort divergence ===
+=== JSON_OBJECT — empty + key length-then-alpha sort divergence ===
 SELECT JSON_OBJECT()                                           AS empty_obj;
 empty_obj
 {}
@@ -7,7 +7,7 @@ keys_sorted_alpha
 {"a":2,"m":3,"z":1}
 SELECT JSON_OBJECT('2', 'a', '1', 'b', '10', 'c')              AS numeric_string_keys_lex;
 numeric_string_keys_lex
-{"1":"b","10":"c","2":"a"}
+{"1":"b","2":"a","10":"c"}
 SELECT JSON_OBJECT('a', 1)                                     AS single_pair;
 single_pair
 {"a":1}
@@ -17,7 +17,7 @@ int_key_stringified
 {"1":"one"}
 SELECT JSON_OBJECT(TRUE, 'yes', FALSE, 'no')                   AS bool_key_stringified;
 bool_key_stringified
-{"false":"no","true":"yes"}
+{"true":"yes","false":"no"}
 SELECT JSON_OBJECT(2, 'two', 'ten', 10, 1, 'one')              AS mixed_keys_stringified;
 mixed_keys_stringified
 {"1":"one","2":"two","ten":10}

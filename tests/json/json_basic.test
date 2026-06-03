@@ -27,12 +27,11 @@
 #   # zeta-adapt: dropped `--error ER_INVALID_JSON_TEXT` cases — zeta's
 #     MySQL shim error-code mapping for malformed JSON literals is a
 #     separate gap to characterize before pinning expectations.
-#   # zeta-adapt: companion .result is pinned to zeta's *observed* output,
-#     not MySQL's canonical output. Known divergences:
-#       - Object key ordering: zeta sorts alphabetically; MySQL sorts by
-#         length-then-alphabetically. See zeta #1062. Visible in the
-#         nested-object SELECT (`SELECT j FROM t1 WHERE i = 12`).
-#     When #1062 lands, retighten the affected line and drop this note.
+#   # zeta-adapt: object key ordering is MySQL-canonical (length-then-
+#     alphabetical) as of zeta #1062 — shorter keys first, ties broken
+#     alphabetically. Matches MySQL 8.0 (and PostgreSQL jsonb). The
+#     remaining cosmetic difference vs MySQL is spacing: zeta emits
+#     compact `{"k":"v"}` where MySQL inserts a space after `:`/`,`.
 # ----------------------------------------------------------------------
 
 --echo # Verify CREATE TABLE with a JSON column.
