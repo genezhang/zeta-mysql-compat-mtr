@@ -83,12 +83,11 @@ shape_ok
 # 2024-03-15 is a Friday.
 # MySQL DAYOFWEEK: Sunday=1..Sat=7 → Friday=6
 # MySQL WEEKDAY:   Monday=0..Sun=6 → Friday=4
-# KNOWN DIVERGENCE: WEEK(d) uses ISO/PG week numbering
-# (Mon-start, week 1 contains Jan 4). MySQL default mode 0
-# is Sun-start with different boundary rules — for
-# 2024-03-15 MySQL mode 0 returns 10, zeta/PG returns 11.
-# Pinning the zeta-side value to surface the divergence;
-# add a `mode` arg + mode 0 algorithm in a follow-up.
+# WEEK(d[, mode]) — all 8 MySQL modes, fixed in zeta #1090.
+# WEEK(d) now defaults to mode 0 (Sun-start) like MySQL, so
+# 2024-03-15 returns 10 (was ISO 11). WEEKOFYEAR stays ISO
+# (== mode 3 == 11). YEARWEEK now uses real mode semantics
+# (default mode 0) too.
 SELECT YEAR('2024-03-15') AS v;
 v
 2024
@@ -121,7 +120,22 @@ v
 4
 SELECT WEEK('2024-03-15') AS v;
 v
+10
+SELECT WEEK('2024-03-15', 0) AS v;
+v
+10
+SELECT WEEK('2024-03-15', 3) AS v;
+v
 11
+SELECT WEEKOFYEAR('2024-03-15') AS v;
+v
+11
+SELECT YEARWEEK('2024-03-15') AS v;
+v
+202410
+SELECT YEARWEEK('2024-01-01', 0) AS v;
+v
+202353
 SELECT QUARTER('2024-03-15') AS v;
 v
 1
@@ -177,7 +191,7 @@ v
 00
 SELECT DATE_FORMAT('2024-01-01', '%V') AS v;
 v
-01
+53
 # STR_TO_DATE always returns Timestamp (midnight for date-only
 # formats) so the runtime value matches the advertised column
 # type. See #1094 review.

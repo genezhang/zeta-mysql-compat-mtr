@@ -85,7 +85,7 @@ wd
 1
 SELECT WEEK('2026-05-19')              AS w;
 w
-21
+20
 SELECT QUARTER('2026-05-19')           AS q;
 q
 2

@@ -9,85 +9,67 @@
 #   - date_time_basic_extra.test:137: ONE row
 #     `WEEKOFYEAR('2024-05-19')`.
 #   - yearweek_basic_extra.test: covers YEARWEEK with the
-#     2-arg mode form and year-shift edge cases (4-day rule,
-#     53-week years). DO NOT duplicate ISO-year-shift
-#     pinning — that file owns it. This slice keeps to bare
-#     WEEK/WEEKOFYEAR per-week-number values and arity.
+#     2-arg mode form and year-boundary edge cases. This slice
+#     keeps to bare WEEK/WEEKOFYEAR per-week-number values,
+#     the WEEK(d, mode) 2-arg form, and arity.
 #   - day_week_last_day_basic_extra.test: covers DAYOFWEEK /
 #     DAYOFYEAR / WEEKDAY / LAST_DAY.
 #
-# This slice pins what those slices DO NOT:
-#   - WEEK and WEEKOFYEAR equivalence (same impl: ISO-week).
-#   - 2-arg WEEK(d, mode) MySQL form → ERROR 1105 (zeta is
-#     1-arg only). MAJOR DIVERGENCE — MySQL defaults to
-#     mode 0 (Sunday-first), zeta returns ISO weeks.
-#   - Arity errors (0 args, 2 args).
-#   - Wrong-type (Int, Float, Bool) → 1105.
-#   - Unparseable-string → 1105.
-#   - NULL propagation (NULL + typed NULL).
-#   - TIMESTAMP arg (separate code path from Date).
-#   - WEEK at ISO 4-day-rule boundary: 2024-12-30 (Monday) →
-#     week 1 of 2025; 2024-01-01 (Monday) → week 1; 2023-01-01
-#     (Sunday) → week 52 of 2022.
-#   - WEEK return type is Int (mysql wire renders as bigint).
-#
-# Big-picture finding:
-#   zeta's WEEK and WEEKOFYEAR are aliases: SAME impl arm at
-#   lib.rs:51753 (`"WEEK" | "WEEKOFYEAR" => iso_week_number`).
-#   Both ALWAYS return ISO 8601 week number (Monday-first,
-#   week-containing-thursday). This is a DIVERGENCE from
-#   MySQL:
-#     - MySQL's WEEK(d) defaults to mode 0 (Sunday-first).
-#       Different value for some dates.
-#     - MySQL's WEEK(d, mode) takes 0..7. Zeta REJECTS the
-#       2-arg form (only 1-arg arity supported).
-#     - MySQL's WEEKOFYEAR(d) = WEEK(d, 3) (ISO). Coincidentally
-#       matches zeta's behavior.
-#   So porting MySQL apps that use WEEK(d) bare may silently
-#   return different values, and apps using WEEK(d, mode)
-#   will fail with arity error.
+# Big-picture finding (zeta #1090):
+#   WEEK(d) defaults to MySQL mode 0 (Sunday-first); WEEKOFYEAR(d)
+#   is always ISO (== WEEK(d, 3), Monday-first 4-day rule). They
+#   AGREE mid-year but DIVERGE near year boundaries (e.g.
+#   2024-01-01: WEEK=0, WEEKOFYEAR=1). WEEK now accepts the
+#   2-arg WEEK(d, mode) form for mode 0..7; WEEKOFYEAR stays
+#   1-arg only. Values verified against MySQL 8.0.
 #
 # Adaptation notes:
-#   # zeta-adapt: WEEK and WEEKOFYEAR both return ISO 8601
-#     week number — same value. zeta's WEEK(d) = MySQL's
-#     WEEK(d, 3), NOT MySQL's WEEK(d, 0).
-#   # zeta-adapt: 2-arg WEEK(d, mode) → 1105 'WEEK requires
-#     1 argument'.
+#   # zeta-adapt: WEEK(d) = MySQL mode 0; WEEKOFYEAR(d) = ISO
+#     (MySQL mode 3). 2-arg WEEK(d, mode) supported 0..=7.
+#   # zeta-adapt: WEEKOFYEAR is 1-arg only → 2-arg is 1105.
 #   # zeta-adapt: Wrong-type → 1105 'requires a date,
 #     timestamp, or parseable string'.
 #   # zeta-adapt: Unparseable string → 1105 'cannot parse <s>
 #     as a date or timestamp'.
 
---echo === WEEK and WEEKOFYEAR equivalence (same ISO impl) ===
+--echo === WEEK (mode 0 default) vs WEEKOFYEAR (ISO) ===
 
-# Both functions share the impl arm — values are identical
-# for ANY input.
+# Agree mid-year, diverge at year boundaries.
 SELECT WEEK(DATE '2024-05-19')        = WEEKOFYEAR(DATE '2024-05-19')        AS may_eq;
-SELECT WEEK(DATE '2024-01-01')        = WEEKOFYEAR(DATE '2024-01-01')        AS jan_eq;
-SELECT WEEK(DATE '2024-12-31')        = WEEKOFYEAR(DATE '2024-12-31')        AS dec_eq;
+SELECT WEEK(DATE '2024-01-01')        = WEEKOFYEAR(DATE '2024-01-01')        AS jan_diverge;
+SELECT WEEK(DATE '2024-12-31')        = WEEKOFYEAR(DATE '2024-12-31')        AS dec_diverge;
 SELECT WEEK(TIMESTAMP '2024-05-19 14:30:00')
      = WEEKOFYEAR(TIMESTAMP '2024-05-19 14:30:00')                           AS ts_eq;
 
---echo === WEEK ISO 4-day rule — year boundary edges ===
+--echo === WEEK default mode 0 — year boundary edges ===
 
-# 2024-01-01 (Monday) → ISO week 1 of 2024.
-SELECT WEEK(DATE '2024-01-01')                                AS mon_jan1_2024_w1;
-# 2023-01-01 (Sunday) → ISO week 52 of 2022 (4-day rule: the
-# week containing Jan 4 / first Thursday).
-SELECT WEEK(DATE '2023-01-01')                                AS sun_jan1_2023_w52;
-# 2024-12-30 (Monday) → ISO week 1 of 2025 (forward shift).
-SELECT WEEK(DATE '2024-12-30')                                AS mon_dec30_2024_forward_w1;
-# 2026-01-01 (Thursday) → ISO week 1 of 2026.
-SELECT WEEK(DATE '2026-01-01')                                AS thu_jan1_2026_w1;
-# 2021-12-31 (Friday) — last day in week 52 of 2021.
+# 2024-01-01 (Monday) before the first Sunday → week 0.
+SELECT WEEK(DATE '2024-01-01')                                AS mon_jan1_2024_w0;
+# 2023-01-01 is a Sunday → starts week 1.
+SELECT WEEK(DATE '2023-01-01')                                AS sun_jan1_2023_w1;
+# 2024-12-30 (Monday) → week 52 of 2024 in mode 0.
+SELECT WEEK(DATE '2024-12-30')                                AS mon_dec30_2024_w52;
+# 2026-01-01 (Thursday) before the first Sunday → week 0.
+SELECT WEEK(DATE '2026-01-01')                                AS thu_jan1_2026_w0;
+# 2021-12-31 (Friday) — week 52 of 2021.
 SELECT WEEK(DATE '2021-12-31')                                AS fri_dec31_2021_w52;
-# Sentinel: WEEK and WEEKOFYEAR agree at all the above edges.
-SELECT WEEK(DATE '2023-01-01') = WEEKOFYEAR(DATE '2023-01-01') AS edges_agree_sun;
-SELECT WEEK(DATE '2024-12-30') = WEEKOFYEAR(DATE '2024-12-30') AS edges_agree_forward;
+
+--echo === WEEKOFYEAR — always ISO (mode 3) ===
+
+SELECT WEEKOFYEAR(DATE '2024-01-01')                          AS iso_jan1_2024_w1;
+SELECT WEEKOFYEAR(DATE '2023-01-01')                          AS iso_jan1_2023_w52;
+SELECT WEEKOFYEAR(DATE '2024-12-30')                          AS iso_dec30_2024_w1;
+
+--echo === WEEK(d, mode) — 2-arg form supported (zeta #1090) ===
+
+SELECT WEEK(DATE '2024-05-19', 0)                             AS may_mode0;
+SELECT WEEK(DATE '2024-05-19', 3)                             AS may_mode3;
+SELECT WEEK(DATE '2024-05-19', 7)                             AS may_mode7;
+# Mode 2 (Sunday-first, rollover) puts 2024-01-01 in week 53.
+SELECT WEEK(DATE '2024-01-01', 2)                             AS jan_mode2_w53;
 
 --echo === WEEK — TIMESTAMP arg (time-of-day independent) ===
 
-# Time-of-day must not change the week number.
 SELECT WEEK(TIMESTAMP '2024-05-19 00:00:00')                  AS midnight;
 SELECT WEEK(TIMESTAMP '2024-05-19 23:59:59')                  AS one_sec_before_midnight;
 SELECT WEEK(TIMESTAMP '2024-05-19 00:00:00')
@@ -100,20 +82,8 @@ SELECT WEEK('2024-05-19')                                     AS str_date_only;
 SELECT WEEK('2024-05-19 14:30:00')                            AS str_with_time;
 SELECT WEEK('2024-05-19') = WEEK(DATE '2024-05-19')           AS str_eq_date;
 
---echo === WEEK — MAJOR DIVERGENCE: 2-arg MySQL form rejected ===
+--echo === WEEKOFYEAR — 2-arg form rejected (1-arg only) ===
 
-# MySQL allows WEEK(d, mode) where mode ∈ 0..7. Zeta is 1-arg
-# only and returns ISO weeks unconditionally — equivalent to
-# MySQL's WEEK(d, 3). Porting MySQL code using WEEK(d, 0)
-# (the MySQL default) will fail at the parser/runtime layer.
---error 1105
-SELECT WEEK(DATE '2024-05-19', 0);
---error 1105
-SELECT WEEK(DATE '2024-05-19', 3);
---error 1105
-SELECT WEEK(DATE '2024-05-19', 7);
-# Same for WEEKOFYEAR — MySQL also forbids 2-arg here, but
-# pin it for the zeta surface.
 --error 1105
 SELECT WEEKOFYEAR(DATE '2024-05-19', 0);
 
@@ -123,6 +93,13 @@ SELECT WEEKOFYEAR(DATE '2024-05-19', 0);
 SELECT WEEK();
 --error 1105
 SELECT WEEKOFYEAR();
+
+--echo === WEEK — mode out of range → ERROR 1105 ===
+
+--error 1105
+SELECT WEEK(DATE '2024-05-19', 8);
+--error 1105
+SELECT WEEK(DATE '2024-05-19', -1);
 
 --echo === WEEK / WEEKOFYEAR — wrong-type → ERROR 1105 ===
 
