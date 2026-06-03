@@ -3,11 +3,9 @@ CREATE TABLE t1 (i INT PRIMARY KEY, j JSON);
 INSERT INTO t1 VALUES
   (1, '[{"name": "apple", "qty": 3}, {"name": "banana", "qty": 7}]'),
   (2, '[{"name": "cherry", "qty": 5}]');
-# ---- JSON_TABLE simple shape ----   zeta #1065
-# MySQL: rows (1,"apple",3) (1,"banana",7) (2,"cherry",5)
-# zeta: parser-level rejection (1064) — JSON_TABLE has its own
-# FROM-clause grammar, not a regular function call, so this is
-# tracked separately from the #1063 function-alias family.
+# ---- JSON_TABLE simple shape ----   zeta #1065 stage 1
+# rows: (1,"apple",3) (1,"banana",7) (2,"cherry",5) — one row
+# per array element, joined laterally against t1.
 SELECT t1.i, jt.name, jt.qty
 FROM t1,
      JSON_TABLE(
@@ -18,5 +16,8 @@ FROM t1,
        )
      ) AS jt
 ORDER BY t1.i, jt.name;
-ERROR 1064: SQL parse error: unsupported FROM clause (only table references, subqueries, and functions supported)
+i	name	qty
+1	apple	3
+1	banana	7
+2	cherry	5
 DROP TABLE t1;
