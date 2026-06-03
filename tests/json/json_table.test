@@ -40,16 +40,14 @@
 #   # zeta-adapt: not a line-for-line copy; surface probe written to
 #     fit the M0 runner. Upstream coverage is 50k+ of feature-by-
 #     feature coverage that the M0 runner can't drive.
-#   # zeta-adapt: scoped to the simple column-extraction case only.
-#     NESTED PATH / FOR ORDINALITY / DEFAULT / EXISTS PATH variants
-#     deferred to follow-up probes once the base parser support
-#     lands.
 #   # zeta-adapt: base JSON_TABLE support landed in zeta #1065 stage 1
 #     (plain `name TYPE PATH '...'` columns over a `$[*]` or `$` root,
-#     incl. implicit-LATERAL against a table column) — this probe now
-#     captures real rows. The heavier features (NESTED PATH / FOR
-#     ORDINALITY / DEFAULT|EXISTS PATH) are still rejected at parse
-#     time and stay out of this probe.
+#     incl. implicit-LATERAL against a table column).
+#   # zeta-adapt: stage 2 landed `FOR ORDINALITY` (#1065 2a, a 1-based
+#     per-expansion row counter) and `NESTED PATH` (#1065 2b, recursive
+#     flatten with MySQL outer-join + sibling-union semantics) — both
+#     probed below. `DEFAULT`/`EXISTS PATH` and `ON EMPTY|ON ERROR`
+#     remain rejected at parse time and stay out of this probe.
 # ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS t1;
@@ -72,4 +70,33 @@ FROM t1,
      ) AS jt
 ORDER BY t1.i, jt.name;
 
+--echo # ---- FOR ORDINALITY ----   zeta #1065 stage 2a
+--echo # rn is a 1-based row counter within each lateral expansion,
+--echo # restarting per outer row: i=1 -> (1,apple),(2,banana); i=2 -> (1,cherry).
+--echo # rows: (1,1,"apple") (1,2,"banana") (2,1,"cherry").
+SELECT t1.i, jt.rn, jt.name
+FROM t1,
+     JSON_TABLE(
+       t1.j,
+       '$[*]' COLUMNS (
+         rn   FOR ORDINALITY,
+         name VARCHAR(20) PATH '$.name'
+       )
+     ) AS jt
+ORDER BY t1.i, jt.rn;
+
 DROP TABLE t1;
+
+--echo # ---- NESTED PATH ----   zeta #1065 stage 2b
+--echo # Parent id repeats per child; an empty/missing nested array still
+--echo # emits one parent row with the nested column NULL (outer-join).
+--echo # rows: (1,10) (1,20) (2,NULL).
+SELECT id, cid
+FROM JSON_TABLE(
+       '[{"id":1,"ch":[{"c":10},{"c":20}]},{"id":2,"ch":[]}]',
+       '$[*]' COLUMNS (
+         id  INT PATH '$.id',
+         NESTED PATH '$.ch[*]' COLUMNS (cid INT PATH '$.c')
+       )
+     ) AS jt
+ORDER BY id, cid;
