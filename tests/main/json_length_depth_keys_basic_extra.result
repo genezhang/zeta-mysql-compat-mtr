@@ -101,11 +101,11 @@ empty_obj_keys_is_null_false
 === JSON_KEYS object keys with special chars ===
 SELECT JSON_KEYS('{"a\"b":1,"c":2}')         AS key_with_quote;
 key_with_quote
-["a\"b","c"]
+["c","a\"b"]
 SELECT JSON_KEYS('{"a\\b":1,"c":2}')         AS key_with_backslash;
 key_with_backslash
-["a\\b","c"]
-=== JSON_KEYS sort order — alphabetic (zeta-jsonb binary) ===
+["c","a\\b"]
+=== JSON_KEYS sort order — length-then-alpha (zeta-jsonb binary) ===
 SELECT JSON_KEYS('{"z":1,"a":2,"m":3}')      AS sorted_alpha;
 sorted_alpha
 ["a","m","z"]
@@ -115,7 +115,7 @@ sorted_alpha_words
 ["apple","banana","cherry"]
 SELECT JSON_KEYS('{"2":1,"1":2,"10":3}')     AS sorted_alpha_numeric_keys;
 sorted_alpha_numeric_keys
-["1","10","2"]
+["1","2","10"]
 === JSON_KEYS on non-object root → SQL NULL ===
 SELECT JSON_KEYS('[1,2,3]')   IS NULL        AS array_root_null;
 array_root_null

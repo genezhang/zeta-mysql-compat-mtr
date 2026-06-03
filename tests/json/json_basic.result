@@ -32,7 +32,7 @@ i	j
 INSERT INTO t1 VALUES (12, '{"a":"b", "c":"d", "ab":"abc", "bc": ["x", "y"]}');
 SELECT j FROM t1 WHERE i = 12;
 j
-{"a":"b","ab":"abc","bc":["x","y"],"c":"d"}
+{"a":"b","c":"d","ab":"abc","bc":["x","y"]}
 # Count by JSON-null vs SQL-null to confirm they are distinct rows.
 SELECT COUNT(*) AS total FROM t1;
 total

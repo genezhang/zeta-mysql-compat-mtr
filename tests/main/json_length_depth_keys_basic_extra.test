@@ -130,16 +130,18 @@ SELECT JSON_KEYS('{}') IS NULL               AS empty_obj_keys_is_null_false;
 SELECT JSON_KEYS('{"a\"b":1,"c":2}')         AS key_with_quote;
 SELECT JSON_KEYS('{"a\\b":1,"c":2}')         AS key_with_backslash;
 
---echo === JSON_KEYS sort order — alphabetic (zeta-jsonb binary) ===
+--echo === JSON_KEYS sort order — length-then-alpha (zeta-jsonb binary) ===
 
-# zeta-jsonb stores objects with keys sorted lexicographically,
-# so JSON_KEYS returns them alphabetically REGARDLESS of input
-# order. MySQL preserves insertion order; documented divergence.
+# zeta-jsonb stores objects in MySQL-canonical key order (length-then-
+# alphabetical, zeta #1062), so JSON_KEYS returns keys that way
+# REGARDLESS of input order — matching MySQL 8.0 (which also returns
+# canonical, not insertion, order). For all-single-char keys this looks
+# like plain alphabetical.
 SELECT JSON_KEYS('{"z":1,"a":2,"m":3}')      AS sorted_alpha;
 SELECT JSON_KEYS('{"banana":1,"apple":2,"cherry":3}')
                                               AS sorted_alpha_words;
-# Numeric-ish keys still sort lexicographically (string-wise).
-# "10" < "2" lexicographically, so the order is "1","10","2".
+# Numeric-ish keys: shorter first, so "1","2" precede "10" — not pure
+# lexicographic ("10" < "2" alpha would give "1","10","2").
 SELECT JSON_KEYS('{"2":1,"1":2,"10":3}')     AS sorted_alpha_numeric_keys;
 
 --echo === JSON_KEYS on non-object root → SQL NULL ===

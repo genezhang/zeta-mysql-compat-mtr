@@ -47,13 +47,15 @@
 #     zeta-jsonb build_object; pinned below so a refactor
 #     that changes "last wins" semantics is caught.
 
---echo === JSON_OBJECT — empty + key alphabetic sort divergence ===
+--echo === JSON_OBJECT — empty + key length-then-alpha sort divergence ===
 
 # Empty constructor: matches MySQL.
 SELECT JSON_OBJECT()                                           AS empty_obj;
-# Output keys sorted alphabetically — input order LOST.
+# Output keys sorted length-then-alphabetically (MySQL-canonical) —
+# input order LOST. For single-char keys this matches plain alpha.
 SELECT JSON_OBJECT('z', 1, 'a', 2, 'm', 3)                     AS keys_sorted_alpha;
-# Numeric-string keys sort lexicographically (NOT numerically).
+# Numeric-string keys: shorter keys first (1, 2 before 10), NOT numeric
+# and NOT pure-lexicographic.
 SELECT JSON_OBJECT('2', 'a', '1', 'b', '10', 'c')              AS numeric_string_keys_lex;
 # Single-pair object — degenerate case.
 SELECT JSON_OBJECT('a', 1)                                     AS single_pair;
