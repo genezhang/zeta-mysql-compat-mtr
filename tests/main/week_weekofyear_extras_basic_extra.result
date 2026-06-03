@@ -1,39 +1,56 @@
-=== WEEK and WEEKOFYEAR equivalence (same ISO impl) ===
+=== WEEK (mode 0 default) vs WEEKOFYEAR (ISO) ===
 SELECT WEEK(DATE '2024-05-19')        = WEEKOFYEAR(DATE '2024-05-19')        AS may_eq;
 may_eq
 1
-SELECT WEEK(DATE '2024-01-01')        = WEEKOFYEAR(DATE '2024-01-01')        AS jan_eq;
-jan_eq
-1
-SELECT WEEK(DATE '2024-12-31')        = WEEKOFYEAR(DATE '2024-12-31')        AS dec_eq;
-dec_eq
-1
+SELECT WEEK(DATE '2024-01-01')        = WEEKOFYEAR(DATE '2024-01-01')        AS jan_diverge;
+jan_diverge
+0
+SELECT WEEK(DATE '2024-12-31')        = WEEKOFYEAR(DATE '2024-12-31')        AS dec_diverge;
+dec_diverge
+0
 SELECT WEEK(TIMESTAMP '2024-05-19 14:30:00')
      = WEEKOFYEAR(TIMESTAMP '2024-05-19 14:30:00')                           AS ts_eq;
 ts_eq
 1
-=== WEEK ISO 4-day rule — year boundary edges ===
-SELECT WEEK(DATE '2024-01-01')                                AS mon_jan1_2024_w1;
-mon_jan1_2024_w1
+=== WEEK default mode 0 — year boundary edges ===
+SELECT WEEK(DATE '2024-01-01')                                AS mon_jan1_2024_w0;
+mon_jan1_2024_w0
+0
+SELECT WEEK(DATE '2023-01-01')                                AS sun_jan1_2023_w1;
+sun_jan1_2023_w1
 1
-SELECT WEEK(DATE '2023-01-01')                                AS sun_jan1_2023_w52;
-sun_jan1_2023_w52
+SELECT WEEK(DATE '2024-12-30')                                AS mon_dec30_2024_w52;
+mon_dec30_2024_w52
 52
-SELECT WEEK(DATE '2024-12-30')                                AS mon_dec30_2024_forward_w1;
-mon_dec30_2024_forward_w1
-1
-SELECT WEEK(DATE '2026-01-01')                                AS thu_jan1_2026_w1;
-thu_jan1_2026_w1
-1
+SELECT WEEK(DATE '2026-01-01')                                AS thu_jan1_2026_w0;
+thu_jan1_2026_w0
+0
 SELECT WEEK(DATE '2021-12-31')                                AS fri_dec31_2021_w52;
 fri_dec31_2021_w52
 52
-SELECT WEEK(DATE '2023-01-01') = WEEKOFYEAR(DATE '2023-01-01') AS edges_agree_sun;
-edges_agree_sun
+=== WEEKOFYEAR — always ISO (mode 3) ===
+SELECT WEEKOFYEAR(DATE '2024-01-01')                          AS iso_jan1_2024_w1;
+iso_jan1_2024_w1
 1
-SELECT WEEK(DATE '2024-12-30') = WEEKOFYEAR(DATE '2024-12-30') AS edges_agree_forward;
-edges_agree_forward
+SELECT WEEKOFYEAR(DATE '2023-01-01')                          AS iso_jan1_2023_w52;
+iso_jan1_2023_w52
+52
+SELECT WEEKOFYEAR(DATE '2024-12-30')                          AS iso_dec30_2024_w1;
+iso_dec30_2024_w1
 1
+=== WEEK(d, mode) — 2-arg form supported (zeta #1090) ===
+SELECT WEEK(DATE '2024-05-19', 0)                             AS may_mode0;
+may_mode0
+20
+SELECT WEEK(DATE '2024-05-19', 3)                             AS may_mode3;
+may_mode3
+20
+SELECT WEEK(DATE '2024-05-19', 7)                             AS may_mode7;
+may_mode7
+20
+SELECT WEEK(DATE '2024-01-01', 2)                             AS jan_mode2_w53;
+jan_mode2_w53
+53
 === WEEK — TIMESTAMP arg (time-of-day independent) ===
 SELECT WEEK(TIMESTAMP '2024-05-19 00:00:00')                  AS midnight;
 midnight
@@ -55,20 +72,19 @@ str_with_time
 SELECT WEEK('2024-05-19') = WEEK(DATE '2024-05-19')           AS str_eq_date;
 str_eq_date
 1
-=== WEEK — MAJOR DIVERGENCE: 2-arg MySQL form rejected ===
-SELECT WEEK(DATE '2024-05-19', 0);
-ERROR 1105: execution error: WEEK requires 1 argument
-SELECT WEEK(DATE '2024-05-19', 3);
-ERROR 1105: execution error: WEEK requires 1 argument
-SELECT WEEK(DATE '2024-05-19', 7);
-ERROR 1105: execution error: WEEK requires 1 argument
+=== WEEKOFYEAR — 2-arg form rejected (1-arg only) ===
 SELECT WEEKOFYEAR(DATE '2024-05-19', 0);
 ERROR 1105: execution error: WEEKOFYEAR requires 1 argument
 === WEEK / WEEKOFYEAR arity 0 → ERROR 1105 ===
 SELECT WEEK();
-ERROR 1105: execution error: WEEK requires 1 argument
+ERROR 1105: execution error: WEEK requires 1 or 2 arguments
 SELECT WEEKOFYEAR();
 ERROR 1105: execution error: WEEKOFYEAR requires 1 argument
+=== WEEK — mode out of range → ERROR 1105 ===
+SELECT WEEK(DATE '2024-05-19', 8);
+ERROR 1105: execution error: WEEK: mode 8 out of valid range 0..=7
+SELECT WEEK(DATE '2024-05-19', -1);
+ERROR 1105: execution error: WEEK: mode -1 out of valid range 0..=7
 === WEEK / WEEKOFYEAR — wrong-type → ERROR 1105 ===
 SELECT WEEK(20240519);
 ERROR 1105: execution error: WEEK requires a date, timestamp, or parseable string

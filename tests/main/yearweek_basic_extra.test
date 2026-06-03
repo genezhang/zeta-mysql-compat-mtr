@@ -2,53 +2,54 @@
 # MTR-format runner. NOT copied or adapted from MySQL's
 # mysql-test/t/func_time.test or PG regress. YEARWEEK was
 # missing in zeta before zeta PR #1227 (errored "unknown
-# function"); this slice locks in the new behavior.
+# function"); zeta #1090 then corrected the numbering to
+# match MySQL's 8 week modes (it was ISO-only before).
 #
-# Big-picture finding: YEARWEEK(date) returns a 6-digit
-# YYYYWW integer = ISO year * 100 + ISO week. zeta uses
-# ISO 8601 numbering throughout (Monday-start, week 1 =
-# first week with 4+ days in the year), consistent with
-# its existing WEEK / WEEKOFYEAR functions. The optional
-# `mode` arg is validated (0..=7) but the ISO numbering is
-# always used — DIVERGENCE from MySQL for modes 0, 2, 4, 6
-# which use Sunday-start numbering. Mode 3 / 7 match.
+# Big-picture finding: YEARWEEK(date[, mode]) returns a
+# 6-digit YYYYWW integer = week-year * 100 + week number,
+# using MySQL's week-mode rules (default mode 0, Sunday-
+# first). At the partial first week of January YEARWEEK
+# forces the WEEK_YEAR bit on, so it reports the adjacent
+# year's last week rather than week 0 (e.g.
+# YEARWEEK('2024-01-01', 0) = 202353). Mode 3 / 7 give ISO
+# (Monday-first, 4-day-rule) numbering. Values verified
+# against MySQL 8.0.
 #
 # NULL in either arg propagates. TIMESTAMP / parseable
 # string accepted. Arity != 1 or 2 → 1105.
 #
 # Adaptation notes:
-#   # zeta-adapt: YEARWEEK returns YYYYWW = iso_year*100
-#     + iso_week. Range: rough YYYY01..YYYY53.
-#   # zeta-adapt: Optional mode arg accepted 0..=7;
-#     validated but always falls back to ISO 8601 numbering.
-#     DIVERGENCE from MySQL for modes other than 3 / 7
-#     (Sunday-start modes are not supported).
+#   # zeta-adapt: YEARWEEK returns YYYYWW = week_year*100
+#     + week_num. Range: rough YYYY01..YYYY53.
+#   # zeta-adapt: Optional mode arg accepted 0..=7 with full
+#     MySQL mode semantics; default mode 0.
 #   # zeta-adapt: TIMESTAMP input strips time-of-day.
 #   # zeta-adapt: NULL in either arg → NULL.
 #   # zeta-adapt: Mode outside 0..=7 → errno 1105.
 #   # zeta-adapt: Arity != 1 or 2 → errno 1105.
 #   # zeta-adapt: Unparseable string → errno 1105.
 
---echo === YEARWEEK basic — ISO week 21 of 2026 ===
+--echo === YEARWEEK basic — mode 0, week 20 of 2026 ===
 
-SELECT YEARWEEK(DATE '2026-05-19') AS week_21_2026;
+SELECT YEARWEEK(DATE '2026-05-19') AS week_20_2026;
 
 --echo === YEARWEEK at year boundaries ===
 
 SELECT YEARWEEK(DATE '2024-01-01') AS mon_jan1_2024;
 SELECT YEARWEEK(DATE '2026-01-01') AS thu_jan1_2026;
-SELECT YEARWEEK(DATE '2026-12-31') AS thu_dec31_2026_w53;
+SELECT YEARWEEK(DATE '2026-12-31') AS thu_dec31_2026;
 
---echo === ISO year shift (iso_year != calendar year) ===
---echo # 2024-12-30 Mon → ISO week 1 of 2025 (forward shift)
---echo # 2023-01-01 Sun → ISO week 52 of 2022 (backward shift)
---echo # 2021-01-01 Fri → ISO week 53 of 2020 (53-week year + shift)
+--echo === Week-year != calendar year (mode 0 rollover) ===
+--echo # 2024-12-30 Mon → week 52 of 2024 (no shift in mode 0)
+--echo # 2023-01-01 Sun → week 1 of 2023 (first Sunday)
+--echo # 2021-01-01 Fri → week 52 of 2020 (before first Sunday)
 
-SELECT YEARWEEK(DATE '2024-12-30') AS forward_shift_to_2025;
-SELECT YEARWEEK(DATE '2023-01-01') AS backward_shift_to_2022;
-SELECT YEARWEEK(DATE '2021-01-01') AS backward_shift_53w_year;
+SELECT YEARWEEK(DATE '2024-12-30') AS dec30_2024;
+SELECT YEARWEEK(DATE '2023-01-01') AS sun_jan1_2023;
+SELECT YEARWEEK(DATE '2021-01-01') AS fri_jan1_2021;
 
---echo === Optional mode arg — accepted 0..=7, ISO numbering used ===
+--echo === Optional mode arg — MySQL mode semantics (default 0) ===
+--echo # mode 0 = Sunday-first; mode 3 = ISO (Monday, 4-day rule)
 
 SELECT YEARWEEK(DATE '2026-05-19', 0) AS m0;
 SELECT YEARWEEK(DATE '2026-05-19', 3) AS m3;

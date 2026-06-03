@@ -147,10 +147,10 @@ iso_week_num_1
 01
 SELECT DATE_FORMAT('2024-12-30', '%X')           AS sunday_week_year;
 sunday_week_year
-2025
+2024
 SELECT DATE_FORMAT('2024-12-30', '%V')           AS sunday_week_num;
 sunday_week_num
-01
+52
 === Pre-1970 date (negative-days path) ===
 SELECT DATE_FORMAT('1900-01-01', '%W')           AS pre_1970_weekday_name;
 pre_1970_weekday_name

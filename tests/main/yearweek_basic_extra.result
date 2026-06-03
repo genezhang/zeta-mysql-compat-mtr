@@ -1,47 +1,48 @@
-=== YEARWEEK basic — ISO week 21 of 2026 ===
-SELECT YEARWEEK(DATE '2026-05-19') AS week_21_2026;
-week_21_2026
-202621
+=== YEARWEEK basic — mode 0, week 20 of 2026 ===
+SELECT YEARWEEK(DATE '2026-05-19') AS week_20_2026;
+week_20_2026
+202620
 === YEARWEEK at year boundaries ===
 SELECT YEARWEEK(DATE '2024-01-01') AS mon_jan1_2024;
 mon_jan1_2024
-202401
+202353
 SELECT YEARWEEK(DATE '2026-01-01') AS thu_jan1_2026;
 thu_jan1_2026
-202601
-SELECT YEARWEEK(DATE '2026-12-31') AS thu_dec31_2026_w53;
-thu_dec31_2026_w53
-202653
-=== ISO year shift (iso_year != calendar year) ===
-# 2024-12-30 Mon → ISO week 1 of 2025 (forward shift)
-# 2023-01-01 Sun → ISO week 52 of 2022 (backward shift)
-# 2021-01-01 Fri → ISO week 53 of 2020 (53-week year + shift)
-SELECT YEARWEEK(DATE '2024-12-30') AS forward_shift_to_2025;
-forward_shift_to_2025
-202501
-SELECT YEARWEEK(DATE '2023-01-01') AS backward_shift_to_2022;
-backward_shift_to_2022
-202252
-SELECT YEARWEEK(DATE '2021-01-01') AS backward_shift_53w_year;
-backward_shift_53w_year
-202053
-=== Optional mode arg — accepted 0..=7, ISO numbering used ===
+202552
+SELECT YEARWEEK(DATE '2026-12-31') AS thu_dec31_2026;
+thu_dec31_2026
+202652
+=== Week-year != calendar year (mode 0 rollover) ===
+# 2024-12-30 Mon → week 52 of 2024 (no shift in mode 0)
+# 2023-01-01 Sun → week 1 of 2023 (first Sunday)
+# 2021-01-01 Fri → week 52 of 2020 (before first Sunday)
+SELECT YEARWEEK(DATE '2024-12-30') AS dec30_2024;
+dec30_2024
+202452
+SELECT YEARWEEK(DATE '2023-01-01') AS sun_jan1_2023;
+sun_jan1_2023
+202301
+SELECT YEARWEEK(DATE '2021-01-01') AS fri_jan1_2021;
+fri_jan1_2021
+202052
+=== Optional mode arg — MySQL mode semantics (default 0) ===
+# mode 0 = Sunday-first; mode 3 = ISO (Monday, 4-day rule)
 SELECT YEARWEEK(DATE '2026-05-19', 0) AS m0;
 m0
-202621
+202620
 SELECT YEARWEEK(DATE '2026-05-19', 3) AS m3;
 m3
 202621
 SELECT YEARWEEK(DATE '2026-05-19', 7) AS m7;
 m7
-202621
+202620
 === TIMESTAMP and string inputs ===
 SELECT YEARWEEK(TIMESTAMP '2026-05-19 14:00:00') AS ts;
 ts
-202621
+202620
 SELECT YEARWEEK('2026-05-19') AS str;
 str
-202621
+202620
 === NULL propagation in either arg ===
 SELECT YEARWEEK(NULL) AS n_date;
 n_date
@@ -68,14 +69,14 @@ CREATE TABLE yw (id INT, d DATE);
 INSERT INTO yw VALUES (1, DATE '2026-01-05'), (2, DATE '2026-01-12'), (3, DATE '2026-05-19'), (4, DATE '2026-12-31');
 SELECT id, YEARWEEK(d) AS yw FROM yw ORDER BY id;
 id	yw
-1	202602
-2	202603
-3	202621
-4	202653
+1	202601
+2	202602
+3	202620
+4	202652
 SELECT YEARWEEK(d) AS yw, COUNT(*) AS c FROM yw GROUP BY YEARWEEK(d) ORDER BY yw;
 yw	c
+202601	1
 202602	1
-202603	1
-202621	1
-202653	1
+202620	1
+202652	1
 DROP TABLE yw;
