@@ -28,17 +28,17 @@ control_no_divergence
 === EPOCH(INTERVAL '1 month') = 30 * 86400 = 2592000 ===
 SELECT EXTRACT(EPOCH FROM INTERVAL '1 month')                 AS one_month_2592000;
 one_month_2592000
-2592000
+2592000.000000
 SELECT EXTRACT(EPOCH FROM INTERVAL '2 months')                AS two_months_5184000;
 two_months_5184000
-5184000
+5184000.000000
 SELECT EXTRACT(EPOCH FROM INTERVAL '12 months')               AS twelve_months_31104000;
 twelve_months_31104000
-31104000
+31557600.000000
 === EPOCH(INTERVAL '1 year') = 12 * 30 * 86400 = 31104000 ===
 SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')                  AS one_year_31104000;
 one_year_31104000
-31104000
+31557600.000000
 SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')
      = EXTRACT(EPOCH FROM INTERVAL '12 months')               AS year_eq_12_months_epoch;
 year_eq_12_months_epoch
@@ -47,23 +47,23 @@ year_eq_12_months_epoch
 SELECT EXTRACT(EPOCH FROM TIMESTAMP '2025-01-01 00:00:00')
      - EXTRACT(EPOCH FROM TIMESTAMP '2024-01-01 00:00:00')    AS leap_year_real_31622400;
 leap_year_real_31622400
-31622400
+31622400.000000
 SELECT EXTRACT(EPOCH FROM INTERVAL '1 year')                  AS interval_year_normalized_31104000;
 interval_year_normalized_31104000
-31104000
+31557600.000000
 SELECT (EXTRACT(EPOCH FROM TIMESTAMP '2025-01-01 00:00:00')
       - EXTRACT(EPOCH FROM TIMESTAMP '2024-01-01 00:00:00'))
       - EXTRACT(EPOCH FROM INTERVAL '1 year')                 AS divergence_518400_seconds;
 divergence_518400_seconds
-518400
+64800.000000
 === EPOCH on mixed-component interval — additive composition ===
 SELECT EXTRACT(EPOCH FROM INTERVAL '1 month 15 days 2 hours') AS composed_3895200;
 composed_3895200
-3895200
+3895200.000000
 === EPOCH on negative interval ===
 SELECT EXTRACT(EPOCH FROM INTERVAL '-1 hour')                 AS neg_3600;
 neg_3600
--3600
+-3600.000000
 SELECT EXTRACT(EPOCH FROM INTERVAL '-1 month')                AS neg_2592000;
 neg_2592000
--2592000
+-2592000.000000

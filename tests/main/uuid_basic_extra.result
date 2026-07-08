@@ -24,7 +24,7 @@ r
 550e8400-e29b-41d4-a716-446655440000
 === ::UUID cast on invalid string — errno 1105 ===
 SELECT 'not-a-uuid'::UUID AS r;
-ERROR 1105: execution error: invalid UUID format: 'not-a-uuid' (expected 8-4-4-4-12)
+ERROR 1105: execution error: invalid input syntax for type uuid: "not-a-uuid"
 === LENGTH(uuid) returns 36 (canonical hyphenated form chars) ===
 SELECT LENGTH('550e8400-e29b-41d4-a716-446655440000'::UUID) AS r;
 r
@@ -91,5 +91,5 @@ ERROR 1105: execution error: unknown function: UUID
 DROP TABLE IF EXISTS u_dflt;
 CREATE TABLE u_dflt (id UUID DEFAULT GEN_RANDOM_UUID() PRIMARY KEY, n INT);
 INSERT INTO u_dflt (n) VALUES (1);
-ERROR 1105: execution error: invalid UUID character 'G' in 'GEN_RANDOM_UUID()'
+ERROR 1105: execution error: invalid input syntax for type uuid: "GEN_RANDOM_UUID()"
 DROP TABLE u_dflt;

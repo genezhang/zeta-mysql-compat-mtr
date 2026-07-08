@@ -59,7 +59,7 @@ SELECT id FROM lo ORDER BY id LIMIT 50 PERCENT;
 ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PERCENT at Line: 1, Column: 40
 === KNOWN GAP: LIMIT past i64::MAX — errno 1105 ===
 SELECT id FROM lo ORDER BY id LIMIT 9223372036854775808;
-ERROR 1105: plan error: LIMIT/OFFSET must be an integer literal or a query parameter ($N)
+ERROR 1105: plan error: LIMIT/OFFSET value out of range: 9223372036854775808
 === KNOWN GAP: LIMIT with column reference — errno 1054 ===
 SELECT id FROM lo ORDER BY id LIMIT id;
 ERROR 1054: column not found: LIMIT/OFFSET references column `id`; either it is correlated to an outer scope (deferred to per-row evaluation) or unsupported here

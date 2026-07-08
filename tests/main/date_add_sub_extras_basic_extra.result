@@ -10,7 +10,7 @@ adds_eq_date_value_coerce
 SELECT EXTRACT(SECOND FROM DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY))
                                                               AS seconds_is_0;
 seconds_is_0
-0
+0.000000
 === ADDDATE(int, int) is INTEGER ARITHMETIC (parser quirk) ===
 SELECT ADDDATE(42, 1)                                         AS adddate_int_int_is_arith;
 adddate_int_int_is_arith
@@ -27,9 +27,9 @@ ERROR 1105: execution error: arithmetic op requires numbers
 SELECT DATE_SUB(42, INTERVAL 1 DAY);
 ERROR 1105: execution error: arithmetic op requires numbers
 SELECT DATE_SUB('not a date', INTERVAL 1 DAY);
-ERROR 1105: execution error: arithmetic op requires numbers
+ERROR 1105: execution error: invalid input syntax for type timestamp: "not a date"
 SELECT ADDDATE('not a date', 1);
-ERROR 1105: execution error: cannot cast 'not a date' to TIMESTAMP: invalid timestamp: not a date
+ERROR 1105: execution error: invalid input syntax for type timestamp: "not a date"
 === DATE_ADD also accepts INT shorthand (parser arith rewrite) ===
 SELECT DATE_ADD(DATE '2024-03-15', 7)
      = ADDDATE(DATE '2024-03-15', 7)                          AS date_add_int_eq_adddate;

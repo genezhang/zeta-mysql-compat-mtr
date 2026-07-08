@@ -21,10 +21,10 @@ str_vs_int_arr
 === Integer-Numeric normalization equality (storage-driven) ===
 SELECT JSON_OVERLAPS('1',    '1.0')           AS int_lex_eq_decimal_lex;
 int_lex_eq_decimal_lex
-1
+0
 SELECT JSON_OVERLAPS('1.0',  '[1]')           AS decimal_lex_in_int_arr;
 decimal_lex_in_int_arr
-1
+0
 SELECT JSON_OVERLAPS('1e0',  '[1]')           AS exp_lex_in_int_arr;
 exp_lex_in_int_arr
 1

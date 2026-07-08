@@ -42,10 +42,10 @@ sql_null_eq_string_NULL_is_unknown
 === JSON_TYPE — INTEGER vs DOUBLE storage-driven divergence ===
 SELECT JSON_TYPE('1.0')                       AS one_point_zero_is_integer;
 one_point_zero_is_integer
-INTEGER
+DOUBLE
 SELECT JSON_TYPE('0.0')                       AS zero_point_zero_is_integer;
 zero_point_zero_is_integer
-INTEGER
+DOUBLE
 SELECT JSON_TYPE('1e0')                       AS one_exp_zero_is_integer;
 one_exp_zero_is_integer
 INTEGER

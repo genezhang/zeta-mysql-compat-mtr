@@ -17,6 +17,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tempfile = "3"
 walkdir = "2"
 nix = { version = "0.27", features = ["signal"] }
+toml = "0.8"
+serde = { version = "1", features = ["derive"] }
 
 [[bin]]
 name = "zeta-mysql-compat-mtr-runner"

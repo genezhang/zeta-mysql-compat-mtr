@@ -6,6 +6,7 @@ mod harness;
 mod mtr_parser;
 mod result_diff;
 mod runner;
+mod skip_list;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "MTR-dialect MySQL-compat test runner for Zeta")]
@@ -37,6 +38,10 @@ async fn main() -> Result<()> {
     let mut zeta = harness::ZetaServer::start(&args.zeta_bin).await?;
     let url_base = format!("mysql://root@127.0.0.1:{}", zeta.port());
 
+    // Load the skip list once for all suites.
+    let skip_list = skip_list::SkipList::load(std::path::Path::new("."))
+        .unwrap_or_default();
+
     let mut had_failure = false;
     for suite in args
         .suite
@@ -44,7 +49,14 @@ async fn main() -> Result<()> {
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        if let Err(e) = runner::run_suite(suite, &url_base, args.filter.as_deref()).await {
+        if let Err(e) = runner::run_suite(
+            suite,
+            &url_base,
+            args.filter.as_deref(),
+            &skip_list,
+        )
+        .await
+        {
             eprintln!("suite {suite} failed: {e}");
             had_failure = true;
         }

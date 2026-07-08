@@ -20,7 +20,7 @@ empty_needle
 1
 SELECT POSITION('' IN '')                AS empty_both;
 empty_both
-0
+1
 SELECT POSITION('a' IN '')               AS empty_hay;
 empty_hay
 0

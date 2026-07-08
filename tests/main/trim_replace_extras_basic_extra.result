@@ -70,13 +70,13 @@ rtrim_date_trailing_5
 === TRIM with timestamp input (note .000000 padding) ===
 SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45', '0')            AS rtrim_timestamp_zeros;
 rtrim_timestamp_zeros
-2024-03-15 14:30:45.
+2024-03-15 14:30:45
 SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45.123000', '0')     AS rtrim_timestamp_nonzero_micros;
 rtrim_timestamp_nonzero_micros
 2024-03-15 14:30:45.123
 SELECT TRIM(TIMESTAMP '2024-03-15 14:30:45')                  AS trim_timestamp_default_ws_noop;
 trim_timestamp_default_ws_noop
-2024-03-15 14:30:45.000000
+2024-03-15 14:30:45
 === REPLACE with bool input ===
 SELECT REPLACE(TRUE, 'tr', 'TR')                              AS replace_bool_true;
 replace_bool_true

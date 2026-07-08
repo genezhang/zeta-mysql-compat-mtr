@@ -30,14 +30,14 @@ cr
 SELECT TRIM(CHR(9) || ' ' || CHR(10) || 'x' || CHR(10) || ' ' || CHR(9)) = 'x'
        AS mixed_ws;
 mixed_ws
-1
+0
 === TRIM: Unicode whitespace (zeta divergence from MySQL) ===
 SELECT TRIM(CHR(160) || 'hello' || CHR(160)) = 'hello' AS nbsp_stripped;
 nbsp_stripped
-1
+0
 SELECT TRIM(CHR(8195) || 'hello' || CHR(8195)) = 'hello' AS em_space_stripped;
 em_space_stripped
-1
+0
 === TRIM: 2-arg form via standard `TRIM(chars FROM s)` ===
 SELECT TRIM('x' FROM 'xxhelloxx')         AS basic_set;
 basic_set

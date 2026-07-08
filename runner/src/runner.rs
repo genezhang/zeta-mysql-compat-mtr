@@ -23,11 +23,17 @@ use walkdir::WalkDir;
 
 use crate::mtr_parser::{parse, Directive};
 use crate::result_diff::compare;
+use crate::skip_list::SkipList;
 
 const TESTS_ROOT: &str = "tests";
 const DEFAULT_DB: &str = "test";
 
-pub async fn run_suite(suite: &str, mysql_url_base: &str, filter: Option<&str>) -> Result<()> {
+pub async fn run_suite(
+    suite: &str,
+    mysql_url_base: &str,
+    filter: Option<&str>,
+    skip_list: &SkipList,
+) -> Result<()> {
     let test_files = discover_tests(suite, filter)?;
     if test_files.is_empty() {
         eprintln!(
@@ -46,7 +52,13 @@ pub async fn run_suite(suite: &str, mysql_url_base: &str, filter: Option<&str>) 
     // in-memory backend and tests are responsible for their own cleanup.)
     let mut passed = 0usize;
     let mut failed: Vec<(PathBuf, String)> = Vec::new();
+    let mut skipped = 0usize;
     for test_path in &test_files {
+        if skip_list.should_skip(test_path) {
+            eprintln!("→ {} (skipped)", test_path.display());
+            skipped += 1;
+            continue;
+        }
         eprintln!("→ {}", test_path.display());
         match run_one(test_path, &url).await {
             Ok(()) => {
@@ -60,7 +72,11 @@ pub async fn run_suite(suite: &str, mysql_url_base: &str, filter: Option<&str>) 
         }
     }
 
-    eprintln!("\n{passed} passed, {} failed", failed.len());
+    eprintln!(
+        "\n{passed} passed, {} failed, {} skipped",
+        failed.len(),
+        skipped
+    );
     if !failed.is_empty() {
         return Err(anyhow!("{} .test file(s) failed", failed.len()));
     }

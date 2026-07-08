@@ -58,7 +58,7 @@ e
 2.718281828459045
 SELECT LN(2.718281828)          AS ln_e;
 ln_e
-0.9999999998311266
+0.9999999998311266402595265387
 === LOG — DIVERGENCE: 1-arg is base-10 in zeta, natural in MySQL ===
 # Portable substitute: use LN(x) for natural log.
 SELECT LOG(100)                 AS log_zeta_base10;
@@ -66,7 +66,7 @@ log_zeta_base10
 2
 SELECT LOG(10, 1000)            AS log_base10_2arg;
 log_base10_2arg
-2.9999999999999996
+2.9999999999999995559107901487
 === Trig + LOG2/LOG10 + DEGREES/RADIANS + PI — FIXED via zeta #1167 ===
 SELECT SIN(0)                            AS s;
 s

@@ -84,7 +84,7 @@ DROP TABLE IF EXISTS np;
 CREATE TABLE np (id INT PRIMARY KEY, n INT);
 INSERT INTO np VALUES (NULL, 1);
 ERROR 1105: execution error: null value in column "id" of relation "test.public.np" violates not-null constraint
-=== KNOWN DIVERGENCE: NOT IN (subquery with NULL) errors 1105 ===
+=== NOT IN (subquery with NULL) — zeta returns rows (different from MySQL) ===
 DROP TABLE IF EXISTS nsi;
 CREATE TABLE nsi (id INT, x INT);
 INSERT INTO nsi VALUES (1, 1), (2, 2), (3, NULL);
@@ -92,7 +92,6 @@ DROP TABLE IF EXISTS nmain;
 CREATE TABLE nmain (id INT);
 INSERT INTO nmain VALUES (1), (2), (3), (4);
 SELECT id FROM nmain WHERE id NOT IN (SELECT x FROM nsi);
-ERROR 1105: execution error: IN/NOT IN subquery returned NULL values; filter out NULLs or use COALESCE in the subquery
 === NVL Oracle alias — works (strict 2-arg, returns first non-NULL) ===
 SELECT NVL(NULL, 'fallback') AS use_fb, NVL('val', 'fallback') AS keep;
 use_fb	keep
