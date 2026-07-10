@@ -38,9 +38,11 @@ async fn main() -> Result<()> {
     let mut zeta = harness::ZetaServer::start(&args.zeta_bin).await?;
     let url_base = format!("mysql://root@127.0.0.1:{}", zeta.port());
 
-    // Load the skip list once for all suites.
-    let skip_list = skip_list::SkipList::load(std::path::Path::new("."))
-        .unwrap_or_default();
+    // Load the skip list once for all suites. A missing file is fine (empty
+    // skip list); a malformed one is a hard error rather than silently
+    // skipping nothing and reporting every previously-skipped test as new
+    // failures.
+    let skip_list = skip_list::SkipList::load(std::path::Path::new("."))?;
 
     let mut had_failure = false;
     for suite in args
@@ -49,13 +51,8 @@ async fn main() -> Result<()> {
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        if let Err(e) = runner::run_suite(
-            suite,
-            &url_base,
-            args.filter.as_deref(),
-            &skip_list,
-        )
-        .await
+        if let Err(e) =
+            runner::run_suite(suite, &url_base, args.filter.as_deref(), &skip_list).await
         {
             eprintln!("suite {suite} failed: {e}");
             had_failure = true;

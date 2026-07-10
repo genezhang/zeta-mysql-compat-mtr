@@ -54,8 +54,18 @@ pub async fn run_suite(
     let mut failed: Vec<(PathBuf, String)> = Vec::new();
     let mut skipped = 0usize;
     for test_path in &test_files {
-        if skip_list.should_skip(test_path) {
-            eprintln!("→ {} (skipped)", test_path.display());
+        if let Some(entry) = skip_list.entry(test_path) {
+            eprintln!(
+                "→ {} (skipped: {} — {}{})",
+                test_path.display(),
+                entry.reason,
+                entry.ticket,
+                entry
+                    .note
+                    .as_deref()
+                    .map(|n| format!(" — {n}"))
+                    .unwrap_or_default()
+            );
             skipped += 1;
             continue;
         }
