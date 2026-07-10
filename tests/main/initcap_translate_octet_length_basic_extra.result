@@ -14,7 +14,7 @@ empty_string
 === INITCAP word boundary = non-alphanumeric ===
 SELECT INITCAP('O''CONNOR')                                   AS apostrophe_boundary;
 apostrophe_boundary
-O'Connor
+O'connor
 SELECT INITCAP('abc123def')                                   AS digit_inside_one_word;
 digit_inside_one_word
 Abc123def

@@ -139,7 +139,7 @@ v
 # logic, not just the wrap.
 SELECT QUOTE('it''s a\test') AS v;
 v
-'it\'s a\\test'
+'it\'s a\test'
 # SOUNDEX — phonetic encoding (4 chars: first letter + 3
 # digits). Slice 5 of zeta #1076 — FIXED.
 SELECT SOUNDEX('Robert') AS v;

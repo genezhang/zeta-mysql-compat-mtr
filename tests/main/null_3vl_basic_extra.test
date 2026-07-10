@@ -154,7 +154,7 @@ CREATE TABLE np (id INT PRIMARY KEY, n INT);
 --error 1105
 INSERT INTO np VALUES (NULL, 1);
 
---echo === KNOWN DIVERGENCE: NOT IN (subquery with NULL) errors 1105 ===
+--echo === NOT IN (subquery with NULL) — zeta returns rows (different from MySQL) ===
 
 DROP TABLE IF EXISTS nsi;
 CREATE TABLE nsi (id INT, x INT);
@@ -162,7 +162,6 @@ INSERT INTO nsi VALUES (1, 1), (2, 2), (3, NULL);
 DROP TABLE IF EXISTS nmain;
 CREATE TABLE nmain (id INT);
 INSERT INTO nmain VALUES (1), (2), (3), (4);
---error 1105
 SELECT id FROM nmain WHERE id NOT IN (SELECT x FROM nsi);
 
 --echo === NVL Oracle alias — works (strict 2-arg, returns first non-NULL) ===

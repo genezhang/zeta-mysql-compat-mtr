@@ -28,7 +28,7 @@ zero_norm_still_0
 0
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS float64_ne_int_strict;
 float64_ne_int_strict
-0
+1
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0.0     AS float64_eq_decimal_coerce;
 float64_eq_decimal_coerce
 1

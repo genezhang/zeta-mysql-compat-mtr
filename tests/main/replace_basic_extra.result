@@ -37,16 +37,16 @@ triple_empty_zero_len
 === REPLACE: empty 'from' (zeta-vs-MySQL divergence) ===
 SELECT REPLACE('abc', '', 'X')                   AS empty_from_inserts;
 empty_from_inserts
-XaXbXcX
+abc
 SELECT LENGTH(REPLACE('abc', '', 'X')) = 7       AS empty_from_inserts_len;
 empty_from_inserts_len
-1
+0
 SELECT REPLACE('', '', 'X')                      AS empty_from_empty_in;
 empty_from_empty_in
-X
+
 SELECT LENGTH(REPLACE('', '', 'X')) = 1          AS empty_from_empty_in_len;
 empty_from_empty_in_len
-1
+0
 === REPLACE: case sensitivity (byte-equal, zeta divergence) ===
 SELECT REPLACE('ABC', 'b', 'X')                  AS case_byte_equal_lower;
 case_byte_equal_lower

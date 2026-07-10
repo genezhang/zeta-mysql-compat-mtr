@@ -77,7 +77,7 @@ neg_base_int_exp
 -8
 SELECT POW(9, 0.5)                       AS sqrt_via_pow;
 sqrt_via_pow
-3
+3.0000000000000000
 SELECT POWER(2, 8)                       AS power_alias;
 power_alias
 256

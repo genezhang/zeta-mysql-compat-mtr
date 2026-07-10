@@ -19,7 +19,7 @@ a	b
 WITH a AS (SELECT 1 AS v), b AS (SELECT 2 AS v)
 SELECT a.v + b.v AS sm FROM a, b;
 sm
-2
+3
 === Second CTE references first ===
 WITH a AS (SELECT 5 AS v), b AS (SELECT v + 1 AS v FROM a)
 SELECT * FROM b;

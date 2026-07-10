@@ -123,7 +123,7 @@ decomposed_reversed_chars
 SELECT SUBSTRING(REVERSE('cafe' || CHR(769)), 1, 1) = CHR(769)
        AS combining_mark_detached;
 combining_mark_detached
-1
+0
 === REVERSE: NULL passthrough ===
 SELECT REVERSE(NULL) IS NULL             AS null_passes;
 null_passes

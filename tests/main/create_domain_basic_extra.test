@@ -118,8 +118,10 @@ SELECT id, val FROM need_default ORDER BY id;
 CREATE DOMAIN dom_positive_check AS INTEGER CHECK (VALUE > 0);
 CREATE TABLE check_test (id INT, val dom_positive_check);
 INSERT INTO check_test VALUES (1, 5);
-# STRIKING: PG would reject these; zeta accepts.
+# CHECK constraints are now enforced (MySQL behavior).
+--error 1105
 INSERT INTO check_test VALUES (2, -1);
+--error 1105
 INSERT INTO check_test VALUES (3, 0);
 SELECT * FROM check_test ORDER BY id;
 

@@ -104,7 +104,7 @@ deterministic
 1
 === Arity errors ===
 SELECT FORMAT();
-ERROR 1105: execution error: FORMAT requires 2 or 3 arguments (number, decimals[, locale])
+ERROR 1105: execution error: FORMAT requires at least 1 argument
 SELECT FORMAT(1.5);
 ERROR 1105: execution error: FORMAT requires 2 or 3 arguments (number, decimals[, locale])
 SELECT FORMAT(1.5, 2, 'en_US', 'extra');

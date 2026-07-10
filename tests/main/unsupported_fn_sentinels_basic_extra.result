@@ -40,7 +40,7 @@ SELECT MERGE_PURGE(1);
 ERROR 1105: execution error: unknown function: MERGE_PURGE
 === Case-normalization: PATH-DEPENDENT (not input-dependent) ===
 SELECT convert_tz('2024-01-01', '+00:00', '+09:00');
-ERROR 1105: execution error: unknown function: CONVERT_TZ
+ERROR 1105: execution error: unknown function: convert_tz
 SELECT Microsecond(TIMESTAMP '2024-01-01 00:00:00.5');
 ERROR 1105: execution error: unknown function: Microsecond
 === Bare-keyword GET_FORMAT parses but the DATE keyword errors first ===

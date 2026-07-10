@@ -59,22 +59,22 @@ DROP INDEX ix_pct_name;
 DROP TABLE pct;
 === KNOWN GAP: pg_catalog.pg_class via MySQL wire — errno 1146 ===
 SELECT relname FROM pg_catalog.pg_class;
-ERROR 1146: table not found: pg_catalog.pg_class
+ERROR 1146: table not found: test.public.pg_class
 === KNOWN GAP: pg_catalog.pg_attribute — errno 1146 ===
 SELECT attname FROM pg_catalog.pg_attribute;
-ERROR 1146: table not found: pg_catalog.pg_attribute
+ERROR 1146: table not found: test.public.pg_attribute
 === KNOWN GAP: pg_catalog.pg_index — errno 1146 ===
 SELECT indrelid FROM pg_catalog.pg_index;
-ERROR 1146: table not found: pg_catalog.pg_index
+ERROR 1146: table not found: test.public.pg_index
 === KNOWN GAP: pg_catalog.pg_constraint — errno 1146 ===
 SELECT conname FROM pg_catalog.pg_constraint;
-ERROR 1146: table not found: pg_catalog.pg_constraint
+ERROR 1146: table not found: test.public.pg_constraint
 === KNOWN GAP: pg_catalog.pg_type — errno 1146 ===
 SELECT typname FROM pg_catalog.pg_type;
-ERROR 1146: table not found: pg_catalog.pg_type
+ERROR 1146: table not found: test.public.pg_type
 === KNOWN GAP: pg_catalog.pg_proc — errno 1146 ===
 SELECT proname FROM pg_catalog.pg_proc;
-ERROR 1146: table not found: pg_catalog.pg_proc
+ERROR 1146: table not found: test.public.pg_proc
 === KNOWN GAP: pg_catalog.pg_namespace — errno 1146 ===
 SELECT nspname FROM pg_catalog.pg_namespace;
-ERROR 1146: table not found: pg_catalog.pg_namespace
+ERROR 1146: table not found: test.public.pg_namespace

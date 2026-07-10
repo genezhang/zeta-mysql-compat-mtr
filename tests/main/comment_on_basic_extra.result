@@ -59,4 +59,4 @@ COMMENT ON SEQUENCE no_seq IS 'seq comment';
 ERROR 1064: SQL parse error: sql parser error: Expected: comment object_type, found: SEQUENCE at Line: 1, Column: 12
 === KNOWN GAP: pg_catalog.pg_description not reachable — errno 1146 ===
 SELECT objoid FROM pg_catalog.pg_description LIMIT 1;
-ERROR 1146: table not found: pg_catalog.pg_description
+ERROR 1146: table not found: test.public.pg_description

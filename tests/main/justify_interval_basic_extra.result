@@ -17,7 +17,7 @@ day_field_5
 === JUSTIFY_DAYS — TRUNCATED division (sign propagates) ===
 SELECT JUSTIFY_DAYS(INTERVAL '-35 days')                      AS neg_thirtyfive_days;
 neg_thirtyfive_days
--1 mon -5 days
+-1 mons -5 days
 SELECT JUSTIFY_DAYS(INTERVAL '-60 days')                      AS neg_sixty_days;
 neg_sixty_days
 -2 mons
@@ -129,7 +129,7 @@ canonical_noop
 1 mon 5 days 03:00:00
 SELECT JUSTIFY_INTERVAL(INTERVAL '-1 month -5 days -3 hours') AS canonical_neg_noop;
 canonical_neg_noop
--1 mon -5 days -03:00:00
+-1 mons -5 days -03:00:00
 SELECT JUSTIFY_INTERVAL(INTERVAL '0 days')                    AS zero_noop;
 zero_noop
 00:00:00

@@ -94,13 +94,13 @@ neg_inf_op_underflow
 0
 === WIDTH_BUCKET: arity errors → 1105 ===
 SELECT WIDTH_BUCKET();
-ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+ERROR 1105: execution error: width_bucket requires 2 or 4 arguments
 SELECT WIDTH_BUCKET(50);
-ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+ERROR 1105: execution error: width_bucket requires 2 or 4 arguments
 SELECT WIDTH_BUCKET(50, 0, 100);
-ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+ERROR 1105: execution error: width_bucket requires 2 or 4 arguments
 SELECT WIDTH_BUCKET(50, 0, 100, 10, 99);
-ERROR 1105: execution error: WIDTH_BUCKET requires 4 arguments
+ERROR 1105: execution error: width_bucket requires 2 or 4 arguments
 === WIDTH_BUCKET: works with table column data ===
 CREATE TABLE wb_data (id INT, val DOUBLE PRECISION);
 INSERT INTO wb_data VALUES

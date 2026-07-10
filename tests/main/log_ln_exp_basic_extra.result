@@ -24,7 +24,7 @@ log2_eight_is_three
 3
 SELECT LOG(10, 1000)                     AS log10_thousand_is_three;
 log10_thousand_is_three
-2.9999999999999996
+2.9999999999999995559107901487
 SELECT LOG(3, 27)                        AS log3_27_is_three;
 log3_27_is_three
 3
@@ -80,10 +80,10 @@ underflow_non_neg
 === Cross-family inverse: LN(EXP(x)) ≈ x ===
 SELECT ROUND(LN(EXP(5)), 9)              AS inverse_5;
 inverse_5
-5
+5.000000000
 SELECT ROUND(LN(EXP(-3)), 9)             AS inverse_neg_3;
 inverse_neg_3
--3
+-3.000000000
 === NULL passthrough ===
 SELECT LOG(NULL)         IS NULL         AS log1_null;
 log1_null

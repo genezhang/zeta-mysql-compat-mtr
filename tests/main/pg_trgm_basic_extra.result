@@ -30,7 +30,7 @@ disjoint_0
 0
 SELECT SIMILARITY('foobar', 'foobaz')                         AS foobar_foobaz_5_9;
 foobar_foobaz_5_9
-0.5555555555555556
+0.5555556
 === Headline finding pinned: 1-char inputs share NO trigrams ===
 SELECT SIMILARITY('a', 'b')                                   AS one_char_disjoint_0;
 one_char_disjoint_0

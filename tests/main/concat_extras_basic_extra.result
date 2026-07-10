@@ -8,7 +8,7 @@ date_first
 === CONCAT with TIMESTAMP input (.000000 padding propagates) ===
 SELECT CONCAT('ts: ', TIMESTAMP '2024-03-15 14:30:45')        AS timestamp_in_concat;
 timestamp_in_concat
-ts: 2024-03-15 14:30:45.000000
+ts: 2024-03-15 14:30:45
 SELECT SUBSTRING(CONCAT('ts: ', TIMESTAMP '2024-03-15 14:30:45'), 5, 4)
                                                               AS timestamp_year_extracted;
 timestamp_year_extracted
@@ -26,7 +26,7 @@ SELECT CONCAT('id=', 42, ', active=', TRUE, ', dob=',
               TIMESTAMP '2024-03-15 14:30:45', ', meta=',
               CAST('{"x":1}' AS JSONB))                       AS mixed_variadic;
 mixed_variadic
-id=42, active=true, dob=2024-03-15, ts=2024-03-15 14:30:45.000000, meta={"x":1}
+id=42, active=true, dob=2024-03-15, ts=2024-03-15 14:30:45, meta={"x":1}
 === CONCAT_WS with numeric separator (sep itself coerces) ===
 SELECT CONCAT_WS(0, 'a', 'b', 'c')                            AS int_sep;
 int_sep
@@ -59,7 +59,7 @@ date_values_joined
 SELECT CONCAT_WS('|', TIMESTAMP '2024-03-15 14:30:45',
                        TIMESTAMP '2024-03-15 14:30:46')       AS timestamp_values_joined;
 timestamp_values_joined
-2024-03-15 14:30:45.000000|2024-03-15 14:30:46.000000
+2024-03-15 14:30:45|2024-03-15 14:30:46
 === Direct MYSQL_CONCAT invocation (wire-shim target) ===
 SELECT MYSQL_CONCAT('a', 'b', 'c')                            AS mysql_concat_basic;
 mysql_concat_basic

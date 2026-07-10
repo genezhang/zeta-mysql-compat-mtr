@@ -30,5 +30,5 @@ ERROR 1105: execution error: unsupported expression: Default
 # PG accepts () VALUES () as a synonym for DEFAULT VALUES.
 # sqlparser rejects the empty column list at parse time.
 INSERT INTO def_t () VALUES ();
-ERROR 1064: SQL parse error: sql parser error: Expected: identifier, found: ) at Line: 1, Column: 20
+ERROR 1064: SQL parse error: sql parser error: Expected: an expression, found: ) at Line: 1, Column: 27
 DROP TABLE def_t;

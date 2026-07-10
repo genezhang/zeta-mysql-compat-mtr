@@ -68,7 +68,7 @@ nonleap_to_leap
 # Day-tier division loses fractional precision; hour-tier works.
 SELECT INTERVAL '1 day' / 2 AS bug_day_div, INTERVAL '4 hours' / 2 AS ok_hour_div;
 bug_day_div	ok_hour_div
-24:00:00	02:00:00
+12:00:00	02:00:00
 === KNOWN DIVERGENCE: date range allows year > 9999 and year < 1 ===
 # MySQL errors 1292 'incorrect datetime value' outside
 # 0001-01-01..9999-12-31; zeta accepts year 0 and 10000+.

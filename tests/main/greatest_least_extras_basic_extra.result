@@ -46,7 +46,7 @@ date_first_text
 SELECT CAST(GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15') AS TEXT)
                                                               AS ts_first_text;
 ts_first_text
-2024-03-15 00:00:00.000000
+2024-03-15 00:00:00
 SELECT GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
      = GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15')
                                                               AS order_invariant_under_eq;
