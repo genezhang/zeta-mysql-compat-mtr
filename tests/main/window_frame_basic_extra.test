@@ -6,16 +6,18 @@
 # UNBOUNDED / N PRECEDING / CURRENT ROW / N FOLLOWING /
 # UNBOUNDED FOLLOWING bound combinations, defaults, frames
 # entirely backward / forward, shorthand syntax, and the
-# GROUPS / EXCLUDE gaps.
+# EXCLUDE gap.
 #
-# Big-picture finding: ROWS and RANGE frame modes work
-# across the standard bound combinations. Default frames
-# match SQL spec: with ORDER BY → RANGE UNBOUNDED PRECEDING
-# AND CURRENT ROW (running aggregate); without ORDER BY →
-# entire partition. Frames entirely before or after the
-# current row work. Negative bounds are rejected at parse.
-# GROUPS frame mode errors as not-yet-supported; EXCLUDE
-# clauses error at parse (sqlparser doesn't accept).
+# Big-picture finding: ROWS, RANGE, and GROUPS frame modes
+# all work across the standard bound combinations (GROUPS
+# support landed after this file was first authored — was
+# pinned to a 1105 "not yet supported" error; now pinned to
+# the real result). Default frames match SQL spec: with
+# ORDER BY → RANGE UNBOUNDED PRECEDING AND CURRENT ROW
+# (running aggregate); without ORDER BY → entire partition.
+# Frames entirely before or after the current row work.
+# Negative bounds are rejected at parse. EXCLUDE clauses
+# error at parse (sqlparser doesn't accept).
 #
 # Inverted frames now produce empty (fixed in zeta PR
 # #1218). `ROWS BETWEEN 5 PRECEDING AND 10 PRECEDING`
@@ -55,13 +57,14 @@
 #   # zeta-adapt: AVG / MIN / MAX / COUNT(*) with frame —
 #     all supported.
 #   # zeta-adapt: Negative frame bound `-1 PRECEDING` —
-#     errors 1064 "frame bound must be a literal number"
+#     errors 1064 "frame bound must be a literal number or
+#     interval"
 #     at parse. Correct (PG: "frame starting offset must
 #     not be negative").
-#   # zeta-adapt: KNOWN GAP — GROUPS frame mode errors
-#     1105 "Groups frame mode is not yet supported, use
-#     ROWS or RANGE". MySQL has no GROUPS; PG and Spark
-#     support it.
+#   # zeta-adapt: GROUPS frame mode — supported (was pinned
+#     as a KNOWN GAP erroring 1105; now produces the same
+#     result as ROWS when peer groups are all singletons).
+#     MySQL has no GROUPS; PG and Spark support it.
 #   # zeta-adapt: KNOWN GAP — EXCLUDE clauses (EXCLUDE
 #     CURRENT ROW / EXCLUDE GROUP / EXCLUDE TIES / EXCLUDE
 #     NO OTHERS) error 1064 at parse (sqlparser-rs
@@ -141,10 +144,9 @@ SELECT id, v, AVG(v) OVER (ORDER BY id ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING)
 --error 1064
 SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN -1 PRECEDING AND CURRENT ROW) FROM wf;
 
---echo === KNOWN GAP: GROUPS frame mode — errno 1105 "not yet supported" ===
+--echo === GROUPS frame mode — supported ===
 
---error 1105
-SELECT id, SUM(v) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW) FROM wf;
+SELECT id, SUM(v) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW) FROM wf ORDER BY id;
 
 --echo === KNOWN GAP: EXCLUDE CURRENT ROW — errno 1064 at parse ===
 
