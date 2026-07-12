@@ -116,10 +116,15 @@ id	v	a	mn	mx	c
 5	50	45	40	50	2
 === Negative frame bound — errno 1064 (correct) ===
 SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN -1 PRECEDING AND CURRENT ROW) FROM wf;
-ERROR 1064: SQL parse error: frame bound must be a literal number
-=== KNOWN GAP: GROUPS frame mode — errno 1105 "not yet supported" ===
-SELECT id, SUM(v) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW) FROM wf;
-ERROR 1105: execution error: Groups frame mode is not yet supported, use ROWS or RANGE
+ERROR 1064: SQL parse error: frame bound must be a literal number or interval
+=== GROUPS frame mode — supported ===
+SELECT id, SUM(v) OVER (ORDER BY id GROUPS BETWEEN 1 PRECEDING AND CURRENT ROW) FROM wf ORDER BY id;
+id	sum
+1	10
+2	30
+3	50
+4	70
+5	90
 === KNOWN GAP: EXCLUDE CURRENT ROW — errno 1064 at parse ===
 SELECT id, SUM(v) OVER (ORDER BY id ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING EXCLUDE CURRENT ROW) FROM wf;
 ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 1, Column: 94

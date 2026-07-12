@@ -47,9 +47,9 @@ REPEATABLE-READ
 === KNOWN GAP: START TRANSACTION ISOLATION LEVEL — errno 1235 with hint ===
 START TRANSACTION ISOLATION LEVEL READ COMMITTED;
 ERROR 1235: START TRANSACTION ISOLATION LEVEL is not supported (use SET TRANSACTION ISOLATION LEVEL before BEGIN)
-=== KNOWN GAP: BEGIN DEFERRABLE (PG) — errno 1064 ===
+=== KNOWN GAP: BEGIN DEFERRABLE (PG) — errno 1235 ===
 BEGIN DEFERRABLE;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: DEFERRABLE at Line: 1, Column: 7
+ERROR 1235: BEGIN with this modifier is not supported over the MySQL wire protocol
 === KNOWN GAP: COMMIT AND CHAIN inside active txn — errno 1105 ===
 BEGIN;
 COMMIT AND CHAIN;

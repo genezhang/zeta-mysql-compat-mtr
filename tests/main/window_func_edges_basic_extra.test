@@ -14,10 +14,12 @@
 # OVER () without ORDER BY. Window functions in WHERE
 # error 1105 (correct).
 #
-# FILTER clause on aggregate window functions now errors
-# explicitly (fixed in zeta PR #1215). Previously silently
-# IGNORED — gave wrong answers without an error signal.
-# Full semantic support (PG/Spark behavior) is a follow-up.
+# FILTER clause on aggregate window functions now has full
+# PG/Spark semantics (filters the per-row contribution to
+# the running aggregate). Previously silently IGNORED (gave
+# wrong answers with no error), then pinned to an explicit
+# 1064 error (zeta PR #1215) as an interim step; real
+# filtering support landed after that pin was written.
 #
 # NTILE(<=0) and LAG/LEAD negative-offset behavior fixed
 # in zeta PR #1216. NTILE rejects non-positive args;
@@ -50,14 +52,12 @@
 #     1105 "unsupported expression: WindowFunction"
 #     (correct: SQL spec forbids).
 #   # zeta-adapt: FILTER (WHERE ...) clause on aggregate
-#     window functions errors 1064 \"FILTER clause on
-#     window aggregate \`<NAME>\` not yet supported\".
-#     Fixed in zeta PR #1215 — previously silently IGNORED
-#     (returned the unfiltered value). Full PG/Spark
-#     semantics (filter the per-row contribution to the
-#     running aggregate) is a follow-up; for now, rewrite
-#     as a subquery with a CASE expression:
-#     `SUM(CASE WHEN n > 15 THEN n END) OVER (...)`.
+#     window functions — supported (full PG/Spark
+#     semantics: filters the per-row contribution to the
+#     running aggregate). Previously silently IGNORED
+#     (returned the unfiltered value), then pinned to an
+#     explicit 1064 error (zeta PR #1215) as an interim
+#     step before real support landed.
 #   # zeta-adapt: NTILE(<=0) errors 1105 \"argument of
 #     NTILE must be greater than zero\". Fixed in zeta PR
 #     #1216 — previously silently returned bucket=1 for
@@ -105,13 +105,11 @@ SELECT id, ROW_NUMBER() OVER () AS rn FROM wf ORDER BY id;
 
 SELECT id, ROW_NUMBER() OVER (PARTITION BY id % 2) AS rn FROM wf ORDER BY id;
 
---echo === FILTER clause on aggregate window — errors 1064 (was silent-ignore) ===
---echo # Fixed in zeta PR #1215. Previously returned the unfiltered
---echo # cumulative sum without any error signal. Full PG/Spark
---echo # semantics is a follow-up. Workaround: rewrite as
---echo # `SUM(CASE WHEN n > 15 THEN n END) OVER (...)`.
+--echo === FILTER clause on aggregate window — real semantics ===
+--echo # Previously silently ignored the filter (zeta PR #1215 then made
+--echo # this an explicit 1064 error as an interim step); now filters the
+--echo # per-row contribution to the running aggregate as PG/Spark do.
 
---error 1064
 SELECT id, n, SUM(n) FILTER (WHERE n > 15) OVER (ORDER BY id) AS s_filt FROM wf ORDER BY id;
 
 --echo === FILTER workaround using CASE ===

@@ -48,13 +48,15 @@ id	rn
 1	1
 2	1
 3	2
-=== FILTER clause on aggregate window — errors 1064 (was silent-ignore) ===
-# Fixed in zeta PR #1215. Previously returned the unfiltered
-# cumulative sum without any error signal. Full PG/Spark
-# semantics is a follow-up. Workaround: rewrite as
-# `SUM(CASE WHEN n > 15 THEN n END) OVER (...)`.
+=== FILTER clause on aggregate window — real semantics ===
+# Previously silently ignored the filter (zeta PR #1215 then made
+# this an explicit 1064 error as an interim step); now filters the
+# per-row contribution to the running aggregate as PG/Spark do.
 SELECT id, n, SUM(n) FILTER (WHERE n > 15) OVER (ORDER BY id) AS s_filt FROM wf ORDER BY id;
-ERROR 1064: SQL parse error: FILTER clause on window aggregate `SUM` not yet supported
+id	n	s_filt
+1	10	NULL
+2	20	20
+3	30	50
 === FILTER workaround using CASE ===
 SELECT id, n, SUM(CASE WHEN n > 15 THEN n END) OVER (ORDER BY id) AS s_filt_case FROM wf ORDER BY id;
 id	n	s_filt_case
@@ -84,5 +86,5 @@ SELECT SUM(ROW_NUMBER() OVER ()) AS agg_of_win FROM wf;
 ERROR 1064: SQL parse error: aggregate function `SUM` cannot contain window function calls
 === Window function in WHERE — correctly errors 1105 ===
 SELECT id FROM wf WHERE ROW_NUMBER() OVER () = 1;
-ERROR 1105: execution error: unsupported expression: WindowFunction { name: "ROW_NUMBER", args: [], partition_by: [], order_by: [], frame: None }
+ERROR 1105: execution error: unsupported expression: WindowFunction { name: "ROW_NUMBER", args: [], filter: None, partition_by: [], order_by: [], frame: None }
 DROP TABLE wf;

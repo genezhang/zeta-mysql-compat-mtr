@@ -10,7 +10,8 @@
 # @@transaction_isolation / @@autocommit variable reads,
 # isolation-doesn't-actually-change divergence, BEGIN
 # ISOLATION LEVEL combined, WORK keyword, AND CHAIN gap,
-# DEFERRABLE gap, START TRANSACTION ISOLATION LEVEL gap.
+# DEFERRABLE gap (1235), START TRANSACTION ISOLATION LEVEL
+# gap.
 #
 # Big-picture finding: zeta accepts all five isolation
 # levels (READ UNCOMMITTED, READ COMMITTED, REPEATABLE
@@ -24,7 +25,7 @@
 # is silently accepted without actually changing the
 # @@tx_isolation reading — the level you set isn't
 # reflected back. Two PG forms are missing: BEGIN
-# DEFERRABLE (1064) and `COMMIT AND CHAIN` inside an
+# DEFERRABLE (1235) and `COMMIT AND CHAIN` inside an
 # active transaction (1105). MySQL's `START TRANSACTION
 # ISOLATION LEVEL ...` (combined, with no SET first)
 # errors 1235 with a helpful hint pointing at SET
@@ -59,7 +60,11 @@
 #     — a helpful rewrite hint pointing at the supported
 #     form.
 #   # zeta-adapt: KNOWN GAP — BEGIN DEFERRABLE (PG) errors
-#     1064 "Expected: end of statement, found: DEFERRABLE".
+#     1235 "BEGIN with this modifier is not supported over
+#     the MySQL wire protocol" (zeta #2700 — the wire layer
+#     rejects any BEGIN modifier it doesn't track locally,
+#     rather than letting it fall through to the engine's
+#     shared session-transaction slot).
 #   # zeta-adapt: KNOWN GAP — `COMMIT AND CHAIN` while a
 #     transaction is active errors 1105 "transaction
 #     control statements are not planned". Works only when
@@ -120,9 +125,9 @@ SELECT @@tx_isolation;
 --error 1235
 START TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
---echo === KNOWN GAP: BEGIN DEFERRABLE (PG) — errno 1064 ===
+--echo === KNOWN GAP: BEGIN DEFERRABLE (PG) — errno 1235 ===
 
---error 1064
+--error 1235
 BEGIN DEFERRABLE;
 
 --echo === KNOWN GAP: COMMIT AND CHAIN inside active txn — errno 1105 ===
