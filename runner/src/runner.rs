@@ -43,6 +43,14 @@ pub async fn run_suite(
         return Ok(());
     }
 
+    // `test` is not pre-created by the server: `USE`/a handshake naming a missing database is
+    // error 1049, as in MySQL. Create it over a connection that names no database.
+    let mut admin = mysql_async::Conn::new(mysql_async::Opts::from_url(mysql_url_base)?).await?;
+    admin
+        .query_drop(format!("CREATE DATABASE IF NOT EXISTS {DEFAULT_DB}"))
+        .await?;
+    admin.disconnect().await?;
+
     let url = format!("{mysql_url_base}/{DEFAULT_DB}");
     eprintln!("connecting to {url}");
 
