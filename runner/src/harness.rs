@@ -52,8 +52,10 @@ impl ZetaServer {
         ]);
         cmd.arg("--mysql-port").arg(listener_port.to_string());
         cmd.arg("--data-dir").arg(data_dir.path());
+        // Nothing reads stdout, and a pipe nobody drains stalls zeta for good once its 64 KiB
+        // buffer fills (every thread blocks in write), so send it nowhere.
         cmd.stdin(Stdio::null())
-            .stdout(Stdio::piped())
+            .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
 
@@ -164,6 +166,13 @@ async fn await_ready(stderr: tokio::process::ChildStderr, expected_port: u16) ->
                 "zeta bound MySQL listener on {actual}, but harness expected {expected_port}"
             ));
         }
+        // Keep draining: a closed read end makes zeta's later log writes fail, a full one
+        // blocks them. Forward the lines so a crash or panic is still visible.
+        tokio::spawn(async move {
+            while let Ok(Some(line)) = buf.next_line().await {
+                eprintln!("[zeta] {}", line);
+            }
+        });
         return Ok(());
     }
     Err(anyhow!(

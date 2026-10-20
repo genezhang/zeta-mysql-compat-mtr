@@ -235,7 +235,7 @@ fn format_rows(rows: &[mysql_async::Row]) -> String {
     out
 }
 
-fn format_value(v: &mysql_async::Value) -> String {
+pub(crate) fn format_value(v: &mysql_async::Value) -> String {
     use mysql_async::Value::*;
     match v {
         NULL => "NULL".to_string(),

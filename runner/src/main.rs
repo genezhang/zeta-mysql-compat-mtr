@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 mod harness;
 mod mtr_parser;
+mod oracle;
 mod result_diff;
 mod runner;
 mod skip_list;
@@ -23,6 +24,25 @@ struct Args {
     /// Optional substring filter applied to the .test path.
     #[arg(long)]
     filter: Option<String>,
+
+    /// Differential mode: base URL of a real MySQL server (for example
+    /// `mysql://root@127.0.0.1:33306`) to compare zeta against, statement by
+    /// statement. The sibling `.result` files and the skip list are not used.
+    /// The server's databases other than the system ones are DROPPED.
+    #[arg(long)]
+    oracle_url: Option<String>,
+
+    /// Differential mode: skip test paths containing this substring (repeatable).
+    /// Used for files that change the oracle's accounts, which need a restored
+    /// server of their own.
+    #[arg(long = "exclude")]
+    exclude: Vec<String>,
+
+    /// Differential mode: write one line per diverging statement (with the
+    /// statement text and both outputs) to this file. Local reading only: it
+    /// quotes test content, so do not commit it.
+    #[arg(long)]
+    report: Option<PathBuf>,
 }
 
 #[tokio::main]
@@ -42,6 +62,27 @@ async fn main() -> Result<()> {
     // skip list); a malformed one is a hard error rather than silently
     // skipping nothing and reporting every previously-skipped test as new
     // failures.
+    if let Some(oracle_url) = &args.oracle_url {
+        let suites: Vec<String> = args
+            .suite
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect();
+        let res = oracle::run_diff(
+            &suites,
+            args.filter.as_deref(),
+            &args.exclude,
+            &url_base,
+            oracle_url,
+            args.report.as_deref(),
+        )
+        .await;
+        let _ = zeta.shutdown().await;
+        return res;
+    }
+
     let skip_list = skip_list::SkipList::load(std::path::Path::new("."))?;
 
     let mut had_failure = false;

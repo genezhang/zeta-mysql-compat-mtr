@@ -41,6 +41,22 @@ cargo run -- --zeta-bin /path/to/zeta --suite main
 
 The runner is **independently re-derived** from public MTR documentation. It does not copy from MySQL's `mysql-test-run.pl`. It connects to a running `zeta` server over the MySQL wire protocol and never links to Zeta as a library.
 
+## Differential mode (compare with a real MySQL)
+
+The `.result` files in this repository record what zeta printed when the test was written, so a pass means "unchanged", not "agrees with MySQL". To measure agreement with MySQL itself, point the runner at a running `mysqld` as well:
+
+```
+cargo run --release -- --zeta-bin /path/to/zeta --suite all \
+    --oracle-url mysql://root@127.0.0.1:33306 \
+    --report /tmp/diff-report.tsv > /tmp/diff-summary.tsv
+```
+
+Every statement of every `.test` file runs on both servers (the oracle's non-system databases are dropped and `test` is recreated before each file) and the outcomes are compared: result set (column names and rows, `--sorted_result` honoured), affected rows, or error code. The run continues past errors, so one divergence does not hide the rest of a file.
+
+`--exclude <substring>` (repeatable) skips files. Files that change accounts or global variables (`CREATE USER`, `SET GLOBAL`, `SHUTDOWN`, ...) damage a shared oracle, so run them one at a time against a restored data directory. Start the oracle with `--default-time-zone=+00:00`, since zeta evaluates in UTC.
+
+Output, one row per file on stdout: `file statements same first_divergence first_kind mysql_ok mysql_ok_same first_hard first_hard_kind diverging_kinds`. A *hard* divergence is one on a statement MySQL itself accepted (a result that differs, or an error from zeta); a statement that MySQL rejects and zeta accepts is only leniency. Totals and histograms go to stderr. The `--report` file holds statement text and both outcomes, so keep it local if the test content is GPL.
+
 ## License
 
 GPL v2. See `LICENSE`. Adapted test files preserve their upstream GPL headers; see `UPSTREAM.md` for the version of MySQL/MariaDB whose tests this repo tracks.
