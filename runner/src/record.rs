@@ -27,9 +27,15 @@
 //! runs the whole corpus more than once, against a restored oracle and in a different file order, and
 //! compares: a statement whose result differs only in some cells carries `"nd":"cells","masked":[[row,col],..]`
 //! (those cells are not compared); one whose rows differ only in order carries `"nd":"order"` (compared as
-//! sorted); one that differs in any other way becomes `excluded`. Masked cells are stored as the literal
-//! `<masked>` so that recording twice gives the same file. Replay reports how many statements fall in each
-//! class.
+//! sorted); one that differs in any other way becomes `excluded`. Masking is by COLUMN (`"masked":[1,3]`): the
+//! passes may return the rows in different orders, so a position in a row list means nothing. Masked values are
+//! stored as the literal `<masked>` (and the rows of an order-insensitive answer in one canonical order) so that
+//! recording twice gives the same file. Replay reports how many statements fall in each class.
+//!
+//! The passes also differ in the oracle's clock: every pass after the first runs its sessions with `SET timestamp`
+//! shifted by weeks, so a value derived from the date (a `DEFAULT (CURRENT_DATE)` column, a stored routine that
+//! calls `NOW()`) differs between the passes and is masked instead of being recorded as a constant that goes stale
+//! at midnight.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -96,19 +102,29 @@ pub struct Rec {
     /// For `volatile`: the class (`time`, `random`, ...).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub class: Option<String>,
+    /// For `cells`: the columns whose values are not compared.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub masked: Option<Vec<[usize; 2]>>,
+    pub masked: Option<Vec<usize>>,
+    /// The rows are compared as a set: their order is not part of the answer.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub unordered: bool,
+    /// The test asked for `--sorted_result` here. Part of what the record was made for: a change invalidates it.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub sorted: bool,
 }
 
-/// FNV-1a 64 of the statement with runs of whitespace collapsed, as 8 hex digits (the low 32 bits are plenty:
-/// this only has to notice a changed `.test`, it is not a security boundary).
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+/// FNV-1a 64 of the statement text (line endings normalised, surrounding whitespace dropped, everything else
+/// exact: a space inside a string literal is part of the statement), as 8 hex digits. The low 32 bits are plenty:
+/// this only has to notice a changed `.test`, it is not a security boundary.
 pub fn stmt_hash(sql: &str) -> String {
     let mut h: u64 = 0xcbf29ce484222325;
-    for tok in sql.split_whitespace() {
-        for b in tok.bytes().chain(std::iter::once(b' ')) {
-            h ^= u64::from(b);
-            h = h.wrapping_mul(0x100000001b3);
-        }
+    for b in sql.trim().replace("\r\n", "\n").bytes() {
+        h ^= u64::from(b);
+        h = h.wrapping_mul(0x100000001b3);
     }
     format!("{:08x}", h as u32 ^ (h >> 32) as u32)
 }
@@ -122,6 +138,8 @@ impl Rec {
             nd: None,
             class: None,
             masked: None,
+            unordered: false,
+            sorted: false,
         }
     }
 
@@ -165,58 +183,41 @@ impl Rec {
             return None;
         }
         let oracle = self.outcome()?;
-        let zeta = &shrink(zeta);
-        let sorted = sorted || self.nd.as_deref() == Some("order");
-        let (z, o) = match (self.nd.as_deref(), &self.masked, zeta, &oracle) {
-            (
-                Some("volatile"),
-                _,
-                Outcome::Rows { cols: zc, rows: zr },
-                Outcome::Rows { cols: oc, rows: or },
-            ) => (
-                Outcome::Rows {
-                    cols: zc.clone(),
-                    rows: zr
-                        .iter()
-                        .map(|r| vec![Some(MASK.into()); r.len()])
-                        .collect(),
-                },
-                Outcome::Rows {
-                    cols: oc.clone(),
-                    rows: or
-                        .iter()
-                        .map(|r| vec![Some(MASK.into()); r.len()])
-                        .collect(),
-                },
+        let zeta = shrink(zeta);
+        let sorted = sorted || self.unordered || self.nd.as_deref() == Some("order");
+        let mask_columns = |o: &Outcome, which: &dyn Fn(usize) -> bool| match o {
+            Outcome::Rows { cols, rows } => Outcome::Rows {
+                cols: cols.clone(),
+                rows: rows
+                    .iter()
+                    .map(|r| {
+                        r.iter()
+                            .enumerate()
+                            .map(|(c, v)| {
+                                if which(c) {
+                                    Some(MASK.into())
+                                } else {
+                                    v.clone()
+                                }
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            },
+            other => other.clone(),
+        };
+        let (z, o) = match self.nd.as_deref() {
+            // By its text the statement's values cannot be trusted: the shape (column names, row count) is compared.
+            Some("volatile") => (
+                mask_columns(&zeta, &|_| true),
+                mask_columns(&oracle, &|_| true),
             ),
-            (
-                Some("cells"),
-                Some(cells),
-                Outcome::Rows { cols: zc, rows: zr },
-                Outcome::Rows { cols: oc, rows: or },
-            ) => {
-                let mut z = zr.clone();
-                let mut o = or.clone();
-                for [r, c] in cells {
-                    if let Some(cell) = z.get_mut(*r).and_then(|row| row.get_mut(*c)) {
-                        *cell = Some(MASK.into());
-                    }
-                    if let Some(cell) = o.get_mut(*r).and_then(|row| row.get_mut(*c)) {
-                        *cell = Some(MASK.into());
-                    }
-                }
-                (
-                    Outcome::Rows {
-                        cols: zc.clone(),
-                        rows: z,
-                    },
-                    Outcome::Rows {
-                        cols: oc.clone(),
-                        rows: o,
-                    },
-                )
+            Some("cells") => {
+                let cols = self.masked.clone().unwrap_or_default();
+                let which = move |c: usize| cols.contains(&c);
+                (mask_columns(&zeta, &which), mask_columns(&oracle, &which))
             }
-            _ => (zeta.clone(), oracle),
+            _ => (zeta, oracle),
         };
         Some(compare(&z, &o, sorted))
     }
@@ -294,8 +295,9 @@ pub fn read(path: &Path) -> Result<(Header, Vec<Rec>)> {
     Ok((header, recs))
 }
 
-/// Why a record cannot be used for `statements` (the file's parsed SQL), or `None` if it matches.
-pub fn stale_reason(recs: &[Rec], statements: &[String]) -> Option<String> {
+/// Why a record cannot be used for `statements` (the file's parsed SQL and its `--sorted_result` flags), or `None`
+/// if it matches.
+pub fn stale_reason(recs: &[Rec], statements: &[(String, bool)]) -> Option<String> {
     if recs.len() != statements.len() {
         return Some(format!(
             "record has {} statements, the test now has {}",
@@ -303,10 +305,16 @@ pub fn stale_reason(recs: &[Rec], statements: &[String]) -> Option<String> {
             statements.len()
         ));
     }
-    for (r, s) in recs.iter().zip(statements) {
-        if r.h != stmt_hash(s) {
+    for (r, (sql, sorted)) in recs.iter().zip(statements) {
+        if r.h != stmt_hash(sql) {
             return Some(format!(
                 "statement {} changed since the record was made",
+                r.i
+            ));
+        }
+        if r.sorted != *sorted {
+            return Some(format!(
+                "--sorted_result on statement {} changed since the record was made",
                 r.i
             ));
         }
@@ -428,14 +436,56 @@ fn excluded(i: usize, sql: &str, why: &str) -> Rec {
     Rec::new(i, sql, Body::Excluded { why: why.into() })
 }
 
+/// Compare two passes' result sets: the columns whose values differ (compared as sets, so a different row order is
+/// not a difference) and whether the rows come in another order. `Err` = the answers differ beyond that.
+fn merge_rows(
+    a: &[Vec<Cell>],
+    b: &[Vec<Cell>],
+) -> std::result::Result<(Vec<usize>, bool), &'static str> {
+    if a.len() != b.len() {
+        return Err("row count differs between passes");
+    }
+    let width = a.first().map_or(0, Vec::len);
+    if a.iter().chain(b).any(|r| r.len() != width) {
+        return Err("row width differs between passes");
+    }
+    fn column(rows: &[Vec<Cell>], c: usize) -> Vec<&Cell> {
+        let mut v: Vec<&Cell> = rows.iter().map(|r| &r[c]).collect();
+        v.sort();
+        v
+    }
+    let masked: Vec<usize> = (0..width)
+        .filter(|&c| column(a, c) != column(b, c))
+        .collect();
+    let project = |rows: &[Vec<Cell>]| -> Vec<Vec<Cell>> {
+        rows.iter()
+            .map(|r| {
+                r.iter()
+                    .enumerate()
+                    .filter(|(c, _)| !masked.contains(c))
+                    .map(|(_, v)| v.clone())
+                    .collect()
+            })
+            .collect()
+    };
+    let (pa, pb) = (project(a), project(b));
+    let (mut sa, mut sb) = (pa.clone(), pb.clone());
+    sa.sort();
+    sb.sort();
+    if sa != sb {
+        return Err("rows differ between passes beyond the columns that vary");
+    }
+    Ok((masked, pa != pb))
+}
+
 /// Merge the outcomes of one statement over several passes into its record. The first pass supplies the stored
 /// answer; where the passes disagree the disagreement is made explicit (see the module doc) and the disagreeing
 /// values are replaced by a fixed placeholder, so that recording twice gives the same file.
 pub fn merge_passes(i: usize, sql: &str, passes: &[&Outcome]) -> Rec {
     let first = passes[0];
     let mut body = Body::from(first);
-    let mut masked: Vec<[usize; 2]> = Vec::new();
-    let mut order = false;
+    let mut masked: Vec<usize> = Vec::new();
+    let mut reordered = false;
     let mut msg_varies = false;
     for other in &passes[1..] {
         match (first, *other) {
@@ -447,27 +497,12 @@ pub fn merge_passes(i: usize, sql: &str, passes: &[&Outcome]) -> Rec {
             (Outcome::Rows { cols: ac, rows: ar }, Outcome::Rows { cols: bc, rows: br })
                 if ac == bc =>
             {
-                if ar.len() != br.len() {
-                    return excluded(i, sql, "row count differs between passes");
-                }
-                let mut diffs = Vec::new();
-                for (ri, (x, y)) in ar.iter().zip(br).enumerate() {
-                    if x.len() != y.len() {
-                        return excluded(i, sql, "row width differs between passes");
+                match merge_rows(ar, br) {
+                    Ok((cols, order)) => {
+                        masked.extend(cols);
+                        reordered |= order;
                     }
-                    for (ci, (cx, cy)) in x.iter().zip(y).enumerate() {
-                        if cx != cy {
-                            diffs.push([ri, ci]);
-                        }
-                    }
-                }
-                let (mut sa, mut sb) = (ar.clone(), br.clone());
-                sa.sort();
-                sb.sort();
-                if sa == sb {
-                    order = true;
-                } else {
-                    masked.extend(diffs);
+                    Err(why) => return excluded(i, sql, why),
                 }
             }
             (a, b) => {
@@ -492,6 +527,7 @@ pub fn merge_passes(i: usize, sql: &str, passes: &[&Outcome]) -> Rec {
     masked.dedup();
     let mut rec = Rec::new(i, sql, body);
     if let Body::Rows { rows, .. } = &mut rec.body {
+        let unordered = reordered || unordered_by_definition(sql);
         if let Some(class) = volatile_class(sql) {
             // By its text the statement's values cannot be trusted: shape only.
             for row in rows.iter_mut() {
@@ -502,17 +538,21 @@ pub fn merge_passes(i: usize, sql: &str, passes: &[&Outcome]) -> Rec {
             rec.nd = Some("volatile".into());
             rec.class = Some(class.into());
         } else if !masked.is_empty() {
-            for [r, c] in &masked {
-                rows[*r][*c] = Some(PLACEHOLDER.into());
+            for row in rows.iter_mut() {
+                for &c in &masked {
+                    row[c] = Some(PLACEHOLDER.into());
+                }
             }
             rec.nd = Some("cells".into());
             rec.masked = Some(masked);
-        } else if order || unordered_by_definition(sql) {
+            rec.unordered = unordered;
+        } else if unordered {
             rec.nd = Some("order".into());
+            rec.unordered = true;
         }
-        if rec.nd.as_deref() == Some("order") {
+        if rec.unordered {
             // The order is not part of the answer: store one canonical order so recording twice gives the same
-            // file, and compare sorted.
+            // file, and compare as a set.
             rows.sort();
         }
     }
@@ -546,8 +586,9 @@ mod tests {
     }
 
     #[test]
-    fn hash_ignores_whitespace_only() {
-        assert_eq!(stmt_hash("SELECT   1\n"), stmt_hash("SELECT 1"));
+    fn hash_ignores_only_surrounding_whitespace() {
+        assert_eq!(stmt_hash("  SELECT 1\n"), stmt_hash("SELECT 1"));
+        assert_ne!(stmt_hash("SELECT   1"), stmt_hash("SELECT 1"));
         assert_ne!(stmt_hash("SELECT 1"), stmt_hash("SELECT 2"));
     }
 
@@ -588,15 +629,32 @@ mod tests {
         let a = rows(&[&[Some("1"), Some("x")], &[Some("2"), Some("y")]]);
         let r = merge_passes(1, "q", &[&a, &a]);
         assert_eq!((r.nd.clone(), r.body.clone()), (None, Body::from(&a)));
-        // One cell differs: masked, and the stored cell is the placeholder.
+        // One cell differs: its column is masked, and the stored cells of that column are the placeholder.
         let b = rows(&[&[Some("1"), Some("z")], &[Some("2"), Some("y")]]);
         let r = merge_passes(1, "q", &[&a, &b]);
         assert_eq!(r.nd.as_deref(), Some("cells"));
-        assert_eq!(r.masked, Some(vec![[0, 1]]));
+        assert_eq!(r.masked, Some(vec![1]));
+        assert!(!r.unordered);
         assert_eq!(
             r.outcome().unwrap(),
-            rows(&[&[Some("1"), Some("<masked>")], &[Some("2"), Some("y")]])
+            rows(&[
+                &[Some("1"), Some("<masked>")],
+                &[Some("2"), Some("<masked>")]
+            ])
         );
+        // The rows moved AND a column varies (information_schema.tables with create_time): the varying column is
+        // masked, the rest is compared as a set, and a wrong value in the stable column is still caught.
+        let t1 = rows(&[&[Some("a"), Some("T1")], &[Some("b"), Some("T2")]]);
+        let t2 = rows(&[&[Some("b"), Some("U1")], &[Some("a"), Some("U2")]]);
+        let r = merge_passes(1, "SELECT n, ts FROM t", &[&t1, &t2]);
+        assert_eq!(
+            (r.nd.as_deref(), r.masked.clone(), r.unordered),
+            (Some("cells"), Some(vec![1]), true)
+        );
+        let swapped = rows(&[&[Some("b"), Some("whatever")], &[Some("a"), Some("else")]]);
+        assert_eq!(r.compare(&swapped, false), Some(Kind::Same));
+        let wrong = rows(&[&[Some("WRONG"), Some("x")], &[Some("a"), Some("y")]]);
+        assert_eq!(r.compare(&wrong, false), Some(Kind::Values));
         // Same rows, other order.
         let c = rows(&[&[Some("2"), Some("y")], &[Some("1"), Some("x")]]);
         assert_eq!(merge_passes(1, "q", &[&a, &c]).nd.as_deref(), Some("order"));
@@ -644,15 +702,19 @@ mod tests {
     }
 
     #[test]
-    fn masks_hide_only_the_masked_cells() {
+    fn masks_hide_only_the_masked_columns() {
         let o = rows(&[&[Some("1"), Some("x")], &[Some("2"), Some("y")]]);
         let mut rec = Rec::from_outcome(1, "q", &o);
         rec.nd = Some("cells".into());
-        rec.masked = Some(vec![[0, 1]]);
+        rec.masked = Some(vec![1]);
         let same_but_masked = rows(&[&[Some("1"), Some("OTHER")], &[Some("2"), Some("y")]]);
         assert_eq!(rec.compare(&same_but_masked, false), Some(Kind::Same));
         let differs_elsewhere = rows(&[&[Some("9"), Some("x")], &[Some("2"), Some("y")]]);
         assert_eq!(rec.compare(&differs_elsewhere, false), Some(Kind::Values));
+        // A mask is by column, so it still lands on the right cells when zeta returns the rows in another order
+        // and the test sorts the result.
+        let reordered = rows(&[&[Some("2"), Some("q")], &[Some("1"), Some("w")]]);
+        assert_eq!(rec.compare(&reordered, true), Some(Kind::Same));
         // A volatile statement compares shape only.
         let mut v = Rec::from_outcome(1, "q", &o);
         v.nd = Some("volatile".into());
@@ -666,6 +728,7 @@ mod tests {
         // Order-nondeterministic: compared as sorted.
         let mut ord = Rec::from_outcome(1, "q", &o);
         ord.nd = Some("order".into());
+        ord.unordered = true;
         let swapped = rows(&[&[Some("2"), Some("y")], &[Some("1"), Some("x")]]);
         assert_eq!(ord.compare(&swapped, false), Some(Kind::Same));
     }
@@ -749,19 +812,40 @@ mod tests {
 
     #[test]
     fn staleness_is_detected() {
-        let stmts = vec!["SELECT 1".to_string(), "SELECT 2".to_string()];
+        let stmts = vec![
+            ("SELECT 1".to_string(), false),
+            ("SELECT 2".to_string(), false),
+        ];
         let recs: Vec<Rec> = stmts
             .iter()
             .enumerate()
-            .map(|(i, s)| Rec::from_outcome(i + 1, s, &Outcome::Ok { affected: 0 }))
+            .map(|(i, (s, _))| Rec::from_outcome(i + 1, s, &Outcome::Ok { affected: 0 }))
             .collect();
         assert_eq!(stale_reason(&recs, &stmts), None);
-        let changed = vec!["SELECT 1".to_string(), "SELECT 3".to_string()];
+        let changed = vec![
+            ("SELECT 1".to_string(), false),
+            ("SELECT 3".to_string(), false),
+        ];
         assert!(stale_reason(&recs, &changed)
             .unwrap()
             .contains("statement 2"));
         assert!(stale_reason(&recs, &stmts[..1])
             .unwrap()
             .contains("2 statements"));
+        // Whitespace inside a literal is part of the statement; --sorted_result is part of the record.
+        let lit = Rec::from_outcome(1, "SELECT 'a  b'", &Outcome::Ok { affected: 0 });
+        assert!(stale_reason(
+            std::slice::from_ref(&lit),
+            &[("SELECT 'a b'".to_string(), false)]
+        )
+        .is_some());
+        assert!(stale_reason(&[lit], &[("SELECT 'a  b'".to_string(), true)])
+            .unwrap()
+            .contains("sorted_result"));
+        // Line endings do not matter.
+        assert_eq!(
+            stmt_hash("SELECT 1\r\nFROM t"),
+            stmt_hash("SELECT 1\nFROM t")
+        );
     }
 }

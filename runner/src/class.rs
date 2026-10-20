@@ -68,7 +68,13 @@ impl Classes {
 fn classes() -> &'static Classes {
     use std::sync::OnceLock;
     static CLASSES: OnceLock<Classes> = OnceLock::new();
-    CLASSES.get_or_init(|| Classes::load(Path::new(".")).unwrap_or_default())
+    CLASSES.get_or_init(|| {
+        Classes::load(Path::new(".")).unwrap_or_else(|e| {
+            // Treating an unreadable list as "no list" would silently switch the whole record mode off.
+            eprintln!("error: {e:#}; treating every test as MySQL-targeted without records");
+            Classes::default()
+        })
+    })
 }
 
 /// The class of `test`, from `./tests/zeta_only.list` (read once). A malformed line cannot occur: the format has

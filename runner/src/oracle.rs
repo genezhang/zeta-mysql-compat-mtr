@@ -107,6 +107,8 @@ struct FileStats {
     oracle_ok: usize,
     oracle_ok_same: usize,
     oracle_ok_order: usize,
+    /// Of `oracle_ok_same`, how many were compared with masked or order-insensitive values.
+    oracle_ok_same_masked: usize,
 }
 
 impl FileStats {
@@ -133,6 +135,7 @@ struct Totals {
     oracle_ok: usize,
     oracle_ok_same: usize,
     oracle_ok_order: usize,
+    oracle_ok_same_masked: usize,
     by_kind: BTreeMap<Kind, usize>,
     first_hist: BTreeMap<Kind, usize>,
     skipped_by: BTreeMap<String, usize>,
@@ -178,7 +181,7 @@ impl Totals {
         if st.first_hard.is_none() {
             c.files_hard_clean += 1;
         }
-        if st.first.is_none() && st.skipped() == 0 {
+        if st.first.is_none() && st.skipped() == 0 && st.excluded == 0 {
             c.files_identical += 1;
         }
         self.statements += st.total;
@@ -186,6 +189,7 @@ impl Totals {
         self.oracle_ok += st.oracle_ok;
         self.oracle_ok_same += st.oracle_ok_same;
         self.oracle_ok_order += st.oracle_ok_order;
+        self.oracle_ok_same_masked += st.oracle_ok_same_masked;
         if st.first_hard.is_none() {
             self.files_hard_clean += 1;
         }
@@ -203,7 +207,7 @@ impl Totals {
         }
         match st.first {
             // A file with skipped statements is not "identical on every statement": some never ran.
-            None if st.skipped() == 0 => self.files_same += 1,
+            None if st.skipped() == 0 && st.excluded == 0 => self.files_same += 1,
             None => {}
             Some((_, k)) => *self.first_hist.entry(k).or_default() += 1,
         }
@@ -226,10 +230,11 @@ impl Totals {
             100.0 * same as f64 / self.statements.max(1) as f64
         );
         eprintln!(
-            "statements MySQL accepted: {}, zeta matched {} ({:.1}%), a further {} up to row order; files with no hard divergence on a statement MySQL accepted: {}",
+            "statements MySQL accepted: {}, zeta matched {} ({:.1}%, of which {} with masked or order-insensitive values), a further {} up to row order; files with no hard divergence on a statement MySQL accepted: {}",
             self.oracle_ok,
             self.oracle_ok_same,
             100.0 * self.oracle_ok_same as f64 / self.oracle_ok.max(1) as f64,
+            self.oracle_ok_same_masked,
             self.oracle_ok_order,
             self.files_hard_clean
         );
@@ -435,7 +440,7 @@ async fn compare_file(
     for (n, stmt) in stmts.iter().enumerate() {
         let idx = n + 1; // position in the file, skipped statements included
         let sql = &stmt.sql;
-        let (z, o, kind) = match &mut src {
+        let (z, o, kind, was_masked) = match &mut src {
             Source::Live { oracle, hazards } => {
                 if let Some(why) = hazards.check(sql) {
                     *st.skipped_by.entry(why.to_string()).or_default() += 1;
@@ -458,7 +463,7 @@ async fn compare_file(
                     );
                 }
                 let kind = settle(compare(&z, &o, stmt.sorted), stmt);
-                (z, o, kind)
+                (z, o, kind, false)
             }
             Source::Replay { recs } => {
                 let rec = &recs[n];
@@ -468,19 +473,33 @@ async fn compare_file(
                 }
                 // Excluded statements still run: later statements depend on their effects.
                 let z = zeta.run(sql).await;
-                let Some(kind) = rec.compare(&z, stmt.sorted).map(|k| settle(k, stmt)) else {
-                    st.excluded += 1;
-                    continue;
+                let kind = match rec.compare(&z, stmt.sorted).map(|k| settle(k, stmt)) {
+                    Some(k) => k,
+                    None => match &z {
+                        // The oracle's answer is unstable, so nothing is compared; but zeta giving no answer at
+                        // all is zeta's problem whatever the oracle said.
+                        Outcome::Err { code: None, .. } => Kind::Transport,
+                        Outcome::Timeout => Kind::Timeout,
+                        _ => {
+                            st.excluded += 1;
+                            continue;
+                        }
+                    },
                 };
+                let mut was_masked = false;
                 if let (Some(nd), Body::Rows { .. }) = (&rec.nd, &rec.body) {
                     let label = match &rec.class {
                         Some(w) => format!("{nd}:{w}"),
                         None => nd.clone(),
                     };
                     *st.masked_by.entry(label).or_default() += 1;
+                    was_masked = true;
                 }
-                let o = rec.outcome().expect("a compared record has an outcome");
-                (z, o, kind)
+                let o = rec.outcome().unwrap_or_else(|| Outcome::Err {
+                    code: Some(0),
+                    msg: "answer excluded as nondeterministic".into(),
+                });
+                (z, o, kind, was_masked)
             }
         };
         st.total += 1;
@@ -489,7 +508,12 @@ async fn compare_file(
         if oracle_accepted {
             st.oracle_ok += 1;
             match kind {
-                Kind::Same => st.oracle_ok_same += 1,
+                Kind::Same => {
+                    st.oracle_ok_same += 1;
+                    if was_masked {
+                        st.oracle_ok_same_masked += 1;
+                    }
+                }
                 Kind::RowOrder => st.oracle_ok_order += 1,
                 _ => {}
             }
@@ -706,7 +730,7 @@ pub async fn run_replay(
     let mut zeta = ZetaCtl::new(zserver, zeta_bin);
     println!("{ROW_HEADER}");
     let mut totals = Totals::default();
-    let res = interruptible(replay_files(
+    let mut res = interruptible(replay_files(
         &files,
         records_root,
         &mut zeta,
@@ -719,6 +743,13 @@ pub async fn run_replay(
     }
     totals.zeta_restarts = zeta.restarts;
     totals.completed = res.is_ok();
+    // A file that could not be compared leaves the totals: that must not look like a clean run.
+    let uncompared = totals.files_norecord + totals.files_stale + totals.files_unparsed;
+    if res.is_ok() && uncompared > 0 {
+        res = Err(anyhow!(
+            "{uncompared} files could not be compared (no record, stale record or unparsable test); the totals leave them out"
+        ));
+    }
     totals.print();
     res
 }
@@ -742,7 +773,7 @@ async fn replay_files(
             continue;
         }
         let (header, recs) = record::read(&rpath)?;
-        let sql: Vec<String> = stmts.iter().map(|s| s.sql.clone()).collect();
+        let sql: Vec<(String, bool)> = stmts.iter().map(|s| (s.sql.clone(), s.sorted)).collect();
         if let Some(why) = record::stale_reason(&recs, &sql) {
             eprintln!("stale record for {}: {why}", path.display());
             print_unusable_row(path, "stale-record");
@@ -793,7 +824,7 @@ pub async fn check_against_record(test: &Path, zeta_base: &str) -> Result<()> {
     let stmts = statements(directives.clone());
     let rpath = sibling_record(test);
     let (_, recs) = record::read(&rpath)?;
-    let sql: Vec<String> = stmts.iter().map(|s| s.sql.clone()).collect();
+    let sql: Vec<(String, bool)> = stmts.iter().map(|s| (s.sql.clone(), s.sorted)).collect();
     if let Some(why) = record::stale_reason(&recs, &sql) {
         bail!(
             "the oracle record {} is stale: {why}; re-record it",
@@ -822,6 +853,13 @@ pub async fn check_against_record(test: &Path, zeta_base: &str) -> Result<()> {
     .await?;
     println!("{ROW_HEADER}");
     print_file_row(test, &st);
+    eprintln!(
+        "  compared {} statements ({} with masked or order-insensitive values), {} excluded as nondeterministic, {} skipped as hazardous",
+        st.total,
+        st.masked(),
+        st.excluded,
+        st.skipped()
+    );
     let diverging: usize = st
         .by_kind
         .iter()
@@ -843,6 +881,12 @@ pub async fn check_against_record(test: &Path, zeta_base: &str) -> Result<()> {
 
 /// Offline: write the `.result` file of every MySQL-targeted test that has an oracle record, from the record.
 pub fn write_results(c: Common<'_>) -> Result<()> {
+    if !class::records_adopted() {
+        bail!(
+            "tests/zeta_only.list is missing: create it (it may list nothing) before --write-results, so that the \
+             PostgreSQL-grammar tests keep their hand-maintained .result files"
+        );
+    }
     let files = collect_files(&c)?;
     let (mut written, mut unchanged, mut norecord) = (0usize, 0usize, 0usize);
     for path in &files {
@@ -859,7 +903,7 @@ pub fn write_results(c: Common<'_>) -> Result<()> {
         let directives = parse(&src).with_context(|| format!("parsing {}", path.display()))?;
         let stmts = statements(directives.clone());
         let (_, recs) = record::read(&rpath)?;
-        let sql: Vec<String> = stmts.iter().map(|s| s.sql.clone()).collect();
+        let sql: Vec<(String, bool)> = stmts.iter().map(|s| (s.sql.clone(), s.sorted)).collect();
         if let Some(why) = record::stale_reason(&recs, &sql) {
             bail!(
                 "{}: record is stale: {why}; re-record it first",
@@ -900,6 +944,7 @@ async fn run_restore(cmd: &str) -> Result<()> {
             .arg(cmd)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
+            .kill_on_drop(true)
             .status(),
     )
     .await
@@ -909,6 +954,22 @@ async fn run_restore(cmd: &str) -> Result<()> {
         bail!("--oracle-restore-cmd failed: {st}");
     }
     Ok(())
+}
+
+/// The restore command returns when it thinks the server is up; wait until it really accepts connections.
+async fn wait_until_up(oracle: &Side) -> Result<()> {
+    let mut last = String::new();
+    for _ in 0..60 {
+        match oracle.admin().await {
+            Ok(c) => {
+                let _ = tokio::time::timeout(Duration::from_secs(5), c.disconnect()).await;
+                return Ok(());
+            }
+            Err(e) => last = e.to_string(),
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    bail!("the oracle did not come back after --oracle-restore-cmd: {last}")
 }
 
 /// Run the corpus against the oracle `passes` times (restoring it before each pass, in a different file order
@@ -942,8 +1003,22 @@ pub async fn run_record(
     let mut info: Option<Vec<(&'static str, String)>> = None;
     let mut hazards = HazardFilter::new();
     for pass in 0..passes {
+        // Every pass after the first runs on a clock shifted by weeks (`SET timestamp`, per session), so that a value
+        // derived from the date differs between the passes and is masked, instead of being recorded as a constant.
+        oracle.session_init = if pass == 0 {
+            Vec::new()
+        } else {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs());
+            vec![format!(
+                "SET timestamp = {}",
+                now + u64::from(pass) * 37 * 24 * 3600
+            )]
+        };
         if let Some(cmd) = restore_cmd {
             run_restore(cmd).await?;
+            wait_until_up(&oracle).await?;
         } else if pass > 0 {
             eprintln!(
                 "warning: no --oracle-restore-cmd, so pass {} starts from the state pass {} left (global state, counters)",
@@ -985,6 +1060,11 @@ pub async fn run_record(
                     results.push(None);
                 } else {
                     results.push(Some(record::shrink(&oracle.run(&stmt.sql).await)));
+                    if oracle.tainted {
+                        bail!(
+                            "the oracle could not stop a timed-out statement; not recording against a busy server"
+                        );
+                    }
                 }
             }
             rf.passes.push(results);
@@ -1011,7 +1091,9 @@ pub async fn run_record(
             let i = n + 1;
             if let Some(why) = &rf.skipped[n] {
                 *skipped_by.entry(why.clone()).or_default() += 1;
-                recs.push(Rec::skipped(i, &stmt.sql, why));
+                let mut rec = Rec::skipped(i, &stmt.sql, why);
+                rec.sorted = stmt.sorted;
+                recs.push(rec);
                 continue;
             }
             let outs: Vec<&Outcome> = rf
@@ -1022,7 +1104,8 @@ pub async fn run_record(
                         .expect("a statement that ran in one pass ran in all")
                 })
                 .collect();
-            let rec = record::merge_passes(i, &stmt.sql, &outs);
+            let mut rec = record::merge_passes(i, &stmt.sql, &outs);
+            rec.sorted = stmt.sorted;
             match &rec.body {
                 Body::Excluded { why } => *excluded_why.entry(why.clone()).or_default() += 1,
                 Body::Timeout => oracle_timeouts += 1,

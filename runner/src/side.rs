@@ -51,6 +51,9 @@ pub struct Side {
     pub connect_failures: u32,
     /// A statement timed out and the server could not be told to stop it: its work may still be running.
     pub tainted: bool,
+    /// Statements every new session of this side runs first, after `SET NAMES` (the recorder shifts the oracle's
+    /// clock with one in later passes).
+    pub session_init: Vec<String>,
     /// No reset has succeeded since this side was (re)started. Only then is a database that refuses to be
     /// dropped accepted as permanent (zeta's default database); later it is an error.
     pub fresh: bool,
@@ -67,6 +70,7 @@ impl Side {
             conn_id: None,
             connect_failures: 0,
             tainted: false,
+            session_init: Vec::new(),
             fresh: true,
         }
     }
@@ -85,7 +89,11 @@ impl Side {
             // mysql_async's handshake announces utf8mb4_general_ci; real clients (JDBC, mysql2, the mysql CLI) end up on
             // the server's default collation, utf8mb4_0900_ai_ci (NO PAD, unlike general_ci). Ask for that, on both
             // sides. SET NAMES is not a SELECT, so it leaves FOUND_ROWS() and friends alone.
-            .init(vec!["SET NAMES utf8mb4"])
+            .init(
+                std::iter::once("SET NAMES utf8mb4".to_string())
+                    .chain(self.session_init.iter().cloned())
+                    .collect::<Vec<_>>(),
+            )
             .prefer_socket(false)
             .max_allowed_packet(Some(64 * 1024 * 1024))
             .wait_timeout(Some(28800))

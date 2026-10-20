@@ -34,9 +34,10 @@ pub async fn run_suite(
     suite: &str,
     mysql_url_base: &str,
     filter: Option<&str>,
+    class: Option<&str>,
     skip_list: &SkipList,
 ) -> Result<()> {
-    let test_files = discover_tests(suite, filter)?;
+    let test_files = discover_tests(suite, filter, class)?;
     if test_files.is_empty() {
         eprintln!(
             "no .test files matched suite={suite}{}",
@@ -313,7 +314,7 @@ fn mysql_error_parts(err: &mysql_async::Error) -> (Option<u32>, String) {
     (None, err.to_string())
 }
 
-fn discover_tests(suite: &str, filter: Option<&str>) -> Result<Vec<PathBuf>> {
+fn discover_tests(suite: &str, filter: Option<&str>, class: Option<&str>) -> Result<Vec<PathBuf>> {
     let root: PathBuf = if suite == "all" {
         PathBuf::from(TESTS_ROOT)
     } else {
@@ -343,6 +344,9 @@ fn discover_tests(suite: &str, filter: Option<&str>) -> Result<Vec<PathBuf>> {
             if !path.to_string_lossy().contains(needle) {
                 continue;
             }
+        }
+        if class.is_some_and(|want| class::of(&path) != want) {
+            continue;
         }
         out.push(path);
     }

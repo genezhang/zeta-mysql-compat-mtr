@@ -103,6 +103,15 @@ async fn main() -> Result<()> {
         .init();
 
     let args = Args::parse();
+    if let Some(c) = &args.class {
+        if c != class::MYSQL && c != class::ZETA_ONLY {
+            bail!(
+                "--class must be `{}` or `{}`, not `{c}`",
+                class::MYSQL,
+                class::ZETA_ONLY
+            );
+        }
+    }
     let suite_list = suites(&args);
     let common = || oracle::Common {
         class: args.class.as_deref(),
@@ -173,8 +182,14 @@ async fn main() -> Result<()> {
 
     let mut had_failure = false;
     for suite in &suite_list {
-        if let Err(e) =
-            runner::run_suite(suite, &url_base, args.filter.as_deref(), &skip_list).await
+        if let Err(e) = runner::run_suite(
+            suite,
+            &url_base,
+            args.filter.as_deref(),
+            args.class.as_deref(),
+            &skip_list,
+        )
+        .await
         {
             eprintln!("suite {suite} failed: {e}");
             had_failure = true;
