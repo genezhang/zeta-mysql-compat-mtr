@@ -387,6 +387,13 @@ fn unordered_by_definition(sql: &str) -> bool {
     normalize(sql).contains("INFORMATION_SCHEMA") && !has_top_level_order_by(sql)
 }
 
+/// ... and with a LIMIT, WHICH rows come back is undefined too: only the shape of the answer is stable.
+fn unordered_limit(sql: &str) -> Option<&'static str> {
+    let n = normalize(sql);
+    (unordered_by_definition(sql) && n.split(';').next().is_some_and(|f| f.contains(" LIMIT ")))
+        .then_some("unordered-limit")
+}
+
 /// A cell longer than this is stored as its length and a hash: one `REPEAT('x', 10000000)` would otherwise put
 /// ten megabytes into a committed file. zeta's cells are shrunk the same way before they are compared.
 const BIG_CELL: usize = 4096;
@@ -528,7 +535,7 @@ pub fn merge_passes(i: usize, sql: &str, passes: &[&Outcome]) -> Rec {
     let mut rec = Rec::new(i, sql, body);
     if let Body::Rows { rows, .. } = &mut rec.body {
         let unordered = reordered || unordered_by_definition(sql);
-        if let Some(class) = volatile_class(sql) {
+        if let Some(class) = volatile_class(sql).or_else(|| unordered_limit(sql)) {
             // By its text the statement's values cannot be trusted: shape only.
             for row in rows.iter_mut() {
                 for c in row.iter_mut() {
@@ -783,6 +790,26 @@ mod tests {
         );
         assert_eq!(r.nd, None);
         assert_eq!(r.outcome().unwrap(), a);
+    }
+
+    #[test]
+    fn a_limit_over_an_unordered_catalog_is_shape_only() {
+        let a = rows(&[&[Some("1"), Some("x")]]);
+        let r = merge_passes(
+            1,
+            "SELECT a, b FROM information_schema.parameters LIMIT 5",
+            &[&a, &a],
+        );
+        assert_eq!(
+            (r.nd.as_deref(), r.class.as_deref()),
+            (Some("volatile"), Some("unordered-limit"))
+        );
+        let r = merge_passes(
+            1,
+            "SELECT a, b FROM information_schema.parameters ORDER BY a LIMIT 5",
+            &[&a, &a],
+        );
+        assert_eq!(r.nd, None);
     }
 
     #[test]
