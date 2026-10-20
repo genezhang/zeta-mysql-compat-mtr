@@ -381,6 +381,40 @@ pub fn has_top_level_order_by(sql: &str) -> bool {
 
 const PLACEHOLDER: &str = "<masked>";
 
+/// Columns that hold the storage engine's estimates or clock readings, whatever statement returns them (`SHOW INDEX`,
+/// `SHOW TABLE STATUS`, `information_schema.TABLES / STATISTICS / PARTITIONS`): InnoDB samples them, so they differ
+/// between server restarts, and recording the value of one pass would make the record flaky. Masked in every record
+/// that has such a column, whether or not the passes happened to differ.
+const ESTIMATE_COLUMNS: &[&str] = &[
+    "CARDINALITY",
+    "TABLE_ROWS",
+    "AVG_ROW_LENGTH",
+    "DATA_LENGTH",
+    "MAX_DATA_LENGTH",
+    "INDEX_LENGTH",
+    "DATA_FREE",
+    "AUTO_INCREMENT",
+    "CREATE_TIME",
+    "UPDATE_TIME",
+    "CHECK_TIME",
+    "MAX_INDEX_LENGTH",
+    "SUB_PART",
+];
+
+/// The positions of the estimate columns in a result set. `Rows` only counts in the shape of `SHOW TABLE STATUS`.
+fn estimate_columns(cols: &[String]) -> Vec<usize> {
+    let upper: Vec<String> = cols.iter().map(|c| c.to_ascii_uppercase()).collect();
+    let table_status = upper.iter().any(|c| c == "AVG_ROW_LENGTH");
+    upper
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| {
+            ESTIMATE_COLUMNS.contains(&c.as_str()) || (table_status && c.as_str() == "ROWS")
+        })
+        .map(|(i, _)| i)
+        .collect()
+}
+
 /// A query over `information_schema` without an ORDER BY: MySQL documents its row order as undefined, and it
 /// does change between server restarts.
 fn unordered_by_definition(sql: &str) -> bool {
@@ -528,6 +562,11 @@ pub fn merge_passes(i: usize, sql: &str, passes: &[&Outcome]) -> Rec {
     if msg_varies {
         if let Body::Err { msg, .. } = &mut body {
             *msg = "<varies>".into();
+        }
+    }
+    if let Body::Rows { cols, rows } = &body {
+        if !rows.is_empty() {
+            masked.extend(estimate_columns(cols));
         }
     }
     masked.sort();
@@ -790,6 +829,42 @@ mod tests {
         );
         assert_eq!(r.nd, None);
         assert_eq!(r.outcome().unwrap(), a);
+    }
+
+    #[test]
+    fn engine_estimates_are_masked_even_when_the_passes_agree() {
+        let o = Outcome::Rows {
+            cols: vec!["Table".into(), "Key_name".into(), "Cardinality".into()],
+            rows: vec![vec![
+                Some("t".into()),
+                Some("PRIMARY".into()),
+                Some("3".into()),
+            ]],
+        };
+        let r = merge_passes(1, "SHOW INDEX FROM t", &[&o, &o]);
+        assert_eq!(
+            (r.nd.as_deref(), r.masked.clone()),
+            (Some("cells"), Some(vec![2]))
+        );
+        // Key_name is still compared.
+        let z = Outcome::Rows {
+            cols: vec!["Table".into(), "Key_name".into(), "Cardinality".into()],
+            rows: vec![vec![
+                Some("t".into()),
+                Some("idx".into()),
+                Some("99".into()),
+            ]],
+        };
+        assert_eq!(r.compare(&z, false), Some(Kind::Values));
+        let z = Outcome::Rows {
+            cols: vec!["Table".into(), "Key_name".into(), "Cardinality".into()],
+            rows: vec![vec![
+                Some("t".into()),
+                Some("PRIMARY".into()),
+                Some("99".into()),
+            ]],
+        };
+        assert_eq!(r.compare(&z, false), Some(Kind::Same));
     }
 
     #[test]
