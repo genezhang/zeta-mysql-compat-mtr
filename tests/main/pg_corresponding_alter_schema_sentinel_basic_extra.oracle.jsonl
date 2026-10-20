@@ -1,0 +1,22 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":21}
+{"i":1,"h":"6cb4298d","k":"ok","affected":0}
+{"i":2,"h":"6cb428c0","k":"ok","affected":0}
+{"i":3,"h":"99888411","k":"ok","affected":0}
+{"i":4,"h":"05cde3c1","k":"ok","affected":0}
+{"i":5,"h":"b99d7ff6","k":"ok","affected":2}
+{"i":6,"h":"39079278","k":"ok","affected":2}
+{"i":7,"h":"cd6a9076","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CORRESPONDING SELECT b, c FROM cb' at line 1"}
+{"i":8,"h":"95b0faa9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CORRESPONDING BY (b) SELECT b, c FROM cb' at line 1"}
+{"i":9,"h":"8ea69e9c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CORRESPONDING SELECT b, c FROM cb' at line 1"}
+{"i":10,"h":"2b5645fc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CORRESPONDING BY (b) SELECT b, c FROM cb' at line 1"}
+{"i":11,"h":"da662c28","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CORRESPONDING BY (b) SELECT b, c FROM cb' at line 1"}
+{"i":12,"h":"7e116a56","k":"ok","affected":0}
+{"i":13,"h":"dcfe3bea","k":"ok","affected":1}
+{"i":14,"h":"91aec46e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RENAME TO sch2' at line 1"}
+{"i":15,"h":"549e5296","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OWNER TO postgres' at line 1"}
+{"i":16,"h":"44b3e236","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF EXISTS sch1 RENAME TO sch2' at line 1"}
+{"i":17,"h":"7791b1e7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OWNED BY postgres' at line 1"}
+{"i":18,"h":"00b41c97","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET SEARCH_PATH = 'public'' at line 1"}
+{"i":19,"h":"d3154c18","k":"ok","affected":0}
+{"i":20,"h":"c0dada14","k":"ok","affected":0}
+{"i":21,"h":"c0dacc2d","k":"ok","affected":0}

@@ -4,23 +4,23 @@ CREATE TABLE c_pk (id INT PRIMARY KEY, name VARCHAR(20));
 === PRIMARY KEY duplicate — errno 1062 ===
 INSERT INTO c_pk VALUES (1, 'a');
 INSERT INTO c_pk VALUES (1, 'a-again');
-ERROR 1062: duplicate key value violates primary key "test.public.c_pk": Key already exists in table "test.public.c_pk"
+ERROR 1062: Duplicate entry '1' for key 'c_pk.PRIMARY'
 === PRIMARY KEY is implicitly NOT NULL ===
 # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 1048.
 # Behavior (rejection) is correct; only the errno differs.
 INSERT INTO c_pk VALUES (NULL, 'x');
-ERROR 1105: execution error: null value in column "id" of relation "test.public.c_pk" violates not-null constraint
+ERROR 1048: Column 'id' cannot be null
 === UNIQUE inline + composite ===
 DROP TABLE IF EXISTS c_uniq;
 CREATE TABLE c_uniq (id INT PRIMARY KEY, email VARCHAR(30) UNIQUE);
 INSERT INTO c_uniq VALUES (1, 'a@x'), (2, 'b@x');
 INSERT INTO c_uniq VALUES (3, 'a@x');
-ERROR 1062: duplicate key value violates unique constraint "test.public.c_uniq_email_key": Key already exists in index "test.public.c_uniq_email_key"
+ERROR 1062: Duplicate entry 'a@x' for key 'c_uniq.email'
 DROP TABLE IF EXISTS c_uniq2;
 CREATE TABLE c_uniq2 (a INT, b INT, UNIQUE(a, b));
 INSERT INTO c_uniq2 VALUES (1, 2), (1, 3);
 INSERT INTO c_uniq2 VALUES (1, 2);
-ERROR 1062: duplicate key value violates unique constraint "test.public.c_uniq2_a_b_key": Key already exists in index "test.public.c_uniq2_a_b_key"
+ERROR 1062: Duplicate entry '1-2' for key 'c_uniq2.a'
 === DEFAULT — literal value substituted for omitted column ===
 DROP TABLE IF EXISTS c_def;
 CREATE TABLE c_def (
@@ -39,17 +39,17 @@ id	status	n
 DROP TABLE IF EXISTS c_nn;
 CREATE TABLE c_nn (id INT PRIMARY KEY, name VARCHAR(20) NOT NULL);
 INSERT INTO c_nn VALUES (1, NULL);
-ERROR 1105: execution error: null value in column "name" of relation "test.public.c_nn" violates not-null constraint
+ERROR 1048: Column 'name' cannot be null
 === NOT NULL on INSERT — missing column is rejected ===
 INSERT INTO c_nn (id) VALUES (2);
-ERROR 1105: execution error: null value in column "name" of relation "test.public.c_nn" violates not-null constraint
+ERROR 1364: Field 'name' doesn't have a default value
 === NOT NULL on UPDATE — FIXED via zeta #1132 ===
 # zeta now rejects UPDATE that writes NULL to a NOT NULL
 # column; the row is unchanged. Errno is 1105 (vs MySQL's
 # 1048) — behavior is correct, only the errno differs.
 INSERT INTO c_nn VALUES (10, 'alice');
 UPDATE c_nn SET name = NULL WHERE id = 10;
-ERROR 1105: execution error: null value in column "name" of relation "test.public.c_nn" violates not-null constraint
+ERROR 1048: Column 'name' cannot be null
 SELECT id, name FROM c_nn WHERE id = 10;
 id	name
 10	alice
@@ -63,7 +63,7 @@ DROP TABLE IF EXISTS c_chk;
 CREATE TABLE c_chk (id INT PRIMARY KEY, age INT CHECK (age >= 0));
 INSERT INTO c_chk VALUES (1, 30);
 INSERT INTO c_chk VALUES (2, -5);
-ERROR 1105: execution error: new row violates check constraint "test.public.c_chk_check1"
+ERROR 3819: Check constraint 'c_chk_chk_1' is violated.
 SELECT id, age FROM c_chk ORDER BY id;
 id	age
 1	30
@@ -80,7 +80,7 @@ CREATE TABLE c_child (
 );
 INSERT INTO c_child VALUES (10, 1);
 INSERT INTO c_child VALUES (11, 999);
-ERROR 1105: foreign key violation: insert or update on table "test.public.c_child" violates foreign key constraint "test.public.c_child_parent_id_fkey": key is not present in table "test.public.c_parent"
+ERROR 1452: Cannot add or update a child row: a foreign key constraint fails (`test`.`c_child`, CONSTRAINT `c_child_ibfk_1` FOREIGN KEY (`parent_id`) REFERENCES `c_parent` (`id`))
 === FOREIGN KEY — NULL child value is allowed (MySQL behavior) ===
 INSERT INTO c_child VALUES (12, NULL);
 SELECT id, parent_id FROM c_child ORDER BY id;
@@ -90,7 +90,7 @@ id	parent_id
 === FOREIGN KEY — delete of referenced parent rejected (RESTRICT) ===
 # KNOWN DIVERGENCE: zeta errors with 1105; MySQL with 1451.
 DELETE FROM c_parent WHERE id = 1;
-ERROR 1105: foreign key violation: update or delete on table "test.public.c_parent" violates foreign key constraint "test.public.c_child_parent_id_fkey" on table "test.public.c_child"
+ERROR 1451: Cannot delete or update a parent row: a foreign key constraint fails (`test`.`c_child`, CONSTRAINT `c_child_ibfk_1` FOREIGN KEY (`parent_id`) REFERENCES `c_parent` (`id`))
 DELETE FROM c_parent WHERE id = 2;
 SELECT id FROM c_parent ORDER BY id;
 id

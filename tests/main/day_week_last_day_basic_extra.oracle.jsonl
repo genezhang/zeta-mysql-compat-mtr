@@ -1,0 +1,45 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":44}
+{"i":1,"h":"a634a14b","k":"rows","cols":["sunday"],"rows":[["1"]]}
+{"i":2,"h":"2fa8d4f9","k":"rows","cols":["monday"],"rows":[["2"]]}
+{"i":3,"h":"9697848c","k":"rows","cols":["tuesday"],"rows":[["3"]]}
+{"i":4,"h":"27b554c0","k":"rows","cols":["wednesday"],"rows":[["4"]]}
+{"i":5,"h":"d9f613f5","k":"rows","cols":["thursday"],"rows":[["5"]]}
+{"i":6,"h":"95716e75","k":"rows","cols":["friday"],"rows":[["6"]]}
+{"i":7,"h":"69daf1a6","k":"rows","cols":["saturday"],"rows":[["7"]]}
+{"i":8,"h":"f9c079b2","k":"rows","cols":["epoch_thursday"],"rows":[["5"]]}
+{"i":9,"h":"7c50b07d","k":"rows","cols":["monday_0"],"rows":[["0"]]}
+{"i":10,"h":"234eec02","k":"rows","cols":["tuesday_1"],"rows":[["1"]]}
+{"i":11,"h":"7584d998","k":"rows","cols":["saturday_5"],"rows":[["5"]]}
+{"i":12,"h":"0b5b1c03","k":"rows","cols":["sunday_6"],"rows":[["6"]]}
+{"i":13,"h":"a204686c","k":"rows","cols":["epoch_thursday_3"],"rows":[["3"]]}
+{"i":14,"h":"404601f3","k":"rows","cols":["invariant_monday"],"rows":[["1"]]}
+{"i":15,"h":"f1f2d304","k":"rows","cols":["invariant_saturday"],"rows":[["1"]]}
+{"i":16,"h":"4fee866d","k":"rows","cols":["year_start"],"rows":[["1"]]}
+{"i":17,"h":"1b147406","k":"rows","cols":["day_31"],"rows":[["31"]]}
+{"i":18,"h":"d33b84ad","k":"rows","cols":["day_32"],"rows":[["32"]]}
+{"i":19,"h":"1e4f59c7","k":"rows","cols":["leap_feb_29"],"rows":[["60"]]}
+{"i":20,"h":"eab5442d","k":"rows","cols":["day_after_leap"],"rows":[["61"]]}
+{"i":21,"h":"36512308","k":"rows","cols":["leap_year_end_366"],"rows":[["366"]]}
+{"i":22,"h":"3ed577fb","k":"rows","cols":["non_leap_year_end_365"],"rows":[["365"]]}
+{"i":23,"h":"a23a487d","k":"rows","cols":["non_leap_day_after_feb"],"rows":[["60"]]}
+{"i":24,"h":"fc7923bd","k":"rows","cols":["year_start_1"],"rows":[["1"]]}
+{"i":25,"h":"2dfc8601","k":"rows","cols":["jan_eom"],"rows":[["2024-01-31"]]}
+{"i":26,"h":"1c5c5b9c","k":"rows","cols":["mar_eom"],"rows":[["2024-03-31"]]}
+{"i":27,"h":"fed936ce","k":"rows","cols":["apr_eom"],"rows":[["2024-04-30"]]}
+{"i":28,"h":"1e443feb","k":"rows","cols":["dec_eom"],"rows":[["2024-12-31"]]}
+{"i":29,"h":"bf26a328","k":"rows","cols":["feb_leap"],"rows":[["2024-02-29"]]}
+{"i":30,"h":"9795bf97","k":"rows","cols":["feb_non_leap"],"rows":[["2023-02-28"]]}
+{"i":31,"h":"66432513","k":"rows","cols":["idempotent"],"rows":[["1"]]}
+{"i":32,"h":"226ed788","k":"rows","cols":["days_to_eom"],"rows":[["16"]]}
+{"i":33,"h":"e094f2d6","k":"rows","cols":["ts_leap_feb"],"rows":[["2024-02-29"]]}
+{"i":34,"h":"6425a2b7","k":"rows","cols":["ts_apr"],"rows":[["2024-04-30"]]}
+{"i":35,"h":"c6b88fa6","k":"rows","cols":["dow_null"],"rows":[["1"]]}
+{"i":36,"h":"b8cc3e23","k":"rows","cols":["wkd_null"],"rows":[["1"]]}
+{"i":37,"h":"87d116e0","k":"rows","cols":["doy_null"],"rows":[["1"]]}
+{"i":38,"h":"c9a1c696","k":"rows","cols":["ld_null"],"rows":[["1"]]}
+{"i":39,"h":"ac3784ea","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DAYOFWEEK'"}
+{"i":40,"h":"276b3dd2","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'WEEKDAY'"}
+{"i":41,"h":"a97345ea","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DAYOFYEAR'"}
+{"i":42,"h":"dd6b7d6a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LAST_DAY'"}
+{"i":43,"h":"2926821d","k":"rows","cols":["dow_det"],"rows":[["1"]]}
+{"i":44,"h":"6bacdea4","k":"rows","cols":["ld_det"],"rows":[["1"]]}

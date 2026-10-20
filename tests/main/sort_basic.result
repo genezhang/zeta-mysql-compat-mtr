@@ -33,40 +33,32 @@ id	name
 # MySQL: NULL is LOWEST (FIRST in ASC, LAST in DESC).
 SELECT id, v FROM sd ORDER BY v;
 id	v
+3	NULL
 4	10
 1	20
 2	30
-3	NULL
 SELECT id, v FROM sd ORDER BY v DESC;
 id	v
-3	NULL
 2	30
 1	20
 4	10
+3	NULL
 === DIVERGENCE: NULLS FIRST / NULLS LAST clauses silently ignored ===
 # zeta accepts the syntax but doesn't honor it — NULL falls
 # to the ASC/DESC default. MySQL rejects the syntax at parse
 # with 1064. Both forms below produce the SAME output as a
 # plain ASC sort.
 SELECT id, v FROM sd ORDER BY v NULLS FIRST;
-id	v
-4	10
-1	20
-2	30
-3	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULLS FIRST' at line 1
 SELECT id, v FROM sd ORDER BY v NULLS LAST;
-id	v
-4	10
-1	20
-2	30
-3	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULLS LAST' at line 1
 === ORDER BY column position ===
 SELECT id, v FROM sd ORDER BY 2;
 id	v
+3	NULL
 4	10
 1	20
 2	30
-3	NULL
 SELECT id, name FROM sd ORDER BY 2, 1;
 id	name
 2	a
@@ -76,10 +68,10 @@ id	name
 === ORDER BY alias ===
 SELECT id, v AS val FROM sd ORDER BY val DESC;
 id	val
-3	NULL
 2	30
 1	20
 4	10
+3	NULL
 === ORDER BY expression ===
 SELECT id FROM sd ORDER BY UPPER(name), id;
 id

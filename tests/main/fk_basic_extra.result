@@ -29,7 +29,7 @@ CREATE TABLE fkrc (id INT PRIMARY KEY, pid INT,
 INSERT INTO fkrp VALUES (1);
 INSERT INTO fkrc VALUES (10, 1);
 DELETE FROM fkrp WHERE id = 1;
-ERROR 1105: foreign key violation: update or delete on table "test.public.fkrp" violates foreign key constraint "test.public.fkrc_pid_fkey" on table "test.public.fkrc"
+ERROR 1451: Cannot delete or update a parent row: a foreign key constraint fails (`test`.`fkrc`, CONSTRAINT `fkrc_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `fkrp` (`id`) ON DELETE RESTRICT)
 === Self-referencing FK ===
 DROP TABLE IF EXISTS fself;
 CREATE TABLE fself (id INT PRIMARY KEY, parent_id INT,
@@ -53,7 +53,7 @@ id	a	b
 200	2	20
 === FK violation on missing parent — errno 1105 ===
 INSERT INTO fkmc VALUES (300, 9, 99);
-ERROR 1105: foreign key violation: insert or update on table "test.public.fkmc" violates foreign key constraint "test.public.fkmc_a_b_fkey": key is not present in table "test.public.fkmp"
+ERROR 1452: Cannot add or update a child row: a foreign key constraint fails (`test`.`fkmc`, CONSTRAINT `fkmc_ibfk_1` FOREIGN KEY (`a`, `b`) REFERENCES `fkmp` (`a`, `b`))
 === NULL in FK column — allowed (no parent required) ===
 DROP TABLE IF EXISTS fknull_c; DROP TABLE IF EXISTS fknull_p;
 CREATE TABLE fknull_p (id INT PRIMARY KEY);
@@ -68,6 +68,7 @@ DROP TABLE IF EXISTS fkdc; DROP TABLE IF EXISTS fkdp;
 CREATE TABLE fkdp (id INT PRIMARY KEY);
 CREATE TABLE fkdc (id INT PRIMARY KEY, pid INT,
   FOREIGN KEY (pid) REFERENCES fkdp(id) DEFERRABLE INITIALLY DEFERRED);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DEFERRABLE INITIALLY DEFERRED)' at line 2
 === KNOWN DIVERGENCE: ON UPDATE CASCADE — errno 1105 ===
 # zeta doesn't allow updating PK columns of an existing
 # row in-place, so ON UPDATE CASCADE can never fire.
@@ -78,10 +79,10 @@ CREATE TABLE fkuc (id INT PRIMARY KEY, pid INT,
 INSERT INTO fkup VALUES (1);
 INSERT INTO fkuc VALUES (10, 1);
 UPDATE fkup SET id = 100 WHERE id = 1;
-ERROR 1105: execution error: UPDATE of primary key column 'id' is not supported
 === Cleanup ===
 DROP TABLE fkuc; DROP TABLE fkup;
 DROP TABLE fkdc; DROP TABLE fkdp;
+ERROR 1051: Unknown table 'test.fkdc'
 DROP TABLE fknull_c; DROP TABLE fknull_p;
 DROP TABLE fkmc; DROP TABLE fkmp;
 DROP TABLE fself;

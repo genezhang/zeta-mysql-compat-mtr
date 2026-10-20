@@ -1,0 +1,38 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":37}
+{"i":1,"h":"ccb43b17","k":"rows","cols":["single_int"],"rows":[["1"]]}
+{"i":2,"h":"4a8805c2","k":"rows","cols":["single_string"],"rows":[["\"hi\""]]}
+{"i":3,"h":"a74131e1","k":"rows","cols":["single_array"],"rows":[["[1, 2, 3]"]]}
+{"i":4,"h":"a724902c","k":"rows","cols":["single_object"],"rows":[["{\"b\": 99}"]]}
+{"i":5,"h":"860b8d2f","k":"rows","cols":["single_bool"],"rows":[["true"]]}
+{"i":6,"h":"534b427e","k":"rows","cols":["single_json_null"],"rows":[["null"]]}
+{"i":7,"h":"bc3b35f4","k":"rows","cols":["no_match"],"rows":[["1"]]}
+{"i":8,"h":"49f67a4f","k":"rows","cols":["json_null_is_not_sql_null"],"rows":[["0"]]}
+{"i":9,"h":"86bc6a32","k":"rows","cols":["arr_first"],"rows":[["10"]]}
+{"i":10,"h":"3b5b4d42","k":"rows","cols":["arr_last"],"rows":[["30"]]}
+{"i":11,"h":"5d97701f","k":"rows","cols":["arr_out_of_bounds"],"rows":[["1"]]}
+{"i":12,"h":"0dba5f46","k":"rows","cols":["nested_obj"],"rows":[["42"]]}
+{"i":13,"h":"a8e8e974","k":"rows","cols":["obj_then_arr"],"rows":[["10"]]}
+{"i":14,"h":"2693b94c","k":"rows","cols":["arr_then_arr"],"rows":[["3"]]}
+{"i":15,"h":"9b767ec6","k":"rows","cols":["multi_hit_2"],"rows":[["[1, 3]"]]}
+{"i":16,"h":"ab54c6c7","k":"rows","cols":["multi_hit_2_order"],"rows":[["[3, 1]"]]}
+{"i":17,"h":"baa3a7a8","k":"rows","cols":["multi_hit_3_length"],"rows":[["1"]]}
+{"i":18,"h":"97a10a94","k":"rows","cols":["multi_one_miss"],"rows":[["[1]"]]}
+{"i":19,"h":"afc8c56e","k":"rows","cols":["multi_one_miss_length"],"rows":[["1"]]}
+{"i":20,"h":"672f63b4","k":"rows","cols":["multi_all_miss"],"rows":[["1"]]}
+{"i":21,"h":"391dfc44","k":"rows","cols":["null_doc"],"rows":[["1"]]}
+{"i":22,"h":"09975d38","k":"rows","cols":["null_path"],"rows":[["1"]]}
+{"i":23,"h":"ff73d14d","k":"rows","cols":["null_path_mid"],"rows":[["1"]]}
+{"i":24,"h":"e8903c85","k":"err","code":3143,"msg":"Invalid JSON path expression. The error is around character position 1."}
+{"i":25,"h":"b370c1b9","k":"err","code":3143,"msg":"Invalid JSON path expression. The error is around character position 0."}
+{"i":26,"h":"6494c506","k":"rows","cols":["JSON_EXTRACT('{\"a\":1,\"b\":2}', '$.*')"],"rows":[["[1, 2]"]]}
+{"i":27,"h":"8999e190","k":"rows","cols":["JSON_EXTRACT('[10,20]',       '$[*]')"],"rows":[["[10, 20]"]]}
+{"i":28,"h":"7dd29bc4","k":"err","code":3143,"msg":"Invalid JSON path expression. The error is around character position 2."}
+{"i":29,"h":"ce4d4d3b","k":"rows","cols":["arr_multi_path"],"rows":[["[10, 20]"]]}
+{"i":30,"h":"e089c61b","k":"rows","cols":["arr_multi_len"],"rows":[["1"]]}
+{"i":31,"h":"6b59617b","k":"rows","cols":["quoted_key"],"rows":[["99"]]}
+{"i":32,"h":"ce07719f","k":"rows","cols":["nested_multi"],"rows":[["[42, {\"c\": 42}]"]]}
+{"i":33,"h":"26bde597","k":"rows","cols":["nested_multi_len"],"rows":[["1"]]}
+{"i":34,"h":"dea7f7a1","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_extract: \"Invalid value.\" at position 1."}
+{"i":35,"h":"c55cdba1","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_EXTRACT'"}
+{"i":36,"h":"6a655929","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_EXTRACT'"}
+{"i":37,"h":"fc93346f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2"}

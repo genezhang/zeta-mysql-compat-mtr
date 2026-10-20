@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"9d89c1f0","k":"rows","cols":["trunc"],"rows":[["abc"]]}
+{"i":2,"h":"223ae938","k":"rows","cols":["trunc"],"rows":[["abc"]]}
+{"i":3,"h":"b4af70d1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty, LENGTH(LPAD('abc', 0, '0')) AS l' at line 1"}
+{"i":4,"h":"21279599","k":"rows","cols":["ns","nl","np"],"rows":[[null,null,null]]}
+{"i":5,"h":"dcc00fa5","k":"rows","cols":["ep"],"rows":[[""]]}
+{"i":6,"h":"f9ee4d83","k":"rows","cols":["l_cycle","r_cycle"],"rows":[["abcabcx","xabcabc"]]}
+{"i":7,"h":"6d475f64","k":"rows","cols":["zero"],"rows":[[""]]}
+{"i":8,"h":"16fe6696","k":"rows","cols":["nl"],"rows":[[null]]}
+{"i":9,"h":"b7dca1a5","k":"rows","cols":["ns"],"rows":[[null]]}
+{"i":10,"h":"43e1fdcd","k":"rows","cols":["big"],"rows":[["100"]]}
+{"i":11,"h":"b3833d45","k":"rows","cols":["l0","lneg"],"rows":[["0","0"]]}
+{"i":12,"h":"bcbde82d","k":"rows","cols":["nl"],"rows":[[null]]}
+{"i":13,"h":"21d0fc92","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":14,"h":"82598212","k":"rows","cols":["nl"],"rows":[[null]]}
+{"i":15,"h":"225179c3","k":"rows","cols":["unicode"],"rows":[["olléh"]]}
+{"i":16,"h":"3f7559b2","k":"rows","cols":["pos0"],"rows":[["abc"]]}
+{"i":17,"h":"47ba04c6","k":"rows","cols":["pos_overflow"],"rows":[["abc"]]}
+{"i":18,"h":"b982c664","k":"rows","cols":["len_overflow"],"rows":[["aX"]]}
+{"i":19,"h":"fe76392c","k":"rows","cols":["neg_len"],"rows":[["aX"]]}
+{"i":20,"h":"ff09ddbb","k":"rows","cols":["nstr"],"rows":[[null]]}
+{"i":21,"h":"5e46b465","k":"rows","cols":["lhs_null","rhs_null"],"rows":[[null,null]]}
+{"i":22,"h":"e963b9be","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":23,"h":"71735683","k":"rows","cols":["prefix"],"rows":[["-1"]]}
+{"i":24,"h":"ec07dada","k":"rows","cols":["l_neg","r_neg"],"rows":[[null,null]]}

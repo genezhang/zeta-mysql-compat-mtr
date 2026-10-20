@@ -1,51 +1,50 @@
 === Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
 SELECT JSON_TYPE(CAST('{"a":1}' AS JSONB))                  AS jsonb_cast_lands_as_object;
-jsonb_cast_lands_as_object
-OBJECT
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                  AS jsonb_cast_lands_as_object' at line 1
 === JSON_MERGE_PATCH on already-typed JSONB args ===
 SELECT JSON_LENGTH(JSON_MERGE_PATCH(
   CAST('{"a":1,"b":2}' AS JSONB),
   CAST('{"b":99,"c":3}' AS JSONB)))                          AS patch_both_typed_len;
-patch_both_typed_len
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+  CAST('{"b":99,"c":3}' AS JSONB)))                          AS patch_bo' at line 2
 SELECT JSON_EXTRACT(JSON_MERGE_PATCH(
   CAST('{"a":1,"b":2}' AS JSONB),
   CAST('{"b":99,"c":3}' AS JSONB)),
   '$.b')                                                     AS patch_both_typed_b;
-patch_both_typed_b
-99
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+  CAST('{"b":99,"c":3}' AS JSONB)),
+  '$.b')                            ' at line 2
 === JSON_MERGE_PRESERVE on already-typed JSONB args ===
 SELECT JSON_LENGTH(JSON_MERGE_PRESERVE(
   CAST('[1,2]' AS JSONB),
   CAST('[3,4]' AS JSONB)))                                   AS preserve_both_typed_len;
-preserve_both_typed_len
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+  CAST('[3,4]' AS JSONB)))                                   AS preserve' at line 2
 === Mixed typed + string args (Value::Jsonb on one side, String on the other) ===
 SELECT JSON_LENGTH(JSON_MERGE_PATCH(
   CAST('{"a":1}' AS JSONB),
   '{"b":2}'))                                                AS patch_typed_left_str_right;
-patch_typed_left_str_right
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+  '{"b":2}'))                                                AS patch_ty' at line 2
 SELECT JSON_LENGTH(JSON_MERGE_PATCH(
   '{"a":1}',
   CAST('{"b":2}' AS JSONB)))                                 AS patch_str_left_typed_right;
-patch_str_left_typed_right
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)))                                 AS patch_str_left_typed_right' at line 3
 SELECT JSON_LENGTH(JSON_MERGE_PRESERVE(
   CAST('[1]' AS JSONB),
   '[2,3]'))                                                  AS preserve_typed_left_str_right;
-preserve_typed_left_str_right
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+  '[2,3]'))                                                  AS preserve' at line 2
 === Wrong-type arg (INT) → ERROR for both ===
 SELECT JSON_MERGE_PATCH(42, '{"a":1}');
-ERROR 1105: execution error: JSON_MERGE_PATCH requires JSON-typed arguments
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_merge_patch; a JSON string or JSON type is required.
 SELECT JSON_MERGE_PRESERVE(42, '[1]');
-ERROR 1105: execution error: JSON_MERGE_PRESERVE requires JSON-typed arguments
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_merge_preserve; a JSON string or JSON type is required.
 === Wrong-type arg (FLOAT, BOOLEAN) → ERROR for both ===
 SELECT JSON_MERGE_PATCH(3.14, '{"a":1}');
-ERROR 1105: execution error: JSON_MERGE_PATCH requires JSON-typed arguments
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_merge_patch; a JSON string or JSON type is required.
 SELECT JSON_MERGE_PRESERVE(TRUE, '[1]');
-ERROR 1105: execution error: JSON_MERGE_PRESERVE requires JSON-typed arguments
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_merge_preserve; a JSON string or JSON type is required.
 === PRESERVE on empty+empty containers ===
 SELECT JSON_TYPE(JSON_MERGE_PRESERVE('[]', '[]'))           AS preserve_empty_arr_arr_type;
 preserve_empty_arr_arr_type

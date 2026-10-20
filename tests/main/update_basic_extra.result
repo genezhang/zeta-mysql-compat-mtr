@@ -4,10 +4,11 @@ CREATE TABLE up (id INT PRIMARY KEY, n INT);
 INSERT INTO up VALUES (1, 10), (2, 20), (3, 30);
 === UPDATE WHERE id IN (subquery) ===
 UPDATE up SET n = 0 WHERE id IN (SELECT id FROM up WHERE n < 25);
+ERROR 1093: You can't specify target table 'up' for update in FROM clause
 SELECT id, n FROM up ORDER BY id;
 id	n
-1	0
-2	0
+1	10
+2	20
 3	30
 === UPDATE WHERE EXISTS (correlated subquery) ===
 DROP TABLE IF EXISTS up2; CREATE TABLE up2 (id INT PRIMARY KEY, n INT);
@@ -25,10 +26,11 @@ DROP TABLE IF EXISTS upo; CREATE TABLE upo (id INT PRIMARY KEY, val INT);
 INSERT INTO upf VALUES (1, 0), (2, 0);
 INSERT INTO upo VALUES (1, 100), (2, 200);
 UPDATE upf SET n = upo.val FROM upo WHERE upf.id = upo.id;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FROM upo WHERE upf.id = upo.id' at line 1
 SELECT id, n FROM upf ORDER BY id;
 id	n
-1	100
-2	200
+1	0
+2	0
 === UPDATE ... RETURNING (PG) — accepted, no wire-side rows ===
 # DIVERGENCE: zeta accepts RETURNING at parse and the
 # underlying UPDATE applies, but the MySQL wire path
@@ -38,16 +40,17 @@ id	n
 # Verified by the next SELECT showing the n=101/201
 # post-update state.
 UPDATE upf SET n = n + 1 RETURNING id, n;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RETURNING id, n' at line 1
 SELECT id, n FROM upf ORDER BY id;
 id	n
-1	101
-2	201
+1	0
+2	0
 === UPDATE SET col = CASE WHEN ... ===
 UPDATE upf SET n = CASE WHEN id = 1 THEN 999 ELSE n END;
 SELECT id, n FROM upf ORDER BY id;
 id	n
 1	999
-2	201
+2	0
 === UPDATE SET col = NULL ===
 UPDATE upf SET n = NULL WHERE id = 2;
 SELECT id, n FROM upf ORDER BY id;
@@ -62,10 +65,8 @@ id	n
 2	42
 === KNOWN GAP: UPDATE ... ORDER BY ... LIMIT N — errno 1064 ===
 UPDATE upf SET n = 0 WHERE id > 0 ORDER BY id DESC LIMIT 1;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ORDER at Line: 1, Column: 35
 === KNOWN GAP: UPDATE SET col = (correlated subquery) — errno 1105 ===
 UPDATE upf SET n = (SELECT MAX(val) FROM upo WHERE upo.id = upf.id);
-ERROR 1105: execution error: unsupported expression: ScalarSubquery { subquery: SelectStmt { distinct: false, distinct_on: [], projections: [SelectItem { expr: Function { name: "MAX", args: [Column("val")], distinct: false, filter: None, within_group: None, agg_order_by: None }, alias: None }], from: [Table { name: "upo", alias: None }], where_clause: Some(BinaryOp { left: QualifiedColumn("upo", "id"), op: Eq, right: QualifiedColumn("upf", "id") }), group_by: [], grouping_sets: [], having: None, order_by: [], limit: None, offset: None, limit_with_ties: false, ctes: [], for_update: false } }
 === Cleanup ===
 DROP TABLE up;
 DROP TABLE up2;

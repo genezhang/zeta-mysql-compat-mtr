@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"232e475b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''abc' AS r1, 'aBc' ILIKE 'abc%' AS r2, 'XYZ' ILIKE 'a%' AS r3' at line 1"}
+{"i":2,"h":"16a5e1bd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''abc' AS r1, 'abc' ILIKE NULL AS r2' at line 1"}
+{"i":3,"h":"13dbc1c0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ILIKE 'abc' AS r3' at line 1"}
+{"i":4,"h":"f211e7fd","k":"rows","cols":["r1","r2","r3","r4","no_match"],"rows":[["1","1","0","1","0"]]}
+{"i":5,"h":"57d04863","k":"rows","cols":["r1","r2"],"rows":[["1","1"]]}
+{"i":6,"h":"cdc35dfd","k":"rows","cols":["r1","r2"],"rows":[["1","0"]]}
+{"i":7,"h":"eb55f9aa","k":"err","code":3685,"msg":"Illegal argument to a regular expression."}
+{"i":8,"h":"415c56eb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '~ 'b' AS r1, 'ABC' ~ 'abc' AS r2' at line 1"}
+{"i":9,"h":"310870a9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '~* 'abc' AS r1, 'XYZ' ~* '^a' AS r2' at line 1"}
+{"i":10,"h":"cc9d3830","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '!~ 'x' AS r1, 'ABC' !~* 'abc' AS r2' at line 1"}
+{"i":11,"h":"9f439dce","k":"rows","cols":["dot_literal","dot_not_meta"],"rows":[["1","0"]]}
+{"i":12,"h":"803b8db6","k":"rows","cols":["brackets"],"rows":[["1"]]}
+{"i":13,"h":"e489d5eb","k":"rows","cols":["esc_pct","esc_under"],"rows":[["1","1"]]}
+{"i":14,"h":"353bc6b9","k":"ok","affected":0}
+{"i":15,"h":"92a9c440","k":"ok","affected":0}
+{"i":16,"h":"73bf2e2a","k":"ok","affected":4}
+{"i":17,"h":"9e0096b5","k":"rows","cols":["id"],"rows":[["1"],["2"]]}
+{"i":18,"h":"c9d12fb7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ILIKE 'h%' ORDER BY id' at line 1"}
+{"i":19,"h":"b507490c","k":"rows","cols":["id"],"rows":[["3"],["4"]]}
+{"i":20,"h":"cb9307d2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '~* '^h' ORDER BY id' at line 1"}
+{"i":21,"h":"9f2141ce","k":"rows","cols":["id"],"rows":[["1"],["2"]]}
+{"i":22,"h":"413795ef","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"],["4"]]}
+{"i":23,"h":"e4854e5e","k":"rows","cols":["id"],"rows":[["3"],["4"]]}
+{"i":24,"h":"bc6cda77","k":"ok","affected":0}

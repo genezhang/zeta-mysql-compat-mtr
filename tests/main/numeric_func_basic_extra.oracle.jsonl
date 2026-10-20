@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"7edb9c7a","k":"rows","cols":["c"],"rows":[["907060870"]]}
+{"i":2,"h":"5187d2be","k":"rows","cols":["r_pos_half"],"rows":[["3"]]}
+{"i":3,"h":"9999bdbf","k":"rows","cols":["r_neg_half"],"rows":[["-3"]]}
+{"i":4,"h":"a58d2c24","k":"rows","cols":["r_pos_half2"],"rows":[["4"]]}
+{"i":5,"h":"994011dc","k":"rows","cols":["r_neg_half2"],"rows":[["-4"]]}
+{"i":6,"h":"43076990","k":"rows","cols":["r_neg_d"],"rows":[["1200"]]}
+{"i":7,"h":"4086bce2","k":"rows","cols":["p_zerozero"],"rows":[["1"]]}
+{"i":8,"h":"69985b0a","k":"rows","cols":["p_neg_exp"],"rows":[["0.5"]]}
+{"i":9,"h":"78ee1157","k":"rows","cols":["a_null"],"rows":[[null]]}
+{"i":10,"h":"39ec2153","k":"rows","cols":["p_null_base"],"rows":[[null]]}
+{"i":11,"h":"49735d82","k":"rows","cols":["p_null_exp"],"rows":[[null]]}
+{"i":12,"h":"30d0a11d","k":"rows","cols":["bc"],"rows":[["3"]]}
+{"i":13,"h":"20adfddd","k":"rows","cols":["bc_zero"],"rows":[["0"]]}
+{"i":14,"h":"501786e7","k":"rows","cols":["bc_all_ones"],"rows":[["64"]]}
+{"i":15,"h":"0d8e9109","k":"rows","cols":["c"],"rows":[["0.6420926159343306"]]}
+{"i":16,"h":"04cb5530","k":"rows","cols":["17 DIV 5"],"rows":[["3"]]}
+{"i":17,"h":"66be43a1","k":"rows","cols":["10 MOD 3"],"rows":[["1"]]}
+{"i":18,"h":"3bfd5230","k":"rows","cols":["v"],"rows":[["1.234.567,89"]]}
+{"i":19,"h":"d8169ced","k":"rows","cols":["SQRT(-1)"],"rows":[[null]]}
+{"i":20,"h":"97c982d8","k":"rows","cols":["LN(0)"],"rows":[[null]]}
+{"i":21,"h":"c7f66321","k":"rows","cols":["LN(-1)"],"rows":[[null]]}
+{"i":22,"h":"c88c2a80","k":"rows","cols":["nan_val"],"rows":[[null]]}
+{"i":23,"h":"605bb65f","k":"rows","cols":["at2"],"rows":[["0.7853981633974483"]]}
+{"i":24,"h":"76850ecb","k":"rows","cols":["RAND(42)"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}

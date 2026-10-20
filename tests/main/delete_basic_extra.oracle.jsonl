@@ -1,0 +1,58 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":57}
+{"i":1,"h":"0b600fda","k":"ok","affected":0}
+{"i":2,"h":"ce813a33","k":"ok","affected":0}
+{"i":3,"h":"4e3e25e1","k":"ok","affected":0}
+{"i":4,"h":"7812293f","k":"ok","affected":3}
+{"i":5,"h":"c2e5ccc6","k":"ok","affected":2}
+{"i":6,"h":"0a95b733","k":"err","code":1109,"msg":"Unknown table 'dt' in MULTI DELETE"}
+{"i":7,"h":"89380574","k":"rows","cols":["id","n"],"rows":[["1","10"],["2","20"],["3","30"]]}
+{"i":8,"h":"8be77bf4","k":"ok","affected":0}
+{"i":9,"h":"afd7063b","k":"ok","affected":0}
+{"i":10,"h":"be73520b","k":"ok","affected":0}
+{"i":11,"h":"e8e3882a","k":"ok","affected":3}
+{"i":12,"h":"f981f94f","k":"ok","affected":2}
+{"i":13,"h":"3706372e","k":"ok","affected":2}
+{"i":14,"h":"b44d3ea6","k":"rows","cols":["id","n"],"rows":[["2","20"]]}
+{"i":15,"h":"6cccb9ab","k":"ok","affected":0}
+{"i":16,"h":"a1845b1f","k":"ok","affected":0}
+{"i":17,"h":"d905b9ad","k":"ok","affected":2}
+{"i":18,"h":"4c081f70","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RETURNING id, n' at line 1"}
+{"i":19,"h":"9d73db57","k":"rows","cols":["id","n"],"rows":[["1","10"],["2","20"]]}
+{"i":20,"h":"6d54c83b","k":"ok","affected":0}
+{"i":21,"h":"87224e04","k":"ok","affected":0}
+{"i":22,"h":"9c38c155","k":"ok","affected":2}
+{"i":23,"h":"ebdc24ea","k":"ok","affected":0}
+{"i":24,"h":"74c68f54","k":"rows","cols":["c"],"rows":[["0"]]}
+{"i":25,"h":"48221c87","k":"ok","affected":0}
+{"i":26,"h":"ffa4cefd","k":"ok","affected":0}
+{"i":27,"h":"d7db16ec","k":"ok","affected":2}
+{"i":28,"h":"ae2c981f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTART IDENTITY' at line 1"}
+{"i":29,"h":"5378a6ae","k":"ok","affected":1}
+{"i":30,"h":"360cabb8","k":"rows","cols":["id","name"],"rows":[["1","a"],["2","b"],["3","c"]]}
+{"i":31,"h":"6ccd5282","k":"ok","affected":0}
+{"i":32,"h":"e63846be","k":"ok","affected":0}
+{"i":33,"h":"8675f074","k":"ok","affected":2}
+{"i":34,"h":"5e7ba826","k":"ok","affected":1}
+{"i":35,"h":"9d73cd4a","k":"rows","cols":["id","n"],"rows":[["2","20"]]}
+{"i":36,"h":"ae92b2a7","k":"ok","affected":0}
+{"i":37,"h":"68517f21","k":"ok","affected":0}
+{"i":38,"h":"ec8d68f4","k":"ok","affected":0}
+{"i":39,"h":"e9944194","k":"ok","affected":2}
+{"i":40,"h":"f20c5443","k":"ok","affected":3}
+{"i":41,"h":"09756761","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DELETE FROM dctp WHERE id = 1 RETURNING id)\nDELETE FROM dctc WHERE pid IN (SELEC' at line 1"}
+{"i":42,"h":"ac26ae25","k":"ok","affected":0}
+{"i":43,"h":"f4926c7b","k":"ok","affected":0}
+{"i":44,"h":"d5029f62","k":"ok","affected":0}
+{"i":45,"h":"52ee43ab","k":"ok","affected":1}
+{"i":46,"h":"caaa1c6c","k":"ok","affected":1}
+{"i":47,"h":"2ac7fb0a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":48,"h":"c8d49e84","k":"rows","cols":["p_count"],"rows":[["1"]]}
+{"i":49,"h":"c669aefc","k":"rows","cols":["c_count"],"rows":[["1"]]}
+{"i":50,"h":"bea567ce","k":"ok","affected":0}
+{"i":51,"h":"982f612b","k":"ok","affected":0}
+{"i":52,"h":"c0cae206","k":"ok","affected":0}
+{"i":53,"h":"c34e7576","k":"ok","affected":0}
+{"i":54,"h":"948f8ed7","k":"ok","affected":0}
+{"i":55,"h":"c0ca321b","k":"ok","affected":0}
+{"i":56,"h":"858e4d1d","k":"ok","affected":0}
+{"i":57,"h":"58512740","k":"ok","affected":0}

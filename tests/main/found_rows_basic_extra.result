@@ -5,11 +5,11 @@ frv
 === FOUND_ROWS in an expression ===
 SELECT FOUND_ROWS() + 100 AS expr;
 expr
-100
+101
 === Mixed case ===
 SELECT Found_Rows() AS mixed_case;
 mixed_case
-0
+1
 === Arity error ===
 SELECT FOUND_ROWS(1);
-ERROR 1105: execution error: FOUND_ROWS takes no arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'FOUND_ROWS'

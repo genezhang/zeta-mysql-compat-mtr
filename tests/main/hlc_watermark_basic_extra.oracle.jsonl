@@ -1,0 +1,21 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":20}
+{"i":1,"h":"782e35f6","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":2,"h":"024758e2","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":3,"h":"ac051d4e","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":4,"h":"49510c25","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":5,"h":"23a112c6","k":"ok","affected":0}
+{"i":6,"h":"056ba79c","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":7,"h":"3a510c02","k":"ok","affected":0}
+{"i":8,"h":"f9ac798e","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":9,"h":"f9ab9e77","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":10,"h":"8a54ba77","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":11,"h":"8a54c53a","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":12,"h":"f710906c","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":13,"h":"5310d413","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":14,"h":"6abec5b8","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":15,"h":"f715b890","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":16,"h":"23a112c6","k":"ok","affected":0}
+{"i":17,"h":"3f736bbf","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":18,"h":"fa87415b","k":"ok","affected":0}
+{"i":19,"h":"509b48cf","k":"err","code":1193,"msg":"Unknown system variable 'zeta.hlc_watermark'"}
+{"i":20,"h":"3e8bdfc2","k":"err","code":1305,"msg":"FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist"}

@@ -1,0 +1,40 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":39}
+{"i":1,"h":"8345f885","k":"rows","cols":["iso_date"],"rows":[["2024-03-15"]]}
+{"i":2,"h":"a588dfc9","k":"rows","cols":["year_2digit"],"rows":[["2024-03-15"]]}
+{"i":3,"h":"20eb156e","k":"rows","cols":["month_nopad"],"rows":[["2024-03-15"]]}
+{"i":4,"h":"465895f8","k":"rows","cols":["month_name_full"],"rows":[["2024-03-15"]]}
+{"i":5,"h":"e105fc04","k":"rows","cols":["month_abbrev"],"rows":[["2024-03-15"]]}
+{"i":6,"h":"3652ec8c","k":"rows","cols":["day_padded"],"rows":[["2024-03-01"]]}
+{"i":7,"h":"478fb6d1","k":"rows","cols":["day_nopad"],"rows":[["2024-03-01"]]}
+{"i":8,"h":"ab43f0a4","k":"rows","cols":["h24"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":9,"h":"1c849491","k":"rows","cols":["h12_pm"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":10,"h":"3222f319","k":"rows","cols":["h12_am"],"rows":[["2024-03-15 02:30:45"]]}
+{"i":11,"h":"3f741d5c","k":"rows","cols":["midnight"],"rows":[["2024-03-15 00:00:00"]]}
+{"i":12,"h":"567db1ac","k":"rows","cols":["noon"],"rows":[["2024-03-15 12:00:00"]]}
+{"i":13,"h":"8bd98a1f","k":"rows","cols":["time_composite_24"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":14,"h":"e805b887","k":"rows","cols":["time_composite_12"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":15,"h":"efd5d8d6","k":"rows","cols":["dformat_str_to_date_rt"],"rows":[["1"]]}
+{"i":16,"h":"7a3e1c99","k":"rows","cols":["pretty_rt"],"rows":[["1"]]}
+{"i":17,"h":"51f7d9ea","k":"rows","cols":["year_only"],"rows":[[null]]}
+{"i":18,"h":"38045789","k":"rows","cols":["year_month_only"],"rows":[[null]]}
+{"i":19,"h":"df1cd317","k":"rows","cols":["STR_TO_DATE('2024-13-01', '%Y-%m-%d')"],"rows":[[null]]}
+{"i":20,"h":"3f4885df","k":"rows","cols":["STR_TO_DATE('2023-02-30', '%Y-%m-%d')"],"rows":[[null]]}
+{"i":21,"h":"ead92081","k":"rows","cols":["STR_TO_DATE('2024-03-15 25:00:00', '%Y-%m-%d %H:%i:%S')"],"rows":[[null]]}
+{"i":22,"h":"feb88a22","k":"rows","cols":["STR_TO_DATE('13:00:00 AM', '%h:%i:%S %p')"],"rows":[[null]]}
+{"i":23,"h":"7a1baf04","k":"rows","cols":["STR_TO_DATE('00:00:00 PM', '%h:%i:%S %p')"],"rows":[[null]]}
+{"i":24,"h":"7841f704","k":"rows","cols":["STR_TO_DATE('2024-03-15 extra', '%Y-%m-%d')"],"rows":[["2024-03-15"]]}
+{"i":25,"h":"f4b14ac5","k":"rows","cols":["STR_TO_DATE('1',          '%j')"],"rows":[[null]]}
+{"i":26,"h":"3fde3229","k":"rows","cols":["STR_TO_DATE('2024-01',    '%X-%v')"],"rows":[[null]]}
+{"i":27,"h":"3b88fe5f","k":"rows","cols":["STR_TO_DATE('garbage',    '%z')"],"rows":[[null]]}
+{"i":28,"h":"aa43237d","k":"rows","cols":["weekday_name_consumed"],"rows":[["2024-03-15"]]}
+{"i":29,"h":"c9482c4c","k":"rows","cols":["weekday_num_consumed"],"rows":[["2024-03-15"]]}
+{"i":30,"h":"592951d7","k":"rows","cols":["ordinal_consumed"],"rows":[["2024-03-01"]]}
+{"i":31,"h":"a0a7ef2c","k":"rows","cols":["frac_seconds"],"rows":[["2024-03-15 14:30:45.100000"]]}
+{"i":32,"h":"9e825a25","k":"rows","cols":["hour_24_nopad"],"rows":[["2024-03-15 09:30:00"]]}
+{"i":33,"h":"5441e3f3","k":"rows","cols":["hour_12_nopad"],"rows":[["2024-03-15 21:30:00"]]}
+{"i":34,"h":"822a875f","k":"rows","cols":["null_str"],"rows":[["1"]]}
+{"i":35,"h":"37393aa6","k":"rows","cols":["null_fmt"],"rows":[["1"]]}
+{"i":36,"h":"0ab8b4df","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'STR_TO_DATE'"}
+{"i":37,"h":"2d8f0c6e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'STR_TO_DATE'"}
+{"i":38,"h":"efe79f56","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'STR_TO_DATE'"}
+{"i":39,"h":"1b1c3d18","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2"}

@@ -54,7 +54,7 @@ id	rn
 # semantics is a follow-up. Workaround: rewrite as
 # `SUM(CASE WHEN n > 15 THEN n END) OVER (...)`.
 SELECT id, n, SUM(n) FILTER (WHERE n > 15) OVER (ORDER BY id) AS s_filt FROM wf ORDER BY id;
-ERROR 1064: SQL parse error: FILTER clause on window aggregate `SUM` not yet supported
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE n > 15) OVER (ORDER BY id) AS s_filt FROM wf ORDER BY id' at line 1
 === FILTER workaround using CASE ===
 SELECT id, n, SUM(CASE WHEN n > 15 THEN n END) OVER (ORDER BY id) AS s_filt_case FROM wf ORDER BY id;
 id	n	s_filt_case
@@ -63,26 +63,20 @@ id	n	s_filt_case
 3	30	50
 === NTILE(<=0) errors 1105 (was silently 1 per row) ===
 SELECT id, NTILE(0) OVER (ORDER BY id) AS n0 FROM wf ORDER BY id;
-ERROR 1105: execution error: argument of NTILE must be greater than zero (got 0)
+ERROR 1210: Incorrect arguments to ntile
 SELECT id, NTILE(-3) OVER (ORDER BY id) AS n_neg FROM wf ORDER BY id;
-ERROR 1105: execution error: argument of NTILE must be greater than zero (got -3)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-3) OVER (ORDER BY id) AS n_neg FROM wf ORDER BY id' at line 1
 === LAG(n, -k) ≡ LEAD(n, k) — negative offset flips direction ===
 SELECT id, n, LAG(n, -1) OVER (ORDER BY id) AS lag_neg, LEAD(n, 1) OVER (ORDER BY id) AS lead_pos FROM wf ORDER BY id;
-id	n	lag_neg	lead_pos
-1	10	20	20
-2	20	30	30
-3	30	NULL	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-1) OVER (ORDER BY id) AS lag_neg, LEAD(n, 1) OVER (ORDER BY id) AS lead_pos FRO' at line 1
 SELECT id, n, LEAD(n, -1) OVER (ORDER BY id) AS lead_neg, LAG(n, 1) OVER (ORDER BY id) AS lag_pos FROM wf ORDER BY id;
-id	n	lead_neg	lag_pos
-1	10	NULL	NULL
-2	20	10	10
-3	30	20	20
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-1) OVER (ORDER BY id) AS lead_neg, LAG(n, 1) OVER (ORDER BY id) AS lag_pos FROM' at line 1
 === Nested window function calls — errors 1064 (was silent NULL) ===
 SELECT id, SUM(ROW_NUMBER() OVER ()) OVER () AS nested FROM wf ORDER BY id;
-ERROR 1064: SQL parse error: window function calls cannot be nested
+ERROR 3593: You cannot use the window function 'row_number' in this context.'
 SELECT SUM(ROW_NUMBER() OVER ()) AS agg_of_win FROM wf;
-ERROR 1064: SQL parse error: aggregate function `SUM` cannot contain window function calls
+ERROR 3593: You cannot use the window function 'row_number' in this context.'
 === Window function in WHERE — correctly errors 1105 ===
 SELECT id FROM wf WHERE ROW_NUMBER() OVER () = 1;
-ERROR 1105: execution error: unsupported expression: WindowFunction { name: "ROW_NUMBER", args: [], partition_by: [], order_by: [], frame: None }
+ERROR 3593: You cannot use the window function 'row_number' in this context.'
 DROP TABLE wf;

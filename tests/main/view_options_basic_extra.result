@@ -29,7 +29,7 @@ one
 # (verified via mysql cli: CREATE / SELECT / REFRESH all
 # function and the data is properly snapshotted).
 CREATE MATERIALIZED VIEW mvw AS SELECT id, x FROM vt;
-ERROR 1146: table not found: vt
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED VIEW mvw AS SELECT id, x FROM vt' at line 1
 INSERT INTO vt VALUES (4, 40);
 === View with ORDER BY + LIMIT in definition ===
 CREATE VIEW vord AS SELECT id FROM vt ORDER BY id DESC LIMIT 2;
@@ -75,7 +75,7 @@ id	label
 DROP VIEW IF EXISTS vnomissing;
 === DROP VIEW on real table — errno 1051 ===
 DROP VIEW vt;
-ERROR 1051: execution error: view 'test.public.vt' does not exist
+ERROR 1347: 'test.vt' is not VIEW
 === information_schema.views — regular views visible ===
 SELECT table_name FROM information_schema.views WHERE table_name IN ('vw1','vord','vdist','vsub','vcols','vjoin','vnew') ORDER BY table_name;
 TABLE_NAME
@@ -92,12 +92,14 @@ SELECT table_name FROM information_schema.views WHERE table_name = 'mvw';
 SELECT table_name FROM information_schema.tables WHERE table_name = 'mvw';
 === KNOWN DIVERGENCE: SHOW CREATE VIEW returns empty (no header) ===
 SHOW CREATE VIEW vw1;
+View	Create View	character_set_client	collation_connection
+vw1	CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw1` AS select `vt`.`x` AS `val` from `vt`	utf8mb4	utf8mb4_0900_ai_ci
 === KNOWN GAP: DROP MATERIALIZED VIEW — errno 1064 ===
 DROP MATERIALIZED VIEW mvw;
-ERROR 1064: SQL parse error: unsupported DROP MATERIALIZED VIEW statement
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED VIEW mvw' at line 1
 === KNOWN GAP: CREATE RECURSIVE VIEW (PG) — errno 1064 ===
 CREATE RECURSIVE VIEW vrec(n) AS VALUES (1) UNION ALL SELECT n + 1 FROM vrec WHERE n < 5;
-ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: RECURSIVE at Line: 1, Column: 8
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RECURSIVE VIEW vrec(n) AS VALUES (1) UNION ALL SELECT n + 1 FROM vrec WHERE n < ' at line 1
 === Cleanup ===
 DROP VIEW vw1;
 DROP VIEW vnew;

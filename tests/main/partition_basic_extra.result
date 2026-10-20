@@ -1,20 +1,19 @@
 === MySQL PARTITION BY RANGE (bare) — parses, data lands ===
 DROP TABLE IF EXISTS pr;
 CREATE TABLE pr (id INT, n INT) PARTITION BY RANGE (id);
+ERROR 1492: For RANGE partitions each partition must be defined
 INSERT INTO pr VALUES (1, 100), (15, 200), (25, 300);
+ERROR 1146: Table 'test.pr' doesn't exist
 SELECT id, n FROM pr ORDER BY id;
-id	n
-1	100
-15	200
-25	300
+ERROR 1146: Table 'test.pr' doesn't exist
 === MySQL PARTITION BY LIST (bare) — parses, data lands ===
 DROP TABLE IF EXISTS pl;
 CREATE TABLE pl (id INT) PARTITION BY LIST (id);
+ERROR 1492: For LIST partitions each partition must be defined
 INSERT INTO pl VALUES (1), (2);
+ERROR 1146: Table 'test.pl' doesn't exist
 SELECT id FROM pl ORDER BY id;
-id
-1
-2
+ERROR 1146: Table 'test.pl' doesn't exist
 === MySQL PARTITION BY HASH (bare) — parses, data lands ===
 DROP TABLE IF EXISTS ph;
 CREATE TABLE ph (id INT) PARTITION BY HASH (id);
@@ -33,54 +32,53 @@ id
 2
 === KNOWN DIVERGENCE: SHOW CREATE TABLE strips PARTITION BY clause ===
 SHOW CREATE TABLE pr;
-Table	Create Table
-pr	CREATE TABLE `pr` (
-  `id` int,
-  `n` int,
-  PRIMARY KEY (`_rowid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+ERROR 1146: Table 'test.pr' doesn't exist
 === KNOWN DIVERGENCE: information_schema.partitions returns empty ===
 SELECT partition_name, table_name FROM information_schema.partitions WHERE table_name = 'pr';
 DROP TABLE pr;
+ERROR 1051: Unknown table 'test.pr'
 DROP TABLE pl;
+ERROR 1051: Unknown table 'test.pl'
 DROP TABLE ph;
 DROP TABLE pk;
 === KNOWN GAP: PARTITION spec body — errno 1064 ===
 CREATE TABLE prs (id INT) PARTITION BY RANGE (id) (PARTITION p1 VALUES LESS THAN (10));
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: ( at Line: 1, Column: 51
 === KNOWN GAP: PARTITIONS N suffix on HASH — errno 1064 ===
 CREATE TABLE phn (id INT) PARTITION BY HASH (id) PARTITIONS 4;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: PARTITIONS at Line: 1, Column: 50
 === KNOWN GAP: PARTITION BY RANGE COLUMNS (multi-col) — errno 1064 ===
 CREATE TABLE pmc (a INT, b INT) PARTITION BY RANGE COLUMNS (a, b);
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: COLUMNS at Line: 1, Column: 52
+ERROR 1492: For RANGE partitions each partition must be defined
 === KNOWN GAP: SUBPARTITION BY HASH — errno 1064 ===
 CREATE TABLE psub (id INT) PARTITION BY RANGE (id) SUBPARTITION BY HASH (id);
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: SUBPARTITION at Line: 1, Column: 52
+ERROR 1492: For RANGE partitions each partition must be defined
 === KNOWN GAP: PG declarative CREATE TABLE … PARTITION OF — errno 1105 (no col inherit) ===
 DROP TABLE IF EXISTS pgpr;
 CREATE TABLE pgpr (id INT) PARTITION BY RANGE (id);
+ERROR 1492: For RANGE partitions each partition must be defined
 CREATE TABLE pgpr_p1 PARTITION OF pgpr FOR VALUES FROM (1) TO (10);
-ERROR 1105: internal error: at least one column required
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OF pgpr FOR VALUES FROM (1) TO (10)' at line 1
 DROP TABLE pgpr;
+ERROR 1051: Unknown table 'test.pgpr'
 === KNOWN GAP: ALTER TABLE ADD PARTITION — errno 1064 ===
 DROP TABLE IF EXISTS pa;
 CREATE TABLE pa (id INT) PARTITION BY LIST (id);
+ERROR 1492: For LIST partitions each partition must be defined
 ALTER TABLE pa ADD PARTITION (PARTITION p1 VALUES IN (1));
-ERROR 1064: SQL parse error: sql parser error: Expected: ), found: p1 at Line: 1, Column: 41
+ERROR 1146: Table 'test.pa' doesn't exist
 === KNOWN GAP: ALTER TABLE DROP PARTITION — errno 1064 ===
 ALTER TABLE pa DROP PARTITION p1;
-ERROR 1064: SQL parse error: sql parser error: Expected: (, found: p1 at Line: 1, Column: 31
+ERROR 1146: Table 'test.pa' doesn't exist
 === KNOWN GAP: ALTER TABLE ATTACH PARTITION — errno 1064 ===
 ALTER TABLE pa ATTACH PARTITION other FOR VALUES IN (1);
-ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: ATTACH at Line: 1, Column: 16
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ATTACH PARTITION other FOR VALUES IN (1)' at line 1
 === KNOWN GAP: ALTER TABLE DETACH PARTITION — errno 1064 ===
 ALTER TABLE pa DETACH PARTITION other;
-ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: DETACH at Line: 1, Column: 16
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DETACH PARTITION other' at line 1
 === KNOWN GAP: ALTER TABLE TRUNCATE PARTITION — errno 1064 ===
 ALTER TABLE pa TRUNCATE PARTITION p1;
-ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: TRUNCATE at Line: 1, Column: 16
+ERROR 1146: Table 'test.pa' doesn't exist
 === KNOWN GAP: ALTER TABLE EXCHANGE PARTITION — errno 1064 ===
 ALTER TABLE pa EXCHANGE PARTITION p1 WITH TABLE pr;
-ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: EXCHANGE at Line: 1, Column: 16
+ERROR 1146: Table 'test.pa' doesn't exist
 DROP TABLE pa;
+ERROR 1051: Unknown table 'test.pa'

@@ -1,7 +1,6 @@
 === SPACE: basic n-spaces ===
 SELECT LENGTH(SPACE(0))    = 0  AS empty;
-empty
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT LENGTH(SPACE(1))    = 1  AS one;
 one
 1
@@ -38,48 +37,47 @@ SELECT LENGTH(SPACE(10485760)) = 10485760 AS at_cap;
 at_cap
 1
 SELECT SPACE(10485761);
-ERROR 1105: execution error: SPACE result exceeds maximum allowed size
+SPACE(10485761)
+<big:len=10485761:fnv=6f66a617b381817f>
 SELECT SPACE(100000000);
-ERROR 1105: execution error: SPACE result exceeds maximum allowed size
+SPACE(100000000)
+NULL
 === SPACE: NULL passthrough ===
 SELECT SPACE(NULL) IS NULL AS null_passes;
 null_passes
 1
 === SPACE: integer-type strictness ===
 SELECT SPACE('five');
-ERROR 1105: execution error: SPACE count must be integer
+SPACE('five')
+
 SELECT SPACE(2.5);
-ERROR 1105: execution error: SPACE count must be integer
+SPACE(2.5)
+   
 === QUOTE: basic ASCII wrap ===
 SELECT QUOTE('hello')      AS basic;
 basic
 'hello'
 SELECT QUOTE('')           AS empty;
-empty
-''
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 === QUOTE: 4 escape chars ===
 SELECT QUOTE('it''s')      AS apostrophe;
 apostrophe
 'it\'s'
 SELECT QUOTE('a\b')        AS backslash;
 backslash
-'a\\b'
+'a'
 SELECT QUOTE('it''s\file') AS combo;
 combo
-'it\'s\\file'
+'it\'sfile'
 === QUOTE: NUL and Ctrl-Z escape arms (via CHR()) ===
 SELECT LENGTH(QUOTE(CHR(0)))  = 4 AS nul_escaped_len;
-nul_escaped_len
-1
+ERROR 1305: FUNCTION test.CHR does not exist
 SELECT LENGTH(QUOTE(CHR(26))) = 4 AS ctrlz_escaped_len;
-ctrlz_escaped_len
-1
+ERROR 1305: FUNCTION test.CHR does not exist
 SELECT SUBSTRING(QUOTE(CHR(0)),  2, 2) = '\0' AS nul_sequence;
-nul_sequence
-1
+ERROR 1305: FUNCTION test.CHR does not exist
 SELECT SUBSTRING(QUOTE(CHR(26)), 2, 2) = '\Z' AS ctrlz_sequence;
-ctrlz_sequence
-1
+ERROR 1305: FUNCTION test.CHR does not exist
 === QUOTE: NULL → literal text 'NULL' (NOT SQL NULL) ===
 SELECT QUOTE(NULL)         AS null_text;
 null_text
@@ -100,7 +98,7 @@ int_in
 '123'
 SELECT QUOTE(TRUE)         AS bool_in;
 bool_in
-'true'
+'1'
 === QUOTE: characters NOT escaped (passed through) ===
 SELECT QUOTE('a%b')        AS pct_through;
 pct_through
@@ -114,10 +112,10 @@ quote_det
 1
 === Arity errors ===
 SELECT SPACE();
-ERROR 1105: execution error: SPACE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SPACE'
 SELECT SPACE(1, 2);
-ERROR 1105: execution error: SPACE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SPACE'
 SELECT QUOTE();
-ERROR 1105: execution error: QUOTE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'QUOTE'
 SELECT QUOTE('a', 'b');
-ERROR 1105: execution error: QUOTE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'QUOTE'

@@ -1,0 +1,26 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":25}
+{"i":1,"h":"6ce1aba0","k":"ok","affected":0}
+{"i":2,"h":"07c1f8f0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY PRIMARY KEY, v TEXT)' at line 1"}
+{"i":3,"h":"2c046ab7","k":"err","code":1146,"msg":"Table 'test.t_id_always' doesn't exist"}
+{"i":4,"h":"cef66cf5","k":"err","code":1146,"msg":"Table 'test.t_id_always' doesn't exist"}
+{"i":5,"h":"bf60158d","k":"err","code":1146,"msg":"Table 'test.t_id_always' doesn't exist"}
+{"i":6,"h":"4afa3903","k":"err","code":1051,"msg":"Unknown table 'test.t_id_always'"}
+{"i":7,"h":"3308369f","k":"ok","affected":0}
+{"i":8,"h":"8427ee10","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BY DEFAULT AS IDENTITY PRIMARY KEY, v TEXT)' at line 1"}
+{"i":9,"h":"f58d0c6f","k":"err","code":1146,"msg":"Table 'test.t_id_default' doesn't exist"}
+{"i":10,"h":"a0e2c1f9","k":"err","code":1146,"msg":"Table 'test.t_id_default' doesn't exist"}
+{"i":11,"h":"c643ff90","k":"err","code":1146,"msg":"Table 'test.t_id_default' doesn't exist"}
+{"i":12,"h":"4d3f708c","k":"err","code":1051,"msg":"Unknown table 'test.t_id_default'"}
+{"i":13,"h":"ca5e82c7","k":"ok","affected":0}
+{"i":14,"h":"21e8c581","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY PRIMARY KEY, v TEXT)' at line 1"}
+{"i":15,"h":"9595b9f9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OVERRIDING SYSTEM VALUE VALUES (1, 'x')' at line 1"}
+{"i":16,"h":"1047390e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OVERRIDING USER VALUE VALUES (2, 'y')' at line 1"}
+{"i":17,"h":"e7cf2e16","k":"err","code":1051,"msg":"Unknown table 'test.t_ov'"}
+{"i":18,"h":"70ddb819","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY (START 100 INCREMENT 10) PRIMARY KEY, v TEXT)' at line 1"}
+{"i":19,"h":"65c44d17","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY (START WITH 100 INCREMENT BY 10) PRIMARY KEY, v TEXT)' at line 1"}
+{"i":20,"h":"67cac85a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY (CACHE 10 START 5) PRIMARY KEY, v TEXT)' at line 1"}
+{"i":21,"h":"828bf2a4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY (OWNED BY x.y) PRIMARY KEY, v TEXT)' at line 1"}
+{"i":22,"h":"b7aa6aaf","k":"ok","affected":0}
+{"i":23,"h":"9a303a8e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY (START 50) PRIMARY KEY, v TEXT)' at line 1"}
+{"i":24,"h":"3bb82376","k":"err","code":1146,"msg":"Table 'test.t_single' doesn't exist"}
+{"i":25,"h":"9796f8c9","k":"err","code":1051,"msg":"Unknown table 'test.t_single'"}

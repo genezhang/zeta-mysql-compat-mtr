@@ -1,0 +1,30 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":29}
+{"i":1,"h":"af1967c4","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":2,"h":"7d002bed","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":3,"h":"d88e24fd","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":4,"h":"8072905f","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":5,"h":"b6754dcb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":6,"h":"db8b20aa","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":7,"h":"8acf0973","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":8,"h":"3cd62e5a","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":9,"h":"bd1d2d3d","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":10,"h":"e58eed80","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":11,"h":"4527477d","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":12,"h":"c215fe62","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":13,"h":"b02e0963","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":14,"h":"28ab6b02","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":15,"h":"618b196e","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":16,"h":"01010fb8","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":17,"h":"e64005b8","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":18,"h":"b05e760d","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":19,"h":"053697b3","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":20,"h":"4541e3b0","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":21,"h":"91e41dc5","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":22,"h":"fa09256e","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":23,"h":"95b43d79","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":24,"h":"60af5228","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":25,"h":"ac46b25a","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":26,"h":"dd863c7c","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":27,"h":"a5a6853c","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":28,"h":"db0a54ac","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}
+{"i":29,"h":"e8d892d9","k":"err","code":1305,"msg":"FUNCTION test.BTRIM does not exist"}

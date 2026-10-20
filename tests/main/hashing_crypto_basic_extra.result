@@ -14,49 +14,41 @@ SELECT CRC32('hello') AS basic;
 basic
 907060870
 SELECT CRC32('') AS empty, CRC32(NULL) AS nl;
-empty	nl
-0	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty, CRC32(NULL) AS nl' at line 1
 SELECT CRC32(123) AS num;
 num
 2286445522
 === DIGEST (PG pgcrypto) ===
 SELECT HEX(DIGEST('hello', 'sha256')) AS d_256;
-d_256
-2CF24DBA5FB0A30E26E83B2AC5B9E29E1B161E5C1FA7425E73043362938B9824
+ERROR 1305: FUNCTION test.DIGEST does not exist
 SELECT HEX(DIGEST('hello', 'md5')) AS d_md5;
-d_md5
-5D41402ABC4B2A76B9719D911017C592
+ERROR 1305: FUNCTION test.DIGEST does not exist
 === ENCRYPT / DECRYPT round-trip (3-arg, PG pgcrypto) ===
 SELECT DECRYPT(ENCRYPT('plain', 'key', 'aes'), 'key', 'aes') AS round_trip;
-round_trip
-plain
+ERROR 1305: FUNCTION test.DECRYPT does not exist
 === HMAC — algorithm variants ===
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'md5'))) AS l_md5;
-l_md5
-32
+ERROR 1305: FUNCTION test.HMAC does not exist
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha1'))) AS l_sha1;
-l_sha1
-40
+ERROR 1305: FUNCTION test.HMAC does not exist
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha256'))) AS l_sha256;
-l_sha256
-64
+ERROR 1305: FUNCTION test.HMAC does not exist
 SELECT LENGTH(HEX(HMAC('hello', 'key', 'sha512'))) AS l_sha512;
-l_sha512
-128
+ERROR 1305: FUNCTION test.HMAC does not exist
 === FIXED: RANDOM_BYTES (MySQL) now supported ===
 SELECT LENGTH(RANDOM_BYTES(16)) AS len16, LENGTH(RANDOM_BYTES(32)) AS len32;
 len16	len32
-16	32
+<masked>	<masked>
 === KNOWN GAP: GEN_RANDOM_BYTES (PG pgcrypto) — errno 1105 ===
 SELECT GEN_RANDOM_BYTES(16);
-ERROR 1105: execution error: unknown function: GEN_RANDOM_BYTES
+ERROR 1305: FUNCTION test.GEN_RANDOM_BYTES does not exist
 === AES_ENCRYPT / AES_DECRYPT — supported since zeta #1209 ===
 SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'mykey'), 'mykey') AS round_trip;
 round_trip
 hello
 SELECT LENGTH(HEX(AES_ENCRYPT('plain', 'key'))) AS enc_hex_len;
 enc_hex_len
-64
+32
 === FIXED: COMPRESS / UNCOMPRESS / UNCOMPRESSED_LENGTH (zlib) ===
 SELECT UNCOMPRESS(COMPRESS('hello')) AS round_trip;
 round_trip
@@ -66,10 +58,10 @@ orig_len
 11
 === KNOWN GAP: PASSWORD (legacy MySQL) — errno 1105 ===
 SELECT PASSWORD('secret');
-ERROR 1105: execution error: unknown function: PASSWORD
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('secret')' at line 1
 === KNOWN GAP: ENCRYPT 2-arg MySQL form — errno 1105 ===
 SELECT ENCRYPT('plain', 'key');
-ERROR 1105: execution error: encrypt() requires 3 arguments (data, key, cipher)
+ERROR 1305: FUNCTION test.ENCRYPT does not exist
 === KNOWN GAP: HMAC 2-arg form — errno 1105 ===
 SELECT HMAC('hello', 'key');
-ERROR 1105: execution error: hmac() requires 3 arguments (data, key, algorithm)
+ERROR 1305: FUNCTION test.HMAC does not exist

@@ -1,0 +1,32 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":31}
+{"i":1,"h":"11ee92e5","k":"rows","cols":["bin_hello"],"rows":[["hello"]]}
+{"i":2,"h":"c7f42208","k":"rows","cols":["bin_hello_len_5"],"rows":[["5"]]}
+{"i":3,"h":"c8ef79f5","k":"rows","cols":["bin_cafe_len_5_bytes"],"rows":[["5"]]}
+{"i":4,"h":"ef4ec702","k":"rows","cols":["bytes_gt_chars"],"rows":[["0"]]}
+{"i":5,"h":"cdae0c48","k":"rows","cols":["hex_cafe_bytes"],"rows":[["636166C3A9"]]}
+{"i":6,"h":"9a471749","k":"rows","cols":["null_propagates"],"rows":[[null]]}
+{"i":7,"h":"32a8e750","k":"rows","cols":["null_pred"],"rows":[["1"]]}
+{"i":8,"h":"edd81a7b","k":"rows","cols":["int_coerce"],"rows":[["42"]]}
+{"i":9,"h":"14dd04dc","k":"rows","cols":["int_str_repr_2_bytes"],"rows":[["2"]]}
+{"i":10,"h":"0eb39660","k":"rows","cols":["bool_coerce"],"rows":[["1"]]}
+{"i":11,"h":"77e64d6d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":12,"h":"650a8832","k":"err","code":1241,"msg":"Operand should contain 1 column(s)"}
+{"i":13,"h":"89739f08","k":"rows","cols":["CAST('hello' AS BINARY)"],"rows":[["hello"]]}
+{"i":14,"h":"ba252a1a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(42)                                            AS int_to_dec' at line 1"}
+{"i":15,"h":"c2798c8a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL('3.14')                                        AS str_to_dec' at line 1"}
+{"i":16,"h":"30a829be","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(3.14)                                          AS dec_passthrough' at line 1"}
+{"i":17,"h":"a273116a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(-5)                                            AS neg_int' at line 1"}
+{"i":18,"h":"6033214c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(3.14) = 3.14                                   AS dec_eq_lit' at line 1"}
+{"i":19,"h":"26405ff4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('NaN'      AS DOUBLE PRECISION))          AS dec_nan_null' at line 1"}
+{"i":20,"h":"533a965c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('Infinity' AS DOUBLE PRECISION))          AS dec_inf_null' at line 1"}
+{"i":21,"h":"a091941a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('-Infinity' AS DOUBLE PRECISION))         AS dec_neg_inf_null' at line 1"}
+{"i":22,"h":"081ba7b8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('NaN' AS DOUBLE PRECISION)) IS NULL       AS dec_nan_pred' at line 1"}
+{"i":23,"h":"e71827bf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE)                                          AS bool_true_renders_as_1' at line 1"}
+{"i":24,"h":"96bb7cdd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(FALSE)                                         AS bool_false_renders_as_' at line 1"}
+{"i":25,"h":"99bf28de","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE) = 1                                      AS bool_dec_ne_int_1' at line 1"}
+{"i":26,"h":"b4ddf260","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE) = DECIMAL(1)                             AS bool_dec_ne_dec_1' at line 1"}
+{"i":27,"h":"69dbed9d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE) = TRUE                                   AS bool_dec_eq_bool_true' at line 1"}
+{"i":28,"h":"e1df9ded","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(NULL)                                          AS null_propagates' at line 1"}
+{"i":29,"h":"835f029c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(NULL) IS NULL                                  AS null_pred' at line 1"}
+{"i":30,"h":"5744c356","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL()' at line 1"}
+{"i":31,"h":"8af7218a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(1, 2)' at line 1"}

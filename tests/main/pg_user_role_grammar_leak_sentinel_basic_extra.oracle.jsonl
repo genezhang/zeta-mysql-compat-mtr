@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"3eb03fd1","k":"skip","why":"accounts and privileges"}
+{"i":2,"h":"bc222c76","k":"skip","why":"accounts and privileges"}
+{"i":3,"h":"746710df","k":"skip","why":"accounts and privileges"}
+{"i":4,"h":"b9a9bdac","k":"skip","why":"accounts and privileges"}
+{"i":5,"h":"349296e4","k":"skip","why":"accounts and privileges"}
+{"i":6,"h":"992f4383","k":"skip","why":"accounts and privileges"}
+{"i":7,"h":"fb026a00","k":"skip","why":"accounts and privileges"}
+{"i":8,"h":"0848d299","k":"skip","why":"accounts and privileges"}
+{"i":9,"h":"da2ae0e1","k":"skip","why":"accounts and privileges"}
+{"i":10,"h":"85119a57","k":"skip","why":"accounts and privileges"}
+{"i":11,"h":"961973be","k":"skip","why":"accounts and privileges"}
+{"i":12,"h":"1ee8754a","k":"skip","why":"accounts and privileges"}
+{"i":13,"h":"ca4313be","k":"skip","why":"accounts and privileges"}
+{"i":14,"h":"4fdb6406","k":"skip","why":"accounts and privileges"}
+{"i":15,"h":"ee0c2bf0","k":"skip","why":"accounts and privileges"}
+{"i":16,"h":"ed4638cd","k":"skip","why":"accounts and privileges"}
+{"i":17,"h":"6827726d","k":"skip","why":"accounts and privileges"}
+{"i":18,"h":"13cea4b7","k":"skip","why":"accounts and privileges"}
+{"i":19,"h":"af4ab393","k":"skip","why":"accounts and privileges"}
+{"i":20,"h":"08965f23","k":"skip","why":"accounts and privileges"}
+{"i":21,"h":"00a113e4","k":"skip","why":"accounts and privileges"}
+{"i":22,"h":"d5b92eab","k":"skip","why":"accounts and privileges"}
+{"i":23,"h":"d1206065","k":"skip","why":"accounts and privileges"}
+{"i":24,"h":"f350dabc","k":"skip","why":"accounts and privileges"}

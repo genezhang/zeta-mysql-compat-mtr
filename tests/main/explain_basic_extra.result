@@ -4,57 +4,69 @@ CREATE TABLE ep (id INT PRIMARY KEY, name VARCHAR(20), age INT);
 INSERT INTO ep VALUES (1, 'a', 10), (2, 'b', 20);
 === EXPLAIN SELECT — simple SeqScan ===
 EXPLAIN SELECT * FROM ep;
-QUERY PLAN
-SeqScan (ep) [id, name, age]
-  (cost=1.00 rows=0)
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	ep	NULL	ALL	NULL	NULL	NULL	NULL	2	100.00	NULL
 === EXPLAIN SELECT with WHERE filter ===
 EXPLAIN SELECT * FROM ep WHERE id = 1;
-QUERY PLAN
-SeqScan (ep) [id, name, age] (filter: id = 1)
-  (cost=1.00 rows=0)
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	ep	NULL	const	PRIMARY	PRIMARY	4	const	1	100.00	NULL
 === EXPLAIN UPDATE ===
 EXPLAIN UPDATE ep SET age = age + 1 WHERE id = 1;
-QUERY PLAN
-Update test.public.ep
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	UPDATE	ep	NULL	range	PRIMARY	PRIMARY	4	const	1	100.00	Using where
 === EXPLAIN DELETE ===
 EXPLAIN DELETE FROM ep WHERE id = 99;
-QUERY PLAN
-Delete from test.public.ep
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	DELETE	ep	NULL	range	PRIMARY	PRIMARY	4	const	1	100.00	Using where
 === EXPLAIN with JOIN — HashJoin tree ===
 DROP TABLE IF EXISTS j2;
 CREATE TABLE j2 (id INT PRIMARY KEY, name VARCHAR(20));
 EXPLAIN SELECT * FROM ep JOIN j2 ON ep.id = j2.id;
-QUERY PLAN
-Project [ep.id, ep.name, ep.age, j2.id, j2.name]
-  HashJoin INNER keys: [ep.id] = [j2.id]
-    Build:
-      SeqScan (j2) [id, name]
-    Probe:
-      SeqScan (ep) [id, name, age]
-  (cost=2.00 rows=0)
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	j2	NULL	ALL	PRIMARY	NULL	NULL	NULL	1	100.00	NULL
+1	SIMPLE	ep	NULL	eq_ref	PRIMARY	PRIMARY	4	test.j2.id	1	100.00	NULL
 === EXPLAIN with ORDER BY + LIMIT — Limit > Sort > SeqScan ===
 EXPLAIN SELECT * FROM ep ORDER BY age LIMIT 10;
-QUERY PLAN
-Limit 10
-  Sort [age ASC]
-    SeqScan (ep) [id, name, age]
-  (cost=1.00 rows=0)
+id	select_type	table	partitions	type	possible_keys	key	key_len	ref	rows	filtered	Extra
+1	SIMPLE	ep	NULL	ALL	NULL	NULL	NULL	NULL	2	100.00	Using filesort
 === EXPLAIN FORMAT=JSON — accept, plain output (divergence) ===
 EXPLAIN FORMAT=JSON SELECT * FROM ep;
-QUERY PLAN
-SeqScan (ep) [id, name, age]
-  (cost=1.00 rows=0)
+EXPLAIN
+{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      "query_cost": "0.45"
+    },
+    "table": {
+      "table_name": "ep",
+      "access_type": "ALL",
+      "rows_examined_per_scan": 2,
+      "rows_produced_per_join": 2,
+      "filtered": "100.00",
+      "cost_info": {
+        "read_cost": "0.25",
+        "eval_cost": "0.20",
+        "prefix_cost": "0.45",
+        "data_read_per_join": "192"
+      },
+      "used_columns": [
+        "id",
+        "name",
+        "age"
+      ]
+    }
+  }
+}
 === EXPLAIN (VERBOSE) — accept, no extra detail (divergence) ===
 EXPLAIN (VERBOSE) SELECT * FROM ep;
-QUERY PLAN
-SeqScan (ep) [id, name, age]
-  (cost=1.00 rows=0)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VERBOSE) SELECT * FROM ep' at line 1
 === KNOWN GAP: EXPLAIN EXTENDED — errno 1064 ===
 EXPLAIN EXTENDED SELECT * FROM ep;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: * at Line: 1, Column: 25
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT * FROM ep' at line 1
 === KNOWN GAP: EXPLAIN PARTITIONS — errno 1064 ===
 EXPLAIN PARTITIONS SELECT * FROM ep;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: SELECT at Line: 1, Column: 20
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT * FROM ep' at line 1
 === Cleanup ===
 DROP TABLE ep;
 DROP TABLE j2;

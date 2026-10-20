@@ -1,0 +1,26 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":25}
+{"i":1,"h":"9bc6460e","k":"rows","cols":["neg_dividend"],"rows":[["-1"]]}
+{"i":2,"h":"81da8123","k":"rows","cols":["neg_divisor"],"rows":[["1"]]}
+{"i":3,"h":"5fdefdd9","k":"rows","cols":["nl_n","nl_d"],"rows":[[null,null]]}
+{"i":4,"h":"e241a59c","k":"rows","cols":["flt"],"rows":[["1.5"]]}
+{"i":5,"h":"cddf739c","k":"rows","cols":["g","l"],"rows":[["3","1"]]}
+{"i":6,"h":"a3bb8fcf","k":"rows","cols":["gs"],"rows":[["c"]]}
+{"i":7,"h":"98b91613","k":"rows","cols":["mixed_coerced"],"rows":[["a"]]}
+{"i":8,"h":"a080afaf","k":"rows","cols":["with_null"],"rows":[[null]]}
+{"i":9,"h":"36eb77a0","k":"rows","cols":["flt"],"rows":[["2.0"]]}
+{"i":10,"h":"3188e231","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'GREATEST'"}
+{"i":11,"h":"f844212f","k":"rows","cols":["c_neg","f_neg"],"rows":[["-3","-4"]]}
+{"i":12,"h":"94e68c77","k":"rows","cols":["c_neg_int","f_neg_int"],"rows":[["-3","-3"]]}
+{"i":13,"h":"149623db","k":"rows","cols":["c_nl","f_nl"],"rows":[[null,null]]}
+{"i":14,"h":"3cb8fda2","k":"rows","cols":["s0","sn","sp","snl"],"rows":[["0","-1","1",null]]}
+{"i":15,"h":"0efdb685","k":"rows","cols":["t_int","t_frac"],"rows":[["1","1.99"]]}
+{"i":16,"h":"4bc6ed02","k":"rows","cols":["t_neg_decimals"],"rows":[["1200"]]}
+{"i":17,"h":"08270598","k":"rows","cols":["t_neg_value"],"rows":[["-1"]]}
+{"i":18,"h":"95e984c1","k":"rows","cols":["p_zero","p_frac","p_neg_base"],"rows":[["1","1.4142135623730951","-8"]]}
+{"i":19,"h":"9aff15ab","k":"rows","cols":["MOD(10, 0)"],"rows":[[null]]}
+{"i":20,"h":"74bbbb13","k":"rows","cols":["10 % 0"],"rows":[[null]]}
+{"i":21,"h":"16e1fa52","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)) AS abs_i64_min' at line 1"}
+{"i":22,"h":"6fdd36bd","k":"err","code":1690,"msg":"DOUBLE value is out of range in 'pow(-(2),0.5)'"}
+{"i":23,"h":"2c8a2b37","k":"rows","cols":["LOG(0)"],"rows":[[null]]}
+{"i":24,"h":"3ca00cfc","k":"rows","cols":["LOG10(0)"],"rows":[[null]]}
+{"i":25,"h":"30628219","k":"rows","cols":["LOG2(-1)"],"rows":[[null]]}

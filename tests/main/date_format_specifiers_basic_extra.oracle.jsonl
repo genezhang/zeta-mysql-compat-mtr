@@ -1,0 +1,66 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":65}
+{"i":1,"h":"e27bbfad","k":"rows","cols":["year_4digit"],"rows":[["2024"]]}
+{"i":2,"h":"ca0741d6","k":"rows","cols":["year_2digit"],"rows":[["24"]]}
+{"i":3,"h":"639f2600","k":"rows","cols":["month_padded"],"rows":[["03"]]}
+{"i":4,"h":"ebc929a8","k":"rows","cols":["month_nopad"],"rows":[["3"]]}
+{"i":5,"h":"bf3dfcd2","k":"rows","cols":["month_name"],"rows":[["March"]]}
+{"i":6,"h":"f41aa6ce","k":"rows","cols":["month_abbrev"],"rows":[["Mar"]]}
+{"i":7,"h":"906da15b","k":"rows","cols":["month_padded_sept"],"rows":[["09"]]}
+{"i":8,"h":"8c908c7b","k":"rows","cols":["month_nopad_sept"],"rows":[["9"]]}
+{"i":9,"h":"a6133e63","k":"rows","cols":["day_padded"],"rows":[["15"]]}
+{"i":10,"h":"9e195d0b","k":"rows","cols":["day_nopad"],"rows":[["15"]]}
+{"i":11,"h":"d7ee6210","k":"rows","cols":["day_padded_first"],"rows":[["01"]]}
+{"i":12,"h":"a4972548","k":"rows","cols":["day_nopad_first"],"rows":[["1"]]}
+{"i":13,"h":"23a3e8a4","k":"rows","cols":["day_ordinal_first"],"rows":[["1st"]]}
+{"i":14,"h":"ff6ea34d","k":"rows","cols":["day_ordinal_second"],"rows":[["2nd"]]}
+{"i":15,"h":"acca7f3f","k":"rows","cols":["day_ordinal_third"],"rows":[["3rd"]]}
+{"i":16,"h":"55cfc433","k":"rows","cols":["day_ordinal_fourth"],"rows":[["4th"]]}
+{"i":17,"h":"8cca1214","k":"rows","cols":["day_ordinal_eleventh"],"rows":[["11th"]]}
+{"i":18,"h":"0c652f29","k":"rows","cols":["day_ordinal_21st"],"rows":[["21st"]]}
+{"i":19,"h":"0e5795ef","k":"rows","cols":["hour_24_padded"],"rows":[["14"]]}
+{"i":20,"h":"89d2fb5c","k":"rows","cols":["hour_24_nopad"],"rows":[["14"]]}
+{"i":21,"h":"7161a3c1","k":"rows","cols":["hour_12_padded"],"rows":[["02"]]}
+{"i":22,"h":"e0a014f8","k":"rows","cols":["hour_12_padded_alias"],"rows":[["02"]]}
+{"i":23,"h":"b91c2af1","k":"rows","cols":["hour_12_nopad"],"rows":[["2"]]}
+{"i":24,"h":"9ae4fdea","k":"rows","cols":["am_pm"],"rows":[["PM"]]}
+{"i":25,"h":"eba663e1","k":"rows","cols":["midnight_h12"],"rows":[["12"]]}
+{"i":26,"h":"aac63905","k":"rows","cols":["noon_h12"],"rows":[["12"]]}
+{"i":27,"h":"006ed518","k":"rows","cols":["midnight_ampm"],"rows":[["AM"]]}
+{"i":28,"h":"08ee947c","k":"rows","cols":["noon_ampm"],"rows":[["PM"]]}
+{"i":29,"h":"7af7660d","k":"rows","cols":["minute"],"rows":[["30"]]}
+{"i":30,"h":"532e3a2c","k":"rows","cols":["second_upper"],"rows":[["45"]]}
+{"i":31,"h":"dec6c0b7","k":"rows","cols":["second_lower"],"rows":[["45"]]}
+{"i":32,"h":"61a99c71","k":"rows","cols":["microsec"],"rows":[["123456"]]}
+{"i":33,"h":"45df1e01","k":"rows","cols":["microsec_date_only"],"rows":[["000000"]]}
+{"i":34,"h":"39f3ce8c","k":"rows","cols":["time_24"],"rows":[["14:30:45"]]}
+{"i":35,"h":"4e15dbb7","k":"rows","cols":["time_12_ampm"],"rows":[["02:30:45 PM"]]}
+{"i":36,"h":"2d9126f9","k":"rows","cols":["time_12_midnight"],"rows":[["12:30:00 AM"]]}
+{"i":37,"h":"f5fc968b","k":"rows","cols":["weekday_full"],"rows":[["Friday"]]}
+{"i":38,"h":"2b5fe225","k":"rows","cols":["weekday_abbrev"],"rows":[["Fri"]]}
+{"i":39,"h":"58d7f4dc","k":"rows","cols":["weekday_numeric"],"rows":[["5"]]}
+{"i":40,"h":"1c15e311","k":"rows","cols":["doy_1"],"rows":[["001"]]}
+{"i":41,"h":"efc2d180","k":"rows","cols":["doy_leap_feb_29"],"rows":[["060"]]}
+{"i":42,"h":"432702da","k":"rows","cols":["doy_leap_year_end"],"rows":[["366"]]}
+{"i":43,"h":"62223e4b","k":"rows","cols":["wday_sunday_0"],"rows":[["0"]]}
+{"i":44,"h":"47b4c489","k":"rows","cols":["wday_saturday_6"],"rows":[["6"]]}
+{"i":45,"h":"bf4cef23","k":"rows","cols":["iso_week_year_2025"],"rows":[["2025"]]}
+{"i":46,"h":"3684f9c2","k":"rows","cols":["iso_week_num_1"],"rows":[["01"]]}
+{"i":47,"h":"fd871423","k":"rows","cols":["sunday_week_year"],"rows":[["2024"]]}
+{"i":48,"h":"bd53167e","k":"rows","cols":["sunday_week_num"],"rows":[["52"]]}
+{"i":49,"h":"65231f00","k":"rows","cols":["pre_1970_weekday_name"],"rows":[["Monday"]]}
+{"i":50,"h":"35774030","k":"rows","cols":["pre_1970_weekday_num"],"rows":[["1"]]}
+{"i":51,"h":"d2d3e584","k":"rows","cols":["pre_1970_roundtrip"],"rows":[["1900-01-01"]]}
+{"i":52,"h":"2950bea6","k":"rows","cols":["iso_8601"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":53,"h":"b925dfb2","k":"rows","cols":["rfc_2822_ish"],"rows":[["Fri, 15 Mar 2024 14:30:45"]]}
+{"i":54,"h":"e0b41d31","k":"rows","cols":["pretty_date"],"rows":[["March 15th, 2024"]]}
+{"i":55,"h":"6bace657","k":"rows","cols":["literal_text"],"rows":[["Year: 2024, Month: March"]]}
+{"i":56,"h":"7ee89db5","k":"rows","cols":["percent_escape"],"rows":[["2024%"]]}
+{"i":57,"h":"fa820954","k":"rows","cols":["trailing_percent"],"rows":[["2024%"]]}
+{"i":58,"h":"66a20c00","k":"rows","cols":["utf8_in_format"],"rows":[["2024 é 03"]]}
+{"i":59,"h":"c142e489","k":"rows","cols":["DATE_FORMAT('2024-03-15', '%z')"],"rows":[["z"]]}
+{"i":60,"h":"ebd7944c","k":"rows","cols":["null_date"],"rows":[["1"]]}
+{"i":61,"h":"4a4beac9","k":"rows","cols":["null_format"],"rows":[["1"]]}
+{"i":62,"h":"cf8d0f01","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DATE_FORMAT'"}
+{"i":63,"h":"3e457132","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DATE_FORMAT'"}
+{"i":64,"h":"9587d25f","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DATE_FORMAT'"}
+{"i":65,"h":"4e6294a3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2"}

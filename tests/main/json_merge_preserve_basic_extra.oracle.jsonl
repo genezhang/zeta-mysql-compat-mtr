@@ -1,0 +1,24 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":23}
+{"i":1,"h":"308373bd","k":"rows","cols":["abc"],"rows":[["[1, [2, 99], 3]"]]}
+{"i":2,"h":"9cfcf539","k":"rows","cols":["three_keys"],"rows":[["3"]]}
+{"i":3,"h":"c0174f61","k":"rows","cols":["b_pair_len"],"rows":[["2"]]}
+{"i":4,"h":"6adab609","k":"rows","cols":["concat_len"],"rows":[["4"]]}
+{"i":5,"h":"261c22ff","k":"rows","cols":["concat_vals"],"rows":[["[1, 2, 3, 4]"]]}
+{"i":6,"h":"24f45b0e","k":"rows","cols":["becomes_array"],"rows":[["ARRAY"]]}
+{"i":7,"h":"f96fe77a","k":"rows","cols":["two_elements"],"rows":[["2"]]}
+{"i":8,"h":"8c21229a","k":"rows","cols":["arr_plus_scalar"],"rows":[["3"]]}
+{"i":9,"h":"8722276b","k":"rows","cols":["obj_arr_is_array"],"rows":[["ARRAY"]]}
+{"i":10,"h":"12550f78","k":"rows","cols":["obj_arr_len"],"rows":[["3"]]}
+{"i":11,"h":"2fcc4752","k":"rows","cols":["inner_keys"],"rows":[["3"]]}
+{"i":12,"h":"29f7e714","k":"rows","cols":["inner_y_pair"],"rows":[["2"]]}
+{"i":13,"h":"f4b9b56a","k":"rows","cols":["a_pair_with_null"],"rows":[["2"]]}
+{"i":14,"h":"aea51f4f","k":"rows","cols":["a_three_long"],"rows":[["3"]]}
+{"i":15,"h":"e88d6056","k":"rows","cols":["first_null"],"rows":[["1"]]}
+{"i":16,"h":"62b0f8f9","k":"rows","cols":["second_null"],"rows":[["1"]]}
+{"i":17,"h":"05a3b94c","k":"rows","cols":["mid_null"],"rows":[["1"]]}
+{"i":18,"h":"1c0ebc37","k":"rows","cols":["unchanged"],"rows":[["1"]]}
+{"i":19,"h":"b61f863b","k":"rows","cols":["a_still"],"rows":[["1"]]}
+{"i":20,"h":"eb6dc23a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_MERGE_PRESERVE'"}
+{"i":21,"h":"5910f956","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_MERGE_PRESERVE'"}
+{"i":22,"h":"48354265","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_merge_preserve: \"Invalid value.\" at position 1."}
+{"i":23,"h":"bdcd3964","k":"err","code":3141,"msg":"Invalid JSON text in argument 2 to function json_merge_preserve: \"Invalid value.\" at position 1."}

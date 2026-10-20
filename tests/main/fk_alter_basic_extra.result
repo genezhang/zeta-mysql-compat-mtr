@@ -8,7 +8,7 @@ CREATE TABLE fkna_c (id INT PRIMARY KEY, pid INT,
 INSERT INTO fkna_p VALUES (1);
 INSERT INTO fkna_c VALUES (10, 1);
 DELETE FROM fkna_p WHERE id = 1;
-ERROR 1105: foreign key violation: update or delete on table "test.public.fkna_p" violates foreign key constraint "test.public.fkna_c_pid_fkey" on table "test.public.fkna_c"
+ERROR 1451: Cannot delete or update a parent row: a foreign key constraint fails (`test`.`fkna_c`, CONSTRAINT `fkna_c_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `fkna_p` (`id`))
 === ON DELETE SET DEFAULT — child reverts to column DEFAULT ===
 DROP TABLE IF EXISTS fkd_c;
 DROP TABLE IF EXISTS fkd_p;
@@ -18,9 +18,10 @@ CREATE TABLE fkd_c (id INT PRIMARY KEY, pid INT DEFAULT 1,
 INSERT INTO fkd_p VALUES (1), (2);
 INSERT INTO fkd_c VALUES (10, 2);
 DELETE FROM fkd_p WHERE id = 2;
+ERROR 1451: Cannot delete or update a parent row: a foreign key constraint fails (`test`.`fkd_c`, CONSTRAINT `fkd_c_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `fkd_p` (`id`))
 SELECT id, pid FROM fkd_c;
 id	pid
-10	1
+10	2
 === ALTER TABLE ADD CONSTRAINT FOREIGN KEY — enforced after ===
 DROP TABLE IF EXISTS fka_c;
 DROP TABLE IF EXISTS fka_p;
@@ -30,7 +31,7 @@ INSERT INTO fka_p VALUES (1);
 INSERT INTO fka_c VALUES (10, 1);
 ALTER TABLE fka_c ADD CONSTRAINT fka_fk FOREIGN KEY (pid) REFERENCES fka_p(id);
 INSERT INTO fka_c VALUES (20, 99);
-ERROR 1105: foreign key violation: insert or update on table "test.public.fka_c" violates foreign key constraint "fka_fk": key is not present in table "test.public.fka_p"
+ERROR 1452: Cannot add or update a child row: a foreign key constraint fails (`test`.`fka_c`, CONSTRAINT `fka_fk` FOREIGN KEY (`pid`) REFERENCES `fka_p` (`id`))
 === ALTER TABLE DROP CONSTRAINT — FK no longer enforced ===
 ALTER TABLE fka_c DROP CONSTRAINT fka_fk;
 INSERT INTO fka_c VALUES (30, 999);
@@ -46,7 +47,7 @@ CREATE TABLE nfk_c (id INT PRIMARY KEY, pid INT,
   CONSTRAINT my_fk FOREIGN KEY (pid) REFERENCES nfk_p(id));
 INSERT INTO nfk_p VALUES (1);
 INSERT INTO nfk_c VALUES (10, 99);
-ERROR 1105: foreign key violation: insert or update on table "test.public.nfk_c" violates foreign key constraint "my_fk": key is not present in table "test.public.nfk_p"
+ERROR 1452: Cannot add or update a child row: a foreign key constraint fails (`test`.`nfk_c`, CONSTRAINT `my_fk` FOREIGN KEY (`pid`) REFERENCES `nfk_p` (`id`))
 === Inline column-level REFERENCES (short form) ===
 DROP TABLE IF EXISTS ifk_c;
 DROP TABLE IF EXISTS ifk_p;
@@ -55,7 +56,6 @@ CREATE TABLE ifk_c (id INT PRIMARY KEY, pid INT REFERENCES ifk_p(id));
 INSERT INTO ifk_p VALUES (1);
 INSERT INTO ifk_c VALUES (10, 1);
 INSERT INTO ifk_c VALUES (20, 999);
-ERROR 1105: foreign key violation: insert or update on table "test.public.ifk_c" violates foreign key constraint "test.public.ifk_c_pid_fkey": key is not present in table "test.public.ifk_p"
 === PG MATCH FULL clause — parses, silent no-op ===
 DROP TABLE IF EXISTS mfk_c;
 DROP TABLE IF EXISTS mfk_p;
@@ -66,14 +66,14 @@ CREATE TABLE mfk_c (id INT PRIMARY KEY, pid INT,
 DROP TABLE IF EXISTS fknope;
 CREATE TABLE fknope (id INT PRIMARY KEY, pid INT,
   FOREIGN KEY (pid) REFERENCES no_such_parent(id));
-ERROR 1146: table not found: test.public.no_such_parent
+ERROR 1824: Failed to open the referenced table 'no_such_parent'
 === FK to non-PK column — errno 1105 ===
 DROP TABLE IF EXISTS fknopk;
 DROP TABLE IF EXISTS fknopkc;
 CREATE TABLE fknopk (id INT);
 CREATE TABLE fknopkc (id INT PRIMARY KEY, pid INT,
   FOREIGN KEY (pid) REFERENCES fknopk(id));
-ERROR 1105: execution error: foreign key references columns that are not the primary key of table 'test.public.fknopk'
+ERROR 6125: Failed to add the foreign key constraint. Missing unique key for constraint 'fknopkc_ibfk_1' in the referenced table 'fknopk'
 === DROP TABLE blocked when referenced — errno 1105 ===
 DROP TABLE IF EXISTS dr_c;
 DROP TABLE IF EXISTS dr_p;
@@ -82,26 +82,28 @@ CREATE TABLE dr_c (id INT PRIMARY KEY, pid INT, FOREIGN KEY (pid) REFERENCES dr_
 INSERT INTO dr_p VALUES (1);
 INSERT INTO dr_c VALUES (10, 1);
 DROP TABLE dr_p;
-ERROR 1105: execution error: cannot drop table 'test.public.dr_p': referenced by foreign key 'test.public.dr_c_pid_fkey' on table 'test.public.dr_c'
+ERROR 3730: Cannot drop table 'dr_p' referenced by a foreign key constraint 'dr_c_ibfk_1' on table 'dr_c'.
 === KNOWN DIVERGENCE: DROP TABLE CASCADE still blocked ===
 DROP TABLE dr_p CASCADE;
-ERROR 1105: execution error: cannot drop table 'test.public.dr_p': referenced by foreign key 'test.public.dr_c_pid_fkey' on table 'test.public.dr_c'
+ERROR 3730: Cannot drop table 'dr_p' referenced by a foreign key constraint 'dr_c_ibfk_1' on table 'dr_c'.
 === KNOWN GAP: TRUNCATE parent with FK children — errno 1105 ===
 TRUNCATE TABLE dr_p;
-ERROR 1105: foreign key violation: update or delete on table "test.public.dr_p" violates foreign key constraint "test.public.dr_c_pid_fkey" on table "test.public.dr_c"
+ERROR 1701: Cannot truncate a table referenced in a foreign key constraint (`test`.`dr_c`, CONSTRAINT `dr_c_ibfk_1`)
 === KNOWN DIVERGENCE: SHOW CREATE TABLE omits FK constraint ===
 SHOW CREATE TABLE dr_c;
 Table	Create Table
 dr_c	CREATE TABLE `dr_c` (
   `id` int NOT NULL,
-  `pid` int,
+  `pid` int DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `test.public.dr_c_pid_fkey_fk_idx` (`pid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  KEY `pid` (`pid`),
+  CONSTRAINT `dr_c_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `dr_p` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 === KNOWN GAP: MySQL `ALTER TABLE DROP FOREIGN KEY` — errno 1064 ===
 ALTER TABLE fka_c ADD CONSTRAINT fka_fk2 FOREIGN KEY (pid) REFERENCES fka_p(id);
+ERROR 1452: <varies>
 ALTER TABLE fka_c DROP FOREIGN KEY fka_fk2;
-ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: DROP FOREIGN KEY fka_fk2
+ERROR 1091: Can't DROP 'fka_fk2'; check that column/key exists
 === Cleanup ===
 DROP TABLE dr_c;
 DROP TABLE dr_p;

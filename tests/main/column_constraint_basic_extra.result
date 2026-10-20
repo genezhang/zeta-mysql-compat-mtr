@@ -27,11 +27,11 @@ id	name
 === BIGSERIAL (PG pseudo-type) ===
 DROP TABLE IF EXISTS bs;
 CREATE TABLE bs (id BIGSERIAL PRIMARY KEY, name VARCHAR(20));
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGSERIAL PRIMARY KEY, name VARCHAR(20))' at line 1
 INSERT INTO bs (name) VALUES ('a'), ('b');
+ERROR 1146: Table 'test.bs' doesn't exist
 SELECT id, name FROM bs ORDER BY id;
-id	name
-1	a
-2	b
+ERROR 1146: Table 'test.bs' doesn't exist
 === GENERATED ALWAYS AS (expr) STORED ===
 DROP TABLE IF EXISTS g;
 CREATE TABLE g (a INT, b INT, c INT GENERATED ALWAYS AS (a + b) STORED, PRIMARY KEY (a, b));
@@ -44,7 +44,7 @@ a	b	c
 DROP TABLE IF EXISTS cc;
 CREATE TABLE cc (id INT PRIMARY KEY, age INT CHECK (age > 0));
 INSERT INTO cc VALUES (1, -5);
-ERROR 1105: execution error: new row violates check constraint "test.public.cc_check1"
+ERROR 3819: Check constraint 'cc_chk_1' is violated.
 === Column COMMENT clause — silent OK ===
 DROP TABLE IF EXISTS cm;
 CREATE TABLE cm (id INT PRIMARY KEY COMMENT 'primary key',
@@ -59,7 +59,7 @@ id	color
 2	blue
 === ENUM column type — invalid value errno 1105 ===
 INSERT INTO en VALUES (3, 'yellow');
-ERROR 1105: execution error: invalid input value for enum test.public.en_color_enum: "yellow"
+ERROR 1265: Data truncated for column 'color' at row 1
 === Multiple constraints on one column (NOT NULL UNIQUE DEFAULT) ===
 DROP TABLE IF EXISTS mc;
 CREATE TABLE mc (id INT PRIMARY KEY,
@@ -78,13 +78,14 @@ DROP TABLE IF EXISTS inv;
 CREATE TABLE inv (id INT PRIMARY KEY, hidden INT INVISIBLE);
 INSERT INTO inv (id, hidden) VALUES (1, 100);
 SELECT * FROM inv;
-id	hidden
-1	100
+id
+1
 === Cleanup ===
 DROP TABLE de;
 DROP TABLE ai;
 DROP TABLE s;
 DROP TABLE bs;
+ERROR 1051: Unknown table 'test.bs'
 DROP TABLE g;
 DROP TABLE cc;
 DROP TABLE cm;

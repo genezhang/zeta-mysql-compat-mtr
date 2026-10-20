@@ -1,0 +1,67 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":66}
+{"i":1,"h":"ef41840a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_basic' at line 1"}
+{"i":2,"h":"146aafb1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_basic' at line 1"}
+{"i":3,"h":"61ad57f2","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":4,"h":"e65ae70b","k":"err","code":1305,"msg":"FUNCTION test.CURRVAL does not exist"}
+{"i":5,"h":"6fd2baaf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_basic' at line 1"}
+{"i":6,"h":"150889b2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_start' at line 1"}
+{"i":7,"h":"9004ca46","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_start START WITH 100' at line 1"}
+{"i":8,"h":"3235e459","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":9,"h":"ee72f99d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_start' at line 1"}
+{"i":10,"h":"687095d0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_inc' at line 1"}
+{"i":11,"h":"d7a6761f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_inc START WITH 10 INCREMENT BY 5' at line 1"}
+{"i":12,"h":"54be326b","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":13,"h":"b04be90e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_inc' at line 1"}
+{"i":14,"h":"7ce870c6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_neg' at line 1"}
+{"i":15,"h":"6286637f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_neg START WITH 100 INCREMENT BY -10' at line 1"}
+{"i":16,"h":"83fd947c","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":17,"h":"54ddb029","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_neg' at line 1"}
+{"i":18,"h":"6ce39dd3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_maxv' at line 1"}
+{"i":19,"h":"4b63f70b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_maxv START WITH 5 MINVALUE 5 MAXVALUE 7' at line 1"}
+{"i":20,"h":"654b0d8e","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":21,"h":"378a6732","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":22,"h":"10e9750f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_maxv' at line 1"}
+{"i":23,"h":"90d7f92c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_setval' at line 1"}
+{"i":24,"h":"ba854fbc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_setval' at line 1"}
+{"i":25,"h":"52cc329a","k":"err","code":1305,"msg":"FUNCTION test.SETVAL does not exist"}
+{"i":26,"h":"d663c557","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":27,"h":"7f103f67","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_setval' at line 1"}
+{"i":28,"h":"cd9d2004","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_cv0' at line 1"}
+{"i":29,"h":"9230ae47","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cv0' at line 1"}
+{"i":30,"h":"fed16119","k":"err","code":1305,"msg":"FUNCTION test.CURRVAL does not exist"}
+{"i":31,"h":"669fa67c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cv0' at line 1"}
+{"i":32,"h":"23125dff","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_missing' at line 1"}
+{"i":33,"h":"e0e5c972","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":34,"h":"a24c2134","k":"ok","affected":0}
+{"i":35,"h":"7ee6c356","k":"ok","affected":0}
+{"i":36,"h":"4c725b73","k":"ok","affected":3}
+{"i":37,"h":"b4156c85","k":"rows","cols":["id","name"],"rows":[["1","a"],["2","b"],["3","c"]]}
+{"i":38,"h":"2c3382bd","k":"ok","affected":0}
+{"i":39,"h":"a7229276","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_no_such' at line 1"}
+{"i":40,"h":"a7229276","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_no_such' at line 1"}
+{"i":41,"h":"fc929163","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_cycle' at line 1"}
+{"i":42,"h":"25998a9f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cycle START WITH 1 MAXVALUE 3 CYCLE' at line 1"}
+{"i":43,"h":"532c46bd","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":44,"h":"c6da9c0e","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":45,"h":"be3ff59f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cycle' at line 1"}
+{"i":46,"h":"d13ee233","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_minneg' at line 1"}
+{"i":47,"h":"76f1c630","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_minneg START WITH 0 INCREMENT BY -1 MINVALUE -3' at line 1"}
+{"i":48,"h":"94a3aa06","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":49,"h":"756bb14c","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":50,"h":"9803f3a1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_minneg' at line 1"}
+{"i":51,"h":"e8db6071","k":"ok","affected":0}
+{"i":52,"h":"df7db9b1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_dflt' at line 1"}
+{"i":53,"h":"01379e97","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_dflt START WITH 100' at line 1"}
+{"i":54,"h":"0d3259df","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NEXTVAL('s_dflt') PRIMARY KEY, name TEXT)' at line 1"}
+{"i":55,"h":"ccd6f28a","k":"err","code":1146,"msg":"Table 'test.t_dflt' doesn't exist"}
+{"i":56,"h":"0c085251","k":"err","code":1051,"msg":"Unknown table 'test.t_dflt'"}
+{"i":57,"h":"e0839cc1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_dflt' at line 1"}
+{"i":58,"h":"c5ed11b8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_alt' at line 1"}
+{"i":59,"h":"4b0425af","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_alt START WITH 1' at line 1"}
+{"i":60,"h":"df27cd81","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_alt INCREMENT BY 10' at line 1"}
+{"i":61,"h":"b1f76174","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_alt' at line 1"}
+{"i":62,"h":"6d806757","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_lv' at line 1"}
+{"i":63,"h":"8ba34247","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_lv' at line 1"}
+{"i":64,"h":"f911b31f","k":"err","code":1305,"msg":"FUNCTION test.NEXTVAL does not exist"}
+{"i":65,"h":"72c87064","k":"err","code":1305,"msg":"FUNCTION test.LASTVAL does not exist"}
+{"i":66,"h":"aba8a85c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_lv' at line 1"}

@@ -1,0 +1,22 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":21}
+{"i":1,"h":"8e27aef9","k":"rows","cols":["date_in_concat"],"rows":[["birthday: 2024-03-15"]]}
+{"i":2,"h":"7d118086","k":"rows","cols":["date_first"],"rows":[["2024-03-15 is the day"]]}
+{"i":3,"h":"bb24b040","k":"rows","cols":["timestamp_in_concat"],"rows":[["ts: 2024-03-15 14:30:45"]]}
+{"i":4,"h":"322ec48b","k":"rows","cols":["timestamp_year_extracted"],"rows":[["2024"]]}
+{"i":5,"h":"6d50171e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))    AS jsonb_in_concat' at line 1"}
+{"i":6,"h":"6e561bab","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))              AS jsonb_array_in_concat' at line 1"}
+{"i":7,"h":"07a4fa2f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                       AS mixed_variadic' at line 4"}
+{"i":8,"h":"bb301f96","k":"rows","cols":["int_sep"],"rows":[["a0b0c"]]}
+{"i":9,"h":"5a9d8253","k":"rows","cols":["int_sep_eq"],"rows":[["1"]]}
+{"i":10,"h":"6d55e4b1","k":"rows","cols":["bool_sep"],"rows":[["a1b"]]}
+{"i":11,"h":"f733e61f","k":"rows","cols":["date_sep"],"rows":[["a2024-03-15b"]]}
+{"i":12,"h":"4a8178b0","k":"rows","cols":["date_sep_eq"],"rows":[["1"]]}
+{"i":13,"h":"278f72cb","k":"rows","cols":["typed_null_date_sep"],"rows":[["1"]]}
+{"i":14,"h":"495bae85","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT), 'a', 'b')  IS NULL        AS typed_null_int_sep' at line 1"}
+{"i":15,"h":"dc6f969c","k":"rows","cols":["date_values_joined"],"rows":[["2024-03-15/2024-06-01"]]}
+{"i":16,"h":"bf89157f","k":"rows","cols":["timestamp_values_joined"],"rows":[["2024-03-15 14:30:45|2024-03-15 14:30:46"]]}
+{"i":17,"h":"e36f7158","k":"err","code":1305,"msg":"FUNCTION test.MYSQL_CONCAT does not exist"}
+{"i":18,"h":"d5eecc50","k":"err","code":1305,"msg":"FUNCTION test.MYSQL_CONCAT does not exist"}
+{"i":19,"h":"2a862764","k":"err","code":1305,"msg":"FUNCTION test.MYSQL_CONCAT does not exist"}
+{"i":20,"h":"a132d2c7","k":"err","code":1305,"msg":"FUNCTION test.MYSQL_CONCAT does not exist"}
+{"i":21,"h":"11521605","k":"err","code":1305,"msg":"FUNCTION test.MYSQL_CONCAT does not exist"}

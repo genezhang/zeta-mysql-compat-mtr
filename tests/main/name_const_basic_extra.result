@@ -10,7 +10,7 @@ null_val
 NULL
 === Column-label divergence (no AS alias) ===
 SELECT NAME_CONST('mylabel', 99);
-NAME_CONST
+mylabel
 99
 === Fractional value ===
 SELECT NAME_CONST('pi', 3.14)       AS pi;
@@ -34,13 +34,14 @@ lower
 8
 === Arity errors ===
 SELECT NAME_CONST('x');
-ERROR 1105: execution error: NAME_CONST requires 2 arguments (name, value)
+ERROR 1582: Incorrect parameter count in the call to native function 'NAME_CONST'
 SELECT NAME_CONST();
-ERROR 1105: execution error: NAME_CONST requires 2 arguments (name, value)
+ERROR 1582: Incorrect parameter count in the call to native function 'NAME_CONST'
 SELECT NAME_CONST('x', 1, 2);
-ERROR 1105: execution error: NAME_CONST requires 2 arguments (name, value)
+ERROR 1582: Incorrect parameter count in the call to native function 'NAME_CONST'
 === Non-string first arg — error ===
 SELECT NAME_CONST(1, 2);
-ERROR 1105: execution error: NAME_CONST first argument must be a string
+1
+2
 SELECT NAME_CONST(NULL, 2);
-ERROR 1105: execution error: NAME_CONST first argument must be a string
+ERROR 1382: The 'NAME_CONST' syntax is reserved for purposes internal to the MySQL server

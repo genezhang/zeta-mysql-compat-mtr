@@ -1,0 +1,21 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":20}
+{"i":1,"h":"880be63c","k":"ok","affected":0}
+{"i":2,"h":"a5620e3e","k":"ok","affected":0}
+{"i":3,"h":"7c84e180","k":"ok","affected":3}
+{"i":4,"h":"bf0a3da8","k":"ok","affected":0}
+{"i":5,"h":"e8c3692f","k":"ok","affected":0}
+{"i":6,"h":"6f5e6ad5","k":"ok","affected":2}
+{"i":7,"h":"8131d0cb","k":"ok","affected":0}
+{"i":8,"h":"8f16c1fe","k":"rows","cols":["id","name","salary"],"rows":[["1","alice","100"],["2","bob","90"]],"sorted":true}
+{"i":9,"h":"d6f91452","k":"ok","affected":0}
+{"i":10,"h":"39e65d4f","k":"rows","cols":["id","name"],"rows":[["1","alice"],["2","bob"]],"sorted":true}
+{"i":11,"h":"34ab3c8f","k":"ok","affected":0}
+{"i":12,"h":"ca7b4435","k":"rows","cols":["id","name","location"],"rows":[["1","alice","sf"],["2","bob","sf"],["3","carol","ny"]],"sorted":true}
+{"i":13,"h":"0ff8e58a","k":"rows","cols":["TABLE_SCHEMA","TABLE_NAME"],"rows":[["test","emp_dept"],["test","eng_emps"]]}
+{"i":14,"h":"03bc3639","k":"ok","affected":0}
+{"i":15,"h":"8bb6cd61","k":"ok","affected":0}
+{"i":16,"h":"495dacc4","k":"ok","affected":0}
+{"i":17,"h":"b9888e23","k":"ok","affected":0}
+{"i":18,"h":"e3d46779","k":"err","code":1051,"msg":"Unknown table 'test.does_not_exist'"}
+{"i":19,"h":"df34e34c","k":"ok","affected":0}
+{"i":20,"h":"17eadc5a","k":"ok","affected":0}

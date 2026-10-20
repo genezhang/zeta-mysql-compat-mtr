@@ -81,11 +81,15 @@ id	w
 # THEN 1 ELSE 0 END), or pre-compute via subquery.
 SELECT COUNT(*) AS cnt, CASE WHEN COUNT(*) >= 1 THEN 1 ELSE 0 END AS buggy_case FROM ce;
 cnt	buggy_case
-3	0
+3	1
 === KNOWN BUG: HAVING CASE WHEN <aggregate> ... yields no rows ===
 # Same root cause as above: the HAVING predicate
 # always evaluates to the ELSE branch, so no group
 # qualifies. Use the aggregate directly in HAVING.
 SELECT s, COUNT(*) AS c FROM ce GROUP BY s HAVING CASE WHEN COUNT(*) >= 1 THEN 1 ELSE 0 END = 1 ORDER BY s;
+s	c
+a	1
+b	1
+c	1
 === Cleanup ===
 DROP TABLE ce;

@@ -1,0 +1,29 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":28}
+{"i":1,"h":"a3a2d2db","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ARRAY[10,20,30]) WITH ORDINALITY' at line 1"}
+{"i":2,"h":"a5e2cf68","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ARRAY[10,20,30]) WITH ORDINALITY AS t(val)' at line 1"}
+{"i":3,"h":"da629a16","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ARRAY[10,20,30]) WITH ORDINALITY AS t(val, idx)' at line 1"}
+{"i":4,"h":"da7fe8a8","k":"ok","affected":0}
+{"i":5,"h":"1f8014b9","k":"ok","affected":0}
+{"i":6,"h":"e87f1cef","k":"ok","affected":1}
+{"i":7,"h":"6e98547a","k":"rows","cols":["pa","pb"],"rows":[[null,"5"]]}
+{"i":8,"h":"d2d65659","k":"ok","affected":0}
+{"i":9,"h":"38f32fd1","k":"ok","affected":0}
+{"i":10,"h":"ac19d87d","k":"ok","affected":0}
+{"i":11,"h":"fb13fd12","k":"ok","affected":0}
+{"i":12,"h":"72c66d91","k":"ok","affected":1}
+{"i":13,"h":"e03a176d","k":"ok","affected":0}
+{"i":14,"h":"5bc56915","k":"ok","affected":0}
+{"i":15,"h":"b7a8677a","k":"ok","affected":0}
+{"i":16,"h":"736f6e03","k":"ok","affected":0}
+{"i":17,"h":"30cae4ea","k":"ok","affected":1}
+{"i":18,"h":"b3f31756","k":"ok","affected":0}
+{"i":19,"h":"685495f8","k":"ok","affected":0}
+{"i":20,"h":"c1bf0fdc","k":"err","code":1305,"msg":"FUNCTION test.to_regclass does not exist"}
+{"i":21,"h":"af6408af","k":"err","code":1305,"msg":"FUNCTION test.to_regtype does not exist"}
+{"i":22,"h":"c7043c97","k":"err","code":1305,"msg":"FUNCTION test.to_regproc does not exist"}
+{"i":23,"h":"06b0fe34","k":"err","code":1305,"msg":"FUNCTION test.to_regoperator does not exist"}
+{"i":24,"h":"8ea1d056","k":"err","code":1305,"msg":"FUNCTION test.pg_get_viewdef does not exist"}
+{"i":25,"h":"6ac7766a","k":"err","code":1305,"msg":"FUNCTION test.pg_get_functiondef does not exist"}
+{"i":26,"h":"4037ed33","k":"err","code":1305,"msg":"FUNCTION test.pg_get_indexdef does not exist"}
+{"i":27,"h":"c70bbda4","k":"err","code":1305,"msg":"FUNCTION test.pg_get_constraintdef does not exist"}
+{"i":28,"h":"72ab94dd","k":"err","code":1305,"msg":"FUNCTION test.format_type does not exist"}

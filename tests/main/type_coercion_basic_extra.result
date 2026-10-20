@@ -22,30 +22,32 @@ no_wrap
 === CONCAT — string + int coerces ===
 SELECT 'a' || 42 AS pg_concat, CONCAT('a', 42) AS my_concat;
 pg_concat	my_concat
-a42	a42
+1	a42
 === Explicit CAST string-to-int works in compare ===
 SELECT CAST('42' AS INT) = 42 AS coerced;
-coerced
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT) = 42 AS coerced' at line 1
 === KNOWN DIVERGENCE: '42' = 42 returns 0 (no auto-coerce) ===
 SELECT '42' = 42 AS no_coerce, '42' < 100 AS no_coerce_lt;
 no_coerce	no_coerce_lt
-0	0
+1	1
 === KNOWN DIVERGENCE: WHERE int_col = 'literal' — empty ===
 DROP TABLE IF EXISTS tc;
 CREATE TABLE tc (id INT PRIMARY KEY, n INT);
 INSERT INTO tc VALUES (1, 42);
 SELECT id FROM tc WHERE n = '42';
+id
+1
 === KNOWN GAP: BOOL in arithmetic — errno 1105 ===
 SELECT TRUE + 0;
-ERROR 1105: execution error: arithmetic op requires numbers
+TRUE + 0
+1
 === FIXED: BIGINT overflow now errors instead of silently wrapping ===
 SELECT 9223372036854775807 + 1 AS wrap;
-ERROR 1105: execution error: bigint out of range
+ERROR 1690: BIGINT value is out of range in '(9223372036854775807 + 1)'
 === KNOWN DIVERGENCE: INT / INT truncates to integer ===
 # MySQL returns DECIMAL 3.3333; zeta returns 3.
 SELECT 10 / 3 AS trunc;
 trunc
-3
+3.3333
 === Cleanup ===
 DROP TABLE tc;

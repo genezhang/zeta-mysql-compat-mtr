@@ -1,0 +1,15 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":14}
+{"i":1,"h":"4bea90a2","k":"rows","cols":["EVENT_CATALOG","EVENT_SCHEMA","EVENT_NAME","DEFINER","TIME_ZONE","EVENT_BODY","EVENT_DEFINITION","EVENT_TYPE","EXECUTE_AT","INTERVAL_VALUE","INTERVAL_FIELD","SQL_MODE","STARTS","ENDS","STATUS","ON_COMPLETION","CREATED","LAST_ALTERED","LAST_EXECUTED","EVENT_COMMENT","ORIGINATOR","CHARACTER_SET_CLIENT","COLLATION_CONNECTION","DATABASE_COLLATION"],"rows":[],"nd":"volatile","class":"unordered-limit"}
+{"i":2,"h":"740431d1","k":"rows","cols":["PLUGIN_NAME","PLUGIN_VERSION","PLUGIN_STATUS","PLUGIN_TYPE","PLUGIN_TYPE_VERSION","PLUGIN_LIBRARY","PLUGIN_LIBRARY_VERSION","PLUGIN_AUTHOR","PLUGIN_DESCRIPTION","PLUGIN_LICENSE","LOAD_OPTION"],"rows":[["<masked>","<masked>","<masked>","<masked>","<masked>","<masked>","<masked>","<masked>","<masked>","<masked>","<masked>"]],"nd":"volatile","class":"server-state"}
+{"i":3,"h":"34382156","k":"rows","cols":["QUERY_ID","SEQ","STATE","DURATION","CPU_USER","CPU_SYSTEM","CONTEXT_VOLUNTARY","CONTEXT_INVOLUNTARY","BLOCK_OPS_IN","BLOCK_OPS_OUT","MESSAGES_SENT","MESSAGES_RECEIVED","PAGE_FAULTS_MAJOR","PAGE_FAULTS_MINOR","SWAPS","SOURCE_FUNCTION","SOURCE_FILE","SOURCE_LINE"],"rows":[],"nd":"volatile","class":"unordered-limit"}
+{"i":4,"h":"baed400b","k":"rows","cols":["USER","HOST","GRANTEE","GRANTEE_HOST","ROLE_NAME","ROLE_HOST","IS_GRANTABLE","IS_DEFAULT","IS_MANDATORY"],"rows":[],"nd":"volatile","class":"unordered-limit"}
+{"i":5,"h":"936c3e41","k":"rows","cols":["GRANTEE","TABLE_CATALOG","TABLE_SCHEMA","TABLE_NAME","COLUMN_NAME","PRIVILEGE_TYPE","IS_GRANTABLE"],"rows":[],"nd":"volatile","class":"unordered-limit"}
+{"i":6,"h":"16bef4da","k":"rows","cols":["GRANTEE","TABLE_CATALOG","TABLE_SCHEMA","TABLE_NAME","PRIVILEGE_TYPE","IS_GRANTABLE"],"rows":[["<masked>","<masked>","<masked>","<masked>","<masked>","<masked>"]],"nd":"volatile","class":"unordered-limit"}
+{"i":7,"h":"ef6c692e","k":"rows","cols":["GRANTEE","TABLE_CATALOG","TABLE_SCHEMA","PRIVILEGE_TYPE","IS_GRANTABLE"],"rows":[["<masked>","<masked>","<masked>","<masked>","<masked>"]],"nd":"volatile","class":"unordered-limit"}
+{"i":8,"h":"7015dac1","k":"err","code":1109,"msg":"Unknown table 'COMPLETELY_MADEUP_VIEW' in information_schema"}
+{"i":9,"h":"51aefd9d","k":"err","code":1109,"msg":"Unknown table 'THIS_DOES_NOT_EXIST' in information_schema"}
+{"i":10,"h":"cd33d445","k":"rows","cols":["PARTITION_NAME"],"rows":[["<masked>"]],"nd":"volatile","class":"unordered-limit"}
+{"i":11,"h":"d206eaf1","k":"rows","cols":["EVENT_NAME"],"rows":[],"nd":"volatile","class":"unordered-limit"}
+{"i":12,"h":"d7bdcae2","k":"rows","cols":["PLUGIN_NAME"],"rows":[["<masked>"]],"nd":"volatile","class":"server-state"}
+{"i":13,"h":"afed8a26","k":"err","code":1054,"msg":"Unknown column 'NONSENSE_COLUMN_NAME' in 'field list'"}
+{"i":14,"h":"7abfede9","k":"err","code":1109,"msg":"Unknown table 'COMPLETELY_MADEUP_VIEW' in information_schema"}

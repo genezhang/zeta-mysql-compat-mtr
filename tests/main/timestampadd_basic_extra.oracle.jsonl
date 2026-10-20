@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"da5e6a4d","k":"rows","cols":["plus_us"],"rows":[["2026-05-19 10:00:00.500000"]]}
+{"i":2,"h":"678cc506","k":"rows","cols":["plus_s"],"rows":[["2026-05-19 10:00:30"]]}
+{"i":3,"h":"06953d0f","k":"rows","cols":["plus_m"],"rows":[["2026-05-19 10:15:00"]]}
+{"i":4,"h":"560c2a87","k":"rows","cols":["plus_h"],"rows":[["2026-05-19 15:00:00"]]}
+{"i":5,"h":"2919c792","k":"rows","cols":["plus_d"],"rows":[["2026-05-29"]]}
+{"i":6,"h":"747a913d","k":"rows","cols":["plus_w"],"rows":[["2026-06-02"]]}
+{"i":7,"h":"85f950e4","k":"rows","cols":["plus_mo"],"rows":[["2026-08-19"]]}
+{"i":8,"h":"d1418b68","k":"rows","cols":["plus_q"],"rows":[["2026-08-19"]]}
+{"i":9,"h":"d669bceb","k":"rows","cols":["plus_y"],"rows":[["2028-05-19"]]}
+{"i":10,"h":"b5c3a635","k":"rows","cols":["minus_d"],"rows":[["2026-05-12"]]}
+{"i":11,"h":"bacc0a14","k":"rows","cols":["minus_mo"],"rows":[["2026-04-19"]]}
+{"i":12,"h":"4965e027","k":"rows","cols":["lower_unit"],"rows":[["2026-05-20"]]}
+{"i":13,"h":"01a5c463","k":"rows","cols":["n_in_n"],"rows":[[null]]}
+{"i":14,"h":"2951af7f","k":"rows","cols":["n_in_target"],"rows":[[null]]}
+{"i":15,"h":"9616f4af","k":"rows","cols":["plus_365d"],"rows":[["2027-05-19"]]}
+{"i":16,"h":"e930fdf5","k":"rows","cols":["jan31_plus_mo"],"rows":[["2024-02-29"]]}
+{"i":17,"h":"9b74e4c7","k":"rows","cols":["leap_plus_y"],"rows":[["2025-02-28"]]}
+{"i":18,"h":"6d5438e4","k":"ok","affected":0}
+{"i":19,"h":"9ff5d509","k":"ok","affected":0}
+{"i":20,"h":"4b893398","k":"ok","affected":2}
+{"i":21,"h":"819a2373","k":"rows","cols":["id","plus_6m"],"rows":[["1","2026-07-01 12:00:00"],["2","2026-12-15 09:30:00"]]}
+{"i":22,"h":"7f4c327c","k":"err","code":1525,"msg":"Incorrect DATETIME value: '2026-05-01'"}
+{"i":23,"h":"c34e7221","k":"ok","affected":0}
+{"i":24,"h":"e9f5cede","k":"rows","cols":["TIMESTAMPADD(DAY, 1, 'not a date')"],"rows":[[null]]}

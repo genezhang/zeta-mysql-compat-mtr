@@ -59,7 +59,7 @@ grp	s
 2	70
 === HAVING with column NOT in GROUP BY and NOT aggregated — errno 1054 ===
 SELECT grp, COUNT(*) FROM h GROUP BY grp HAVING v > 0;
-ERROR 1054: column not found: v
+ERROR 1054: Unknown column 'v' in 'having clause'
 === WHERE filters before aggregate; HAVING after ===
 SELECT grp, SUM(v) AS s FROM h WHERE v > 5 GROUP BY grp HAVING SUM(v) > 20 ORDER BY grp;
 grp	s
@@ -89,6 +89,5 @@ SELECT SUM(v) AS s FROM h HAVING SUM(v) > 100;
 s
 105
 SELECT SUM(v) AS s FROM h GROUP BY 1 HAVING SUM(v) > 100;
-s
-105
+ERROR 1056: Can't group on 's'
 DROP TABLE h;

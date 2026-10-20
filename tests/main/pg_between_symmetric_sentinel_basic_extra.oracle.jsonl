@@ -1,0 +1,9 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":8}
+{"i":1,"h":"19ce582b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '10 AND 1' at line 1"}
+{"i":2,"h":"b3c8ddfc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '1 AND 10' at line 1"}
+{"i":3,"h":"197c02b1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''z' AND 'a'' at line 1"}
+{"i":4,"h":"cd3a5152","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '1 AND 10' at line 1"}
+{"i":5,"h":"8d458961","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '10 AND 1' at line 1"}
+{"i":6,"h":"384c4d32","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '10 AND 1' at line 1"}
+{"i":7,"h":"867abcbb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '1 AND 10' at line 1"}
+{"i":8,"h":"6214eb6d","k":"rows","cols":["sym_low_high","sym_high_low"],"rows":[["1","1"]]}

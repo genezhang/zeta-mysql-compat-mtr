@@ -3,21 +3,20 @@ SELECT JSON_QUOTE('hello')      AS plain;
 plain
 "hello"
 SELECT JSON_QUOTE('')           AS empty;
-empty
-""
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 === JSON_QUOTE: escape semantics ===
 SELECT JSON_QUOTE('he"llo')     AS embedded_quote;
 embedded_quote
 "he\"llo"
 SELECT JSON_QUOTE('back\\slash') AS embedded_backslash;
 embedded_backslash
-"back\\\\slash"
+"back\\slash"
 SELECT JSON_QUOTE('a\nb')       AS embedded_newline;
 embedded_newline
-"a\\nb"
+"a\nb"
 SELECT JSON_QUOTE('a\tb')       AS embedded_tab;
 embedded_tab
-"a\\tb"
+"a\tb"
 SELECT JSON_QUOTE('a/b')        AS forward_slash;
 forward_slash
 "a/b"
@@ -26,11 +25,9 @@ multi_byte
 "héllo"
 === JSON_QUOTE: non-string coercion ===
 SELECT JSON_QUOTE(123)          AS coerce_int;
-coerce_int
-"123"
+ERROR 3064: Incorrect type for argument 1 in function json_quote.
 SELECT JSON_QUOTE(TRUE)         AS coerce_bool;
-coerce_bool
-"true"
+ERROR 3064: Incorrect type for argument 1 in function json_quote.
 === JSON_QUOTE: NULL passthrough ===
 SELECT JSON_QUOTE(NULL) IS NULL AS null_passes;
 null_passes
@@ -44,10 +41,11 @@ empty_str
 
 SELECT JSON_UNQUOTE('"he\\"llo"')   AS quote_unescape_invalid_json_passthrough;
 quote_unescape_invalid_json_passthrough
-"he\\"llo"
+he"llo
 SELECT JSON_UNQUOTE('"a\\nb"')      AS newline_unescape;
 newline_unescape
-a\nb
+a
+b
 === JSON_UNQUOTE: non-string-shape returns JSON text ===
 SELECT JSON_VALID(JSON_UNQUOTE('{"a":1}'))   AS unq_obj_still_json;
 unq_obj_still_json
@@ -90,10 +88,10 @@ rt_len_independent
 1
 === Arity errors ===
 SELECT JSON_QUOTE();
-ERROR 1105: execution error: JSON_QUOTE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_QUOTE'
 SELECT JSON_QUOTE('a', 'b');
-ERROR 1105: execution error: JSON_QUOTE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_QUOTE'
 SELECT JSON_UNQUOTE();
-ERROR 1105: execution error: JSON_UNQUOTE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_UNQUOTE'
 SELECT JSON_UNQUOTE('"a"', '"b"');
-ERROR 1105: execution error: JSON_UNQUOTE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_UNQUOTE'

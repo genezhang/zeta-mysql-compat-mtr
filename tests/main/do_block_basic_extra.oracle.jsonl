@@ -1,0 +1,16 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":15}
+{"i":1,"h":"41d55f9b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ SELECT 1 $body$' at line 1"}
+{"i":2,"h":"d27d3e3d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$$ SELECT 1 $$' at line 1"}
+{"i":3,"h":"c5148e5e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ BEGIN END $body$' at line 1"}
+{"i":4,"h":"9bf8ba21","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$$ BEGIN END $$' at line 1"}
+{"i":5,"h":"9e685d38","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ BEGIN END $body$' at line 1"}
+{"i":6,"h":"c0c19d1d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'sql $body$ SELECT 1 $body$' at line 1"}
+{"i":7,"h":"c8908aa8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ INVALID SYNTAX $body$' at line 1"}
+{"i":8,"h":"bcf02156","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ SELECT FROM $body$' at line 1"}
+{"i":9,"h":"9d8d65a9","k":"ok","affected":0}
+{"i":10,"h":"9c3d13ed","k":"ok","affected":0}
+{"i":11,"h":"516b4635","k":"ok","affected":0}
+{"i":12,"h":"93209d48","k":"ok","affected":1}
+{"i":13,"h":"3047244d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ SELECT * FROM dot $body$' at line 1"}
+{"i":14,"h":"1425199b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ INSERT INTO dot VALUES (2, 20) $body$' at line 1"}
+{"i":15,"h":"d3ae0ce9","k":"ok","affected":0}

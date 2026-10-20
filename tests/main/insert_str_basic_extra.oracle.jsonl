@@ -1,0 +1,33 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":32}
+{"i":1,"h":"12457ce1","k":"rows","cols":["middle"],"rows":[["QuWhattic"]]}
+{"i":2,"h":"6b4fb374","k":"rows","cols":["replace_start"],"rows":[["XXXXratic"]]}
+{"i":3,"h":"cb959025","k":"rows","cols":["shorter_replacement"],"rows":[["Quadrtic"]]}
+{"i":4,"h":"9885cbc6","k":"rows","cols":["replace_word"],"rows":[["Hello Earth"]]}
+{"i":5,"h":"da996dc7","k":"rows","cols":["pos_past_end"],"rows":[["Quadratic"]]}
+{"i":6,"h":"c491940a","k":"rows","cols":["pos_zero"],"rows":[["Quadratic"]]}
+{"i":7,"h":"f96b3a3b","k":"rows","cols":["pos_negative"],"rows":[["Quadratic"]]}
+{"i":8,"h":"db6b0ca7","k":"rows","cols":["append_at_strlen_plus_one"],"rows":[["abc"]]}
+{"i":9,"h":"59101ba6","k":"rows","cols":["append_into_empty"],"rows":[[""]]}
+{"i":10,"h":"2b365a7d","k":"rows","cols":["insert_only_pos2"],"rows":[["Q__uadratic"]]}
+{"i":11,"h":"a1eaccd9","k":"rows","cols":["insert_only_pos1"],"rows":[["Xabc"]]}
+{"i":12,"h":"c568ccff","k":"rows","cols":["remove_one_char"],"rows":[["ac"]]}
+{"i":13,"h":"aa3b0fe2","k":"rows","cols":["len_too_big"],"rows":[["QuXYZ"]]}
+{"i":14,"h":"9bb364e3","k":"rows","cols":["len_negative"],"rows":[["QuXYZ"]]}
+{"i":15,"h":"acc8a262","k":"rows","cols":["len_intmax"],"rows":[["QuXYZ"]]}
+{"i":16,"h":"58574767","k":"rows","cols":["empty_replace"],"rows":[["Qutic"]]}
+{"i":17,"h":"cdd7f612","k":"rows","cols":["null_str"],"rows":[["1"]]}
+{"i":18,"h":"1cf0efa3","k":"rows","cols":["null_pos"],"rows":[["1"]]}
+{"i":19,"h":"7451c242","k":"rows","cols":["null_len"],"rows":[["1"]]}
+{"i":20,"h":"eb1c9f02","k":"rows","cols":["null_newstr"],"rows":[["1"]]}
+{"i":21,"h":"a38ee538","k":"rows","cols":["utf8_middle"],"rows":[["caFé"]]}
+{"i":22,"h":"57104be8","k":"rows","cols":["utf8_replace_multibyte"],"rows":[["cafe"]]}
+{"i":23,"h":"c019dc41","k":"rows","cols":["INSERT('abc', 'two', 1, 'X')"],"rows":[["abc"]]}
+{"i":24,"h":"685ad420","k":"rows","cols":["INSERT('abc', 2, 'three', 'X')"],"rows":[["aXbc"]]}
+{"i":25,"h":"49b50896","k":"rows","cols":["INSERT('abc', 2.0, 1, 'X')"],"rows":[["aXc"]]}
+{"i":26,"h":"b749f5b6","k":"rows","cols":["INSERT('abc', 2, 1.0, 'X')"],"rows":[["aXc"]]}
+{"i":27,"h":"fab9ef2d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 1"}
+{"i":28,"h":"922a240a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":29,"h":"2284db63","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":30,"h":"43760b5f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":31,"h":"cbca6cb3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":32,"h":"3b8e92b5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'extra')' at line 1"}

@@ -1,0 +1,40 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":39}
+{"i":1,"h":"654ebbf0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":2,"h":"5f59a1e6","k":"rows","cols":["one"],"rows":[["1"]]}
+{"i":3,"h":"fa53fddb","k":"rows","cols":["five"],"rows":[["1"]]}
+{"i":4,"h":"57f72180","k":"rows","cols":["hundred"],"rows":[["1"]]}
+{"i":5,"h":"19e3997b","k":"rows","cols":["char_len"],"rows":[["1"]]}
+{"i":6,"h":"99831878","k":"rows","cols":["char_len_hundred"],"rows":[["1"]]}
+{"i":7,"h":"3953f58c","k":"rows","cols":["three_spaces_text"],"rows":[["1"]]}
+{"i":8,"h":"30528eb8","k":"rows","cols":["zero_not_null"],"rows":[["0"]]}
+{"i":9,"h":"e5129511","k":"rows","cols":["neg_not_null"],"rows":[["0"]]}
+{"i":10,"h":"2a2dc28d","k":"rows","cols":["neg_zero_len"],"rows":[["1"]]}
+{"i":11,"h":"a086baed","k":"rows","cols":["big_neg_zero_len"],"rows":[["1"]]}
+{"i":12,"h":"1ec72923","k":"rows","cols":["at_cap"],"rows":[["1"]]}
+{"i":13,"h":"60586747","k":"rows","cols":["SPACE(10485761)"],"rows":[["<big:len=10485761:fnv=6f66a617b381817f>"]]}
+{"i":14,"h":"d7ec039a","k":"rows","cols":["SPACE(100000000)"],"rows":[[null]]}
+{"i":15,"h":"635cefbb","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":16,"h":"f5222e95","k":"rows","cols":["SPACE('five')"],"rows":[[""]]}
+{"i":17,"h":"b521cf4a","k":"rows","cols":["SPACE(2.5)"],"rows":[["   "]]}
+{"i":18,"h":"f1a6fa79","k":"rows","cols":["basic"],"rows":[["'hello'"]]}
+{"i":19,"h":"4953c2ab","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":20,"h":"992f48e8","k":"rows","cols":["apostrophe"],"rows":[["'it\\'s'"]]}
+{"i":21,"h":"c9a2ef9c","k":"rows","cols":["backslash"],"rows":[["'a\b'"]]}
+{"i":22,"h":"0be4c140","k":"rows","cols":["combo"],"rows":[["'it\\'sfile'"]]}
+{"i":23,"h":"27e061b0","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":24,"h":"9393bb14","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":25,"h":"85946685","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":26,"h":"6734304c","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":27,"h":"122b0929","k":"rows","cols":["null_text"],"rows":[["NULL"]]}
+{"i":28,"h":"9a5cab52","k":"rows","cols":["null_returns_not_sql_null"],"rows":[["0"]]}
+{"i":29,"h":"0187461b","k":"rows","cols":["null_text_length"],"rows":[["1"]]}
+{"i":30,"h":"40c83370","k":"rows","cols":["utf8_pass"],"rows":[["'café'"]]}
+{"i":31,"h":"25b8221b","k":"rows","cols":["int_in"],"rows":[["'123'"]]}
+{"i":32,"h":"5af77d15","k":"rows","cols":["bool_in"],"rows":[["'1'"]]}
+{"i":33,"h":"d1356fb9","k":"rows","cols":["pct_through"],"rows":[["'a%b'"]]}
+{"i":34,"h":"e3f3c8b2","k":"rows","cols":["space_det"],"rows":[["1"]]}
+{"i":35,"h":"96f9b3eb","k":"rows","cols":["quote_det"],"rows":[["1"]]}
+{"i":36,"h":"b7834324","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SPACE'"}
+{"i":37,"h":"02765b50","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SPACE'"}
+{"i":38,"h":"b64185fd","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'QUOTE'"}
+{"i":39,"h":"93abf458","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'QUOTE'"}

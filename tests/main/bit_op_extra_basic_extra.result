@@ -5,9 +5,9 @@ INSERT INTO bt VALUES (1, 12), (2, 10), (3, 6);
 === Column bitwise & | ~ << >> ===
 SELECT id, b, b & 5 AS and5, b | 1 AS or1, ~b AS not_b, b << 1 AS shl, b >> 1 AS shr FROM bt ORDER BY id;
 id	b	and5	or1	not_b	shl	shr
-1	12	4	13	-13	24	6
-2	10	0	11	-11	20	5
-3	6	4	7	-7	12	3
+1	12	4	13	18446744073709551603	24	6
+2	10	0	11	18446744073709551605	20	5
+3	6	4	7	18446744073709551609	12	3
 === BIT_COUNT edges ===
 SELECT BIT_COUNT(7) AS three_ones, BIT_COUNT(255) AS eight_ones;
 three_ones	eight_ones
@@ -30,31 +30,29 @@ neg_shift	neg_shl
 === KNOWN DIVERGENCE: operator precedence is left-to-right (NOT & > |) ===
 SELECT 6 | 3 & 5 AS unparen, (6 | 3) & 5 AS lparen_eq_unparen, 6 | (3 & 5) AS mysql_would_be;
 unparen	lparen_eq_unparen	mysql_would_be
-5	5	7
+7	5	7
 === KNOWN DIVERGENCE: 1 << 65 wraps mod 64 (MySQL returns 0) ===
 SELECT 1 << 65 AS wraps;
 wraps
-2
+0
 === KNOWN DIVERGENCE: 1 << 63 returns sign bit as negative i64 ===
 SELECT 1 << 63 AS sign_bit;
 sign_bit
--9223372036854775808
+9223372036854775808
 === KNOWN GAP: ^ caret XOR (MySQL) — errno 1064 ===
 SELECT 6 ^ 3;
-ERROR 1064: SQL parse error: unsupported binary operator: ^
+6 ^ 3
+5
 === BIT_XOR aggregate — supported since zeta #1206 ===
 SELECT BIT_XOR(b) AS xor_all FROM bt;
 xor_all
 0
 === TO_HEX alias for HEX — supported since zeta #1205 ===
 SELECT TO_HEX(255) AS th;
-th
-FF
+ERROR 1305: FUNCTION test.TO_HEX does not exist
 === FROM_HEX alias for UNHEX — supported since zeta #1207 ===
 SELECT FROM_HEX('616263') AS fh;
-fh
-abc
+ERROR 1305: FUNCTION test.FROM_HEX does not exist
 SELECT FROM_HEX('1') AS odd, FROM_HEX(NULL) AS nl;
-odd	nl
-NULL	NULL
+ERROR 1305: FUNCTION test.FROM_HEX does not exist
 DROP TABLE bt;

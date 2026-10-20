@@ -1,0 +1,23 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":22}
+{"i":1,"h":"c85baf69","k":"rows","cols":["abc"],"rows":[["[1, 99, 3]"]]}
+{"i":2,"h":"60a7c927","k":"rows","cols":["keys_after"],"rows":[["3"]]}
+{"i":3,"h":"f0123957","k":"rows","cols":["keys_after_delete"],"rows":[["1"]]}
+{"i":4,"h":"240de347","k":"rows","cols":["a_preserved"],"rows":[["1"]]}
+{"i":5,"h":"7f57ad1d","k":"rows","cols":["b_gone"],"rows":[[null]]}
+{"i":6,"h":"793e1386","k":"rows","cols":["nested_keys"],"rows":[["3"]]}
+{"i":7,"h":"a98923e3","k":"rows","cols":["nested_xyz"],"rows":[["[1, 99, 3]"]]}
+{"i":8,"h":"cb774ef8","k":"rows","cols":["becomes_array"],"rows":[["ARRAY"]]}
+{"i":9,"h":"ca86198f","k":"rows","cols":["becomes_int"],"rows":[["INTEGER"]]}
+{"i":10,"h":"ea3f4da5","k":"rows","cols":["becomes_string"],"rows":[["STRING"]]}
+{"i":11,"h":"9e03a901","k":"rows","cols":["becomes_object"],"rows":[["OBJECT"]]}
+{"i":12,"h":"92760614","k":"rows","cols":["one_key"],"rows":[["1"]]}
+{"i":13,"h":"0f9bf2e9","k":"rows","cols":["three_keys"],"rows":[["3"]]}
+{"i":14,"h":"13559d2e","k":"rows","cols":["first_null"],"rows":[["1"]]}
+{"i":15,"h":"1bcd1d5d","k":"rows","cols":["second_null"],"rows":[["1"]]}
+{"i":16,"h":"ff9b93c2","k":"rows","cols":["mid_null"],"rows":[["1"]]}
+{"i":17,"h":"20c18688","k":"rows","cols":["unchanged"],"rows":[["1"]]}
+{"i":18,"h":"791fe30b","k":"rows","cols":["a_still"],"rows":[["1"]]}
+{"i":19,"h":"357c6164","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_MERGE_PATCH'"}
+{"i":20,"h":"891090bc","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_MERGE_PATCH'"}
+{"i":21,"h":"0c6eb1cf","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_merge_patch: \"Invalid value.\" at position 1."}
+{"i":22,"h":"60c40458","k":"err","code":3141,"msg":"Invalid JSON text in argument 2 to function json_merge_patch: \"Invalid value.\" at position 1."}

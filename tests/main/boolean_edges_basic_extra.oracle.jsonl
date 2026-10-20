@@ -1,0 +1,24 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":23}
+{"i":1,"h":"298d7569","k":"rows","cols":["p1"],"rows":[["1"]]}
+{"i":2,"h":"1db74472","k":"rows","cols":["p2"],"rows":[["1"]]}
+{"i":3,"h":"efd7778a","k":"rows","cols":["p3"],"rows":[["0"]]}
+{"i":4,"h":"03c67e46","k":"rows","cols":["expl"],"rows":[["0"]]}
+{"i":5,"h":"92c33a2d","k":"rows","cols":["expl2"],"rows":[["1"]]}
+{"i":6,"h":"84751578","k":"rows","cols":["tan","fan","nta","nfa"],"rows":[[null,"0",null,"0"]]}
+{"i":7,"h":"de917a9a","k":"rows","cols":["ton","fon","nto","nfo"],"rows":[["1",null,"1",null]]}
+{"i":8,"h":"2a1fb00b","k":"rows","cols":["not_nl","not_t","not_f"],"rows":[[null,"0","1"]]}
+{"i":9,"h":"1c9e772f","k":"rows","cols":["up_t","up_f","lo_t","lo_f"],"rows":[["1","0","1","0"]]}
+{"i":10,"h":"723eccb2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::BOOLEAN AS s_true, 'false'::BOOLEAN AS s_false, 't'::BOOLEAN AS s_t, 'yes'::BO' at line 1"}
+{"i":11,"h":"6f2bb4c0","k":"rows","cols":["t_u","n_u","f_u"],"rows":[["0","1","0"]]}
+{"i":12,"h":"9a23de2b","k":"rows","cols":["r_lit","r_cmp"],"rows":[["1","yes"]]}
+{"i":13,"h":"32a7ba5e","k":"rows","cols":["one_eq_t","zero_eq_f"],"rows":[["1","1"]]}
+{"i":14,"h":"14e12df5","k":"rows","cols":["and_int"],"rows":[["0"]]}
+{"i":15,"h":"6cbc21e8","k":"ok","affected":0}
+{"i":16,"h":"44453082","k":"ok","affected":0}
+{"i":17,"h":"8786a303","k":"ok","affected":3}
+{"i":18,"h":"abb11686","k":"rows","cols":["id","n"],"rows":[["2","1"],["3","10"]]}
+{"i":19,"h":"304ed738","k":"rows","cols":["TRUE + 1"],"rows":[["2"]]}
+{"i":20,"h":"45a13bef","k":"rows","cols":["TRUE XOR FALSE"],"rows":[["1"]]}
+{"i":21,"h":"b6ae80e3","k":"rows","cols":["TRUE XOR TRUE"],"rows":[["0"]]}
+{"i":22,"h":"72a6a64e","k":"rows","cols":["NULL XOR TRUE"],"rows":[[null]]}
+{"i":23,"h":"c0dd1231","k":"ok","affected":0}

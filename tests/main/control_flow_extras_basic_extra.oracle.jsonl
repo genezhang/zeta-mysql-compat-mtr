@@ -1,0 +1,35 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":34}
+{"i":1,"h":"2a676700","k":"rows","cols":["str_zero_is_false"],"rows":[["else"]]}
+{"i":2,"h":"0b737827","k":"rows","cols":["empty_str_is_false"],"rows":[["else"]]}
+{"i":3,"h":"8b2671e2","k":"rows","cols":["nonempty_str_is_true"],"rows":[["else"]]}
+{"i":4,"h":"eec09f93","k":"rows","cols":["str_zero_point_zero_is_true"],"rows":[["else"]]}
+{"i":5,"h":"afb6f48a","k":"rows","cols":["whitespace_str_is_true"],"rows":[["else"]]}
+{"i":6,"h":"420c560a","k":"rows","cols":["decimal_zero_is_TRUTHY"],"rows":[["else"]]}
+{"i":7,"h":"cf91e361","k":"rows","cols":["decimal_nonzero_is_truthy"],"rows":[["then"]]}
+{"i":8,"h":"cb506e4e","k":"rows","cols":["decimal_negative_is_truthy"],"rows":[["then"]]}
+{"i":9,"h":"24bed004","k":"rows","cols":["decimal_zero_differs_from_int_zero"],"rows":[["0"]]}
+{"i":10,"h":"129be421","k":"rows","cols":["float64_zero_is_false"],"rows":[["else"]]}
+{"i":11,"h":"c9e0b696","k":"rows","cols":["float64_nonzero_is_true"],"rows":[["then"]]}
+{"i":12,"h":"1ba9078c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 'then', 'else')                  AS int64_zero_is_false' at line 1"}
+{"i":13,"h":"29cedb42","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 'then', 'else')                  AS int64_nonzero_is_true' at line 1"}
+{"i":14,"h":"634b3131","k":"rows","cols":["uint64_zero_is_false"],"rows":[["else"]]}
+{"i":15,"h":"07b2a274","k":"rows","cols":["uint64_nonzero_is_true"],"rows":[["then"]]}
+{"i":16,"h":"a54a114b","k":"rows","cols":["date_is_true"],"rows":[["then"]]}
+{"i":17,"h":"5eeeb1d4","k":"rows","cols":["timestamp_is_true"],"rows":[["then"]]}
+{"i":18,"h":"27396e0e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), 'then', 'else')           AS jsonb_is_true' at line 1"}
+{"i":19,"h":"73cdfbbd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'then', 'else')                     AS interval_is_true' at line 1"}
+{"i":20,"h":"68aae9c6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":21,"h":"17045f13","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":22,"h":"81d3c84d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":23,"h":"158de8bc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 4)' at line 1"}
+{"i":24,"h":"9d4c62e4","k":"rows","cols":["date_eq_ts_midnight_returns_null"],"rows":[["1"]]}
+{"i":25,"h":"e8c9336f","k":"rows","cols":["date_ne_ts_noon_returns_first"],"rows":[["1"]]}
+{"i":26,"h":"3e60f400","k":"rows","cols":["bool_true_vs_int_1_kept_not_null"],"rows":[["0"]]}
+{"i":27,"h":"c7e49bec","k":"rows","cols":["bool_false_vs_int_0_kept_not_null"],"rows":[["0"]]}
+{"i":28,"h":"2a1845f2","k":"rows","cols":["bool_eq_bool_returns_null"],"rows":[["1"]]}
+{"i":29,"h":"33e86882","k":"rows","cols":["int_eq_int_returns_null"],"rows":[["1"]]}
+{"i":30,"h":"a4fc9692","k":"rows","cols":["isnull_date"],"rows":[["0"]]}
+{"i":31,"h":"e0988fe2","k":"rows","cols":["isnull_timestamp"],"rows":[["0"]]}
+{"i":32,"h":"d96549e6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                       AS isnull_jsonb' at line 1"}
+{"i":33,"h":"b96d1a03","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')                                 AS isnull_interval' at line 1"}
+{"i":34,"h":"c28989ab","k":"rows","cols":["isnull_typed_null"],"rows":[["1"]]}

@@ -35,7 +35,7 @@ n
 NULL
 === Arity error ===
 SELECT TO_SECONDS();
-ERROR 1105: execution error: TO_SECONDS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'TO_SECONDS'
 === Round-trip: TO_DAYS * 86400 matches TO_SECONDS for pure dates ===
 SELECT TO_DAYS('2024-03-15') * 86400 = TO_SECONDS('2024-03-15') AS day_sec_agree;
 day_sec_agree

@@ -1,55 +1,43 @@
 === L2_NORMALIZE: classical unit-vector decomposition ===
 SELECT L2_NORMALIZE('[3,4]'::vector)                          AS unit_3_4;
-unit_3_4
-Vector([0.6, 0.8])
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                          AS unit_3_4' at line 1
 === Round-trip: VECTOR_NORM after L2_NORMALIZE ≈ 1 ===
 SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) > 0.9999    AS norm_above_threshold;
-norm_above_threshold
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)) > 0.9999    AS norm_above_threshold' at line 1
 SELECT VECTOR_NORM(L2_NORMALIZE('[3,4]'::vector)) < 1.0001    AS norm_below_threshold;
-norm_below_threshold
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)) < 1.0001    AS norm_below_threshold' at line 1
 SELECT VECTOR_NORM(L2_NORMALIZE('[5,12]'::vector)) > 0.9999   AS norm_5_12_above;
-norm_5_12_above
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)) > 0.9999   AS norm_5_12_above' at line 1
 === Idempotent on unit vectors ===
 SELECT L2_NORMALIZE('[1,0,0]'::vector)                        AS already_unit;
-already_unit
-Vector([1.0, 0.0, 0.0])
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                        AS already_unit' at line 1
 SELECT VECTOR_NORM(L2_NORMALIZE('[1,0,0]'::vector)) > 0.9999  AS unit_norm_preserved;
-unit_norm_preserved
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)) > 0.9999  AS unit_norm_preserved' at line 1
 === ZERO vector — no divide-by-zero, returns zero ===
 SELECT L2_NORMALIZE('[0,0,0]'::vector)                        AS zero_in_zero_out;
-zero_in_zero_out
-Vector([0.0, 0.0, 0.0])
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                        AS zero_in_zero_out' at line 1
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))           AS zero_norm_still_0;
-zero_norm_still_0
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector))           AS zero_norm_still_0' at line 1
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0       AS float64_ne_int_strict;
-float64_ne_int_strict
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)) = 0       AS float64_ne_int_strict' at line 1
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector)) = 0.0     AS float64_eq_decimal_coerce;
-float64_eq_decimal_coerce
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)) = 0.0     AS float64_eq_decimal_coerce' at line 1
 SELECT VECTOR_NORM(L2_NORMALIZE('[0,0,0]'::vector))
      = CAST(0 AS DOUBLE PRECISION)                            AS float64_eq_float64_same_type;
-float64_eq_float64_same_type
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector))
+     = CAST(0 AS DOUBLE PRECISION)                            AS floa' at line 1
 === NULL propagation ===
 SELECT L2_NORMALIZE(NULL::vector)                             AS null_propagates;
-null_propagates
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                             AS null_propagates' at line 1
 SELECT L2_NORMALIZE(NULL::vector) IS NULL                     AS null_pred;
-null_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector) IS NULL                     AS null_pred' at line 1
 === Wrong-type → ERROR 1105 ===
 SELECT L2_NORMALIZE('not_a_vector');
-ERROR 1105: execution error: l2_normalize() requires a vector argument
+ERROR 1305: FUNCTION test.L2_NORMALIZE does not exist
 SELECT L2_NORMALIZE(42);
-ERROR 1105: execution error: l2_normalize() requires a vector argument
+ERROR 1305: FUNCTION test.L2_NORMALIZE does not exist
 === Arity errors → 1105 ===
 SELECT L2_NORMALIZE();
-ERROR 1105: execution error: l2_normalize() requires 1 argument
+ERROR 1305: FUNCTION test.L2_NORMALIZE does not exist
 SELECT L2_NORMALIZE('[1,2]'::vector, '[3,4]'::vector);
-ERROR 1105: execution error: l2_normalize() requires 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[3,4]'::vector)' at line 1

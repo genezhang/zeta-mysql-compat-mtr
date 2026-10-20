@@ -8,7 +8,7 @@ y
 2
 === Backward reference (A uses B defined later) — errno 1146 ===
 WITH a AS (SELECT y - 1 AS x FROM b), b AS (SELECT 10 AS y) SELECT * FROM a;
-ERROR 1146: table not found: b
+ERROR 1146: Table 'test.b' doesn't exist
 === CTE shadowing outer table ===
 WITH ct AS (SELECT 100 AS id) SELECT id FROM ct;
 id
@@ -23,31 +23,26 @@ ax	bx
 5	5
 === CTE with empty body — errno 1064 ===
 WITH x AS () SELECT 1;
-ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: ) at Line: 1, Column: 12
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ') SELECT 1' at line 1
 === KNOWN DIVERGENCE: CTE column-list mismatch silently uses first alias ===
 # `WITH c(a, b)` declares 2 cols but SELECT returns 1; zeta
 # silently uses 'a' for the single returned column. PG/MySQL
 # error 'WITH query has N columns available but M specified'.
 WITH c(a, b) AS (SELECT 1) SELECT * FROM c;
-a
-1
+ERROR 1353: In definition of view, derived table or common table expression, SELECT list and column names list have different column counts
 === PARTIAL FIX: WITH+INSERT now supported; WITH+DELETE/UPDATE still 1064 ===
 DROP TABLE IF EXISTS cti;
 CREATE TABLE cti (id INT, n INT);
 WITH src AS (SELECT 1 AS id, 10 AS n) INSERT INTO cti SELECT * FROM src;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INSERT INTO cti SELECT * FROM src' at line 1
 SELECT * FROM cti;
-id	n
-1	10
 WITH src AS (SELECT 1 AS id) DELETE FROM cti WHERE id IN (SELECT id FROM src);
-ERROR 1064: SQL parse error: WITH … UPDATE/DELETE is not supported yet — move the CTE into a subquery, or split into a separate statement
 WITH src AS (SELECT 1 AS id) UPDATE cti SET n=99 WHERE id IN (SELECT id FROM src);
-ERROR 1064: SQL parse error: WITH … UPDATE/DELETE is not supported yet — move the CTE into a subquery, or split into a separate statement
 === KNOWN DIVERGENCE: duplicate CTE name silently uses last ===
 # PG/MySQL error 'WITH query name X specified more than once';
 # zeta returns row from the second definition (x=2).
 WITH a AS (SELECT 1 AS x), a AS (SELECT 2 AS x) SELECT * FROM a;
-x
-2
+ERROR 1066: Not unique table/alias: 'a'
 === KNOWN DIVERGENCE: WITH RECURSIVE without UNION silently returns anchor ===
 # PG/MySQL error 'recursive query has no UNION'; zeta returns
 # the single anchor row.

@@ -30,38 +30,25 @@ id
 5
 === Bare OFFSET (no LIMIT) ===
 SELECT id FROM lo ORDER BY id OFFSET 3;
-id
-4
-5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OFFSET 3' at line 1
 === FETCH FIRST n ROWS ONLY (SQL-standard) ===
 SELECT id FROM lo ORDER BY id FETCH FIRST 2 ROWS ONLY;
-id
-1
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH FIRST 2 ROWS ONLY' at line 1
 === OFFSET m ROWS FETCH NEXT n ROWS ONLY ===
 SELECT id FROM lo ORDER BY id OFFSET 2 ROWS FETCH NEXT 2 ROWS ONLY;
-id
-3
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OFFSET 2 ROWS FETCH NEXT 2 ROWS ONLY' at line 1
 === LIMIT in subquery (derived table) ===
 SELECT MAX(id) AS mx FROM (SELECT id FROM lo ORDER BY id LIMIT 3) AS sub;
 mx
 3
 === LIMIT NULL — all rows (NULL = no-limit) ===
 SELECT id FROM lo ORDER BY id LIMIT NULL;
-id
-1
-2
-3
-4
-5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL' at line 1
 === LIMIT expression ===
 SELECT id FROM lo ORDER BY id LIMIT 1+1;
-id
-1
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '+1' at line 1
 === KNOWN GAP: negative LIMIT — errno 1105 ===
 SELECT id FROM lo LIMIT -1;
-ERROR 1105: plan error: LIMIT/OFFSET must be non-negative, got -1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-1' at line 1
 === Cleanup ===
 DROP TABLE lo;

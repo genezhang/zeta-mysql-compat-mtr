@@ -1,0 +1,40 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":39}
+{"i":1,"h":"cb0a60ae","k":"rows","cols":["d"],"rows":[["2024-01-01"]]}
+{"i":2,"h":"003de70f","k":"rows","cols":["t"],"rows":[["14:30:00"]]}
+{"i":3,"h":"a71c0038","k":"rows","cols":["ts"],"rows":[["2024-01-01 14:30:00"]]}
+{"i":4,"h":"92b032a2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d_plus_7' at line 1"}
+{"i":5,"h":"5f17c4ad","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d_minus_1m' at line 1"}
+{"i":6,"h":"e1324ade","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS ts_plus_3h' at line 1"}
+{"i":7,"h":"02b58a83","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d_minus_3' at line 1"}
+{"i":8,"h":"66b1c69b","k":"rows","cols":["day_diff"],"rows":[["9"]]}
+{"i":9,"h":"b491b305","k":"rows","cols":["hr_diff"],"rows":[["40000"]]}
+{"i":10,"h":"f4e63f2f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS i_pg' at line 1"}
+{"i":11,"h":"3cca7af1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS i_quoted' at line 1"}
+{"i":12,"h":"3e5c4ddd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS i_mysql' at line 1"}
+{"i":13,"h":"4ebba0d3","k":"rows","cols":["y"],"rows":[["2024"]]}
+{"i":14,"h":"ae6ff012","k":"rows","cols":["m"],"rows":[["5"]]}
+{"i":15,"h":"bc9f1538","k":"rows","cols":["d"],"rows":[["19"]]}
+{"i":16,"h":"cad075e4","k":"rows","cols":["h"],"rows":[["14"]]}
+{"i":17,"h":"a4f7ac28","k":"rows","cols":["mi"],"rows":[["30"]]}
+{"i":18,"h":"618e8f41","k":"rows","cols":["s"],"rows":[["45"]]}
+{"i":19,"h":"c754e370","k":"err","code":1305,"msg":"FUNCTION test.DATE_TRUNC does not exist"}
+{"i":20,"h":"513a446f","k":"err","code":1305,"msg":"FUNCTION test.DATE_TRUNC does not exist"}
+{"i":21,"h":"ec055d54","k":"err","code":1305,"msg":"FUNCTION test.DATE_TRUNC does not exist"}
+{"i":22,"h":"655a8bd7","k":"err","code":1305,"msg":"FUNCTION test.DATE_TRUNC does not exist"}
+{"i":23,"h":"ea86d7d1","k":"err","code":1305,"msg":"FUNCTION test.DATE_TRUNC does not exist"}
+{"i":24,"h":"548244c7","k":"rows","cols":["same_date"],"rows":[["<masked>"]],"nd":"volatile","class":"time"}
+{"i":25,"h":"5b58b833","k":"rows","cols":["in_future"],"rows":[["<masked>"]],"nd":"volatile","class":"time"}
+{"i":26,"h":"9c1bd3c3","k":"ok","affected":0}
+{"i":27,"h":"06505d00","k":"ok","affected":0}
+{"i":28,"h":"52923da2","k":"ok","affected":2}
+{"i":29,"h":"aa520a4d","k":"rows","cols":["id"],"rows":[["1"]],"sorted":true}
+{"i":30,"h":"c48403a5","k":"rows","cols":["id"],"rows":[["1"]],"sorted":true}
+{"i":31,"h":"6b2d4bb1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIME ZONE 'UTC' AS ts_utc' at line 1"}
+{"i":32,"h":"36ca48e4","k":"err","code":1305,"msg":"FUNCTION test.MAKE_DATE does not exist"}
+{"i":33,"h":"9b098b20","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIME does not exist"}
+{"i":34,"h":"618ed847","k":"rows","cols":["w"],"rows":[["20"]]}
+{"i":35,"h":"0994bb96","k":"rows","cols":["mt"],"rows":[["14:30:45"]]}
+{"i":36,"h":"43707fde","k":"rows","cols":["r"],"rows":[["16:00:00"]]}
+{"i":37,"h":"ec64cae9","k":"rows","cols":["r"],"rows":[["13:00:00"]]}
+{"i":38,"h":"6eda12eb","k":"rows","cols":["d"],"rows":[["2024-05-19"]]}
+{"i":39,"h":"d0689dcf","k":"ok","affected":0}

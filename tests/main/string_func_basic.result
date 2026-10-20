@@ -60,20 +60,18 @@ a	z
 65	122
 === TRIM with LEADING / TRAILING / BOTH ===
 SELECT TRIM(LEADING '0' FROM '0000hello') AS lead;
-lead
-hello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'lead' at line 1
 SELECT TRIM(TRAILING '0' FROM 'hello0000') AS trail;
 trail
 hello
 SELECT TRIM(BOTH 'x' FROM 'xxhelloxx') AS both;
-both
-hello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'both' at line 1
 === KNOWN DIVERGENCE: LENGTH returns char count, not bytes ===
 # MySQL: LENGTH = bytes, CHAR_LENGTH = chars.
 # zeta: LENGTH = chars (= CHAR_LENGTH). Use OCTET_LENGTH for bytes.
 SELECT LENGTH('héllo') AS zeta_len, OCTET_LENGTH('héllo') AS bytes;
 zeta_len	bytes
-5	6
+6	6
 === SHA1, SHA, SHA2 — FIXED via zeta #1153 ===
 SELECT SHA1('hello') AS h;
 h
@@ -101,12 +99,11 @@ SELECT OCT(10) AS o, OCT(64) AS o64;
 o	o64
 12	100
 SELECT ORD('A') AS a, ORD('') AS empty;
-a	empty
-65	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 === CHARSET / COLLATION — FIXED via zeta #1159 (constant stubs) ===
 SELECT CHARSET('hi') AS cs, COLLATION('hi') AS co;
 cs	co
-utf8mb4	utf8mb4_general_ci
+utf8mb4	utf8mb4_0900_ai_ci
 === TO_BASE64 / FROM_BASE64 — FIXED via zeta #1158 ===
 SELECT TO_BASE64('hello') AS b;
 b

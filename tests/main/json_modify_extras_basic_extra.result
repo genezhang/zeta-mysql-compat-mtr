@@ -1,55 +1,54 @@
 === Routing-proof: CAST AS JSONB lands a typed Value::Jsonb ===
 SELECT JSON_TYPE(CAST('[1,2]' AS JSONB))                      AS jsonb_cast_lands_as_array;
-jsonb_cast_lands_as_array
-ARRAY
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                      AS jsonb_cast_lands_as_array' at line 1
 === JSON_ARRAY_APPEND on already-typed JSONB target ===
 SELECT JSON_LENGTH(JSON_ARRAY_APPEND(CAST('[1,2]' AS JSONB), '$', 3))
                                                               AS typed_append_len;
-typed_append_len
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$', 3))
+                                                              A' at line 1
 SELECT JSON_EXTRACT(JSON_ARRAY_APPEND(CAST('[1,2]' AS JSONB), '$', 3), '$[2]')
                                                               AS typed_append_val;
-typed_append_val
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$', 3), '$[2]')
+                                                       ' at line 1
 === JSON_ARRAY_INSERT on already-typed JSONB target ===
 SELECT JSON_LENGTH(JSON_ARRAY_INSERT(CAST('[1,2,3]' AS JSONB), '$[1]', 9))
                                                               AS typed_insert_len;
-typed_insert_len
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$[1]', 9))
+                                                            ' at line 1
 SELECT JSON_EXTRACT(JSON_ARRAY_INSERT(CAST('[1,2,3]' AS JSONB), '$[1]', 9), '$[1]')
                                                               AS typed_insert_val;
-typed_insert_val
-9
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$[1]', 9), '$[1]')
+                                                    ' at line 1
 === JSON_REMOVE on already-typed JSONB target ===
 SELECT JSON_LENGTH(JSON_REMOVE(CAST('{"a":1,"b":2}' AS JSONB), '$.a'))
                                                               AS typed_remove_len;
-typed_remove_len
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$.a'))
+                                                              AS' at line 1
 SELECT JSON_EXTRACT(JSON_REMOVE(CAST('{"a":1,"b":2}' AS JSONB), '$.a'), '$.b')
                                                               AS typed_remove_survivor;
-typed_remove_survivor
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$.a'), '$.b')
+                                                         ' at line 1
 === Wrong-type target (INT) → ERROR for all three ===
 SELECT JSON_ARRAY_APPEND(42, '$', 1);
-ERROR 1105: execution error: JSON_ARRAY_APPEND target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_array_append; a JSON string or JSON type is required.
 SELECT JSON_ARRAY_INSERT(42, '$[0]', 1);
-ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_array_insert; a JSON string or JSON type is required.
 SELECT JSON_REMOVE(42, '$.a');
-ERROR 1105: execution error: JSON_REMOVE target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_remove; a JSON string or JSON type is required.
 === Wrong-type target (FLOAT) → ERROR for all three ===
 SELECT JSON_ARRAY_APPEND(3.14, '$', 1);
-ERROR 1105: execution error: JSON_ARRAY_APPEND target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_array_append; a JSON string or JSON type is required.
 SELECT JSON_ARRAY_INSERT(3.14, '$[0]', 1);
-ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_array_insert; a JSON string or JSON type is required.
 SELECT JSON_REMOVE(3.14, '$.a');
-ERROR 1105: execution error: JSON_REMOVE target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_remove; a JSON string or JSON type is required.
 === Wrong-type target (BOOLEAN) → ERROR for all three ===
 SELECT JSON_ARRAY_APPEND(TRUE, '$', 1);
-ERROR 1105: execution error: JSON_ARRAY_APPEND target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_array_append; a JSON string or JSON type is required.
 SELECT JSON_ARRAY_INSERT(TRUE, '$[0]', 1);
-ERROR 1105: execution error: JSON_ARRAY_INSERT target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_array_insert; a JSON string or JSON type is required.
 SELECT JSON_REMOVE(TRUE, '$.a');
-ERROR 1105: execution error: JSON_REMOVE target must be JSON
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_remove; a JSON string or JSON type is required.
 === CAST AS JSON value injection (APPEND) ===
 SELECT JSON_TYPE(JSON_EXTRACT(
   JSON_ARRAY_APPEND('[]', '$', '{"x":1}'),

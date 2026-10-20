@@ -1,0 +1,9 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":8}
+{"i":1,"h":"6d546d82","k":"ok","affected":0}
+{"i":2,"h":"ca1273ab","k":"ok","affected":0}
+{"i":3,"h":"1c13bc70","k":"ok","affected":1}
+{"i":4,"h":"db066dc6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1"}
+{"i":5,"h":"1239bc4b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1"}
+{"i":6,"h":"ad38e8c6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1"}
+{"i":7,"h":"746b82ab","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1"}
+{"i":8,"h":"c34180fb","k":"ok","affected":0}

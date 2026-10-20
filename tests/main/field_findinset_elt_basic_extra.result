@@ -28,7 +28,7 @@ string_needle_int_hay
 === FIELD: case sensitivity (zeta byte-equal divergence) ===
 SELECT FIELD('B', 'a', 'b', 'c')       AS case_byte_equal;
 case_byte_equal
-0
+2
 === FIND_IN_SET: basic comma-split ===
 SELECT FIND_IN_SET('b', 'a,b,c')   AS hit_second;
 hit_second
@@ -68,7 +68,7 @@ null_csv
 === FIND_IN_SET: case sensitivity (zeta byte-equal divergence) ===
 SELECT FIND_IN_SET('B', 'a,b,c')   AS case_byte_equal;
 case_byte_equal
-0
+2
 === ELT: 1-based pick ===
 SELECT ELT(1, 'a', 'b', 'c')   AS pick_first;
 pick_first
@@ -101,7 +101,7 @@ string_n_nonnum
 1
 SELECT ELT('2',   'a', 'b')    IS NULL AS string_n_digits_zeta_null;
 string_n_digits_zeta_null
-1
+0
 === Determinism cross-check ===
 SELECT FIELD('b', 'a', 'b') = FIELD('b', 'a', 'b')       AS field_det;
 field_det
@@ -114,16 +114,16 @@ elt_det
 1
 === Arity errors ===
 SELECT FIELD();
-ERROR 1105: execution error: FIELD requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'FIELD'
 SELECT FIELD('a');
-ERROR 1105: execution error: FIELD requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'FIELD'
 SELECT FIND_IN_SET();
-ERROR 1105: execution error: FIND_IN_SET requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'FIND_IN_SET'
 SELECT FIND_IN_SET('a');
-ERROR 1105: execution error: FIND_IN_SET requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'FIND_IN_SET'
 SELECT FIND_IN_SET('a', 'b', 'c');
-ERROR 1105: execution error: FIND_IN_SET requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'FIND_IN_SET'
 SELECT ELT();
-ERROR 1105: execution error: ELT requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'ELT'
 SELECT ELT(1);
-ERROR 1105: execution error: ELT requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'ELT'

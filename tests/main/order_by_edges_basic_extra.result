@@ -43,7 +43,6 @@ id
 SELECT DISTINCT name FROM ot ORDER BY name;
 name
 A
-B
 b
 c
 === ORDER BY aggregate alias + LIMIT (Top-N) ===
@@ -69,24 +68,16 @@ CREATE TABLE otn (a INT, b INT);
 INSERT INTO otn VALUES (1, 100), (NULL, 50), (NULL, NULL), (2, 200);
 SELECT a, b FROM otn ORDER BY a, b;
 a	b
+NULL	NULL
+NULL	50
 1	100
 2	200
-NULL	50
-NULL	NULL
 === KNOWN DIVERGENCE: ORDER BY 99 (out-of-range) silently ignored ===
 SELECT id, name FROM ot ORDER BY 99;
-id	name
-1	b
-2	A
-3	c
-4	B
+ERROR 1054: Unknown column '99' in 'order clause'
 === KNOWN DIVERGENCE: ORDER BY 0 silently ignored ===
 SELECT id, name FROM ot ORDER BY 0;
-id	name
-1	b
-2	A
-3	c
-4	B
+ERROR 1054: Unknown column '0' in 'order clause'
 === KNOWN DIVERGENCE: ORDER BY -1 silently ignored ===
 SELECT id, name FROM ot ORDER BY -1;
 id	name
@@ -96,7 +87,11 @@ id	name
 4	B
 === KNOWN GAP: ORDER BY col COLLATE name — errno 1064 ===
 SELECT name FROM ot ORDER BY name COLLATE utf8mb4_bin;
-ERROR 1064: SQL parse error: unsupported expression: name COLLATE utf8mb4_bin
+name
+A
+B
+b
+c
 DROP TABLE ot;
 DROP TABLE ot2;
 DROP TABLE otn;

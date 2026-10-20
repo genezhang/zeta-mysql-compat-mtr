@@ -1,0 +1,27 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":26}
+{"i":1,"h":"903c25f3","k":"rows","cols":["obj"],"rows":[["{\n  \"a\": 1,\n  \"b\": 2\n}"]]}
+{"i":2,"h":"07936656","k":"rows","cols":["arr"],"rows":[["[\n  1,\n  2,\n  3\n]"]]}
+{"i":3,"h":"2ecde38c","k":"rows","cols":["nested"],"rows":[["{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": {\n    \"c\": 3\n  }\n}"]]}
+{"i":4,"h":"e4739d55","k":"rows","cols":["num"],"rows":[["42"]]}
+{"i":5,"h":"5d3cfd86","k":"rows","cols":["str"],"rows":[["\"hi\""]]}
+{"i":6,"h":"16d3b560","k":"rows","cols":["b"],"rows":[["true"]]}
+{"i":7,"h":"d7b1aba2","k":"rows","cols":["n"],"rows":[["null"]]}
+{"i":8,"h":"7cdc91c8","k":"rows","cols":["x"],"rows":[[null]]}
+{"i":9,"h":"7cbf99d4","k":"rows","cols":["grows"],"rows":[["1"]]}
+{"i":10,"h":"42b641e5","k":"rows","cols":["empty_obj_pos"],"rows":[["1"]]}
+{"i":11,"h":"44ac818a","k":"rows","cols":["empty_arr_pos"],"rows":[["1"]]}
+{"i":12,"h":"84b4baec","k":"rows","cols":["num_pos"],"rows":[["1"]]}
+{"i":13,"h":"c1c74d73","k":"rows","cols":["str_pos"],"rows":[["1"]]}
+{"i":14,"h":"c4fbd38f","k":"rows","cols":["null_pos"],"rows":[["1"]]}
+{"i":15,"h":"7daeea40","k":"rows","cols":["x"],"rows":[[null]]}
+{"i":16,"h":"3e1a44f6","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_PRETTY'"}
+{"i":17,"h":"0066c2e4","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_PRETTY'"}
+{"i":18,"h":"c7840e28","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_STORAGE_SIZE'"}
+{"i":19,"h":"3303f92d","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_STORAGE_SIZE'"}
+{"i":20,"h":"e72e49b8","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_pretty: \"Invalid value.\" at position 1."}
+{"i":21,"h":"b3bc98bb","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_storage_size: \"Invalid value.\" at position 1."}
+{"i":22,"h":"834d12a3","k":"ok","affected":0}
+{"i":23,"h":"7359cc34","k":"ok","affected":0}
+{"i":24,"h":"d931c8c8","k":"ok","affected":4}
+{"i":25,"h":"12e9995c","k":"rows","cols":["id"],"rows":[["2"],["4"]]}
+{"i":26,"h":"46efb76d","k":"ok","affected":0}

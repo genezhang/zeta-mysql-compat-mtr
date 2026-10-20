@@ -1,10 +1,10 @@
 === MySQL DATE_ADD / DATE_SUB ===
 SELECT DATE_ADD(DATE '2024-01-01', INTERVAL 7 DAY) AS d_plus_7;
 d_plus_7
-2024-01-08 00:00:00
+2024-01-08
 SELECT DATE_SUB(DATE '2024-01-08', INTERVAL 7 DAY) AS d_minus_7;
 d_minus_7
-2024-01-01 00:00:00
+2024-01-01
 === MySQL DATEDIFF / TIMESTAMPDIFF ===
 SELECT DATEDIFF(DATE '2024-05-19', DATE '2024-05-10') AS dd;
 dd
@@ -20,11 +20,9 @@ m_unit
 4
 === PG DATE_PART (alias for EXTRACT) ===
 SELECT DATE_PART('year', DATE '2024-05-19') AS y;
-y
-2024
+ERROR 1305: FUNCTION test.DATE_PART does not exist
 SELECT DATE_PART('month', TIMESTAMP '2024-05-19 14:30:45') AS m;
-m
-5
+ERROR 1305: FUNCTION test.DATE_PART does not exist
 === MySQL day/month name family ===
 SELECT DAYOFWEEK(DATE '2024-05-19') AS dow, DAYOFMONTH(DATE '2024-05-19') AS dom, DAYOFYEAR(DATE '2024-05-19') AS doy;
 dow	dom	doy
@@ -48,18 +46,14 @@ minus
 2024-01-01
 === Multi-component INTERVAL ===
 SELECT INTERVAL '1 year 2 months' AS yr_mo;
-yr_mo
-1 year 2 mons
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS yr_mo' at line 1
 SELECT INTERVAL '1 day 12 hours' AS day_hr;
-day_hr
-36:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS day_hr' at line 1
 SELECT INTERVAL '1:30:45' HOUR_SECOND;
-HOUR_SECOND
-01:30:45
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
 === INTERVAL addition ===
 SELECT INTERVAL 1 YEAR + INTERVAL 2 MONTH AS yr_plus_mo;
-yr_plus_mo
-1 year 2 mons
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS yr_plus_mo' at line 1
 === FROM_UNIXTIME / UNIX_TIMESTAMP ===
 SELECT FROM_UNIXTIME(1700000000) AS from_ts;
 from_ts
@@ -70,15 +64,15 @@ to_epoch
 === CURDATE() — same-call equality (deterministic by day) ===
 SELECT CURDATE() = CURDATE() AS same_day;
 same_day
-1
+<masked>
 === NOW() / CURRENT_TIMESTAMP — relational only (non-deterministic) ===
 SELECT NOW() > TIMESTAMP '2020-01-01 00:00:00' AS in_future;
 in_future
-1
+<masked>
 === KNOWN DIVERGENCE: DATE_ADD on DATE returns TIMESTAMP, not DATE ===
 SELECT DATE_ADD(DATE '2024-01-01', INTERVAL 1 DAY) AS d_returns_ts;
 d_returns_ts
-2024-01-02 00:00:00
+2024-01-02
 === FIXED: ADDTIME (TIME, TIME) now supported ===
 SELECT ADDTIME(TIME '10:00:00', TIME '01:30:00') AS r;
 r
@@ -93,8 +87,7 @@ t
 14:30:45
 === MAKE_DATE / MAKE_TIME (PG spelling) — work ===
 SELECT MAKE_DATE(2024, 5, 19) AS d, MAKE_TIME(14, 30, 45) AS t;
-d	t
-2024-05-19	14:30:45
+ERROR 1305: FUNCTION test.MAKE_DATE does not exist
 === MAKEDATE (MySQL day-of-year form) — supported ===
 SELECT MAKEDATE(2024, 140) AS d;
 d
@@ -107,13 +100,13 @@ d_zero
 NULL
 === KNOWN GAP: INTERVAL n MICROSECOND — errno 1064 ===
 SELECT INTERVAL 1 MICROSECOND;
-ERROR 1064: SQL parse error: unsupported interval field: MICROSECOND
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
 === KNOWN GAP: INTERVAL n QUARTER — errno 1064 ===
 SELECT INTERVAL 1 QUARTER;
-ERROR 1064: SQL parse error: unsupported interval field: QUARTER
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
 === KNOWN GAP: INTERVAL n DECADE — errno 1064 ===
 SELECT INTERVAL 1 DECADE;
-ERROR 1064: SQL parse error: unsupported interval field: DECADE
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECADE' at line 1
 === KNOWN GAP: INTERVAL n CENTURY — errno 1064 ===
 SELECT INTERVAL 1 CENTURY;
-ERROR 1064: SQL parse error: unsupported interval field: CENTURY
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CENTURY' at line 1

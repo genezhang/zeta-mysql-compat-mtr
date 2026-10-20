@@ -5,6 +5,7 @@ CREATE TABLE customers (
   name VARCHAR(100)
 );
 CREATE UNIQUE INDEX customers_email_uk ON customers(email);
+ERROR 1170: BLOB/TEXT column 'email' used in key specification without a key length
 CREATE INDEX customers_name_idx ON customers(name);
 CREATE TABLE orders (
   id INTEGER PRIMARY KEY,
@@ -30,16 +31,15 @@ orders
 SELECT column_name, data_type, is_nullable, column_key FROM information_schema.columns WHERE table_schema='test' AND table_name='customers' ORDER BY ordinal_position;
 COLUMN_NAME	DATA_TYPE	IS_NULLABLE	COLUMN_KEY
 id	int	NO	PRI
-email	text	NO	UNI
+email	text	NO	
 name	varchar	YES	MUL
 === Supported: information_schema.statistics ===
 # Index metadata for `customers` — pin PRIMARY +
 # secondary indexes with their cardinality info.
 SELECT index_name, seq_in_index, column_name, non_unique FROM information_schema.statistics WHERE table_schema='test' AND table_name='customers' ORDER BY index_name, seq_in_index;
 INDEX_NAME	SEQ_IN_INDEX	COLUMN_NAME	NON_UNIQUE
-PRIMARY	1	id	0
-customers_email_uk	1	email	0
 customers_name_idx	1	name	1
+PRIMARY	1	id	0
 === Supported: information_schema.key_column_usage (#1100 Phase 1) ===
 # MySQL apps query this to discover foreign keys. zeta now
 # emits one row per PK / UK / FK column. FK rows carry
@@ -52,18 +52,16 @@ customers_name_idx	1	name	1
 SELECT constraint_name, table_name, column_name, ordinal_position, position_in_unique_constraint, referenced_table_name, referenced_column_name FROM information_schema.key_column_usage WHERE table_schema='test' ORDER BY table_name, constraint_name, ordinal_position;
 CONSTRAINT_NAME	TABLE_NAME	COLUMN_NAME	ORDINAL_POSITION	POSITION_IN_UNIQUE_CONSTRAINT	REFERENCED_TABLE_NAME	REFERENCED_COLUMN_NAME
 PRIMARY	customers	id	1	NULL	NULL	NULL
-customers_email_uk	customers	email	1	NULL	NULL	NULL
+orders_ibfk_1	orders	customer_id	1	1	customers	id
 PRIMARY	orders	id	1	NULL	NULL	NULL
-test.public.orders_customer_id_fkey	orders	customer_id	1	1	customers	id
 === Supported: information_schema.table_constraints (#1100 Phase 1) ===
 # Schema-migration tooling (Liquibase, Flyway) reads this to
 # find PRIMARY KEY / UNIQUE / FOREIGN KEY constraint names.
 SELECT constraint_name, table_name, constraint_type FROM information_schema.table_constraints WHERE table_schema='test' ORDER BY table_name, constraint_type, constraint_name;
 CONSTRAINT_NAME	TABLE_NAME	CONSTRAINT_TYPE
 PRIMARY	customers	PRIMARY KEY
-customers_email_uk	customers	UNIQUE
+orders_ibfk_1	orders	FOREIGN KEY
 PRIMARY	orders	PRIMARY KEY
-test.public.orders_customer_id_fkey	orders	FOREIGN KEY
 === Supported: information_schema.referential_constraints (#1100 Phase 1) ===
 # MySQL apps cross-reference this with KEY_COLUMN_USAGE to get
 # UPDATE_RULE / DELETE_RULE for foreign keys.
@@ -75,7 +73,7 @@ test.public.orders_customer_id_fkey	orders	FOREIGN KEY
 # parses MySQL's omitted-clause shape the same way.
 SELECT constraint_name, table_name, referenced_table_name, unique_constraint_name, update_rule, delete_rule FROM information_schema.referential_constraints WHERE constraint_schema='test';
 CONSTRAINT_NAME	TABLE_NAME	REFERENCED_TABLE_NAME	UNIQUE_CONSTRAINT_NAME	UPDATE_RULE	DELETE_RULE
-test.public.orders_customer_id_fkey	orders	customers	PRIMARY	NO ACTION	NO ACTION
+orders_ibfk_1	orders	customers	PRIMARY	NO ACTION	NO ACTION
 === Supported: information_schema.views (#1100 Phase 1) ===
 # VIEWS now exposes definition / check_option / is_updatable.
 # Probe the empty case first, then create a view and probe again.
@@ -83,7 +81,7 @@ SELECT table_name, is_updatable FROM information_schema.views WHERE table_schema
 CREATE VIEW customer_emails AS SELECT id, email FROM customers;
 SELECT table_name, view_definition, check_option, is_updatable FROM information_schema.views WHERE table_schema='test';
 TABLE_NAME	VIEW_DEFINITION	CHECK_OPTION	IS_UPDATABLE
-customer_emails	SELECT id, email FROM customers	NONE	NO
+customer_emails	select `test`.`customers`.`id` AS `id`,`test`.`customers`.`email` AS `email` from `test`.`customers`	NONE	YES
 === Supported: information_schema.character_sets (#1100 Phase 2) ===
 # Connection-time probe by many MySQL drivers. zeta advertises
 # utf8mb4 via lookup_system_variable; the directory now exposes
@@ -92,10 +90,12 @@ customer_emails	SELECT id, email FROM customers	NONE	NO
 # binary etc. are not — zeta runs utf8mb4-only.
 SELECT * FROM information_schema.character_sets WHERE character_set_name='utf8mb4';
 CHARACTER_SET_NAME	DEFAULT_COLLATE_NAME	DESCRIPTION	MAXLEN
-utf8mb4	utf8mb4_general_ci	UTF-8 Unicode	4
+utf8mb4	utf8mb4_0900_ai_ci	UTF-8 Unicode	4
 # Probe a non-existent charset — empty result confirms the
 # filter works (the row above isn't always returned).
 SELECT * FROM information_schema.character_sets WHERE character_set_name='latin1';
+CHARACTER_SET_NAME	DEFAULT_COLLATE_NAME	DESCRIPTION	MAXLEN
+latin1	latin1_swedish_ci	cp1252 West European	1
 === Supported: information_schema.collations (#1100 Phase 2) ===
 # Common ORM probe. zeta exposes a single utf8mb4_general_ci
 # collation (id=45, matches MySQL's well-known assignment).
@@ -103,8 +103,8 @@ SELECT * FROM information_schema.character_sets WHERE character_set_name='latin1
 # other utf8mb4 collations (utf8mb4_unicode_ci, utf8mb4_bin)
 # are not.
 SELECT * FROM information_schema.collations WHERE collation_name='utf8mb4_general_ci';
-COLLATION_NAME	CHARACTER_SET_NAME	ID	IS_DEFAULT	IS_COMPILED	SORTLEN
-utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
+COLLATION_NAME	CHARACTER_SET_NAME	ID	IS_DEFAULT	IS_COMPILED	SORTLEN	PAD_ATTRIBUTE
+utf8mb4_general_ci	utf8mb4	45		Yes	1	PAD SPACE
 === Supported: information_schema.engines (#1100 Phase 2) ===
 # MySQL `SHOW ENGINES` / engine-introspection tooling. zeta
 # presents itself as InnoDB-compatible (matches the
@@ -112,7 +112,17 @@ utf8mb4_general_ci	utf8mb4	45	Yes	Yes	1
 # savepoints all advertised as supported.
 SELECT * FROM information_schema.engines;
 ENGINE	SUPPORT	COMMENT	TRANSACTIONS	XA	SAVEPOINTS
+ARCHIVE	YES	Archive storage engine	NO	NO	NO
+BLACKHOLE	YES	/dev/null storage engine (anything you write to it disappears)	NO	NO	NO
+CSV	YES	CSV storage engine	NO	NO	NO
+FEDERATED	NO	Federated MySQL storage engine	NULL	NULL	NULL
 InnoDB	DEFAULT	Supports transactions, row-level locking, and foreign keys	YES	YES	YES
+MEMORY	YES	Hash based, stored in memory, useful for temporary tables	NO	NO	NO
+MRG_MYISAM	YES	Collection of identical MyISAM tables	NO	NO	NO
+MyISAM	YES	MyISAM storage engine	NO	NO	NO
+PERFORMANCE_SCHEMA	YES	Performance Schema	NO	NO	NO
+ndbcluster	NO	Clustered, fault-tolerant tables	NULL	NULL	NULL
+ndbinfo	NO	MySQL Cluster system information storage engine	NULL	NULL	NULL
 === Supported: information_schema.routines (#1100 Phase 3) ===
 # PROCEDURE / FUNCTION metadata. zeta only has trigger functions
 # (no stored procedures / general user functions with typed
@@ -120,11 +130,10 @@ InnoDB	DEFAULT	Supports transactions, row-level locking, and foreign keys	YES	YE
 # DATA_TYPE='trigger'. The shim scopes them to the connection's
 # current database so `WHERE routine_schema = DATABASE()` works.
 CREATE FUNCTION audit_fn() RETURNS trigger AS 'BEGIN RETURN NEW; END' LANGUAGE plpgsql;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'trigger AS 'BEGIN RETURN NEW; END' LANGUAGE plpgsql' at line 1
 SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DATA_TYPE,
        ROUTINE_BODY, EXTERNAL_LANGUAGE, SECURITY_TYPE
   FROM information_schema.routines WHERE routine_schema='test';
-ROUTINE_SCHEMA	ROUTINE_NAME	ROUTINE_TYPE	DATA_TYPE	ROUTINE_BODY	EXTERNAL_LANGUAGE	SECURITY_TYPE
-test	audit_fn	FUNCTION	trigger	SQL	SQL	DEFINER
 === Supported: information_schema.parameters (#1100 Phase 3) ===
 # zeta has no stored procedures or general user functions with
 # typed parameters, so PARAMETERS is always empty — but the
@@ -145,4 +154,5 @@ SELECT ORDINAL_POSITION, PARAMETER_NAME FROM information_schema.parameters WHERE
 # a connection pool will get errno 1235 instead of a row.
 # Note: errno 1235 (ER_NOT_SUPPORTED_YET) rather than 1054.
 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='test';
-ERROR 1235: information_schema queries with function call or expression are not yet supported by zeta's MySQL wire shim
+COUNT(*)
+3

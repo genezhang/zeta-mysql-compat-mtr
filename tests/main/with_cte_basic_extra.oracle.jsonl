@@ -1,0 +1,9 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":8}
+{"i":1,"h":"0682e0c3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte' at line 1"}
+{"i":2,"h":"fe20dfba","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte' at line 1"}
+{"i":3,"h":"d5946e7f","k":"rows","cols":["y"],"rows":[["10"],["20"]]}
+{"i":4,"h":"f43493d0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(3), (1), (2)) AS t(v) ORDER BY v DESC)\nSELECT v FROM a' at line 1"}
+{"i":5,"h":"e41f6841","k":"rows","cols":["n"],"rows":[["1"],["2"],["3"],["4"],["5"]]}
+{"i":6,"h":"b903530e","k":"rows","cols":["a","b"],"rows":[["1","10"],["2","20"],["3","40"],["4","80"]]}
+{"i":7,"h":"bc033fe8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('east', 10), ('west', 20), ('east', 30)) AS t(region, qty)\n    GROUP BY region\n' at line 3"}
+{"i":8,"h":"67be23f6","k":"err","code":3636,"msg":"Recursive query aborted after 1001 iterations. Try increasing @@cte_max_recursion_depth to a larger value."}

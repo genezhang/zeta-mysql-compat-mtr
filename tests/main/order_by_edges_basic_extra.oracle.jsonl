@@ -1,0 +1,27 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":26}
+{"i":1,"h":"6cca9dee","k":"ok","affected":0}
+{"i":2,"h":"76466f91","k":"ok","affected":0}
+{"i":3,"h":"50b38540","k":"ok","affected":4}
+{"i":4,"h":"cfb0c1f0","k":"rows","cols":["name"],"rows":[["b"],["A"],["c"],["B"]]}
+{"i":5,"h":"af91d730","k":"rows","cols":["id","name"],"rows":[["2","A"],["1","b"],["3","c"],["4","B"]]}
+{"i":6,"h":"41e9fd82","k":"rows","cols":["x"],"rows":[["1"],["2"],["3"]]}
+{"i":7,"h":"370cbaec","k":"rows","cols":["id"],"rows":[["4"],["3"],["2"],["1"]]}
+{"i":8,"h":"b53f1c4c","k":"ok","affected":0}
+{"i":9,"h":"9b78df02","k":"ok","affected":0}
+{"i":10,"h":"3c36225f","k":"ok","affected":4}
+{"i":11,"h":"4303a9e0","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"],["4"]]}
+{"i":12,"h":"f2da81f7","k":"rows","cols":["name"],"rows":[["A"],["b"],["c"]]}
+{"i":13,"h":"5b1ca515","k":"rows","cols":["id","c"],"rows":[["1","1"],["2","1"]]}
+{"i":14,"h":"b5269bb4","k":"rows","cols":["id","name"],"rows":[["3","c"],["1","b"],["4","B"],["2","A"]]}
+{"i":15,"h":"4d55d02b","k":"rows","cols":["id"],"rows":[["3"],["1"]]}
+{"i":16,"h":"b53fd5d0","k":"ok","affected":0}
+{"i":17,"h":"1733bf95","k":"ok","affected":0}
+{"i":18,"h":"25fefe7e","k":"ok","affected":4}
+{"i":19,"h":"ce873837","k":"rows","cols":["a","b"],"rows":[[null,null],[null,"50"],["1","100"],["2","200"]]}
+{"i":20,"h":"5de9abf7","k":"err","code":1054,"msg":"Unknown column '99' in 'order clause'"}
+{"i":21,"h":"b4e7e3b2","k":"err","code":1054,"msg":"Unknown column '0' in 'order clause'"}
+{"i":22,"h":"5a616d9b","k":"rows","cols":["id","name"],"rows":[["1","b"],["2","A"],["3","c"],["4","B"]]}
+{"i":23,"h":"95e806a1","k":"rows","cols":["name"],"rows":[["A"],["B"],["b"],["c"]]}
+{"i":24,"h":"c0f37807","k":"ok","affected":0}
+{"i":25,"h":"6f577275","k":"ok","affected":0}
+{"i":26,"h":"6f50c401","k":"ok","affected":0}

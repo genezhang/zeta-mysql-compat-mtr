@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"d4916067","k":"err","code":1305,"msg":"FUNCTION public.length does not exist"}
+{"i":2,"h":"3b3815f6","k":"err","code":1305,"msg":"FUNCTION public.upper does not exist"}
+{"i":3,"h":"3d575e9d","k":"err","code":1305,"msg":"FUNCTION pg_catalog.length does not exist"}
+{"i":4,"h":"77c75061","k":"err","code":1305,"msg":"FUNCTION pg_catalog.current_database does not exist"}
+{"i":5,"h":"3ee8c789","k":"err","code":1630,"msg":"FUNCTION pg_catalog.now does not exist. Check the 'Function Name Parsing and Resolution' section in the Reference Manual"}
+{"i":6,"h":"8892cdf4","k":"err","code":1305,"msg":"FUNCTION pg_catalog.version does not exist"}
+{"i":7,"h":"9746ce6a","k":"ok","affected":0}
+{"i":8,"h":"795b0272","k":"ok","affected":3}
+{"i":9,"h":"9f3805ef","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '*) FROM sq_qtbl' at line 1"}
+{"i":10,"h":"4b11b84c","k":"err","code":1630,"msg":"FUNCTION public.sum does not exist. Check the 'Function Name Parsing and Resolution' section in the Reference Manual"}
+{"i":11,"h":"dca6a4bc","k":"ok","affected":0}
+{"i":12,"h":"042b7c3d","k":"err","code":1305,"msg":"FUNCTION nosuchschema.length does not exist"}
+{"i":13,"h":"abe35bc6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('x')' at line 1"}
+{"i":14,"h":"128c54f2","k":"rows","cols":["length('hi')"],"rows":[["2"]]}
+{"i":15,"h":"e3ed8049","k":"rows","cols":["upper('hi')"],"rows":[["HI"]]}
+{"i":16,"h":"1832b847","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regclass' at line 1"}
+{"i":17,"h":"4a5837ff","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regclass' at line 1"}
+{"i":18,"h":"86a1d988","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regtype' at line 1"}
+{"i":19,"h":"2faf2541","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regnamespace' at line 1"}
+{"i":20,"h":"fd538f29","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regrole' at line 1"}
+{"i":21,"h":"3fa3f9cf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regprocedure' at line 1"}
+{"i":22,"h":"54a79dc8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regproc' at line 1"}
+{"i":23,"h":"9042782c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::regoperator' at line 1"}
+{"i":24,"h":"84637ccf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::pg_catalog.regclass' at line 1"}

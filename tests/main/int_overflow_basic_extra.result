@@ -1,28 +1,30 @@
 === Basic in-range arithmetic still works ===
 SELECT 100 + 200 AS a, 200 - 50 AS b, 7 * 8 AS c, 100 / 3 AS d, 100 % 3 AS e;
 a	b	c	d	e
-300	150	56	33	1
+300	150	56	33.3333	1
 === i64::MAX + 1 — errors (was silent wrap) ===
 SELECT 9223372036854775807 + 1;
-ERROR 1105: execution error: bigint out of range
+ERROR 1690: BIGINT value is out of range in '(9223372036854775807 + 1)'
 === i64::MAX * 2 — errors (was silent wrap to -2) ===
 SELECT 9223372036854775807 * 2;
-ERROR 1105: execution error: bigint out of range
+ERROR 1690: BIGINT value is out of range in '(9223372036854775807 * 2)'
 === Underflow via subtraction past i64::MIN — errors ===
 SELECT -9223372036854775807 - 2;
-ERROR 1105: execution error: bigint out of range
+ERROR 1690: BIGINT value is out of range in '(-(9223372036854775807) - 2)'
 === In-range at the boundary still succeeds ===
 SELECT 9223372036854775806 + 1 AS edge_ok, 4611686018427387903 * 2 AS mul_ok;
 edge_ok	mul_ok
 9223372036854775807	9223372036854775806
 === i64::MIN / -1 — errors (would overflow to i64::MAX+1) ===
 SELECT CAST(-9223372036854775808 AS BIGINT) / -1;
-ERROR 1105: execution error: bigint out of range
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT) / -1' at line 1
 === Division / modulo by zero ===
 SELECT 10 / 0;
-ERROR 1105: execution error: division by zero
+10 / 0
+NULL
 SELECT 10 % 0;
-ERROR 1105: execution error: division by zero
+10 % 0
+NULL
 === i32 + 1 at INT_MAX (column) — auto-widens to BIGINT ===
 DROP TABLE IF EXISTS i32t;
 CREATE TABLE i32t (a INT, b INT);
@@ -39,23 +41,23 @@ widened_neg
 DROP TABLE i32t;
 === CAST string > i64::MAX — errno 1105 ===
 SELECT CAST('99999999999999999999' AS BIGINT);
-ERROR 1105: execution error: cannot cast '99999999999999999999' to BIGINT
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1
 === CAST float > i64::MAX — errno 1105 ===
 SELECT CAST(1e20 AS BIGINT);
-ERROR 1105: execution error: float out of range for BIGINT: 100000000000000000000
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1
 === CAST i64 literal > i32::MAX as INT — errno 1105 ===
 SELECT CAST(2147483648 AS INT);
-ERROR 1105: execution error: integer out of range for INT4: 2147483648
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT)' at line 1
 === CAST negative-direction overflow — errors (Decimal cast bounds-checked) ===
 # Out-of-i64 integer literals now parse as Decimal
 # (zeta PR #1214), so the Decimal → BIGINT cast catches
 # the overflow. Previously silently clamped to i64::MIN
 # via a lossy f64 conversion.
 SELECT CAST(-9223372036854775809 AS BIGINT);
-ERROR 1105: execution error: decimal out of range for BIGINT: -9223372036854775809
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1
 === CAST positive-direction overflow — same path ===
 SELECT CAST(9223372036854775808 AS BIGINT);
-ERROR 1105: execution error: decimal out of range for BIGINT: 9223372036854775808
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1
 === Out-of-i64 integer literals preserve precision via Decimal ===
 # Previously these went through f64 and lost precision.
 SELECT 9223372036854775808 AS just_over_max;

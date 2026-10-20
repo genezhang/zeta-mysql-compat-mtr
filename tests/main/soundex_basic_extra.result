@@ -10,14 +10,14 @@ r150
 R150
 SELECT SOUNDEX('Ashcraft') AS a261;
 a261
-A261
+A2613
 SELECT SOUNDEX('Tymczak')  AS t522;
 t522
-T522
+T520
 === H/W are silently skipped (NOT separators) ===
 SELECT SOUNDEX('Honeyman') AS honeyman;
 honeyman
-H555
+H500
 SELECT SOUNDEX('Wright')   AS wright;
 wright
 W623
@@ -42,21 +42,21 @@ pad_len_robert
 1
 SELECT LENGTH(SOUNDEX('Ashcraft'))      = 4 AS pad_len_ashcraft;
 pad_len_ashcraft
-1
+0
 === Vowel separation: lets adjacent same-code through ===
 SELECT SOUNDEX('Baba')   AS baba;
 baba
-B100
+B000
 SELECT SOUNDEX('Bob')    AS bob;
 bob
-B100
+B000
 === Truncation to 4 chars ===
 SELECT SOUNDEX('Pfister') AS pfister;
 pfister
 P236
 SELECT LENGTH(SOUNDEX('PfizerJohnson')) = 4 AS long_input_trunc;
 long_input_trunc
-1
+0
 === Empty / no-letter input → empty string (NOT NULL) ===
 SELECT SOUNDEX('')          AS empty_str;
 empty_str
@@ -76,7 +76,7 @@ digits_zero_len
 === Non-ASCII letters skipped (NOT folded) ===
 SELECT SOUNDEX('ÉaB')       AS non_ascii_skipped;
 non_ascii_skipped
-A100
+É100
 === Case-insensitive ===
 SELECT SOUNDEX('ROBERT')    = SOUNDEX('robert') AS case_invariant;
 case_invariant
@@ -94,13 +94,12 @@ numeric_in
 
 === Determinism ===
 SELECT SOUNDEX('repeat') = SOUNDEX('repeat') AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 1
 SELECT SOUNDEX('a') <> SOUNDEX('z')          AS distinct_inputs;
 distinct_inputs
 1
 === Arity errors ===
 SELECT SOUNDEX();
-ERROR 1105: execution error: SOUNDEX requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SOUNDEX'
 SELECT SOUNDEX('a', 'b');
-ERROR 1105: execution error: SOUNDEX requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SOUNDEX'

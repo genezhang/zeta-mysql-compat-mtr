@@ -1,0 +1,24 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":23}
+{"i":1,"h":"8efe9db8","k":"rows","cols":["one_hr_one_min_six_sec"],"rows":[["01:01:06"]]}
+{"i":2,"h":"4358947b","k":"rows","cols":["midnight"],"rows":[["00:00:00"]]}
+{"i":3,"h":"b42e4dbc","k":"rows","cols":["one_day_boundary"],"rows":[["24:00:00"]]}
+{"i":4,"h":"eb94b385","k":"rows","cols":["n"],"rows":[[null]]}
+{"i":5,"h":"b8a7383f","k":"rows","cols":["SEC_TO_TIME(86401)"],"rows":[["24:00:01"]]}
+{"i":6,"h":"8a62e3a2","k":"rows","cols":["SEC_TO_TIME(-1)"],"rows":[["-00:00:01"]]}
+{"i":7,"h":"eb86a288","k":"rows","cols":["hms"],"rows":[["3666"]]}
+{"i":8,"h":"fcc48bee","k":"rows","cols":["day_end"],"rows":[["86399"]]}
+{"i":9,"h":"143bbefb","k":"rows","cols":["zero"],"rows":[["0"]]}
+{"i":10,"h":"77341bc8","k":"rows","cols":["str_one_hr"],"rows":[["3600"]]}
+{"i":11,"h":"cb6acda7","k":"rows","cols":["n"],"rows":[[null]]}
+{"i":12,"h":"7900623d","k":"rows","cols":["TIME_TO_SEC('not a time')"],"rows":[[null]]}
+{"i":13,"h":"dd8deb59","k":"rows","cols":["rt"],"rows":[["3661"]]}
+{"i":14,"h":"891fa21d","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SEC_TO_TIME'"}
+{"i":15,"h":"9e355a35","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SEC_TO_TIME'"}
+{"i":16,"h":"c4e62973","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'TIME_TO_SEC'"}
+{"i":17,"h":"cfef4297","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'TIME_TO_SEC'"}
+{"i":18,"h":"6d54cedd","k":"ok","affected":0}
+{"i":19,"h":"d190f757","k":"ok","affected":0}
+{"i":20,"h":"3a3a997a","k":"ok","affected":3}
+{"i":21,"h":"5d50d13f","k":"rows","cols":["id","s"],"rows":[["1","30"],["2","3600"],["3","9000"]]}
+{"i":22,"h":"904b2d84","k":"rows","cols":["id"],"rows":[["3"]]}
+{"i":23,"h":"c34e7944","k":"ok","affected":0}

@@ -50,30 +50,26 @@ n4
 NULL
 === Invalid period (month=0 or >12) → NULL ===
 SELECT PERIOD_ADD(202000, 1)        AS month_zero;
-month_zero
-NULL
+ERROR 1210: Incorrect arguments to period_add
 SELECT PERIOD_ADD(202013, 1)        AS month_thirteen;
-month_thirteen
-NULL
+ERROR 1210: Incorrect arguments to period_add
 SELECT PERIOD_DIFF(202013, 202001)  AS p1_bad;
-p1_bad
-NULL
+ERROR 1210: Incorrect arguments to period_diff
 SELECT PERIOD_DIFF(202001, 202000)  AS p2_bad;
-p2_bad
-NULL
+ERROR 1210: Incorrect arguments to period_diff
 === Zero diff for equal periods ===
 SELECT PERIOD_DIFF(202001, 202001)  AS zero_diff;
 zero_diff
 0
 === Arity errors ===
 SELECT PERIOD_ADD();
-ERROR 1105: execution error: PERIOD_ADD requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'PERIOD_ADD'
 SELECT PERIOD_ADD(1);
-ERROR 1105: execution error: PERIOD_ADD requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'PERIOD_ADD'
 SELECT PERIOD_DIFF(1);
-ERROR 1105: execution error: PERIOD_DIFF requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'PERIOD_DIFF'
 SELECT PERIOD_DIFF(1, 2, 3);
-ERROR 1105: execution error: PERIOD_DIFF requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'PERIOD_DIFF'
 === Against an INT column ===
 DROP TABLE IF EXISTS pf_test;
 CREATE TABLE pf_test (id INT, period INT);

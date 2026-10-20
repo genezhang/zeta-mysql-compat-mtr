@@ -49,9 +49,9 @@ n_left_iv
 NULL
 === Arity errors ===
 SELECT ADDDATE('2024-03-15');
-ERROR 1105: execution error: ADDDATE requires exactly 2 arguments (date/timestamp, interval)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT SUBDATE('2024-03-15', 1, 1);
-ERROR 1105: execution error: SUBDATE requires exactly 2 arguments (date/timestamp, interval)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 1)' at line 1
 === Against a DATE column ===
 DROP TABLE IF EXISTS add_sub_test;
 CREATE TABLE add_sub_test (id INT, d DATE);

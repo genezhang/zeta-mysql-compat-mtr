@@ -86,6 +86,6 @@ SELECT id,
                     EXCLUDE CURRENT ROW) AS sw
   FROM wf
   ORDER BY id;
-ERROR 1064: SQL parse error: sql parser error: Expected: ), found: EXCLUDE at Line: 3, Column: 21
+ERROR 1235: This version of MySQL doesn't yet support 'EXCLUDE'
 === Cleanup ===
 DROP TABLE wf;

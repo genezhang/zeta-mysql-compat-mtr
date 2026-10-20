@@ -1,42 +1,62 @@
 === CREATE EXTENSION — six whitelisted (silent accept) ===
 CREATE EXTENSION plpgsql;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION plpgsql' at line 1
 CREATE EXTENSION "uuid-ossp";
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION "uuid-ossp"' at line 1
 CREATE EXTENSION pgcrypto;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION pgcrypto' at line 1
 CREATE EXTENSION pg_stat_statements;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION pg_stat_statements' at line 1
 CREATE EXTENSION citext;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION citext' at line 1
 CREATE EXTENSION pg_trgm;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION pg_trgm' at line 1
 === CREATE EXTENSION IF NOT EXISTS — silent on whitelisted ===
 CREATE EXTENSION IF NOT EXISTS plpgsql;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION IF NOT EXISTS plpgsql' at line 1
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION IF NOT EXISTS "uuid-ossp"' at line 1
 === Unknown extension WITHOUT IF NOT EXISTS → 1105 ===
 CREATE EXTENSION postgis;
-ERROR 1105: execution error: extension "postgis" is not available — Zeta does not support PostgreSQL C extensions. Natively supported: plpgsql, uuid-ossp, pgcrypto, pg_stat_statements, citext, pg_trgm
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION postgis' at line 1
 CREATE EXTENSION "hstore";
-ERROR 1105: execution error: extension "hstore" is not available — Zeta does not support PostgreSQL C extensions. Natively supported: plpgsql, uuid-ossp, pgcrypto, pg_stat_statements, citext, pg_trgm
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION "hstore"' at line 1
 CREATE EXTENSION ltree;
-ERROR 1105: execution error: extension "ltree" is not available — Zeta does not support PostgreSQL C extensions. Natively supported: plpgsql, uuid-ossp, pgcrypto, pg_stat_statements, citext, pg_trgm
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION ltree' at line 1
 === CREATE EXTENSION IF NOT EXISTS — swallows unknown ===
 CREATE EXTENSION IF NOT EXISTS postgis;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION IF NOT EXISTS postgis' at line 1
 CREATE EXTENSION IF NOT EXISTS "hstore";
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION IF NOT EXISTS "hstore"' at line 1
 CREATE EXTENSION IF NOT EXISTS unknown_made_up_name;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION IF NOT EXISTS unknown_made_up_name' at line 1
 === STRIKING: case-insensitive in both unquoted AND quoted forms ===
 CREATE EXTENSION PLPGSQL;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION PLPGSQL' at line 1
 CREATE EXTENSION PgCrypto;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION PgCrypto' at line 1
 CREATE EXTENSION "PLPGSQL";
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION "PLPGSQL"' at line 1
 CREATE EXTENSION "PgCrypto";
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION "PgCrypto"' at line 1
 CREATE EXTENSION "UUID-OSSP";
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION "UUID-OSSP"' at line 1
 === DROP EXTENSION — ALWAYS no-op (whitelisted and unknown) ===
 DROP EXTENSION plpgsql;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION plpgsql' at line 1
 DROP EXTENSION "uuid-ossp";
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION "uuid-ossp"' at line 1
 DROP EXTENSION pgcrypto;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION pgcrypto' at line 1
 DROP EXTENSION made_up_name;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION made_up_name' at line 1
 === DROP EXTENSION IF EXISTS — also silent ===
 DROP EXTENSION IF EXISTS plpgsql;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION IF EXISTS plpgsql' at line 1
 DROP EXTENSION IF EXISTS never_existed;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXTENSION IF EXISTS never_existed' at line 1
 === Sanity after DROPs — whitelisted functions STILL work ===
 SELECT LENGTH(GEN_RANDOM_UUID()) AS uuid_still_works;
-uuid_still_works
-36
+ERROR 1305: FUNCTION test.GEN_RANDOM_UUID does not exist
 SELECT SIMILARITY('cat', 'cat') AS trgm_still_works;
-trgm_still_works
-1
+ERROR 1305: FUNCTION test.SIMILARITY does not exist

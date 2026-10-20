@@ -1,0 +1,21 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":20}
+{"i":1,"h":"6cb46fc2","k":"ok","affected":0}
+{"i":2,"h":"48abe72b","k":"ok","affected":0}
+{"i":3,"h":"da9f59ca","k":"ok","affected":1}
+{"i":4,"h":"bebd403d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON TABLE ct IS 'my table'' at line 1"}
+{"i":5,"h":"fd7a0a9c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON COLUMN ct.n IS 'numeric column'' at line 1"}
+{"i":6,"h":"0d116f88","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON SCHEMA public IS 'public schema'' at line 1"}
+{"i":7,"h":"e4e57820","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON TABLE ct IS NULL' at line 1"}
+{"i":8,"h":"d33aa29b","k":"rows","cols":["TABLE_NAME","TABLE_COMMENT"],"rows":[["ct",""]],"nd":"order","unordered":true}
+{"i":9,"h":"f69045a8","k":"rows","cols":["COLUMN_NAME","COLUMN_COMMENT"],"rows":[["id",""],["n",""]]}
+{"i":10,"h":"c0daf65b","k":"ok","affected":0}
+{"i":11,"h":"5e11e6d6","k":"ok","affected":0}
+{"i":12,"h":"e19e2514","k":"ok","affected":0}
+{"i":13,"h":"5bdb43cd","k":"rows","cols":["Table","Create Table"],"rows":[["mct","CREATE TABLE `mct` (\n  `id` int NOT NULL COMMENT 'pk col',\n  `n` int DEFAULT NULL COMMENT 'a number',\n  PRIMARY KEY (`id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='my mysql table'"]]}
+{"i":14,"h":"ad986d3a","k":"rows","cols":["TABLE_NAME","TABLE_COMMENT"],"rows":[["mct","my mysql table"]],"nd":"order","unordered":true}
+{"i":15,"h":"c87ce697","k":"rows","cols":["COLUMN_NAME","COLUMN_COMMENT"],"rows":[["id","pk col"],["n","a number"]]}
+{"i":16,"h":"6ac6a2f6","k":"ok","affected":0}
+{"i":17,"h":"2362f986","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON INDEX no_such_ix IS 'idx comment'' at line 1"}
+{"i":18,"h":"abf052b3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON FUNCTION no_fn() IS 'fn comment'' at line 1"}
+{"i":19,"h":"26d345c1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON SEQUENCE no_seq IS 'seq comment'' at line 1"}
+{"i":20,"h":"5153e2ba","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}

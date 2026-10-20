@@ -1,0 +1,24 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":23}
+{"i":1,"h":"fa5452c6","k":"rows","cols":["a","b","c","d","e"],"rows":[["300","150","56","33.3333","1"]]}
+{"i":2,"h":"c879970f","k":"err","code":1690,"msg":"BIGINT value is out of range in '(9223372036854775807 + 1)'"}
+{"i":3,"h":"db791e8d","k":"err","code":1690,"msg":"BIGINT value is out of range in '(9223372036854775807 * 2)'"}
+{"i":4,"h":"7a5f4720","k":"err","code":1690,"msg":"BIGINT value is out of range in '(-(9223372036854775807) - 2)'"}
+{"i":5,"h":"d79cc51c","k":"rows","cols":["edge_ok","mul_ok"],"rows":[["9223372036854775807","9223372036854775806"]]}
+{"i":6,"h":"9231f379","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT) / -1' at line 1"}
+{"i":7,"h":"c62cc111","k":"rows","cols":["10 / 0"],"rows":[[null]]}
+{"i":8,"h":"74bbbb13","k":"rows","cols":["10 % 0"],"rows":[[null]]}
+{"i":9,"h":"f89ea989","k":"ok","affected":0}
+{"i":10,"h":"eb3c6a2a","k":"ok","affected":0}
+{"i":11,"h":"4708e138","k":"ok","affected":1}
+{"i":12,"h":"ce9cf5c9","k":"rows","cols":["widened"],"rows":[["2147483648"]]}
+{"i":13,"h":"55ae4026","k":"ok","affected":1}
+{"i":14,"h":"436f9be4","k":"ok","affected":1}
+{"i":15,"h":"9b37244a","k":"rows","cols":["widened_neg"],"rows":[["-2147483649"]]}
+{"i":16,"h":"c4c7f776","k":"ok","affected":0}
+{"i":17,"h":"8f353e8b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1"}
+{"i":18,"h":"a83f0fe5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1"}
+{"i":19,"h":"f16e7ca5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT)' at line 1"}
+{"i":20,"h":"901b5128","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1"}
+{"i":21,"h":"038a4c32","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)' at line 1"}
+{"i":22,"h":"2daca830","k":"rows","cols":["just_over_max"],"rows":[["9223372036854775808"]]}
+{"i":23,"h":"c17056b0","k":"rows","cols":["exact_add"],"rows":[["9223372036854775809"]]}

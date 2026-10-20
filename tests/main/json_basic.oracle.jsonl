@@ -1,0 +1,49 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":48}
+{"i":1,"h":"834d12a3","k":"ok","affected":0}
+{"i":2,"h":"7a6e6910","k":"ok","affected":0}
+{"i":3,"h":"91e84194","k":"ok","affected":3}
+{"i":4,"h":"ba8cf6ef","k":"rows","cols":["id","data"],"rows":[["1","{\"age\": 30, \"name\": \"alice\"}"],["2","[1, 2, 3]"],["3","{\"a\": {\"b\": 42}}"]]}
+{"i":5,"h":"7a7b429f","k":"rows","cols":["o"],"rows":[["{\"k1\": \"v1\", \"k2\": 42}"]]}
+{"i":6,"h":"fc62c28c","k":"rows","cols":["a"],"rows":[["[1, 2, 3, \"x\"]"]]}
+{"i":7,"h":"e054aa5f","k":"rows","cols":["name"],"rows":[["\"alice\""]]}
+{"i":8,"h":"974b8f7d","k":"err","code":3143,"msg":"Invalid JSON path expression. The error is around character position 1."}
+{"i":9,"h":"1080c196","k":"err","code":3143,"msg":"Invalid JSON path expression. The error is around character position 1."}
+{"i":10,"h":"ec07fcad","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '0 AS first FROM j WHERE id = 2' at line 1"}
+{"i":11,"h":"e20f915b","k":"rows","cols":["id","t"],"rows":[["1","OBJECT"],["2","ARRAY"],["3","OBJECT"]]}
+{"i":12,"h":"f68f9700","k":"rows","cols":["ok"],"rows":[["1"]]}
+{"i":13,"h":"59cabca7","k":"rows","cols":["q"],"rows":[["\"hello\""]]}
+{"i":14,"h":"782fbd08","k":"rows","cols":["u"],"rows":[["hello"]]}
+{"i":15,"h":"7298896b","k":"rows","cols":["c"],"rows":[["{\"x\": 1}"]]}
+{"i":16,"h":"808d1ba4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@> '{\"name\":\"alice\"}' AS contains FROM j WHERE id = 1' at line 1"}
+{"i":17,"h":"dac75123","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '? 'name' AS has_name FROM j WHERE id = 1' at line 1"}
+{"i":18,"h":"f5a739d7","k":"rows","cols":["id","n"],"rows":[["1","2"],["2","3"],["3","1"]]}
+{"i":19,"h":"841911dd","k":"rows","cols":["scalar_n"],"rows":[["1"]]}
+{"i":20,"h":"6ac5f5cf","k":"rows","cols":["null_n"],"rows":[[null]]}
+{"i":21,"h":"e0709407","k":"rows","cols":["k"],"rows":[["[\"age\", \"name\"]"]]}
+{"i":22,"h":"e0709a2e","k":"rows","cols":["k"],"rows":[[null]]}
+{"i":23,"h":"e07095e1","k":"rows","cols":["k"],"rows":[["[\"a\"]"]]}
+{"i":24,"h":"ab91ca0d","k":"rows","cols":["null_k"],"rows":[[null]]}
+{"i":25,"h":"4070eb0f","k":"rows","cols":["s"],"rows":[["{\"a\": 99}"]]}
+{"i":26,"h":"bbf6d291","k":"rows","cols":["s"],"rows":[["{\"a\": 1, \"b\": 2}"]]}
+{"i":27,"h":"72b5ccd3","k":"rows","cols":["s"],"rows":[["{\"a\": 2, \"b\": 3}"]]}
+{"i":28,"h":"e10b650e","k":"rows","cols":["s"],"rows":[["{\"a\": 1, \"b\": 2}"]]}
+{"i":29,"h":"95d275a9","k":"rows","cols":["s"],"rows":[["{\"a\": 1}"]]}
+{"i":30,"h":"332b4456","k":"rows","cols":["s"],"rows":[["{\"a\": 99}"]]}
+{"i":31,"h":"c30e9708","k":"rows","cols":["s"],"rows":[["{\"a\": 1}"]]}
+{"i":32,"h":"496cb233","k":"rows","cols":["d"],"rows":[["1"]]}
+{"i":33,"h":"02a2305e","k":"rows","cols":["d"],"rows":[["1"]]}
+{"i":34,"h":"2076b1c6","k":"rows","cols":["d"],"rows":[["2"]]}
+{"i":35,"h":"290e7e8c","k":"rows","cols":["d"],"rows":[["3"]]}
+{"i":36,"h":"e16dab8c","k":"rows","cols":["d"],"rows":[["4"]]}
+{"i":37,"h":"73c330c7","k":"rows","cols":["r"],"rows":[["1"]]}
+{"i":38,"h":"fad78514","k":"rows","cols":["r"],"rows":[["0"]]}
+{"i":39,"h":"5838311e","k":"rows","cols":["r"],"rows":[["1"]]}
+{"i":40,"h":"06e56580","k":"rows","cols":["r"],"rows":[["0"]]}
+{"i":41,"h":"5f1e6900","k":"rows","cols":["r"],"rows":[["1"]]}
+{"i":42,"h":"32f43ef6","k":"rows","cols":["r"],"rows":[[null]]}
+{"i":43,"h":"6cf824fc","k":"ok","affected":0}
+{"i":44,"h":"f78ff610","k":"ok","affected":0}
+{"i":45,"h":"95abc4b8","k":"ok","affected":3}
+{"i":46,"h":"d080877f","k":"rows","cols":["o"],"rows":[["{\"a\": 1, \"b\": 2, \"c\": 3}"]]}
+{"i":47,"h":"c0ce8f39","k":"ok","affected":0}
+{"i":48,"h":"46efb76d","k":"ok","affected":0}

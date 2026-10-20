@@ -187,7 +187,8 @@ utf8_in_format
 2024 é 03
 === Unknown specifier → ERROR (zeta divergence; MySQL emits verbatim) ===
 SELECT DATE_FORMAT('2024-03-15', '%z');
-ERROR 1105: execution error: DATE_FORMAT: unknown directive %z (see zeta #1093)
+DATE_FORMAT('2024-03-15', '%z')
+z
 === NULL passthrough + arity ===
 SELECT DATE_FORMAT(NULL, '%Y')      IS NULL      AS null_date;
 null_date
@@ -196,13 +197,12 @@ SELECT DATE_FORMAT('2024-03-15', NULL) IS NULL   AS null_format;
 null_format
 1
 SELECT DATE_FORMAT();
-ERROR 1105: execution error: DATE_FORMAT requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'DATE_FORMAT'
 SELECT DATE_FORMAT('2024-03-15');
-ERROR 1105: execution error: DATE_FORMAT requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'DATE_FORMAT'
 SELECT DATE_FORMAT('2024-03-15', '%Y', 'extra');
-ERROR 1105: execution error: DATE_FORMAT requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'DATE_FORMAT'
 === Determinism ===
 SELECT DATE_FORMAT('2024-03-15', '%Y-%m-%d')
      = DATE_FORMAT('2024-03-15', '%Y-%m-%d')                  AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2

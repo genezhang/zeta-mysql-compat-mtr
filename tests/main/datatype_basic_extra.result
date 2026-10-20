@@ -1,45 +1,47 @@
 === UUID column type ===
 DROP TABLE IF EXISTS dt_u;
 CREATE TABLE dt_u (id INT PRIMARY KEY, u UUID);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'UUID)' at line 1
 INSERT INTO dt_u VALUES (1, '550e8400-e29b-41d4-a716-446655440000');
+ERROR 1146: Table 'test.dt_u' doesn't exist
 SELECT id, u FROM dt_u;
-id	u
-1	550e8400-e29b-41d4-a716-446655440000
+ERROR 1146: Table 'test.dt_u' doesn't exist
 === JSONB column + -> and ->> path operators ===
 DROP TABLE IF EXISTS dt_j;
 CREATE TABLE dt_j (id INT PRIMARY KEY, data JSONB);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)' at line 1
 INSERT INTO dt_j VALUES (1, '{"name":"alice","age":30}');
+ERROR 1146: Table 'test.dt_j' doesn't exist
 SELECT id, data -> 'name' AS name_jsonb, data -> 'age' AS age FROM dt_j;
-id	name_jsonb	age
-1	"alice"	30
+ERROR 1146: Table 'test.dt_j' doesn't exist
 SELECT id, data ->> 'name' AS name_text FROM dt_j;
-id	name_text
-1	alice
+ERROR 1146: Table 'test.dt_j' doesn't exist
 === JSONB ? exists operator ===
 SELECT '{"a":1}'::JSONB ? 'a' AS has_a, '{"a":1}'::JSONB ? 'b' AS has_b;
-has_a	has_b
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB ? 'a' AS has_a, '{"a":1}'::JSONB ? 'b' AS has_b' at line 1
 === ARRAY column + literal + indexing + ARRAY_LENGTH ===
 # KNOWN DIVERGENCE: the array column display uses Rust's
 # Debug formatter (zeta-internal), not PG's `{red,green}`.
 DROP TABLE IF EXISTS dt_a;
 CREATE TABLE dt_a (id INT PRIMARY KEY, tags TEXT[]);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[])' at line 1
 INSERT INTO dt_a VALUES (1, ARRAY['red', 'green']);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '['red', 'green'])' at line 1
 SELECT id, tags[1] AS first, ARRAY_LENGTH(tags, 1) AS len FROM dt_a;
-id	first	len
-1	red	2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1] AS first, ARRAY_LENGTH(tags, 1) AS len FROM dt_a' at line 1
 === Array @> contains operator ===
 SELECT ARRAY[1, 2, 3] @> ARRAY[1, 2] AS contains_subset,
        ARRAY[1, 2, 3] @> ARRAY[9]   AS contains_missing;
-contains_subset	contains_missing
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3] @> ARRAY[1, 2] AS contains_subset,
+       ARRAY[1, 2, 3] @> ARRAY[9]  ' at line 1
 === INTERVAL column ===
 DROP TABLE IF EXISTS dt_i;
 CREATE TABLE dt_i (id INT PRIMARY KEY, dur INTERVAL);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTERVAL)' at line 1
 INSERT INTO dt_i VALUES (1, INTERVAL '1 hour');
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT id, dur FROM dt_i;
-id	dur
-1	01:00:00
+ERROR 1146: Table 'test.dt_i' doesn't exist
 === NUMERIC ≡ DECIMAL (aliases) ===
 DROP TABLE IF EXISTS dt_n;
 CREATE TABLE dt_n (id INT PRIMARY KEY, n1 NUMERIC(10,2), n2 DECIMAL(10,2));
@@ -56,19 +58,13 @@ id	r	d
 1	3.14	2.71828
 === UNNEST in FROM clause ===
 SELECT v FROM UNNEST(ARRAY[10, 20, 30]) AS t(v) ORDER BY v;
-v
-10
-20
-30
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ARRAY[10, 20, 30]) AS t(v) ORDER BY v' at line 1
 === generate_series in FROM ===
 SELECT v FROM generate_series(1, 3) AS t(v) ORDER BY v;
-v
-1
-2
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 3) AS t(v) ORDER BY v' at line 1
 === KNOWN GAP: UNNEST as scalar expression — errno 1105 ===
 SELECT UNNEST(ARRAY[1, 2, 3]);
-ERROR 1105: execution error: unknown function: UNNEST
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3])' at line 1
 === KNOWN DIVERGENCE: CHAR(N) does NOT pad to N chars ===
 # 'ab' stored in CHAR(5) stays 2 chars (zeta); PG/MySQL
 # would pad to 5.
@@ -80,9 +76,13 @@ id	c	len
 1	ab	2
 === Cleanup ===
 DROP TABLE dt_u;
+ERROR 1051: Unknown table 'test.dt_u'
 DROP TABLE dt_j;
+ERROR 1051: Unknown table 'test.dt_j'
 DROP TABLE dt_a;
+ERROR 1051: Unknown table 'test.dt_a'
 DROP TABLE dt_i;
+ERROR 1051: Unknown table 'test.dt_i'
 DROP TABLE dt_n;
 DROP TABLE dt_r;
 DROP TABLE dt_c;

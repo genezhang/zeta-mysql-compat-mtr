@@ -1,43 +1,34 @@
 === UUID_NIL — all-zero UUID sentinel ===
 SELECT UUID_NIL()                                             AS nil_uuid;
-nil_uuid
-00000000-0000-0000-0000-000000000000
+ERROR 1305: FUNCTION test.UUID_NIL does not exist
 SELECT LENGTH(UUID_NIL())                                     AS len_36;
-len_36
-36
+ERROR 1305: FUNCTION test.UUID_NIL does not exist
 SELECT UUID_NIL() = UUID_NIL()                                AS self_eq_1;
-self_eq_1
-1
+ERROR 1305: FUNCTION test.UUID_NIL does not exist
 SELECT UUID_NIL() <> GEN_RANDOM_UUID()                        AS nil_ne_random;
-nil_ne_random
-1
+ERROR 1305: FUNCTION test.UUID_NIL does not exist
 SELECT UUID_NIL() = '00000000-0000-0000-0000-000000000000'    AS matches_canonical_zero;
-matches_canonical_zero
-1
+ERROR 1305: FUNCTION test.UUID_NIL does not exist
 === UUID_NIL — wrong-arg error ===
 SELECT UUID_NIL(1);
-ERROR 1105: execution error: uuid_nil() takes no arguments
+ERROR 1305: FUNCTION test.UUID_NIL does not exist
 SELECT UUID_NIL('a', 'b');
-ERROR 1105: execution error: uuid_nil() takes no arguments
+ERROR 1305: FUNCTION test.UUID_NIL does not exist
 === ZETA_LAST_COMMIT_HLC — vendor HLC inspector ===
 SELECT ZETA_LAST_COMMIT_HLC() >= 0                            AS hlc_non_negative;
-hlc_non_negative
-1
+ERROR 1305: FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist
 SELECT ZETA_LAST_COMMIT_HLC() = ZETA_LAST_COMMIT_HLC()        AS hlc_stable_in_stmt;
-hlc_stable_in_stmt
-1
+ERROR 1305: FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist
 BEGIN;
 COMMIT;
 SELECT ZETA_LAST_COMMIT_HLC() IS NOT NULL                     AS post_commit_hlc_defined;
-post_commit_hlc_defined
-1
+ERROR 1305: FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist
 === ZETA_LAST_COMMIT_HLC — wrong-arg error ===
 SELECT ZETA_LAST_COMMIT_HLC(1);
-ERROR 1105: execution error: zeta_last_commit_hlc() takes no arguments
+ERROR 1305: FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist
 SELECT ZETA_LAST_COMMIT_HLC('a');
-ERROR 1105: execution error: zeta_last_commit_hlc() takes no arguments
+ERROR 1305: FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist
 === Cross-function: type independence ===
 SELECT UUID_NIL() IS NOT NULL,
        ZETA_LAST_COMMIT_HLC() >= 0                            AS types_distinct;
-UUID_NIL() IS NOT NULL	types_distinct
-1	1
+ERROR 1305: FUNCTION test.UUID_NIL does not exist

@@ -1,60 +1,52 @@
 === CREATE TYPE AS ENUM (PG form) + table column + INSERT + SELECT ===
 DROP TABLE IF EXISTS e1;
 DROP TYPE IF EXISTS mood;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS mood' at line 1
 CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE mood AS ENUM ('sad', 'ok', 'happy')' at line 1
 CREATE TABLE e1 (id INT PRIMARY KEY, m mood);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'mood)' at line 1
 INSERT INTO e1 VALUES (1, 'sad'), (2, 'ok'), (3, 'happy'), (4, 'sad');
+ERROR 1146: Table 'test.e1' doesn't exist
 SELECT id, m FROM e1 ORDER BY id;
-id	m
-1	sad
-2	ok
-3	happy
-4	sad
+ERROR 1146: Table 'test.e1' doesn't exist
 === ORDER BY follows DECLARATION order (sad < ok < happy) ===
 # Note: alphabetical would put 'happy' first.
 SELECT id, m FROM e1 ORDER BY m, id;
-id	m
-1	sad
-4	sad
-2	ok
-3	happy
+ERROR 1146: Table 'test.e1' doesn't exist
 === Equality and ordered comparison ===
 SELECT id FROM e1 WHERE m = 'happy';
-id
-3
+ERROR 1146: Table 'test.e1' doesn't exist
 SELECT id, m FROM e1 WHERE m > 'sad' ORDER BY id;
-id	m
-2	ok
-3	happy
+ERROR 1146: Table 'test.e1' doesn't exist
 === INSERT of an invalid value — errno 1105 ===
 INSERT INTO e1 VALUES (5, 'bogus');
-ERROR 1105: execution error: invalid input value for enum mood: "bogus"
+ERROR 1146: Table 'test.e1' doesn't exist
 === UPDATE to a valid value ===
 UPDATE e1 SET m = 'ok' WHERE id = 1;
+ERROR 1146: Table 'test.e1' doesn't exist
 SELECT id, m FROM e1 ORDER BY id;
-id	m
-1	ok
-2	ok
-3	happy
-4	sad
+ERROR 1146: Table 'test.e1' doesn't exist
 DROP TABLE e1;
+ERROR 1051: Unknown table 'test.e1'
 DROP TYPE mood;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE mood' at line 1
 === ::enum cast and CAST(text AS enum) ===
 DROP TYPE IF EXISTS color;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS color' at line 1
 CREATE TYPE color AS ENUM ('red', 'green', 'blue');
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE color AS ENUM ('red', 'green', 'blue')' at line 1
 SELECT 'red'::color AS r1, CAST('blue' AS color) AS r2;
-r1	r2
-red	blue
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color AS r1, CAST('blue' AS color) AS r2' at line 1
 SELECT 'red'::color = 'red'::color AS eq, 'red'::color <> 'blue'::color AS neq;
-eq	neq
-1	1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color = 'red'::color AS eq, 'red'::color <> 'blue'::color AS neq' at line 1
 SELECT 'red'::color < 'blue'::color AS lt;
-lt
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color < 'blue'::color AS lt' at line 1
 === ::enum cast on invalid string — errno 1105 ===
 SELECT 'bogus'::color AS r;
-ERROR 1105: execution error: invalid input value for enum color: "bogus"
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color AS r' at line 1
 DROP TYPE color;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE color' at line 1
 === MySQL inline form: column ENUM('a','b','c') ===
 DROP TABLE IF EXISTS my_enum;
 CREATE TABLE my_enum (id INT PRIMARY KEY, c ENUM('red', 'green', 'blue'));
@@ -64,44 +56,56 @@ id	c
 1	red
 2	green
 INSERT INTO my_enum VALUES (3, 'bogus');
-ERROR 1105: execution error: invalid input value for enum test.public.my_enum_c_enum: "bogus"
+ERROR 1265: Data truncated for column 'c' at row 1
 DROP TABLE my_enum;
 === ALTER TYPE … ADD VALUE ===
 DROP TYPE IF EXISTS extending;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS extending' at line 1
 CREATE TYPE extending AS ENUM ('a', 'b');
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE extending AS ENUM ('a', 'b')' at line 1
 ALTER TYPE extending ADD VALUE 'c';
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE extending ADD VALUE 'c'' at line 1
 SELECT 'c'::extending AS r;
-r
-c
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::extending AS r' at line 1
 DROP TYPE extending;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE extending' at line 1
 === DROP TYPE IF EXISTS — no-op on missing ===
 DROP TYPE IF EXISTS no_such_type;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS no_such_type' at line 1
 === DROP TYPE on missing — errno 1105 ===
 DROP TYPE no_such_type;
-ERROR 1105: execution error: type "no_such_type" does not exist
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE no_such_type' at line 1
 === Empty ENUM accepted at parse time; cast errors 1105 ===
 DROP TYPE IF EXISTS empty_enum;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS empty_enum' at line 1
 CREATE TYPE empty_enum AS ENUM ();
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE empty_enum AS ENUM ()' at line 1
 SELECT 'a'::empty_enum AS r;
-ERROR 1105: execution error: invalid input value for enum empty_enum: "a"
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_enum AS r' at line 1
 DROP TYPE empty_enum;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE empty_enum' at line 1
 === ENUM value with whitespace ===
 DROP TYPE IF EXISTS ws_enum;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS ws_enum' at line 1
 CREATE TYPE ws_enum AS ENUM ('with space', 'no space');
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE ws_enum AS ENUM ('with space', 'no space')' at line 1
 SELECT 'with space'::ws_enum AS r;
-r
-with space
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::ws_enum AS r' at line 1
 DROP TYPE ws_enum;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE ws_enum' at line 1
 === COALESCE on ENUM column with ENUM literal ===
 DROP TABLE IF EXISTS tasks;
 DROP TYPE IF EXISTS status;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS status' at line 1
 CREATE TYPE status AS ENUM ('new', 'open', 'closed');
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE status AS ENUM ('new', 'open', 'closed')' at line 1
 CREATE TABLE tasks (id INT PRIMARY KEY, s status);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'status)' at line 1
 INSERT INTO tasks VALUES (1, 'new'), (2, 'closed'), (3, NULL);
+ERROR 1146: Table 'test.tasks' doesn't exist
 SELECT id, COALESCE(s, 'new'::status) AS s FROM tasks ORDER BY id;
-id	s
-1	new
-2	closed
-3	new
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::status) AS s FROM tasks ORDER BY id' at line 1
 DROP TABLE tasks;
+ERROR 1051: Unknown table 'test.tasks'
 DROP TYPE status;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE status' at line 1

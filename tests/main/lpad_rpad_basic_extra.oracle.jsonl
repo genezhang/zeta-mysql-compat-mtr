@@ -1,0 +1,47 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":46}
+{"i":1,"h":"3045ee54","k":"rows","cols":["basic"],"rows":[["***abc"]]}
+{"i":2,"h":"f2941b82","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LPAD'"}
+{"i":3,"h":"107ddbae","k":"rows","cols":["truncate"],"rows":[["abc"]]}
+{"i":4,"h":"43f4fcd6","k":"rows","cols":["truncate_zero"],"rows":[[""]]}
+{"i":5,"h":"2f2bfda6","k":"rows","cols":["cycle_ab"],"rows":[["ababx"]]}
+{"i":6,"h":"aee6d960","k":"rows","cols":["cycle_abc"],"rows":[["abcabxy"]]}
+{"i":7,"h":"b0a1260f","k":"rows","cols":["basic"],"rows":[["abc***"]]}
+{"i":8,"h":"accc431e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RPAD'"}
+{"i":9,"h":"869ce438","k":"rows","cols":["truncate"],"rows":[["abc"]]}
+{"i":10,"h":"2bcc8f74","k":"rows","cols":["truncate_zero"],"rows":[[""]]}
+{"i":11,"h":"071550d2","k":"rows","cols":["cycle_ab"],"rows":[["xabab"]]}
+{"i":12,"h":"5f8e7c26","k":"rows","cols":["cycle_abc"],"rows":[["xyabcab"]]}
+{"i":13,"h":"1372e738","k":"rows","cols":["lpad_len"],"rows":[["1"]]}
+{"i":14,"h":"d65b5563","k":"rows","cols":["rpad_len"],"rows":[["1"]]}
+{"i":15,"h":"acb9c241","k":"rows","cols":["lpad_trunc_len"],"rows":[["1"]]}
+{"i":16,"h":"5afde3b7","k":"rows","cols":["rpad_trunc_len"],"rows":[["1"]]}
+{"i":17,"h":"04d7c4a7","k":"rows","cols":["lpad_neg_empty"],"rows":[[null]]}
+{"i":18,"h":"85631342","k":"rows","cols":["rpad_neg_empty"],"rows":[[null]]}
+{"i":19,"h":"dff6da0a","k":"rows","cols":["lpad_empty_fill"],"rows":[["0"]]}
+{"i":20,"h":"5895daa0","k":"rows","cols":["rpad_empty_fill"],"rows":[["0"]]}
+{"i":21,"h":"040e0be7","k":"rows","cols":["lpad_empty_fill_no_pad_needed"],"rows":[["abc"]]}
+{"i":22,"h":"ed2f2fdb","k":"rows","cols":["rpad_empty_fill_no_pad_needed"],"rows":[["abc"]]}
+{"i":23,"h":"fd5ab82f","k":"rows","cols":["lpad_utf8"],"rows":[["**café"]]}
+{"i":24,"h":"de5edd50","k":"rows","cols":["rpad_utf8"],"rows":[["café**"]]}
+{"i":25,"h":"3014baaf","k":"rows","cols":["lpad_utf8_pg_len"],"rows":[["0"]]}
+{"i":26,"h":"b8db9b54","k":"rows","cols":["rpad_utf8_pg_len"],"rows":[["0"]]}
+{"i":27,"h":"366f15ba","k":"rows","cols":["lpad_utf8_trunc"],"rows":[["caf"]]}
+{"i":28,"h":"61ccb44b","k":"rows","cols":["rpad_utf8_trunc"],"rows":[["caf"]]}
+{"i":29,"h":"6ac43a05","k":"rows","cols":["lpad_empty_in"],"rows":[["*****"]]}
+{"i":30,"h":"0d58e1c6","k":"rows","cols":["rpad_empty_in"],"rows":[["*****"]]}
+{"i":31,"h":"c9d2a7b5","k":"rows","cols":["lpad_empty_in_cycle"],"rows":[["ababa"]]}
+{"i":32,"h":"845fa267","k":"rows","cols":["rpad_empty_in_cycle"],"rows":[["ababa"]]}
+{"i":33,"h":"659f938a","k":"rows","cols":["lpad_long_fill_short_pad"],"rows":[["axy"]]}
+{"i":34,"h":"7b3b71f9","k":"rows","cols":["rpad_long_fill_short_pad"],"rows":[["xya"]]}
+{"i":35,"h":"53ce2d52","k":"rows","cols":["lpad_null_s"],"rows":[["1"]]}
+{"i":36,"h":"634d5e2e","k":"rows","cols":["lpad_null_len"],"rows":[["1"]]}
+{"i":37,"h":"5c5eb2cc","k":"rows","cols":["lpad_null_fill"],"rows":[["1"]]}
+{"i":38,"h":"9f66d4a0","k":"rows","cols":["rpad_null_s"],"rows":[["1"]]}
+{"i":39,"h":"8a90e88f","k":"rows","cols":["rpad_null_len"],"rows":[["1"]]}
+{"i":40,"h":"b1e2ac2e","k":"rows","cols":["rpad_null_fill"],"rows":[["1"]]}
+{"i":41,"h":"d6ffcda3","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LPAD'"}
+{"i":42,"h":"30c7f4e3","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LPAD'"}
+{"i":43,"h":"25a126d9","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LPAD'"}
+{"i":44,"h":"a0eb769a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RPAD'"}
+{"i":45,"h":"b9a9b62c","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RPAD'"}
+{"i":46,"h":"bf33c80a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RPAD'"}

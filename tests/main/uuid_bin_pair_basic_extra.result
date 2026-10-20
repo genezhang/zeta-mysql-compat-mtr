@@ -28,32 +28,31 @@ SELECT UUID_TO_BIN(NULL)              AS n_to;
 n_to
 NULL
 SELECT UUID_TO_BIN('uuid', NULL)      AS n_to_swap;
-n_to_swap
-NULL
+ERROR 1411: Incorrect string value: 'uuid' for function uuid_to_bin
 SELECT BIN_TO_UUID(NULL)              AS n_from;
 n_from
 NULL
 SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), NULL) AS n_from_swap;
 n_from_swap
-NULL
+00112233-4455-6677-8899-aabbccddeeff
 === Bad input — errno 1105 ===
 SELECT UUID_TO_BIN('not-a-uuid');
-ERROR 1105: execution error: UUID_TO_BIN: "not-a-uuid" is not a valid UUID (expected 32 hex digits)
+ERROR 1411: Incorrect string value: 'not-a-uuid' for function uuid_to_bin
 SELECT UUID_TO_BIN('123e4567-e89b-12d3-a456');
-ERROR 1105: execution error: UUID_TO_BIN: "123e4567-e89b-12d3-a456" is not a valid UUID (expected 32 hex digits)
+ERROR 1411: Incorrect string value: '123e4567-e89b-12d3-a456' for function uuid_to_bin
 SELECT BIN_TO_UUID(UNHEX('AABB'));
-ERROR 1105: execution error: BIN_TO_UUID: input must be exactly 16 bytes (got 2)
+ERROR 1411: Incorrect string value: '\xAA\xBB' for function bin_to_uuid
 SELECT BIN_TO_UUID(UNHEX('00'));
-ERROR 1105: execution error: BIN_TO_UUID first argument must be a 16-byte binary
+ERROR 1411: Incorrect string value: '\x00' for function bin_to_uuid
 === Arity errors ===
 SELECT UUID_TO_BIN();
-ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'UUID_TO_BIN'
 SELECT UUID_TO_BIN('x', 0, 1);
-ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'UUID_TO_BIN'
 SELECT BIN_TO_UUID();
-ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'BIN_TO_UUID'
 SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), 0, 1);
-ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'BIN_TO_UUID'
 === In SELECT against TEXT column + WHERE filter ===
 DROP TABLE IF EXISTS uuids;
 CREATE TABLE uuids (id INT, u TEXT);

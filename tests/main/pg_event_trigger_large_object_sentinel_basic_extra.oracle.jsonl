@@ -1,0 +1,26 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":25}
+{"i":1,"h":"2c54934e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et ON ddl_command_start EXECUTE FUNCTION fn()' at line 1"}
+{"i":2,"h":"7d7980cd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et ON ddl_command_end EXECUTE PROCEDURE fn()' at line 1"}
+{"i":3,"h":"c3ac10d2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et ON sql_drop WHEN TAG IN ('DROP TABLE') EXECUTE FUNCTION fn()' at line 1"}
+{"i":4,"h":"51f401ec","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et DISABLE' at line 1"}
+{"i":5,"h":"483d11fa","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et ENABLE' at line 1"}
+{"i":6,"h":"4bbe97c1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et ENABLE REPLICA' at line 1"}
+{"i":7,"h":"58287762","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et OWNER TO postgres' at line 1"}
+{"i":8,"h":"1b768acd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et RENAME TO et2' at line 1"}
+{"i":9,"h":"30102229","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et' at line 1"}
+{"i":10,"h":"c1023b42","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER IF EXISTS et' at line 1"}
+{"i":11,"h":"c9e7612a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER et CASCADE' at line 1"}
+{"i":12,"h":"c4d51a42","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LARGE OBJECT 12345 OWNER TO postgres' at line 1"}
+{"i":13,"h":"dbbf5ec9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LARGE OBJECT 12345' at line 1"}
+{"i":14,"h":"e53320fe","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'COMMENT ON LARGE OBJECT 12345 IS 'classified blob'' at line 1"}
+{"i":15,"h":"1de60857","k":"skip","why":"accounts and privileges"}
+{"i":16,"h":"dd380ad9","k":"skip","why":"accounts and privileges"}
+{"i":17,"h":"338e0c9e","k":"err","code":1305,"msg":"FUNCTION test.lo_lseek does not exist"}
+{"i":18,"h":"50ee559e","k":"err","code":1305,"msg":"FUNCTION test.lo_tell does not exist"}
+{"i":19,"h":"80b9c921","k":"err","code":1305,"msg":"FUNCTION test.lo_truncate does not exist"}
+{"i":20,"h":"d2b42ab3","k":"err","code":1305,"msg":"FUNCTION test.lo_put does not exist"}
+{"i":21,"h":"773f341a","k":"err","code":1305,"msg":"FUNCTION test.lo_get does not exist"}
+{"i":22,"h":"e82060b8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::bytea)' at line 1"}
+{"i":23,"h":"30b86dfe","k":"err","code":1305,"msg":"FUNCTION test.loread does not exist"}
+{"i":24,"h":"cf83f629","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::bytea)' at line 1"}
+{"i":25,"h":"24fca17d","k":"err","code":1305,"msg":"FUNCTION test.lo_compat_privileges does not exist"}

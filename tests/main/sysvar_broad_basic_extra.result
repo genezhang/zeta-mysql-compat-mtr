@@ -1,19 +1,19 @@
 === Identity strings ===
 SELECT @@version;
 @@version
-8.0.36-zeta
+<masked>
 SELECT @@version_comment;
 @@version_comment
-Zeta DATABASE (MySQL Compatible)
+<masked>
 SELECT @@version_compile_os;
 @@version_compile_os
-linux
+<masked>
 SELECT @@version_compile_machine;
 @@version_compile_machine
-x86_64
+<masked>
 SELECT @@license;
 @@license
-Proprietary
+GPL
 === Charset family — all 'utf8mb4' ===
 SELECT @@character_set_client;
 @@character_set_client
@@ -32,27 +32,27 @@ SELECT @@character_set_database;
 utf8mb4
 SELECT @@character_set_system;
 @@character_set_system
-utf8mb4
+utf8mb3
 SELECT @@character_set_filesystem;
 @@character_set_filesystem
-utf8mb4
+binary
 === Collation family — all 'utf8mb4_general_ci' ===
 SELECT @@collation_connection;
 @@collation_connection
-utf8mb4_general_ci
+utf8mb4_0900_ai_ci
 SELECT @@collation_server;
 @@collation_server
-utf8mb4_general_ci
+utf8mb4_0900_ai_ci
 SELECT @@collation_database;
 @@collation_database
-utf8mb4_general_ci
+utf8mb4_0900_ai_ci
 === Protocol / connection / hostname ===
 SELECT @@protocol_version;
 @@protocol_version
 10
 SELECT @@hostname;
 @@hostname
-localhost
+<masked>
 === Limits — return as numeric (not string) ===
 SELECT @@max_allowed_packet;
 @@max_allowed_packet
@@ -90,42 +90,40 @@ SELECT @@max_execution_time;
 === STRIKING: socket/ssl return EMPTY STRING (NOT NULL) ===
 SELECT @@socket;
 @@socket
-
+<masked>
 SELECT @@ssl_version;
-@@ssl_version
-
+ERROR 1193: Unknown system variable 'ssl_version'
 SELECT @@ssl_cipher;
 @@ssl_cipher
-
+<masked>
 SELECT @@ssl_ca;
 @@ssl_ca
-
+<masked>
 SELECT @@ssl_cert;
 @@ssl_cert
-
+<masked>
 SELECT @@ssl_key;
 @@ssl_key
-
+<masked>
 === Time zone — both = 'UTC' ===
 SELECT @@time_zone;
 @@time_zone
-UTC
++00:00
 SELECT @@system_time_zone;
 @@system_time_zone
-UTC
+<masked>
 === sql_mode / engine (isolation vars already in txn_isolation_basic_extra) ===
 SELECT @@sql_mode;
 @@sql_mode
-
+ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
 SELECT @@default_storage_engine;
 @@default_storage_engine
 InnoDB
 SELECT @@storage_engine;
-@@storage_engine
-InnoDB
+ERROR 1193: Unknown system variable 'storage_engine'
 SELECT @@innodb_version;
 @@innodb_version
-8.0.36
+8.4.6
 === @@lc_time_names — hardcoded 'en_US' ===
 SELECT @@lc_time_names;
 @@lc_time_names
@@ -134,17 +132,13 @@ en_US
 SET lc_time_names = 'fr_FR';
 SELECT @@lc_time_names;
 @@lc_time_names
-en_US
+fr_FR
 === STRIKING: unknown @@var → NULL silent (not MySQL error) ===
 SELECT @@nonexistent_var;
-@@nonexistent_var
-NULL
+ERROR 1193: Unknown system variable 'nonexistent_var'
 SELECT @@made_up_variable;
-@@made_up_variable
-NULL
+ERROR 1193: Unknown system variable 'made_up_variable'
 SELECT @@some_other_garbage;
-@@some_other_garbage
-NULL
+ERROR 1193: Unknown system variable 'some_other_garbage'
 SELECT @@nonexistent_var IS NULL                              AS unknown_is_null;
-@@nonexistent_var is null                              as unknown_is_null
-NULL
+ERROR 1193: Unknown system variable 'nonexistent_var'

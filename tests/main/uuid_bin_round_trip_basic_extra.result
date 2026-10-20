@@ -48,7 +48,7 @@ null_arg
 1
 SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db', NULL) IS NULL AS null_swap;
 null_swap
-1
+0
 === BIN_TO_UUID: canonical decode ===
 SELECT BIN_TO_UUID(UNHEX('6CCD780CBABA102695645B8C656024DB')) AS decode_canonical;
 decode_canonical
@@ -66,7 +66,7 @@ null_arg
 1
 SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), NULL) IS NULL AS null_swap;
 null_swap
-1
+0
 === Inverse round-trip ===
 SELECT BIN_TO_UUID(UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db'))
      = '6ccd780c-baba-1026-9564-5b8c656024db' AS rt_default;
@@ -84,21 +84,21 @@ rt_len_swap
 1
 === Bad input rejected ===
 SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564');
-ERROR 1105: execution error: UUID_TO_BIN: "6ccd780c-baba-1026-9564" is not a valid UUID (expected 32 hex digits)
+ERROR 1411: Incorrect string value: '6ccd780c-baba-1026-9564' for function uuid_to_bin
 SELECT UUID_TO_BIN('6ccd780c-baba-1026-9564-5b8c656024db-extra');
-ERROR 1105: execution error: UUID_TO_BIN: "6ccd780c-baba-1026-9564-5b8c656024db-extra" is not a valid UUID (expected 32 hex digits)
+ERROR 1411: Incorrect string value: '6ccd780c-baba-1026-9564-5b8c656024db-extra' for function uuid_to_bin
 SELECT UUID_TO_BIN('zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz');
-ERROR 1105: execution error: UUID_TO_BIN: "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz" contains non-hex characters
+ERROR 1411: Incorrect string value: 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz' for function uuid_to_bin
 SELECT BIN_TO_UUID(UNHEX('00112233'));
-ERROR 1105: execution error: BIN_TO_UUID first argument must be a 16-byte binary
+ERROR 1411: Incorrect string value: '\x00\x11"3' for function bin_to_uuid
 SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFFAA'));
-ERROR 1105: execution error: BIN_TO_UUID: input must be exactly 16 bytes (got 17)
+ERROR 1411: Incorrect string value: '\x00\x11"3DUfw\x88\x99\xAA\xBB\xCC\xDD\xEE\xFF\xAA' for function bin_to_uuid
 === Arity errors ===
 SELECT UUID_TO_BIN();
-ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'UUID_TO_BIN'
 SELECT UUID_TO_BIN('a', 'b', 'c');
-ERROR 1105: execution error: UUID_TO_BIN requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'UUID_TO_BIN'
 SELECT BIN_TO_UUID();
-ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'BIN_TO_UUID'
 SELECT BIN_TO_UUID(UNHEX('00112233445566778899AABBCCDDEEFF'), 1, 2);
-ERROR 1105: execution error: BIN_TO_UUID requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'BIN_TO_UUID'

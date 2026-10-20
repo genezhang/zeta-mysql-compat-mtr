@@ -115,10 +115,10 @@ sha2_null_both
 === SHA2: non-integer bits coerces to NULL (not error) ===
 SELECT SHA2('zeta', 256.0) IS NULL AS sha2_float_bits_null;
 sha2_float_bits_null
-1
+0
 SELECT SHA2('zeta', 'abc') IS NULL AS sha2_string_bits_null;
 sha2_string_bits_null
-1
+0
 === Determinism: same input → same output ===
 SELECT MD5('repeat') = MD5('repeat')       AS md5_det;
 md5_det
@@ -144,16 +144,16 @@ sha2_widths_distinct
 1
 === Arity errors ===
 SELECT MD5();
-ERROR 1105: execution error: MD5 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'MD5'
 SELECT MD5('a', 'b');
-ERROR 1105: execution error: MD5 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'MD5'
 SELECT SHA1();
-ERROR 1105: execution error: SHA1 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SHA1'
 SELECT SHA1('a', 'b');
-ERROR 1105: execution error: SHA1 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SHA1'
 SELECT SHA2();
-ERROR 1105: execution error: SHA2 requires 2 arguments (string, bits)
+ERROR 1582: Incorrect parameter count in the call to native function 'SHA2'
 SELECT SHA2('a');
-ERROR 1105: execution error: SHA2 requires 2 arguments (string, bits)
+ERROR 1582: Incorrect parameter count in the call to native function 'SHA2'
 SELECT SHA2('a', 256, 'extra');
-ERROR 1105: execution error: SHA2 requires 2 arguments (string, bits)
+ERROR 1582: Incorrect parameter count in the call to native function 'SHA2'

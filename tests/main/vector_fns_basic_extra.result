@@ -1,118 +1,96 @@
 === L2_DISTANCE (Euclidean) ===
 SELECT L2_DISTANCE('[1,0,0]'::vector, '[0,1,0]'::vector)      AS sqrt_2;
-sqrt_2
-1.4142135623730951
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[0,1,0]'::vector)      AS sqrt_2' at line 1
 SELECT L2_DISTANCE('[1,2,3]'::vector, '[1,2,3]'::vector)      AS identity_0;
-identity_0
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[1,2,3]'::vector)      AS identity_0' at line 1
 SELECT L2_DISTANCE('[0,0]'::vector,   '[3,4]'::vector)        AS three_four_five;
-three_four_five
-5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector,   '[3,4]'::vector)        AS three_four_five' at line 1
 === COSINE_DISTANCE (1 - cos(θ)) ===
 SELECT COSINE_DISTANCE('[1,0]'::vector, '[0,1]'::vector)      AS orthogonal_1;
-orthogonal_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[0,1]'::vector)      AS orthogonal_1' at line 1
 SELECT COSINE_DISTANCE('[1,0]'::vector, '[5,0]'::vector)      AS same_dir_0;
-same_dir_0
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[5,0]'::vector)      AS same_dir_0' at line 1
 SELECT COSINE_DISTANCE('[1,0]'::vector, '[-1,0]'::vector)     AS opposite_2;
-opposite_2
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[-1,0]'::vector)     AS opposite_2' at line 1
 === INNER_PRODUCT (dot product) ===
 SELECT INNER_PRODUCT('[1,2,3]'::vector, '[4,5,6]'::vector)    AS dot_32;
-dot_32
-32
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[4,5,6]'::vector)    AS dot_32' at line 1
 SELECT INNER_PRODUCT('[1,0]'::vector, '[0,1]'::vector)        AS orthogonal_0;
-orthogonal_0
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[0,1]'::vector)        AS orthogonal_0' at line 1
 SELECT INNER_PRODUCT('[2,3]'::vector, '[2,3]'::vector)        AS self_dot_13;
-self_dot_13
-13
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[2,3]'::vector)        AS self_dot_13' at line 1
 === VECTOR_DIMS ===
 SELECT VECTOR_DIMS('[1,2,3]'::vector)                         AS dim_3;
-dim_3
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                         AS dim_3' at line 1
 SELECT VECTOR_DIMS('[0]'::vector)                             AS dim_1;
-dim_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                             AS dim_1' at line 1
 === VECTOR_NORM (L2 norm) ===
 SELECT VECTOR_NORM('[3,4]'::vector)                           AS norm_5;
-norm_5
-5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                           AS norm_5' at line 1
 SELECT VECTOR_NORM('[1,0,0]'::vector)                         AS unit_norm_1;
-unit_norm_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                         AS unit_norm_1' at line 1
 SELECT VECTOR_NORM('[0,0,0]'::vector)                         AS zero_norm_0;
-zero_norm_0
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                         AS zero_norm_0' at line 1
 === Distance OPERATORS (pgvector convention) ===
 SELECT '[1,0,0]'::vector <-> '[0,1,0]'::vector                AS op_l2;
-op_l2
-1.4142135623730951
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector <-> '[0,1,0]'::vector                AS op_l2' at line 1
 SELECT ('[1,0,0]'::vector <-> '[0,1,0]'::vector)
      = L2_DISTANCE('[1,0,0]'::vector, '[0,1,0]'::vector)      AS op_eq_fn_l2;
-op_eq_fn_l2
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector <-> '[0,1,0]'::vector)
+     = L2_DISTANCE('[1,0,0]'::vector, '[0,1,0]':' at line 1
 SELECT '[1,0]'::vector <=> '[1,0]'::vector                    AS op_cosine_same;
-op_cosine_same
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector <=> '[1,0]'::vector                    AS op_cosine_same' at line 1
 SELECT ('[1,0]'::vector <=> '[0,1]'::vector)
      = COSINE_DISTANCE('[1,0]'::vector, '[0,1]'::vector)      AS op_eq_fn_cosine;
-op_eq_fn_cosine
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector <=> '[0,1]'::vector)
+     = COSINE_DISTANCE('[1,0]'::vector, '[0,1]'::v' at line 1
 SELECT '[1,2]'::vector <#> '[3,4]'::vector                    AS op_neg_inner_neg_11;
-op_neg_inner_neg_11
--11
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector <#> '[3,4]'::vector                    AS op_neg_inner_neg_11' at line 1
 SELECT ('[1,2,3]'::vector <#> '[4,5,6]'::vector)
      = -INNER_PRODUCT('[1,2,3]'::vector, '[4,5,6]'::vector)   AS op_eq_neg_fn;
-op_eq_neg_fn
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector <#> '[4,5,6]'::vector)
+     = -INNER_PRODUCT('[1,2,3]'::vector, '[4,5,6' at line 1
 === Dimension-mismatch → ERROR 1105 ===
 SELECT L2_DISTANCE('[1,2,3]'::vector, '[1,2]'::vector);
-ERROR 1105: execution error: different vector dimensions 3 and 2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[1,2]'::vector)' at line 1
 SELECT COSINE_DISTANCE('[1]'::vector, '[1,2]'::vector);
-ERROR 1105: execution error: different vector dimensions 1 and 2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[1,2]'::vector)' at line 1
 SELECT INNER_PRODUCT('[1,2,3]'::vector, '[1,2]'::vector);
-ERROR 1105: execution error: different vector dimensions 3 and 2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[1,2]'::vector)' at line 1
 === NULL prop on any arg → NULL (not error) ===
 SELECT L2_DISTANCE(NULL, '[1,2,3]'::vector)                   AS null_left;
-null_left
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)                   AS null_left' at line 1
 SELECT L2_DISTANCE('[1,2,3]'::vector, NULL)                   AS null_right;
-null_right
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, NULL)                   AS null_right' at line 1
 SELECT VECTOR_DIMS(NULL)                                      AS null_dims;
-null_dims
-NULL
+ERROR 1305: FUNCTION test.VECTOR_DIMS does not exist
 SELECT VECTOR_NORM(NULL)                                      AS null_norm;
-null_norm
-NULL
+ERROR 1305: FUNCTION test.VECTOR_NORM does not exist
 SELECT L2_DISTANCE(NULL, '[1,2,3]'::vector) IS NULL           AS null_pred;
-null_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector) IS NULL           AS null_pred' at line 1
 === Wrong-type (non-vector) → ERROR 1105 ===
 SELECT L2_DISTANCE(1, 2);
-ERROR 1105: execution error: l2_distance() requires vector arguments
+ERROR 1305: FUNCTION test.L2_DISTANCE does not exist
 SELECT COSINE_DISTANCE('hello', 'world');
-ERROR 1105: execution error: cosine_distance() requires vector arguments
+ERROR 1305: FUNCTION test.COSINE_DISTANCE does not exist
 SELECT INNER_PRODUCT('[1,2,3]'::vector, 42);
-ERROR 1105: execution error: inner_product() requires vector arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, 42)' at line 1
 SELECT VECTOR_DIMS('not a vector');
-ERROR 1105: execution error: vector_dims() requires a vector argument
+ERROR 1305: FUNCTION test.VECTOR_DIMS does not exist
 SELECT VECTOR_NORM(42);
-ERROR 1105: execution error: vector_norm() requires a vector argument
+ERROR 1305: FUNCTION test.VECTOR_NORM does not exist
 === Arity errors → 1105 ===
 SELECT L2_DISTANCE();
-ERROR 1105: execution error: l2_distance() requires 2 arguments
+ERROR 1305: FUNCTION test.L2_DISTANCE does not exist
 SELECT L2_DISTANCE('[1,2]'::vector);
-ERROR 1105: execution error: l2_distance() requires 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector)' at line 1
 SELECT COSINE_DISTANCE('[1]'::vector, '[2]'::vector, '[3]'::vector);
-ERROR 1105: execution error: cosine_distance() requires 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[2]'::vector, '[3]'::vector)' at line 1
 SELECT INNER_PRODUCT();
-ERROR 1105: execution error: inner_product() requires 2 arguments
+ERROR 1305: FUNCTION test.INNER_PRODUCT does not exist
 SELECT VECTOR_DIMS();
-ERROR 1105: execution error: vector_dims() requires 1 argument
+ERROR 1305: FUNCTION test.VECTOR_DIMS does not exist
 SELECT VECTOR_DIMS('[1]'::vector, '[2]'::vector);
-ERROR 1105: execution error: vector_dims() requires 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::vector, '[2]'::vector)' at line 1
 SELECT VECTOR_NORM();
-ERROR 1105: execution error: vector_norm() requires 1 argument
+ERROR 1305: FUNCTION test.VECTOR_NORM does not exist

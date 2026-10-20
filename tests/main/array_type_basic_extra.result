@@ -1,46 +1,37 @@
 === ARRAY_APPEND, ARRAY_CAT, || (concat) ===
 SELECT ARRAY_LENGTH(ARRAY_APPEND(ARRAY[1, 2, 3], 4), 1) AS len_app;
-len_app
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3], 4), 1) AS len_app' at line 1
 SELECT ARRAY_LENGTH(ARRAY_CAT(ARRAY[1, 2], ARRAY[3, 4]), 1) AS len_cat;
-len_cat
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2], ARRAY[3, 4]), 1) AS len_cat' at line 1
 SELECT ARRAY_LENGTH(ARRAY[1, 2] || ARRAY[3, 4], 1) AS len_pipe;
-len_pipe
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2] || ARRAY[3, 4], 1) AS len_pipe' at line 1
 === ARRAY_REMOVE — removes ALL occurrences ===
 SELECT ARRAY_LENGTH(ARRAY_REMOVE(ARRAY[1, 2, 3, 2], 2), 1) AS r;
-r
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3, 2], 2), 1) AS r' at line 1
 === ARRAY_POSITION (1-based PG semantics) ===
 SELECT ARRAY_POSITION(ARRAY['a', 'b', 'c', 'b'], 'b') AS r;
-r
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '['a', 'b', 'c', 'b'], 'b') AS r' at line 1
 === = ANY (array) ===
 SELECT 2 = ANY(ARRAY[1, 2, 3]) AS r1, 9 = ANY(ARRAY[1, 2, 3]) AS r2;
-r1	r2
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ARRAY[1, 2, 3]) AS r1, 9 = ANY(ARRAY[1, 2, 3]) AS r2' at line 1
 === = ALL (array) ===
 SELECT 2 = ALL(ARRAY[2, 2, 2]) AS r1, 2 = ALL(ARRAY[2, 2, 9]) AS r2;
-r1	r2
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ARRAY[2, 2, 2]) AS r1, 2 = ALL(ARRAY[2, 2, 9]) AS r2' at line 1
 === NULL handling inside ANY (3VL) ===
 # 1 IS a member -> TRUE; 9 might match NULL -> NULL.
 SELECT 1 = ANY(ARRAY[1, NULL, 3]) AS yes, 9 = ANY(ARRAY[1, NULL, 3]) AS unknown;
-yes	unknown
-1	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ARRAY[1, NULL, 3]) AS yes, 9 = ANY(ARRAY[1, NULL, 3]) AS unknown' at line 1
 SELECT NULL = ANY(ARRAY[1, 2, 3]) AS nl;
-nl
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ARRAY[1, 2, 3]) AS nl' at line 1
 === @>, <@, && (contains / contained-by / overlap) ===
 SELECT ARRAY[1, 2, 3] @> ARRAY[2] AS contains,
        ARRAY[1, 2, 3] <@ ARRAY[1, 2, 3, 4] AS contained_by;
-contains	contained_by
-1	1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3] @> ARRAY[2] AS contains,
+       ARRAY[1, 2, 3] <@ ARRAY[1, 2, 3, 4] AS' at line 1
 SELECT ARRAY[1, 2, 3] && ARRAY[3, 4, 5] AS overlap,
        ARRAY[1, 2, 3] && ARRAY[9, 8, 7] AS no_overlap;
-overlap	no_overlap
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3] && ARRAY[3, 4, 5] AS overlap,
+       ARRAY[1, 2, 3] && ARRAY[9, 8, 7] ' at line 1
 === ARRAY_AGG with ORDER BY (via GROUP BY) ===
 # ARRAY_AGG output is rendered using zeta's Debug
 # formatter (the same divergence pinned in
@@ -49,57 +40,47 @@ DROP TABLE IF EXISTS aa;
 CREATE TABLE aa (g INT, x INT);
 INSERT INTO aa VALUES (1, 3), (1, 1), (1, 2);
 SELECT g, ARRAY_AGG(x ORDER BY x) AS r FROM aa GROUP BY g;
-g	r
-1	Array { element_type: Int32, elements: [Int32(1), Int32(2), Int32(3)] }
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ORDER BY x) AS r FROM aa GROUP BY g' at line 1
 DROP TABLE aa;
 === ARRAY equality (= / <>) ===
 SELECT ARRAY[1, 2, 3] = ARRAY[1, 2, 3] AS eq,
        ARRAY[1, 2, 3] = ARRAY[1, 2, 9] AS neq;
-eq	neq
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3] = ARRAY[1, 2, 3] AS eq,
+       ARRAY[1, 2, 3] = ARRAY[1, 2, 9] AS neq' at line 1
 === Empty array — ARRAY_LENGTH returns NULL (PG semantics) ===
 SELECT ARRAY_LENGTH(ARRAY[]::INT[], 1) AS empty_len;
-empty_len
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[]::INT[], 1) AS empty_len' at line 1
 === NULL inside ARRAY literal — preserved + counted ===
 SELECT ARRAY_LENGTH(ARRAY[1, 2, NULL, 4], 1) AS r;
-r
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, NULL, 4], 1) AS r' at line 1
 === ARRAY_TO_STRING(arr, sep) ===
 SELECT ARRAY_TO_STRING(ARRAY[1, 2, 3], ',') AS s;
-s
-1,2,3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3], ',') AS s' at line 1
 === ARRAY_PREPEND — supported (push to front) ===
 SELECT ARRAY_PREPEND(0, ARRAY[1, 2, 3]) AS r;
-r
-Array { element_type: Int64, elements: [Int64(0), Int64(1), Int64(2), Int64(3)] }
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3]) AS r' at line 1
 === ARRAY_REPLACE — supported (substitute every match) ===
 SELECT ARRAY_REPLACE(ARRAY[1, 2, 3], 2, 9) AS r;
-r
-Array { element_type: Int64, elements: [Int64(1), Int64(9), Int64(3)] }
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3], 2, 9) AS r' at line 1
 === CARDINALITY — supported (returns 0 for empty, NULL for NULL) ===
 SELECT CARDINALITY(ARRAY[1, 2, 3]) AS r;
-r
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3]) AS r' at line 1
 SELECT CARDINALITY(ARRAY[]::INT[]) AS empty;
-empty
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[]::INT[]) AS empty' at line 1
 === ARRAY_UPPER / ARRAY_LOWER — supported (1-based; empty → NULL) ===
 SELECT ARRAY_UPPER(ARRAY[1, 2, 3], 1) AS u;
-u
-3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3], 1) AS u' at line 1
 SELECT ARRAY_LOWER(ARRAY[1, 2, 3], 1) AS l;
-l
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3], 1) AS l' at line 1
 === KNOWN GAP: array slicing (arr)[a:b] — errno 1064 ===
 # Substitute: ARRAY(SELECT x FROM UNNEST(arr) WITH
 # ORDINALITY t(x, i) WHERE i BETWEEN a AND b).
 SELECT (ARRAY[1, 2, 3, 4])[2:3] AS r;
-ERROR 1064: SQL parse error: unsupported compound field access: [2:3]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2, 3, 4])[2:3] AS r' at line 1
 === KNOWN DIVERGENCE: array <, <=, >, >= always return 0 ===
 # PG returns lexicographic comparison; zeta returns 0.
 # = and <> work correctly (see above).
 SELECT ARRAY[1, 2] < ARRAY[1, 3]  AS lt_zeta,
        ARRAY[1, 2] < ARRAY[1, 2, 3] AS lt_prefix_zeta;
-lt_zeta	lt_prefix_zeta
-0	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1, 2] < ARRAY[1, 3]  AS lt_zeta,
+       ARRAY[1, 2] < ARRAY[1, 2, 3] AS lt_pref' at line 1

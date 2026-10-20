@@ -1,0 +1,64 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":63}
+{"i":1,"h":"b33d5c16","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT)) AS date_str_len' at line 1"}
+{"i":2,"h":"870d8add","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT), 1, 6) LIKE '__:__:' AS shape_ok' at line 1"}
+{"i":3,"h":"c4825e70","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT), 1, 10) LIKE '____-__-__' AS shape_ok' at line 1"}
+{"i":4,"h":"ca01316c","k":"rows","cols":["v"],"rows":[["2024-03-22"]]}
+{"i":5,"h":"f2db01d1","k":"rows","cols":["v"],"rows":[["2024-03-08"]]}
+{"i":6,"h":"f58a5eba","k":"rows","cols":["v"],"rows":[["2024-03-22"]]}
+{"i":7,"h":"bc6fcad7","k":"rows","cols":["v"],"rows":[["2024-03-08"]]}
+{"i":8,"h":"d123ae09","k":"rows","cols":["v"],"rows":[["2024-03-08"]]}
+{"i":9,"h":"ebda7f00","k":"rows","cols":["v"],"rows":[["2024-03-15 13:00:00"]]}
+{"i":10,"h":"61fc6d9e","k":"rows","cols":["v"],"rows":[["14"]]}
+{"i":11,"h":"6118124e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::date) AS year' at line 1"}
+{"i":12,"h":"79985a98","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::date) AS month' at line 1"}
+{"i":13,"h":"bd030f14","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::date) AS day' at line 1"}
+{"i":14,"h":"c776caca","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::date, 'YYYY-MM-DD') AS formatted' at line 1"}
+{"i":15,"h":"922d3d63","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT)) AS date_str_len' at line 1"}
+{"i":16,"h":"169f2c6c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT), 1, 6) LIKE '__:__:' AS shape_ok' at line 1"}
+{"i":17,"h":"387a4012","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT), 1, 10) LIKE '____-__-__' AS shape_ok' at line 1"}
+{"i":18,"h":"5d5e97da","k":"rows","cols":["v"],"rows":[["2024"]]}
+{"i":19,"h":"b6642a3a","k":"rows","cols":["v"],"rows":[["3"]]}
+{"i":20,"h":"99aec522","k":"rows","cols":["v"],"rows":[["15"]]}
+{"i":21,"h":"a42d4591","k":"rows","cols":["v"],"rows":[["14"]]}
+{"i":22,"h":"d41e276a","k":"rows","cols":["v"],"rows":[["30"]]}
+{"i":23,"h":"6f5af741","k":"rows","cols":["v"],"rows":[["45"]]}
+{"i":24,"h":"32215b09","k":"rows","cols":["v"],"rows":[["6"]]}
+{"i":25,"h":"95dc4bed","k":"rows","cols":["v"],"rows":[["15"]]}
+{"i":26,"h":"52f12d04","k":"rows","cols":["v"],"rows":[["75"]]}
+{"i":27,"h":"7ba0b84c","k":"rows","cols":["v"],"rows":[["4"]]}
+{"i":28,"h":"7c0d7300","k":"rows","cols":["v"],"rows":[["10"]]}
+{"i":29,"h":"295c3403","k":"rows","cols":["v"],"rows":[["10"]]}
+{"i":30,"h":"e6eafac5","k":"rows","cols":["v"],"rows":[["11"]]}
+{"i":31,"h":"0a92e20e","k":"rows","cols":["v"],"rows":[["11"]]}
+{"i":32,"h":"8484ffc7","k":"rows","cols":["v"],"rows":[["202410"]]}
+{"i":33,"h":"60e00e78","k":"rows","cols":["v"],"rows":[["202353"]]}
+{"i":34,"h":"43b29f93","k":"rows","cols":["v"],"rows":[["1"]]}
+{"i":35,"h":"cfa29502","k":"rows","cols":["v"],"rows":[["2024-03-15"]]}
+{"i":36,"h":"f3bc9db0","k":"rows","cols":["v"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":37,"h":"78602f01","k":"rows","cols":["v"],"rows":[["Friday, March 15, 2024"]]}
+{"i":38,"h":"33ec7e28","k":"rows","cols":["v"],"rows":[["3-15"]]}
+{"i":39,"h":"b9b1a254","k":"rows","cols":["v"],"rows":[["02:30:45 PM"]]}
+{"i":40,"h":"28a45513","k":"rows","cols":["v"],"rows":[["02:30:45 PM"]]}
+{"i":41,"h":"66b3f53d","k":"rows","cols":["v"],"rows":[["123456"]]}
+{"i":42,"h":"10026783","k":"rows","cols":["v"],"rows":[["075"]]}
+{"i":43,"h":"b7741f1c","k":"rows","cols":["v"],"rows":[["15th March 2024"]]}
+{"i":44,"h":"cd054d80","k":"rows","cols":["v"],"rows":[["01"]]}
+{"i":45,"h":"757d82f3","k":"rows","cols":["v"],"rows":[["01"]]}
+{"i":46,"h":"b317cfc9","k":"rows","cols":["v"],"rows":[["00"]]}
+{"i":47,"h":"bd384f12","k":"rows","cols":["v"],"rows":[["53"]]}
+{"i":48,"h":"af0e5557","k":"rows","cols":["v"],"rows":[["2024-03-15"]]}
+{"i":49,"h":"3569ff7b","k":"rows","cols":["v"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":50,"h":"3c30cf6d","k":"rows","cols":["v"],"rows":[["2024-03-15 14:30:45"]]}
+{"i":51,"h":"c7523042","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT)) = 10 AS shape_ok' at line 1"}
+{"i":52,"h":"3fc05969","k":"rows","cols":["v"],"rows":[["1710460800"]]}
+{"i":53,"h":"ebd4e305","k":"rows","cols":["v"],"rows":[["2023-11-14 22:13:20"]]}
+{"i":54,"h":"fcd6ac26","k":"rows","cols":["v"],"rows":[["Friday"]]}
+{"i":55,"h":"e9c7513b","k":"rows","cols":["v"],"rows":[["March"]]}
+{"i":56,"h":"f0fd7cd0","k":"rows","cols":["v"],"rows":[["2024-02-29"]]}
+{"i":57,"h":"db2eed3f","k":"rows","cols":["v"],"rows":[["14"]]}
+{"i":58,"h":"9aa72e0d","k":"rows","cols":["v"],"rows":[["6"]]}
+{"i":59,"h":"f38144ab","k":"rows","cols":["v"],"rows":[["3"]]}
+{"i":60,"h":"4ab3dc2b","k":"rows","cols":["v"],"rows":[["-1"]]}
+{"i":61,"h":"ceb842fa","k":"rows","cols":["v"],"rows":[["02:15:15"]]}
+{"i":62,"h":"9b496b6d","k":"rows","cols":["v"],"rows":[["-02:00:00"]]}
+{"i":63,"h":"8ce7d334","k":"rows","cols":["v"],"rows":[["02:15:14.876544"]]}

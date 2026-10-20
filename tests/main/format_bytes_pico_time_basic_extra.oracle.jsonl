@@ -1,0 +1,32 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":31}
+{"i":1,"h":"3ff982a6","k":"rows","cols":["zero"],"rows":[["   0 bytes"]]}
+{"i":2,"h":"9149c697","k":"rows","cols":["sub_kib"],"rows":[["1023 bytes"]]}
+{"i":3,"h":"c9d77afc","k":"rows","cols":["one_kib"],"rows":[["1.00 KiB"]]}
+{"i":4,"h":"9898beba","k":"rows","cols":["half_above_kib"],"rows":[["1.50 KiB"]]}
+{"i":5,"h":"d5c086bb","k":"rows","cols":["one_mib"],"rows":[["1.00 MiB"]]}
+{"i":6,"h":"5d3df98d","k":"rows","cols":["one_gib"],"rows":[["1.00 GiB"]]}
+{"i":7,"h":"a346e0e7","k":"rows","cols":["one_tib"],"rows":[["1.00 TiB"]]}
+{"i":8,"h":"3f08492a","k":"rows","cols":["neg"],"rows":[["-2.00 KiB"]]}
+{"i":9,"h":"2d5e4e92","k":"rows","cols":["n"],"rows":[[null]]}
+{"i":10,"h":"d51f5595","k":"rows","cols":["zero"],"rows":[["  0 ps"]]}
+{"i":11,"h":"066a8369","k":"rows","cols":["sub_ns"],"rows":[["999 ps"]]}
+{"i":12,"h":"d8b604f4","k":"rows","cols":["one_ns"],"rows":[["1.00 ns"]]}
+{"i":13,"h":"0d72f9e5","k":"rows","cols":["one_half_us"],"rows":[["1.50 us"]]}
+{"i":14,"h":"fb31fe3e","k":"rows","cols":["one_half_ms"],"rows":[["1.50 ms"]]}
+{"i":15,"h":"62530af9","k":"rows","cols":["one_half_s"],"rows":[["1.50 s"]]}
+{"i":16,"h":"3c866caf","k":"rows","cols":["minute_and_a_half"],"rows":[["1.50 min"]]}
+{"i":17,"h":"c76e8a16","k":"rows","cols":["hour_and_a_half"],"rows":[["1.50 h"]]}
+{"i":18,"h":"59d6321f","k":"rows","cols":["day_and_a_half"],"rows":[["1.50 d"]]}
+{"i":19,"h":"4acf2299","k":"rows","cols":["neg"],"rows":[["-1.50 us"]]}
+{"i":20,"h":"1390d8a7","k":"rows","cols":["n"],"rows":[[null]]}
+{"i":21,"h":"14cfbed1","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FORMAT_BYTES'"}
+{"i":22,"h":"a328b7f1","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FORMAT_PICO_TIME'"}
+{"i":23,"h":"f4132033","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FORMAT_BYTES'"}
+{"i":24,"h":"58bab5db","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FORMAT_PICO_TIME'"}
+{"i":25,"h":"b9343a7a","k":"rows","cols":["FORMAT_BYTES('not a number')"],"rows":[["   0 bytes"]]}
+{"i":26,"h":"27dac2a6","k":"rows","cols":["FORMAT_PICO_TIME('not a number')"],"rows":[["  0 ps"]]}
+{"i":27,"h":"2af4cb1a","k":"ok","affected":0}
+{"i":28,"h":"73dc937e","k":"ok","affected":0}
+{"i":29,"h":"6dd42955","k":"ok","affected":4}
+{"i":30,"h":"0e9202a9","k":"rows","cols":["id","pretty"],"rows":[["1","   0 bytes"],["2","1023 bytes"],["3","4.00 KiB"],["4","10.00 MiB"]]}
+{"i":31,"h":"00cc28ad","k":"ok","affected":0}

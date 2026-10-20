@@ -88,19 +88,16 @@ SELECT region, STRING_AGG(product, ',') AS products
   FROM sales
   GROUP BY region
   ORDER BY region;
-region	products
-AP	widget
-EU	widget,gadget
-NA	widget,widget,gadget
+ERROR 1305: FUNCTION test.STRING_AGG does not exist
 === STRING_AGG with internal ORDER BY ===
 SELECT region, STRING_AGG(product, ',' ORDER BY product) AS products
   FROM sales
   GROUP BY region
   ORDER BY region;
-region	products
-AP	widget
-EU	gadget,widget
-NA	gadget,widget,widget
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ORDER BY product) AS products
+  FROM sales
+  GROUP BY region
+  ORDER BY region' at line 1
 === Empty-table aggregate — COUNT 0; MIN/MAX/SUM/AVG NULL ===
 DROP TABLE IF EXISTS empty_t;
 CREATE TABLE empty_t (x INT);
@@ -133,17 +130,17 @@ SELECT region, GROUP_CONCAT(product, '|') AS p
   GROUP BY region
   ORDER BY region;
 region	p
-AP	widget
-EU	widget|gadget
-NA	widget|widget|gadget
+AP	widget|
+EU	widget|,gadget|
+NA	widget|,widget|,gadget|
 SELECT region, GROUP_CONCAT(product, ',' ORDER BY product) AS p
   FROM sales
   GROUP BY region
   ORDER BY region;
 region	p
-AP	widget
-EU	gadget,widget
-NA	gadget,widget,widget
+AP	widget,
+EU	gadget,,widget,
+NA	gadget,,widget,,widget,
 === ANY_VALUE — FIXED via zeta #1142 ===
 # Aliased to MIN. Returns one of the group's values for any
 # orderable type. Deterministic (stronger than MySQL's
@@ -154,8 +151,8 @@ SELECT region, ANY_VALUE(product) AS p
   ORDER BY region;
 region	p
 AP	widget
-EU	gadget
-NA	gadget
+EU	widget
+NA	widget
 === KNOWN DIVERGENCE: ONLY_FULL_GROUP_BY violation — errno 1054 ===
 # zeta rejects a SELECT-list reference to a non-grouped,
 # non-aggregated column with errno 1054 (column not found);
@@ -163,7 +160,7 @@ NA	gadget
 # default. The rejection behavior matches; only the errno
 # differs.
 SELECT region, product FROM sales GROUP BY region;
-ERROR 1054: column not found: product
+ERROR 1055: Expression #2 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'test.sales.product' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by
 === Cleanup ===
 DROP TABLE sales;
 DROP TABLE empty_t;

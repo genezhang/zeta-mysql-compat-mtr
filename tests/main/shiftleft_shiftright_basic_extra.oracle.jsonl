@@ -1,0 +1,45 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":44}
+{"i":1,"h":"aadd27ac","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":2,"h":"ef7b804a","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":3,"h":"684b67ae","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":4,"h":"f094ccbd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 31)                      AS int_one_lsh_31_min' at line 1"}
+{"i":5,"h":"7c4773df","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 32)                      AS int_one_lsh_32_eq_1' at line 1"}
+{"i":6,"h":"72658f70","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 33)                      AS int_one_lsh_33_eq_2' at line 1"}
+{"i":7,"h":"939ed3bf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 63)\n     = SHIFTLEFT(CAST(1 AS INTEGER), 31)                      AS i' at line 1"}
+{"i":8,"h":"3b2726e2","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":9,"h":"9766cf02","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":10,"h":"409fa52f","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":11,"h":"f1772fd4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 31)                       AS bigint_one_lsh_31' at line 1"}
+{"i":12,"h":"b107bb14","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 64)                       AS bigint_one_lsh_64_eq_1' at line 1"}
+{"i":13,"h":"e7d7faa2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 63)                       AS bigint_one_lsh_63_min' at line 1"}
+{"i":14,"h":"045defdd","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHT does not exist"}
+{"i":15,"h":"4f9c5b20","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHT does not exist"}
+{"i":16,"h":"5a97705b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 1)                     AS neg_one_arith_rsh_neg_one' at line 1"}
+{"i":17,"h":"ad639cb6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 31)                    AS neg_one_arith_rsh_full_neg_one' at line 1"}
+{"i":18,"h":"b4652260","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 1)                     AS neg_eight_arith_rsh_neg_four' at line 1"}
+{"i":19,"h":"b4c456a6","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHTUNSIGNED does not exist"}
+{"i":20,"h":"9ee980b9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 1)             AS neg_one_logic_rsh_int_max' at line 1"}
+{"i":21,"h":"8f933816","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 31)            AS neg_one_logic_rsh_31_eq_1' at line 1"}
+{"i":22,"h":"67b2a8d9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 1)              AS bigint_neg_one_logic_rsh' at line 1"}
+{"i":23,"h":"82e19268","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), -1)                      AS int_lsh_neg_one_min' at line 1"}
+{"i":24,"h":"bf3c5f05","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), -1)                       AS bigint_lsh_neg_one_min' at line 1"}
+{"i":25,"h":"79221d47","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), -1)                     AS int_rsh_neg_one_eq_0' at line 1"}
+{"i":26,"h":"fae3b3b0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), -1)            AS int_unsigned_rsh_neg_one_eq_1' at line 1"}
+{"i":27,"h":"6949d5d1","k":"rows","cols":["zeta_op_arith_not_u64"],"rows":[["9223372036854775807"]]}
+{"i":28,"h":"a251a302","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 1)                      AS shiftright_bigint_neg_one' at line 1"}
+{"i":29,"h":"36ffe157","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 1)              AS shiftrightunsigned_bigint_int64_max' at line 1"}
+{"i":30,"h":"77a8ba4a","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":31,"h":"24fd4632","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":32,"h":"80b553a5","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHT does not exist"}
+{"i":33,"h":"8cec39de","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHTUNSIGNED does not exist"}
+{"i":34,"h":"db3ab1b2","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":35,"h":"efb219f4","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":36,"h":"070f6b2c","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHT does not exist"}
+{"i":37,"h":"ded45053","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHTUNSIGNED does not exist"}
+{"i":38,"h":"401b916b","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":39,"h":"ff40855a","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHT does not exist"}
+{"i":40,"h":"ffe104a5","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":41,"h":"7cf61243","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":42,"h":"87da73d1","k":"err","code":1305,"msg":"FUNCTION test.SHIFTLEFT does not exist"}
+{"i":43,"h":"007547b5","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHT does not exist"}
+{"i":44,"h":"a29f132e","k":"err","code":1305,"msg":"FUNCTION test.SHIFTRIGHTUNSIGNED does not exist"}

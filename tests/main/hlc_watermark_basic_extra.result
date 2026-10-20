@@ -1,29 +1,43 @@
 === SET zeta.hlc_watermark — basic forms silently succeed ===
 SET zeta.hlc_watermark = 0;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 SET zeta.hlc_watermark = 1000;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 SET zeta.hlc_watermark = 1700000000000000;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 === SET LOCAL — same silent-no-op ===
 SET LOCAL zeta.hlc_watermark = 2000;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 BEGIN;
 SET LOCAL zeta.hlc_watermark = 3000;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 COMMIT;
 === STRIKING: even way-over-i64::MAX silently succeeds ===
 SET zeta.hlc_watermark = 9223372036854775807;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 SET zeta.hlc_watermark = 9223372036854775808;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 SET zeta.hlc_watermark = 18446744073709551615;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 SET zeta.hlc_watermark = 18446744073709551616;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 === STRIKING: negative values silently succeed too ===
 SET zeta.hlc_watermark = -1;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 SET zeta.hlc_watermark = -9999;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 === STRIKING: garbage values silently succeed ===
 SET zeta.hlc_watermark = 'not-a-number';
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 SET zeta.hlc_watermark = '';
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 === Transaction context — ROLLBACK doesn't matter (shim absorbs) ===
 BEGIN;
 SET LOCAL zeta.hlc_watermark = 9999;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 ROLLBACK;
 SET zeta.hlc_watermark = 11111;
+ERROR 1193: Unknown system variable 'zeta.hlc_watermark'
 === Cross-link: ZETA_LAST_COMMIT_HLC() read-side still works ===
 SELECT ZETA_LAST_COMMIT_HLC() >= 0                            AS read_side_works;
-read_side_works
-1
+ERROR 1305: FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist

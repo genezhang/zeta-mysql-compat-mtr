@@ -1,0 +1,70 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":69}
+{"i":1,"h":"f471e169","k":"rows","cols":["zero"],"rows":[["0"]]}
+{"i":2,"h":"3b6e6964","k":"rows","cols":["one"],"rows":[["1"]]}
+{"i":3,"h":"25d4fb58","k":"rows","cols":["two"],"rows":[["10"]]}
+{"i":4,"h":"b682b62f","k":"rows","cols":["five"],"rows":[["101"]]}
+{"i":5,"h":"8234b81f","k":"rows","cols":["byte_max"],"rows":[["11111111"]]}
+{"i":6,"h":"62ee29c7","k":"rows","cols":["kilo"],"rows":[["10000000000"]]}
+{"i":7,"h":"00a7a3bc","k":"rows","cols":["neg_one"],"rows":[["1111111111111111111111111111111111111111111111111111111111111111"]]}
+{"i":8,"h":"9d7b84b7","k":"rows","cols":["neg_one_len_64"],"rows":[["1"]]}
+{"i":9,"h":"e958d0ef","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":10,"h":"c7eac4a7","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'BIN'"}
+{"i":11,"h":"f3b66aab","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'BIN'"}
+{"i":12,"h":"6181f1da","k":"rows","cols":["zero"],"rows":[["0"]]}
+{"i":13,"h":"0fbeb7fd","k":"rows","cols":["eight"],"rows":[["10"]]}
+{"i":14,"h":"215f863a","k":"rows","cols":["sixty_four"],"rows":[["100"]]}
+{"i":15,"h":"0835a51d","k":"rows","cols":["three_digit"],"rows":[["777"]]}
+{"i":16,"h":"114eedce","k":"rows","cols":["five_digit"],"rows":[["10000"]]}
+{"i":17,"h":"d9794021","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":18,"h":"51e395e3","k":"rows","cols":["zero_bits"],"rows":[["0"]]}
+{"i":19,"h":"8b3463fd","k":"rows","cols":["one_bit"],"rows":[["1"]]}
+{"i":20,"h":"e123d4bd","k":"rows","cols":["three_bits"],"rows":[["3"]]}
+{"i":21,"h":"58f9d1fc","k":"rows","cols":["four_bits"],"rows":[["4"]]}
+{"i":22,"h":"d934db04","k":"rows","cols":["eight_bits"],"rows":[["8"]]}
+{"i":23,"h":"4b7f1860","k":"rows","cols":["ten_bits"],"rows":[["10"]]}
+{"i":24,"h":"e28013c7","k":"rows","cols":["one_bit_pow2"],"rows":[["1"]]}
+{"i":25,"h":"28153526","k":"rows","cols":["minus_one_64_bits"],"rows":[["64"]]}
+{"i":26,"h":"206ac5a1","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":27,"h":"002709ea","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'BIT_COUNT'"}
+{"i":28,"h":"abc794f3","k":"rows","cols":["dec_to_hex"],"rows":[["FF"]]}
+{"i":29,"h":"9d8a63ed","k":"rows","cols":["dec_to_bin"],"rows":[["1111"]]}
+{"i":30,"h":"2242ac72","k":"rows","cols":["hex_lower_to_dec"],"rows":[["255"]]}
+{"i":31,"h":"0143537c","k":"rows","cols":["hex_upper_to_dec"],"rows":[["255"]]}
+{"i":32,"h":"15dafc27","k":"rows","cols":["round_trip"],"rows":[["1234"]]}
+{"i":33,"h":"eded94d8","k":"rows","cols":["upper_hex"],"rows":[["1"]]}
+{"i":34,"h":"84696714","k":"rows","cols":["upper_hex_long"],"rows":[["1"]]}
+{"i":35,"h":"25694cb5","k":"rows","cols":["neg_unsigned_to"],"rows":[["FFFFFFFFFFFFFFFF"]]}
+{"i":36,"h":"c7bc56a5","k":"rows","cols":["neg_signed_to"],"rows":[["-1"]]}
+{"i":37,"h":"3701a111","k":"rows","cols":["neg_signed_hex"],"rows":[["-FF"]]}
+{"i":38,"h":"c98abfff","k":"rows","cols":["neg_signed_binary"],"rows":[["-101"]]}
+{"i":39,"h":"0776e0b5","k":"rows","cols":["leading_trailing_ws"],"rows":[["255"]]}
+{"i":40,"h":"eba33ccb","k":"rows","cols":["ws_strips_clean"],"rows":[["1"]]}
+{"i":41,"h":"32ddc95b","k":"rows","cols":["empty_str"],"rows":[[null]]}
+{"i":42,"h":"b63e3dfb","k":"rows","cols":["bare_minus"],"rows":[["0"]]}
+{"i":43,"h":"e7e65810","k":"rows","cols":["bare_plus"],"rows":[["0"]]}
+{"i":44,"h":"46653c85","k":"rows","cols":["bin_decimal_unreachable"],"rows":[["0"]]}
+{"i":45,"h":"9e7c16cf","k":"rows","cols":["oct_decimal_unreachable"],"rows":[["0"]]}
+{"i":46,"h":"9ac1db63","k":"rows","cols":["bc_decimal_unreachable"],"rows":[["0"]]}
+{"i":47,"h":"7e842e69","k":"rows","cols":["conv_decimal_trunc"],"rows":[["FF"]]}
+{"i":48,"h":"422286e0","k":"rows","cols":["conv_decimal_trunc_value"],"rows":[["1"]]}
+{"i":49,"h":"cf9e0b6f","k":"rows","cols":["i64_max_bits"],"rows":[["63"]]}
+{"i":50,"h":"d74af29c","k":"rows","cols":["from_base_too_low"],"rows":[["1"]]}
+{"i":51,"h":"e3695909","k":"rows","cols":["from_base_too_high"],"rows":[["1"]]}
+{"i":52,"h":"c5fcc57e","k":"rows","cols":["to_base_too_low"],"rows":[["1"]]}
+{"i":53,"h":"92ec3ce3","k":"rows","cols":["to_base_too_high"],"rows":[["1"]]}
+{"i":54,"h":"a2453add","k":"rows","cols":["from_zero"],"rows":[["1"]]}
+{"i":55,"h":"5d8eae37","k":"rows","cols":["to_zero"],"rows":[["1"]]}
+{"i":56,"h":"037dc4b5","k":"rows","cols":["parse_until_invalid"],"rows":[["12"]]}
+{"i":57,"h":"1664acac","k":"rows","cols":["hex_invalid_z"],"rows":[["1"]]}
+{"i":58,"h":"18ae4c90","k":"rows","cols":["no_valid_prefix"],"rows":[["0"]]}
+{"i":59,"h":"e8c430ee","k":"rows","cols":["null_n"],"rows":[["1"]]}
+{"i":60,"h":"9b0f86dc","k":"rows","cols":["null_from"],"rows":[["1"]]}
+{"i":61,"h":"0d3119eb","k":"rows","cols":["null_to"],"rows":[["1"]]}
+{"i":62,"h":"c0c67d69","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'CONV'"}
+{"i":63,"h":"7dc09930","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'CONV'"}
+{"i":64,"h":"7b2b979d","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'CONV'"}
+{"i":65,"h":"d1f33fe5","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'CONV'"}
+{"i":66,"h":"6ce80577","k":"rows","cols":["bin_det"],"rows":[["1"]]}
+{"i":67,"h":"3eb3e0bf","k":"rows","cols":["oct_det"],"rows":[["1"]]}
+{"i":68,"h":"55ee8ddf","k":"rows","cols":["bc_det"],"rows":[["1"]]}
+{"i":69,"h":"fef1bc7b","k":"rows","cols":["conv_det"],"rows":[["1"]]}

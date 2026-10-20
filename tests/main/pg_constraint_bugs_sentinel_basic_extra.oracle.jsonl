@@ -1,0 +1,22 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":21}
+{"i":1,"h":"567c65de","k":"ok","affected":0}
+{"i":2,"h":"00450715","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT DISTINCT (a))' at line 1"}
+{"i":3,"h":"db0d9a36","k":"err","code":1146,"msg":"Table 'test.nnd' doesn't exist"}
+{"i":4,"h":"db0d9a36","k":"err","code":1146,"msg":"Table 'test.nnd' doesn't exist"}
+{"i":5,"h":"dc248684","k":"err","code":1146,"msg":"Table 'test.nnd' doesn't exist"}
+{"i":6,"h":"95848f84","k":"err","code":1146,"msg":"Table 'test.nnd' doesn't exist"}
+{"i":7,"h":"95848f84","k":"err","code":1146,"msg":"Table 'test.nnd' doesn't exist"}
+{"i":8,"h":"7fd3a686","k":"err","code":1051,"msg":"Unknown table 'test.nnd'"}
+{"i":9,"h":"efc36f66","k":"ok","affected":0}
+{"i":10,"h":"eaef242d","k":"ok","affected":0}
+{"i":11,"h":"7aa86f83","k":"ok","affected":0}
+{"i":12,"h":"3dc16702","k":"ok","affected":1}
+{"i":13,"h":"7aa7ac40","k":"err","code":3815,"msg":"An expression of a check constraint 'chk_sub_chk_1' contains disallowed function."}
+{"i":14,"h":"0efe1a3b","k":"err","code":1146,"msg":"Table 'test.chk_sub' doesn't exist"}
+{"i":15,"h":"d0424348","k":"err","code":1051,"msg":"Unknown table 'test.chk_sub'"}
+{"i":16,"h":"55054fdd","k":"ok","affected":0}
+{"i":17,"h":"e16aec8f","k":"ok","affected":0}
+{"i":18,"h":"29efbf65","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT 7))' at line 1"}
+{"i":19,"h":"c40b0b73","k":"err","code":1146,"msg":"Table 'test.def_sub' doesn't exist"}
+{"i":20,"h":"38f45b1d","k":"err","code":1146,"msg":"Table 'test.def_sub' doesn't exist"}
+{"i":21,"h":"f9b34e4f","k":"err","code":1051,"msg":"Unknown table 'test.def_sub'"}

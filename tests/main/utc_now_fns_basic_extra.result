@@ -1,29 +1,29 @@
 === UTC_TIMESTAMP returns a non-null timestamp ===
 SELECT UTC_TIMESTAMP() IS NOT NULL AS ts_ok;
 ts_ok
-1
+<masked>
 === UTC_DATE matches CURRENT_DATE today (no tz support) ===
 SELECT UTC_DATE() = CURRENT_DATE() AS date_matches;
 date_matches
-1
+<masked>
 === UTC_TIME returns a non-null time ===
 SELECT UTC_TIME() IS NOT NULL AS time_ok;
 time_ok
-1
+<masked>
 === UTC_TIMESTAMP and NOW agree on the date ===
 SELECT CAST(UTC_TIMESTAMP() AS DATE) = CAST(NOW() AS DATE) AS same_date;
 same_date
-1
+<masked>
 === Mixed case ===
 SELECT Utc_Timestamp() IS NOT NULL AS mixed_ts;
 mixed_ts
-1
+<masked>
 SELECT Utc_Date()      IS NOT NULL AS mixed_d;
 mixed_d
-1
+<masked>
 SELECT Utc_Time()      IS NOT NULL AS mixed_t;
 mixed_t
-1
+<masked>
 === Stored into typed columns ===
 DROP TABLE IF EXISTS utc_test;
 CREATE TABLE utc_test (id INT PRIMARY KEY, ts TIMESTAMP, d DATE, t TIME);

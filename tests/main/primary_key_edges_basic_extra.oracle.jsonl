@@ -1,0 +1,40 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":39}
+{"i":1,"h":"6dae8b56","k":"ok","affected":0}
+{"i":2,"h":"0c3eb626","k":"ok","affected":0}
+{"i":3,"h":"46909827","k":"ok","affected":2}
+{"i":4,"h":"4fbc0dc2","k":"ok","affected":0}
+{"i":5,"h":"04c504dc","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["pa","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":6,"h":"fd5a1af1","k":"err","code":1068,"msg":"Multiple primary key defined"}
+{"i":7,"h":"6dae85f8","k":"ok","affected":0}
+{"i":8,"h":"e2711a59","k":"ok","affected":0}
+{"i":9,"h":"b7bcad1a","k":"ok","affected":3}
+{"i":10,"h":"b082fb12","k":"err","code":1062,"msg":"Duplicate entry '1-2' for key 'pc.PRIMARY'"}
+{"i":11,"h":"6dae8649","k":"ok","affected":0}
+{"i":12,"h":"fcdebc69","k":"ok","affected":0}
+{"i":13,"h":"0c0c9a04","k":"ok","affected":2}
+{"i":14,"h":"e7a935f6","k":"err","code":1062,"msg":"Duplicate entry 'alice' for key 'pt.PRIMARY'"}
+{"i":15,"h":"6daef3ab","k":"ok","affected":0}
+{"i":16,"h":"e6327a75","k":"ok","affected":0}
+{"i":17,"h":"8e680390","k":"err","code":1048,"msg":"Column 'id' cannot be null"}
+{"i":18,"h":"9df2882b","k":"ok","affected":0}
+{"i":19,"h":"27de1f43","k":"err","code":1171,"msg":"All parts of a PRIMARY KEY must be NOT NULL; if you need NULL in a key, use UNIQUE instead"}
+{"i":20,"h":"987faecd","k":"err","code":1146,"msg":"Table 'test.pnnull' doesn't exist"}
+{"i":21,"h":"6e4c2afb","k":"err","code":1146,"msg":"Table 'test.pnnull' doesn't exist"}
+{"i":22,"h":"d142d521","k":"err","code":1146,"msg":"Table 'test.pnnull' doesn't exist"}
+{"i":23,"h":"c9248a27","k":"ok","affected":0}
+{"i":24,"h":"00dd86fa","k":"ok","affected":0}
+{"i":25,"h":"4b3065ad","k":"ok","affected":2}
+{"i":26,"h":"3e163d70","k":"err","code":1062,"msg":"Duplicate entry '1' for key 'pad.PRIMARY'"}
+{"i":27,"h":"6daefcfe","k":"ok","affected":0}
+{"i":28,"h":"56c662c8","k":"ok","affected":0}
+{"i":29,"h":"98446e5b","k":"ok","affected":3}
+{"i":30,"h":"2fed7516","k":"rows","cols":["id","name"],"rows":[["1","a"],["2","b"],["3","c"]]}
+{"i":31,"h":"cab9fda0","k":"rows","cols":["first_id"],"rows":[["1"]]}
+{"i":32,"h":"113a1e2d","k":"err","code":1075,"msg":"Incorrect table definition; there can be only one auto column and it must be defined as a key"}
+{"i":33,"h":"c343aacf","k":"ok","affected":0}
+{"i":34,"h":"c343b535","k":"ok","affected":0}
+{"i":35,"h":"c3439710","k":"ok","affected":0}
+{"i":36,"h":"c343a8b6","k":"ok","affected":0}
+{"i":37,"h":"c4092554","k":"err","code":1051,"msg":"Unknown table 'test.pnnull'"}
+{"i":38,"h":"6c42a36b","k":"ok","affected":0}
+{"i":39,"h":"c3439c37","k":"ok","affected":0}

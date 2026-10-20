@@ -9,7 +9,7 @@ shl	shr
 === Unary ~ (NOT) ===
 SELECT ~5 AS r;
 r
--6
+18446744073709551610
 === HEX(int) / HEX(text) ===
 SELECT HEX(255) AS h_int, HEX('hello') AS h_text;
 h_int	h_text
@@ -20,8 +20,7 @@ r
 FFFFFFFFFFFFFFFF
 === UNHEX — decode hex back to text ===
 SELECT UNHEX('48656C6C6F') AS r, UNHEX('') AS empty;
-r	empty
-Hello	
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 === UNHEX on invalid hex chars — NULL ===
 SELECT UNHEX('Z') AS r;
 r
@@ -68,11 +67,11 @@ r
 NULL
 === KNOWN GAP: ^ infix (MySQL BITWISE XOR) — errno 1064 ===
 SELECT 6 ^ 3 AS r;
-ERROR 1064: SQL parse error: unsupported binary operator: ^
+r
+5
 === KNOWN GAP: XOR(a, b) function form — errno 1105 ===
 SELECT XOR(6, 3) AS r;
-ERROR 1105: execution error: unknown function: XOR
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'XOR(6, 3) AS r' at line 1
 === TO_HEX (PG alias) — supported since zeta #1205 ===
 SELECT TO_HEX(255) AS r;
-r
-FF
+ERROR 1305: FUNCTION test.TO_HEX does not exist

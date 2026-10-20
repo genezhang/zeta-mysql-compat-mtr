@@ -1,0 +1,21 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":20}
+{"i":1,"h":"2a2fe14e","k":"skip","why":"accounts and privileges"}
+{"i":2,"h":"0ef507e8","k":"skip","why":"accounts and privileges"}
+{"i":3,"h":"81d68d3c","k":"skip","why":"accounts and privileges"}
+{"i":4,"h":"b7f68989","k":"err","code":3530,"msg":"`r1`@`%` is not granted to `root`@`localhost`"}
+{"i":5,"h":"5068fe8e","k":"rows","cols":["Grants for root@localhost"],"rows":[["GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.* TO `root`@`localhost` WITH GRANT OPTION"],["GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ABORT_EXEMPT,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FIREWALL_EXEMPT,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `root`@`localhost` WITH GRANT OPTION"],["GRANT PROXY ON ``@`` TO `root`@`localhost` WITH GRANT OPTION"]]}
+{"i":6,"h":"79da1ceb","k":"err","code":1141,"msg":"There is no such grant defined for user 'u2' on host 'localhost'"}
+{"i":7,"h":"ba890206","k":"skip","why":"accounts and privileges"}
+{"i":8,"h":"c88d5538","k":"skip","why":"accounts and privileges"}
+{"i":9,"h":"710147ca","k":"skip","why":"accounts and privileges"}
+{"i":10,"h":"ae291c1e","k":"skip","why":"accounts and privileges"}
+{"i":11,"h":"bc2d272e","k":"skip","why":"accounts and privileges"}
+{"i":12,"h":"f46548cb","k":"skip","why":"accounts and privileges"}
+{"i":13,"h":"b9d49a4e","k":"skip","why":"accounts and privileges"}
+{"i":14,"h":"c67a6d48","k":"skip","why":"accounts and privileges"}
+{"i":15,"h":"d3be9e61","k":"skip","why":"accounts and privileges"}
+{"i":16,"h":"7f935518","k":"skip","why":"accounts and privileges"}
+{"i":17,"h":"82256ce1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ROLE' at line 1"}
+{"i":18,"h":"6a6fb8a6","k":"skip","why":"accounts and privileges"}
+{"i":19,"h":"428ac342","k":"skip","why":"accounts and privileges"}
+{"i":20,"h":"4de2456d","k":"ok","affected":0}

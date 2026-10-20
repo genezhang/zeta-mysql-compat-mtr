@@ -1,0 +1,58 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":57}
+{"i":1,"h":"c9dd425b","k":"rows","cols":["hit_middle"],"rows":[["2"]]}
+{"i":2,"h":"d19a54b9","k":"rows","cols":["hit_first"],"rows":[["1"]]}
+{"i":3,"h":"bf65eed3","k":"rows","cols":["hit_last"],"rows":[["3"]]}
+{"i":4,"h":"180b4758","k":"rows","cols":["miss"],"rows":[["0"]]}
+{"i":5,"h":"3e5af5f6","k":"rows","cols":["multi_char"],"rows":[["5"]]}
+{"i":6,"h":"20c8b2cc","k":"rows","cols":["empty_needle"],"rows":[["1"]]}
+{"i":7,"h":"6884aadb","k":"rows","cols":["empty_both"],"rows":[["1"]]}
+{"i":8,"h":"d629c9a5","k":"rows","cols":["empty_hay"],"rows":[["0"]]}
+{"i":9,"h":"554b1748","k":"rows","cols":["null_needle"],"rows":[["1"]]}
+{"i":10,"h":"f6b33a28","k":"rows","cols":["null_hay"],"rows":[["1"]]}
+{"i":11,"h":"bc1db34d","k":"rows","cols":["hit_middle"],"rows":[["2"]]}
+{"i":12,"h":"e8414075","k":"rows","cols":["hit_first"],"rows":[["1"]]}
+{"i":13,"h":"f3f74534","k":"rows","cols":["hit_last"],"rows":[["3"]]}
+{"i":14,"h":"339a3d9d","k":"rows","cols":["miss"],"rows":[["0"]]}
+{"i":15,"h":"893cccbc","k":"rows","cols":["instr_position_parity"],"rows":[["1"]]}
+{"i":16,"h":"be0ce931","k":"rows","cols":["empty_needle"],"rows":[["1"]]}
+{"i":17,"h":"b5156989","k":"rows","cols":["empty_both"],"rows":[["1"]]}
+{"i":18,"h":"5a0efab3","k":"rows","cols":["empty_hay"],"rows":[["0"]]}
+{"i":19,"h":"fbd15f41","k":"rows","cols":["null_hay"],"rows":[["1"]]}
+{"i":20,"h":"2372c671","k":"rows","cols":["null_needle"],"rows":[["1"]]}
+{"i":21,"h":"24b871c0","k":"rows","cols":["hit_middle"],"rows":[["2"]]}
+{"i":22,"h":"e38283ce","k":"rows","cols":["hit_first"],"rows":[["1"]]}
+{"i":23,"h":"098ee9cb","k":"rows","cols":["miss"],"rows":[["0"]]}
+{"i":24,"h":"741269a1","k":"rows","cols":["empty_needle_nonempty_hay"],"rows":[["1"]]}
+{"i":25,"h":"2e6a1249","k":"rows","cols":["empty_needle_empty_hay"],"rows":[["1"]]}
+{"i":26,"h":"ddeef826","k":"rows","cols":["three_way_parity"],"rows":[["1"]]}
+{"i":27,"h":"0ab65afe","k":"rows","cols":["start_skips_first"],"rows":[["5"]]}
+{"i":28,"h":"826e2899","k":"rows","cols":["start_at_1_finds_first"],"rows":[["2"]]}
+{"i":29,"h":"4f0edbb5","k":"rows","cols":["start_past_end"],"rows":[["0"]]}
+{"i":30,"h":"79c13f2d","k":"rows","cols":["empty_needle_start_2"],"rows":[["2"]]}
+{"i":31,"h":"bbd44f0e","k":"rows","cols":["empty_needle_start_strlen_plus_one"],"rows":[["4"]]}
+{"i":32,"h":"674ca1f5","k":"rows","cols":["empty_needle_past_end"],"rows":[["0"]]}
+{"i":33,"h":"04823b5f","k":"rows","cols":["start_zero"],"rows":[["0"]]}
+{"i":34,"h":"96dff9a2","k":"rows","cols":["start_negative"],"rows":[["0"]]}
+{"i":35,"h":"828b1bda","k":"rows","cols":["null_needle"],"rows":[["1"]]}
+{"i":36,"h":"b3f7d6ed","k":"rows","cols":["null_hay"],"rows":[["1"]]}
+{"i":37,"h":"5eb9b91f","k":"rows","cols":["null_start"],"rows":[["1"]]}
+{"i":38,"h":"e205c218","k":"rows","cols":["pos_utf8"],"rows":[["4"]]}
+{"i":39,"h":"b6d5818f","k":"rows","cols":["instr_utf8"],"rows":[["4"]]}
+{"i":40,"h":"662e9a72","k":"rows","cols":["locate_utf8"],"rows":[["4"]]}
+{"i":41,"h":"7627b0c2","k":"rows","cols":["pos_after_utf8"],"rows":[["5"]]}
+{"i":42,"h":"ac9c494b","k":"rows","cols":["instr_after_utf8"],"rows":[["5"]]}
+{"i":43,"h":"7d3ef5d1","k":"rows","cols":["locate_after_utf8"],"rows":[["5"]]}
+{"i":44,"h":"0ca88a67","k":"rows","cols":["locate_3arg_start_finds_utf8"],"rows":[["4"]]}
+{"i":45,"h":"25556073","k":"rows","cols":["locate_3arg_start_past_end"],"rows":[["0"]]}
+{"i":46,"h":"fbdc3397","k":"rows","cols":["pos_case_byte_equal"],"rows":[["2"]]}
+{"i":47,"h":"59858dde","k":"rows","cols":["instr_case_byte_equal"],"rows":[["2"]]}
+{"i":48,"h":"c6f1a3f1","k":"rows","cols":["locate_case_byte_equal"],"rows":[["2"]]}
+{"i":49,"h":"1ca60239","k":"rows","cols":["pos_det"],"rows":[["1"]]}
+{"i":50,"h":"3a8a3b9c","k":"rows","cols":["instr_det"],"rows":[["1"]]}
+{"i":51,"h":"ab072866","k":"rows","cols":["locate_det"],"rows":[["1"]]}
+{"i":52,"h":"f5b2dad2","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'INSTR'"}
+{"i":53,"h":"71f51331","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'INSTR'"}
+{"i":54,"h":"b49450cc","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'INSTR'"}
+{"i":55,"h":"d9d90ec4","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LOCATE'"}
+{"i":56,"h":"6e8a5c64","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LOCATE'"}
+{"i":57,"h":"386d8cdb","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LOCATE'"}

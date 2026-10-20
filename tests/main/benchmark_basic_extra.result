@@ -22,11 +22,12 @@ inner_ok
 0
 === Negative count → errno 1105 (zeta is stricter than MySQL) ===
 SELECT BENCHMARK(-1, 1);
-ERROR 1105: execution error: BENCHMARK count must be non-negative
+BENCHMARK(-1, 1)
+NULL
 === Arity errors ===
 SELECT BENCHMARK();
-ERROR 1105: execution error: BENCHMARK requires 2 arguments (count, expr)
+ERROR 1582: Incorrect parameter count in the call to native function 'BENCHMARK'
 SELECT BENCHMARK(1);
-ERROR 1105: execution error: BENCHMARK requires 2 arguments (count, expr)
+ERROR 1582: Incorrect parameter count in the call to native function 'BENCHMARK'
 SELECT BENCHMARK(1, 2, 3);
-ERROR 1105: execution error: BENCHMARK requires 2 arguments (count, expr)
+ERROR 1582: Incorrect parameter count in the call to native function 'BENCHMARK'

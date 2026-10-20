@@ -1,0 +1,22 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":21}
+{"i":1,"h":"eaf6d203","k":"rows","cols":["plus_7d"],"rows":[["2024-03-22"]]}
+{"i":2,"h":"7e75ee6e","k":"rows","cols":["plus_1m"],"rows":[["2024-04-15"]]}
+{"i":3,"h":"9708d3d8","k":"rows","cols":["feb_clamp"],"rows":[["2024-02-29"]]}
+{"i":4,"h":"8e342219","k":"rows","cols":["shorthand_7"],"rows":[["2024-03-22"]]}
+{"i":5,"h":"497eb1cf","k":"rows","cols":["shorthand_0"],"rows":[["2024-03-15"]]}
+{"i":6,"h":"e0ff9b05","k":"rows","cols":["shorthand_neg"],"rows":[["2024-03-05"]]}
+{"i":7,"h":"fd6b174f","k":"rows","cols":["sub_iv"],"rows":[["2024-03-05"]]}
+{"i":8,"h":"b6a32157","k":"rows","cols":["sub_int"],"rows":[["2024-03-05"]]}
+{"i":9,"h":"01b116ab","k":"rows","cols":["sub_iv_month"],"rows":[["2024-02-29"]]}
+{"i":10,"h":"42a9a328","k":"rows","cols":["add_equiv"],"rows":[["1"]]}
+{"i":11,"h":"2a3141bc","k":"rows","cols":["sub_equiv"],"rows":[["1"]]}
+{"i":12,"h":"c7f0e650","k":"rows","cols":["n_left"],"rows":[[null]]}
+{"i":13,"h":"aa72ab3b","k":"rows","cols":["n_right_int"],"rows":[[null]]}
+{"i":14,"h":"24ca16ef","k":"rows","cols":["n_left_iv"],"rows":[[null]]}
+{"i":15,"h":"77e191f8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":16,"h":"9fba92bc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 1)' at line 1"}
+{"i":17,"h":"5a3df207","k":"ok","affected":0}
+{"i":18,"h":"72423895","k":"ok","affected":0}
+{"i":19,"h":"ec47e183","k":"ok","affected":3}
+{"i":20,"h":"fb3c6392","k":"rows","cols":["id","plus_5d","minus_5d"],"rows":[["1","2024-01-06","2023-12-27"],["2","2024-06-20","2024-06-10"],["3","2025-01-05","2024-12-26"]]}
+{"i":21,"h":"1ace6555","k":"ok","affected":0}

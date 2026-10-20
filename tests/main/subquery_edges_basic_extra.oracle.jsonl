@@ -1,0 +1,27 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":26}
+{"i":1,"h":"6d5c3fed","k":"ok","affected":0}
+{"i":2,"h":"e687b84f","k":"ok","affected":0}
+{"i":3,"h":"19dbe239","k":"ok","affected":0}
+{"i":4,"h":"d0f00bee","k":"ok","affected":3}
+{"i":5,"h":"abddae2f","k":"ok","affected":0}
+{"i":6,"h":"5a6f9c9e","k":"rows","cols":["zero_row"],"rows":[[null]]}
+{"i":7,"h":"ecf974b8","k":"err","code":1242,"msg":"Subquery returns more than 1 row"}
+{"i":8,"h":"1a6234fb","k":"rows","cols":["some_match","some_nomatch"],"rows":[["1","0"]]}
+{"i":9,"h":"747f3f8b","k":"rows","cols":["ex_empty"],"rows":[["0"]]}
+{"i":10,"h":"66fd8c79","k":"rows","cols":["not_ex_empty"],"rows":[["1"]]}
+{"i":11,"h":"417be1ce","k":"rows","cols":["in_empty"],"rows":[["0"]]}
+{"i":12,"h":"083a3dc9","k":"rows","cols":["not_in_empty"],"rows":[["1"]]}
+{"i":13,"h":"4d178e27","k":"rows","cols":["any_empty"],"rows":[["0"]]}
+{"i":14,"h":"f2ae7b9c","k":"rows","cols":["n"],"rows":[["10"],["20"],["30"]]}
+{"i":15,"h":"692d63f7","k":"rows","cols":["scalar_eq"],"rows":[["1"]]}
+{"i":16,"h":"a60eab06","k":"rows","cols":["scalar_lt"],"rows":[["1"]]}
+{"i":17,"h":"f4121713","k":"err","code":1242,"msg":"Subquery returns more than 1 row"}
+{"i":18,"h":"f2f1edc1","k":"rows","cols":["nl"],"rows":[[null]]}
+{"i":19,"h":"4e2ce2dd","k":"rows","cols":["nl_in"],"rows":[[null]]}
+{"i":20,"h":"f56dff6e","k":"rows","cols":["gt_any"],"rows":[["1"]]}
+{"i":21,"h":"3c5c2790","k":"rows","cols":["gt_all"],"rows":[["1"]]}
+{"i":22,"h":"af2a91aa","k":"rows","cols":["lt_all"],"rows":[["1"]]}
+{"i":23,"h":"b9bafafa","k":"rows","cols":["eq_any_miss"],"rows":[["0"]]}
+{"i":24,"h":"2f12ef0d","k":"rows","cols":["1 = ALL (SELECT id FROM empty_t)"],"rows":[["1"]]}
+{"i":25,"h":"c346b354","k":"ok","affected":0}
+{"i":26,"h":"8107b432","k":"ok","affected":0}

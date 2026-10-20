@@ -12,7 +12,7 @@ p
 # MySQL: ["$.a", "$.nested.k"] (LIKE wildcard matches both `ap%`)
 SELECT JSON_SEARCH(j, 'all', 'ap%') AS p FROM t1 WHERE i = 1;
 p
-["$.a","$.nested.k"]
+["$.a", "$.nested.k"]
 # ---- JSON_SEARCH — array element match ----   zeta #1063 — FIXED
 # MySQL: "$[0]"
 SELECT JSON_SEARCH(j, 'one', 'apple') AS p FROM t1 WHERE i = 2;

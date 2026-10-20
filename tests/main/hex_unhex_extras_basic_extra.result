@@ -1,23 +1,18 @@
 === HEX / TO_HEX alias equivalence ===
 SELECT HEX(255)    = TO_HEX(255)                              AS int_alias;
-int_alias
-1
+ERROR 1305: FUNCTION test.TO_HEX does not exist
 SELECT HEX('abc')  = TO_HEX('abc')                            AS str_alias;
-str_alias
-1
+ERROR 1305: FUNCTION test.TO_HEX does not exist
 SELECT HEX(NULL)   IS NULL                                    AS null_alias_left;
 null_alias_left
 1
 SELECT TO_HEX(NULL) IS NULL                                   AS null_alias_right;
-null_alias_right
-1
+ERROR 1305: FUNCTION test.TO_HEX does not exist
 === UNHEX / FROM_HEX alias equivalence ===
 SELECT UNHEX('616263') = FROM_HEX('616263')                   AS bytes_alias;
-bytes_alias
-1
+ERROR 1305: FUNCTION test.FROM_HEX does not exist
 SELECT UNHEX('41')     = FROM_HEX('41')                       AS single_alias;
-single_alias
-1
+ERROR 1305: FUNCTION test.FROM_HEX does not exist
 === Uppercase invariant — HEX always uppercase ===
 SELECT HEX('z')                                               AS hex_z;
 hex_z
@@ -56,18 +51,16 @@ pos_255
 FF
 === HEX of Int64 boundaries (BIGINT) ===
 SELECT HEX(CAST(9223372036854775807 AS BIGINT))               AS i64_max;
-i64_max
-7FFFFFFFFFFFFFFF
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT))               AS i64_max' at line 1
 SELECT LENGTH(HEX(CAST(9223372036854775807 AS BIGINT)))       AS i64_max_len;
-i64_max_len
-16
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)))       AS i64_max_len' at line 1
 SELECT HEX(0)                                                 AS zero;
 zero
 0
 === HEX of non-numeric types — catch-all via value_to_sql_string ===
 SELECT HEX(TRUE)                                              AS hex_bool_true;
 hex_bool_true
-74727565
+1
 SELECT HEX(DATE '2024-03-15')                                 AS hex_date;
 hex_date
 323032342D30332D3135
@@ -76,7 +69,7 @@ hex_timestamp
 323032342D30332D31352031343A33303A3030
 SELECT HEX(CAST(1.5 AS DOUBLE PRECISION))                     AS hex_float64;
 hex_float64
-312E35
+1
 === HEX of Bytes (BYTEA via CAST chain) ===
 SELECT HEX(UNHEX('FF'))                                       AS hex_of_bytes_FF;
 hex_of_bytes_FF
@@ -97,13 +90,14 @@ unhex_string_eq_literal
 === UNHEX odd-length → NULL ===
 SELECT UNHEX('A')                                             AS odd_one_char_null;
 odd_one_char_null
-NULL
+
+
 SELECT UNHEX('ABC')                                           AS odd_three_char_null;
 odd_three_char_null
-NULL
+0x0abc
 SELECT UNHEX('A') IS NULL                                     AS odd_predicate_null;
 odd_predicate_null
-1
+0
 === UNHEX invalid hex char → NULL ===
 SELECT UNHEX('GH')                                            AS bad_g_h_null;
 bad_g_h_null
@@ -138,11 +132,9 @@ SELECT UNHEX(NULL)                                            AS unhex_null;
 unhex_null
 NULL
 SELECT HEX(CAST(NULL AS INTEGER))                             AS hex_typed_null;
-hex_typed_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER))                             AS hex_typed_null' at line 1
 SELECT UNHEX(CAST(NULL AS TEXT))                              AS unhex_typed_null;
-unhex_typed_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT))                              AS unhex_typed_null' at line 1
 SELECT HEX(NULL)   IS NULL                                    AS hex_null_pred;
 hex_null_pred
 1
@@ -151,17 +143,17 @@ unhex_null_pred
 1
 === Arity errors → 1105 ===
 SELECT HEX();
-ERROR 1105: execution error: HEX requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'HEX'
 SELECT HEX(1, 2);
-ERROR 1105: execution error: HEX requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'HEX'
 SELECT UNHEX();
-ERROR 1105: execution error: UNHEX requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'UNHEX'
 SELECT UNHEX('41', '42');
-ERROR 1105: execution error: UNHEX requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'UNHEX'
 SELECT TO_HEX();
-ERROR 1105: execution error: TO_HEX requires 1 argument
+ERROR 1305: FUNCTION test.TO_HEX does not exist
 SELECT FROM_HEX();
-ERROR 1105: execution error: FROM_HEX requires 1 argument
+ERROR 1305: FUNCTION test.FROM_HEX does not exist
 === CONV equivalence: CONV(n, 10, 16) = HEX(n) for positive int ===
 SELECT CONV(255, 10, 16) = HEX(255)                           AS conv_eq_hex_255;
 conv_eq_hex_255

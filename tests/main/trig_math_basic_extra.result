@@ -22,11 +22,9 @@ tan_pi_2_finite
 1
 === COT(0) = +Infinity (divergence; MySQL errors) ===
 SELECT 1.0/COT(0) < 1e-300                                    AS cot_0_is_inf_via_recip;
-cot_0_is_inf_via_recip
-1
+ERROR 1690: DOUBLE value is out of range in 'cot(0)'
 SELECT COT(0) > 1e308                                         AS cot_0_above_max;
-cot_0_above_max
-1
+ERROR 1690: DOUBLE value is out of range in 'cot(0)'
 === ACOS at additional value (-1 = π) ===
 SELECT ROUND(ACOS(-1), 10) > 3.141
    AND ROUND(ACOS(-1), 10) < 3.142                            AS acos_neg_1_is_pi;
@@ -39,13 +37,13 @@ acos_0_is_pi_2
 === ASIN / ACOS: out-of-domain → NaN (divergence; MySQL NULL) ===
 SELECT ASIN(2)  <> ASIN(2)                                    AS asin_2_is_nan;
 asin_2_is_nan
-1
+NULL
 SELECT ACOS(2)  <> ACOS(2)                                    AS acos_2_is_nan;
 acos_2_is_nan
-1
+NULL
 SELECT ASIN(-2) <> ASIN(-2)                                   AS asin_neg_2_is_nan;
 asin_neg_2_is_nan
-1
+NULL
 === ATAN(y, x) = ATAN2(y, x) overload equivalence ===
 SELECT ATAN(1, 1)  = ATAN2(1, 1)                              AS atan_2arg_eq_atan2;
 atan_2arg_eq_atan2
@@ -75,50 +73,37 @@ atan2_y_axis
 1
 === Hyperbolic family (full coverage — net-new) ===
 SELECT ABS(SINH(0)) < 1e-10                                   AS sinh_0_is_0;
-sinh_0_is_0
-1
+ERROR 1305: FUNCTION test.SINH does not exist
 SELECT ABS(COSH(0) - 1) < 1e-10                               AS cosh_0_is_1;
-cosh_0_is_1
-1
+ERROR 1305: FUNCTION test.COSH does not exist
 SELECT ABS(TANH(0)) < 1e-10                                   AS tanh_0_is_0;
-tanh_0_is_0
-1
+ERROR 1305: FUNCTION test.TANH does not exist
 SELECT TANH(20)  > 0.999 AND TANH(20)  <= 1.0                 AS tanh_large_pos_near_1;
-tanh_large_pos_near_1
-1
+ERROR 1305: FUNCTION test.TANH does not exist
 SELECT TANH(-20) < -0.999 AND TANH(-20) >= -1.0               AS tanh_large_neg_near_neg_1;
-tanh_large_neg_near_neg_1
-1
+ERROR 1305: FUNCTION test.TANH does not exist
 SELECT ABS(ASINH(0)) < 1e-10                                  AS asinh_0_is_0;
-asinh_0_is_0
-1
+ERROR 1305: FUNCTION test.ASINH does not exist
 SELECT ABS(ACOSH(1)) < 1e-10                                  AS acosh_1_is_0;
-acosh_1_is_0
-1
+ERROR 1305: FUNCTION test.ACOSH does not exist
 SELECT ABS(ATANH(0)) < 1e-10                                  AS atanh_0_is_0;
-atanh_0_is_0
-1
+ERROR 1305: FUNCTION test.ATANH does not exist
 === Inverse hyperbolic out-of-domain (NaN) + boundary (±Inf) ===
 SELECT ACOSH(0)  <> ACOSH(0)                                  AS acosh_below_1_is_nan;
-acosh_below_1_is_nan
-1
+ERROR 1305: FUNCTION test.ACOSH does not exist
 SELECT ACOSH(-1) <> ACOSH(-1)                                 AS acosh_neg_is_nan;
-acosh_neg_is_nan
-1
+ERROR 1305: FUNCTION test.ACOSH does not exist
 SELECT ATANH(2)  <> ATANH(2)                                  AS atanh_above_1_is_nan;
-atanh_above_1_is_nan
-1
+ERROR 1305: FUNCTION test.ATANH does not exist
 SELECT  1.0/ATANH(1)  < 1e-300                                AS atanh_1_is_pos_inf;
-atanh_1_is_pos_inf
-1
+ERROR 1305: FUNCTION test.ATANH does not exist
 SELECT -1.0/ATANH(-1) < 1e-300                                AS atanh_neg_1_is_neg_inf;
-atanh_neg_1_is_neg_inf
-1
+ERROR 1305: FUNCTION test.ATANH does not exist
 === PI() rejects ANY arg ===
 SELECT PI(1);
-ERROR 1105: execution error: PI() takes no arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'PI'
 SELECT PI('foo');
-ERROR 1105: execution error: PI() takes no arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'PI'
 === NULL passthrough across the family ===
 SELECT SIN(NULL)      IS NULL                                 AS sin_null;
 sin_null
@@ -148,23 +133,17 @@ SELECT ATAN2(1, NULL) IS NULL                                 AS atan2_x_null;
 atan2_x_null
 1
 SELECT SINH(NULL)     IS NULL                                 AS sinh_null;
-sinh_null
-1
+ERROR 1305: FUNCTION test.SINH does not exist
 SELECT COSH(NULL)     IS NULL                                 AS cosh_null;
-cosh_null
-1
+ERROR 1305: FUNCTION test.COSH does not exist
 SELECT TANH(NULL)     IS NULL                                 AS tanh_null;
-tanh_null
-1
+ERROR 1305: FUNCTION test.TANH does not exist
 SELECT ASINH(NULL)    IS NULL                                 AS asinh_null;
-asinh_null
-1
+ERROR 1305: FUNCTION test.ASINH does not exist
 SELECT ACOSH(NULL)    IS NULL                                 AS acosh_null;
-acosh_null
-1
+ERROR 1305: FUNCTION test.ACOSH does not exist
 SELECT ATANH(NULL)    IS NULL                                 AS atanh_null;
-atanh_null
-1
+ERROR 1305: FUNCTION test.ATANH does not exist
 SELECT DEGREES(NULL)  IS NULL                                 AS degrees_null;
 degrees_null
 1
@@ -179,24 +158,25 @@ log10_null
 1
 === Arity errors (representatives across the shared arm) ===
 SELECT SIN();
-ERROR 1105: execution error: SIN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SIN'
 SELECT SIN(1, 2);
-ERROR 1105: execution error: SIN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'SIN'
 SELECT COSH();
-ERROR 1105: execution error: COSH requires 1 argument
+ERROR 1305: FUNCTION test.COSH does not exist
 SELECT LOG2();
-ERROR 1105: execution error: LOG2 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'LOG2'
 SELECT LOG2(1, 2);
-ERROR 1105: execution error: LOG2 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'LOG2'
 SELECT DEGREES();
-ERROR 1105: execution error: DEGREES requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'DEGREES'
 SELECT ATAN();
-ERROR 1105: execution error: ATAN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'ATAN'
 SELECT ATAN(1, 2, 3);
-ERROR 1105: execution error: ATAN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'ATAN'
 SELECT ATAN2();
-ERROR 1105: execution error: ATAN2 requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'ATAN2'
 SELECT ATAN2(1);
-ERROR 1105: execution error: ATAN2 requires 2 arguments
+ATAN2(1)
+0.7853981633974483
 SELECT ATAN2(1, 2, 3);
-ERROR 1105: execution error: ATAN2 requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'ATAN2'

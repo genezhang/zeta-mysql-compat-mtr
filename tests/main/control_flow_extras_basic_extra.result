@@ -7,17 +7,17 @@ empty_str_is_false
 else
 SELECT IF('hello', 'then', 'else')                            AS nonempty_str_is_true;
 nonempty_str_is_true
-then
+else
 SELECT IF('0.0', 'then', 'else')                              AS str_zero_point_zero_is_true;
 str_zero_point_zero_is_true
-then
+else
 SELECT IF(' ', 'then', 'else')                                AS whitespace_str_is_true;
 whitespace_str_is_true
-then
+else
 === IF truthiness — Decimal vs Float64 (STRIKING finding) ===
 SELECT IF(0.0, 'then', 'else')                                AS decimal_zero_is_TRUTHY;
 decimal_zero_is_TRUTHY
-then
+else
 SELECT IF(3.14, 'then', 'else')                               AS decimal_nonzero_is_truthy;
 decimal_nonzero_is_truthy
 then
@@ -27,7 +27,7 @@ then
 SELECT IF(0.0, 'then', 'else')
     <> IF(0,   'then', 'else')                                AS decimal_zero_differs_from_int_zero;
 decimal_zero_differs_from_int_zero
-1
+0
 SELECT IF(CAST(0.0 AS DOUBLE PRECISION), 'then', 'else')      AS float64_zero_is_false;
 float64_zero_is_false
 else
@@ -36,11 +36,9 @@ float64_nonzero_is_true
 then
 === IF truthiness — Int64 / UInt64 arms (CAST coercion) ===
 SELECT IF(CAST(0 AS BIGINT), 'then', 'else')                  AS int64_zero_is_false;
-int64_zero_is_false
-else
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 'then', 'else')                  AS int64_zero_is_false' at line 1
 SELECT IF(CAST(5 AS BIGINT), 'then', 'else')                  AS int64_nonzero_is_true;
-int64_nonzero_is_true
-then
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 'then', 'else')                  AS int64_nonzero_is_true' at line 1
 SELECT IF(CAST(0 AS UNSIGNED), 'then', 'else')                AS uint64_zero_is_false;
 uint64_zero_is_false
 else
@@ -55,20 +53,18 @@ SELECT IF(TIMESTAMP '2024-03-15 14:30:00', 'then', 'else')    AS timestamp_is_tr
 timestamp_is_true
 then
 SELECT IF(CAST('{"a":1}' AS JSONB), 'then', 'else')           AS jsonb_is_true;
-jsonb_is_true
-then
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), 'then', 'else')           AS jsonb_is_true' at line 1
 SELECT IF(INTERVAL 1 DAY, 'then', 'else')                     AS interval_is_true;
-interval_is_true
-then
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'then', 'else')                     AS interval_is_true' at line 1
 === IF arity errors ===
 SELECT IF();
-ERROR 1105: execution error: IF requires exactly 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT IF(1);
-ERROR 1105: execution error: IF requires exactly 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT IF(1, 2);
-ERROR 1105: execution error: IF requires exactly 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT IF(1, 2, 3, 4);
-ERROR 1105: execution error: IF requires exactly 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 4)' at line 1
 === NULLIF DATE/TIMESTAMP value-coercive equality (cross-slice link) ===
 SELECT NULLIF(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
                                                               IS NULL
@@ -83,10 +79,10 @@ date_ne_ts_noon_returns_first
 === NULLIF Bool/Int strict comparison ===
 SELECT NULLIF(TRUE, 1)   IS NOT NULL                          AS bool_true_vs_int_1_kept_not_null;
 bool_true_vs_int_1_kept_not_null
-1
+0
 SELECT NULLIF(FALSE, 0)  IS NOT NULL                          AS bool_false_vs_int_0_kept_not_null;
 bool_false_vs_int_0_kept_not_null
-1
+0
 SELECT NULLIF(TRUE, TRUE)  IS NULL                            AS bool_eq_bool_returns_null;
 bool_eq_bool_returns_null
 1
@@ -101,11 +97,9 @@ SELECT ISNULL(TIMESTAMP '2024-03-15 14:30:00')                AS isnull_timestam
 isnull_timestamp
 0
 SELECT ISNULL(CAST('{"a":1}' AS JSONB))                       AS isnull_jsonb;
-isnull_jsonb
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                       AS isnull_jsonb' at line 1
 SELECT ISNULL(INTERVAL 1 DAY)                                 AS isnull_interval;
-isnull_interval
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')                                 AS isnull_interval' at line 1
 SELECT ISNULL(CAST(NULL AS DATE))                             AS isnull_typed_null;
 isnull_typed_null
 1

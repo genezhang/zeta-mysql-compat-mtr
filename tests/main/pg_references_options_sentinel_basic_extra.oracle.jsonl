@@ -1,0 +1,32 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":31}
+{"i":1,"h":"bf2d8956","k":"ok","affected":0}
+{"i":2,"h":"aadeb792","k":"ok","affected":0}
+{"i":3,"h":"9081221b","k":"ok","affected":0}
+{"i":4,"h":"0853d637","k":"ok","affected":0}
+{"i":5,"h":"51e70cfe","k":"ok","affected":0}
+{"i":6,"h":"6d7b9b93","k":"ok","affected":0}
+{"i":7,"h":"8453ecdb","k":"ok","affected":0}
+{"i":8,"h":"76c9cf22","k":"ok","affected":0}
+{"i":9,"h":"7f1eefa5","k":"ok","affected":0}
+{"i":10,"h":"95b0175a","k":"ok","affected":0}
+{"i":11,"h":"68a67cb6","k":"ok","affected":0}
+{"i":12,"h":"6ef4bcb0","k":"ok","affected":0}
+{"i":13,"h":"b426f0f8","k":"ok","affected":0}
+{"i":14,"h":"d54ab74d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DEFERRABLE)' at line 1"}
+{"i":15,"h":"60569474","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT DEFERRABLE)' at line 1"}
+{"i":16,"h":"ca65c9c0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DEFERRABLE INITIALLY IMMEDIATE)' at line 2"}
+{"i":17,"h":"9eb0e051","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DEFERRABLE INITIALLY DEFERRED)' at line 2"}
+{"i":18,"h":"98758a84","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(pid))' at line 1"}
+{"i":19,"h":"45054405","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(pid))' at line 1"}
+{"i":20,"h":"c6f4a4f2","k":"ok","affected":0}
+{"i":21,"h":"28aee6b1","k":"ok","affected":0}
+{"i":22,"h":"7d99d86c","k":"err","code":1051,"msg":"Unknown table 'test.pro_c9'"}
+{"i":23,"h":"7d99d8bf","k":"err","code":1051,"msg":"Unknown table 'test.pro_c8'"}
+{"i":24,"h":"7d99376e","k":"err","code":1051,"msg":"Unknown table 'test.pro_c7'"}
+{"i":25,"h":"7d9931b1","k":"err","code":1051,"msg":"Unknown table 'test.pro_c6'"}
+{"i":26,"h":"7d993188","k":"ok","affected":0}
+{"i":27,"h":"7d9930db","k":"ok","affected":0}
+{"i":28,"h":"7d99cc5a","k":"ok","affected":0}
+{"i":29,"h":"7d99d4ed","k":"ok","affected":0}
+{"i":30,"h":"7d9932c4","k":"ok","affected":0}
+{"i":31,"h":"df32fcd2","k":"ok","affected":0}

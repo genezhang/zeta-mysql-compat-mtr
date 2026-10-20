@@ -1,0 +1,47 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":46}
+{"i":1,"h":"6d77d98f","k":"ok","affected":0}
+{"i":2,"h":"f42bb5b1","k":"ok","affected":0}
+{"i":3,"h":"9c604601","k":"ok","affected":3}
+{"i":4,"h":"2b9d1c38","k":"ok","affected":0}
+{"i":5,"h":"596ba121","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"]]}
+{"i":6,"h":"02a9119b","k":"ok","affected":0}
+{"i":7,"h":"22ca765a","k":"rows","cols":["val"],"rows":[["10"],["20"],["30"]]}
+{"i":8,"h":"ff5a38b7","k":"ok","affected":0}
+{"i":9,"h":"de4dddce","k":"ok","affected":0}
+{"i":10,"h":"3ab069b2","k":"rows","cols":["one"],"rows":[["1"]]}
+{"i":11,"h":"d15ba4b5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED VIEW mvw AS SELECT id, x FROM vt' at line 1"}
+{"i":12,"h":"a14a76d3","k":"ok","affected":1}
+{"i":13,"h":"34192e34","k":"ok","affected":0}
+{"i":14,"h":"79905a40","k":"rows","cols":["id"],"rows":[["4"],["3"]]}
+{"i":15,"h":"8476763b","k":"ok","affected":0}
+{"i":16,"h":"4073f209","k":"rows","cols":["x"],"rows":[["10"],["20"],["30"],["40"]]}
+{"i":17,"h":"38f90e2e","k":"ok","affected":0}
+{"i":18,"h":"48969537","k":"rows","cols":["id"],"rows":[["3"],["4"]]}
+{"i":19,"h":"ef420aa4","k":"ok","affected":0}
+{"i":20,"h":"b50ded32","k":"rows","cols":["a","b"],"rows":[["1","10"],["2","20"],["3","30"],["4","40"]]}
+{"i":21,"h":"507f6fb1","k":"ok","affected":0}
+{"i":22,"h":"507f6d44","k":"ok","affected":0}
+{"i":23,"h":"c3872caf","k":"ok","affected":0}
+{"i":24,"h":"e396f614","k":"ok","affected":0}
+{"i":25,"h":"16a9e3cf","k":"ok","affected":2}
+{"i":26,"h":"0c6c3075","k":"ok","affected":2}
+{"i":27,"h":"9f9da716","k":"ok","affected":0}
+{"i":28,"h":"e0f7ba55","k":"rows","cols":["id","label"],"rows":[["1","a"],["2","b"]]}
+{"i":29,"h":"c29c23b3","k":"ok","affected":0}
+{"i":30,"h":"45f32d95","k":"err","code":1347,"msg":"'test.vt' is not VIEW"}
+{"i":31,"h":"905b2161","k":"rows","cols":["TABLE_NAME"],"rows":[["vcols"],["vdist"],["vjoin"],["vnew"],["vord"],["vsub"],["vw1"]]}
+{"i":32,"h":"112958aa","k":"rows","cols":["TABLE_NAME"],"rows":[],"nd":"order","unordered":true}
+{"i":33,"h":"a94d04b5","k":"rows","cols":["TABLE_NAME"],"rows":[],"nd":"order","unordered":true}
+{"i":34,"h":"78990ab6","k":"rows","cols":["View","Create View","character_set_client","collation_connection"],"rows":[["vw1","CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw1` AS select `vt`.`x` AS `val` from `vt`","utf8mb4","utf8mb4_0900_ai_ci"]]}
+{"i":35,"h":"14c3e395","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED VIEW mvw' at line 1"}
+{"i":36,"h":"00aeec89","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RECURSIVE VIEW vrec(n) AS VALUES (1) UNION ALL SELECT n + 1 FROM vrec WHERE n < ' at line 1"}
+{"i":37,"h":"0c21dc86","k":"ok","affected":0}
+{"i":38,"h":"5552f134","k":"ok","affected":0}
+{"i":39,"h":"71e293f5","k":"ok","affected":0}
+{"i":40,"h":"fff9895c","k":"ok","affected":0}
+{"i":41,"h":"c12aa90f","k":"ok","affected":0}
+{"i":42,"h":"897e3784","k":"ok","affected":0}
+{"i":43,"h":"50205e02","k":"ok","affected":0}
+{"i":44,"h":"c3432eee","k":"ok","affected":0}
+{"i":45,"h":"b7d831e5","k":"ok","affected":0}
+{"i":46,"h":"b7d832b0","k":"ok","affected":0}

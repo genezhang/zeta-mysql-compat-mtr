@@ -1,0 +1,59 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":58}
+{"i":1,"h":"3cff665d","k":"rows","cols":["basic"],"rows":[["hello"]]}
+{"i":2,"h":"3c0073ae","k":"rows","cols":["single_space"],"rows":[["hello"]]}
+{"i":3,"h":"c5240a28","k":"rows","cols":["no_trim_needed"],"rows":[["hello"]]}
+{"i":4,"h":"910c4c5c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":5,"h":"e668ff43","k":"rows","cols":["only_whitespace"],"rows":[[""]]}
+{"i":6,"h":"2096b25e","k":"rows","cols":["only_ws_zero_len"],"rows":[["1"]]}
+{"i":7,"h":"c41e5f55","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":8,"h":"edcbd75c","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":9,"h":"b7b85e25","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":10,"h":"b5f8f6ff","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":11,"h":"5538cf48","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":12,"h":"25b4aed5","k":"err","code":1305,"msg":"FUNCTION test.CHR does not exist"}
+{"i":13,"h":"33bd5e15","k":"rows","cols":["basic_set"],"rows":[["hello"]]}
+{"i":14,"h":"1c19df27","k":"rows","cols":["multi_char_set"],"rows":[["hello"]]}
+{"i":15,"h":"22bf1b92","k":"rows","cols":["dot_set"],"rows":[["hello"]]}
+{"i":16,"h":"0e1ee817","k":"rows","cols":["no_match"],"rows":[["hello"]]}
+{"i":17,"h":"982e377d","k":"rows","cols":["all_match"],"rows":[[""]]}
+{"i":18,"h":"5cfeaa7e","k":"rows","cols":["all_match_zero_len"],"rows":[["1"]]}
+{"i":19,"h":"a05c3b47","k":"rows","cols":["trim_empty_set"],"rows":[["hello"]]}
+{"i":20,"h":"c26f90c5","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":21,"h":"06c42947","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}
+{"i":22,"h":"ea465bc2","k":"rows","cols":["trim_empty_set_keeps_ws"],"rows":[["1"]]}
+{"i":23,"h":"93096f3b","k":"rows","cols":["ltrim_basic"],"rows":[["hello   "]]}
+{"i":24,"h":"5dcfda15","k":"rows","cols":["rtrim_basic"],"rows":[["   hello"]]}
+{"i":25,"h":"04399d78","k":"rows","cols":["ltrim_only_ws_zero_len"],"rows":[["1"]]}
+{"i":26,"h":"8b0f5e2c","k":"rows","cols":["rtrim_only_ws_zero_len"],"rows":[["1"]]}
+{"i":27,"h":"c1e2649c","k":"rows","cols":["ltrim_keeps_trailing"],"rows":[["1"]]}
+{"i":28,"h":"68df19a6","k":"rows","cols":["rtrim_keeps_leading"],"rows":[["1"]]}
+{"i":29,"h":"748ada30","k":"rows","cols":["ltrim_only_leading"],"rows":[["1"]]}
+{"i":30,"h":"3a8dcadd","k":"rows","cols":["rtrim_only_trailing"],"rows":[["1"]]}
+{"i":31,"h":"b6967927","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":32,"h":"245b5f62","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}
+{"i":33,"h":"4f457783","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":34,"h":"2af9660e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}
+{"i":35,"h":"0470b8ed","k":"rows","cols":["utf8_trim_set"],"rows":[["hello"]]}
+{"i":36,"h":"f93d5356","k":"rows","cols":["utf8_trim_char_len"],"rows":[["1"]]}
+{"i":37,"h":"7b27ce34","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":38,"h":"3b6dacdb","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}
+{"i":39,"h":"0ed37b8e","k":"rows","cols":["middle_intact"],"rows":[["hellxo"]]}
+{"i":40,"h":"b002ad7b","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":41,"h":"6bc52d1c","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}
+{"i":42,"h":"e502f1b5","k":"rows","cols":["trim_null_s"],"rows":[["1"]]}
+{"i":43,"h":"fc00870a","k":"rows","cols":["trim_null_chars"],"rows":[["1"]]}
+{"i":44,"h":"6845af43","k":"rows","cols":["ltrim_null_s"],"rows":[["1"]]}
+{"i":45,"h":"2dbd74fe","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":46,"h":"5744944a","k":"rows","cols":["rtrim_null_s"],"rows":[["1"]]}
+{"i":47,"h":"c939d605","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}
+{"i":48,"h":"38dd7618","k":"rows","cols":["trim_det"],"rows":[["1"]]}
+{"i":49,"h":"708192c3","k":"rows","cols":["ltrim_det"],"rows":[["1"]]}
+{"i":50,"h":"d28a63fa","k":"rows","cols":["rtrim_det"],"rows":[["1"]]}
+{"i":51,"h":"0657da7c","k":"rows","cols":["trim_idem"],"rows":[["1"]]}
+{"i":52,"h":"08fad513","k":"rows","cols":["ltrim_idem"],"rows":[["1"]]}
+{"i":53,"h":"130cc680","k":"rows","cols":["rtrim_idem"],"rows":[["1"]]}
+{"i":54,"h":"4fcf657d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":55,"h":"8abc59e6","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":56,"h":"a25f8e6e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LTRIM'"}
+{"i":57,"h":"45e612de","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}
+{"i":58,"h":"07af4689","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RTRIM'"}

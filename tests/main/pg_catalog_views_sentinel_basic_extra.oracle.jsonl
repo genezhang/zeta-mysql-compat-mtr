@@ -1,0 +1,23 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":22}
+{"i":1,"h":"04023372","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":2,"h":"1368f918","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":3,"h":"c4421a4d","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":4,"h":"a68e0824","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":5,"h":"2c0123ef","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":6,"h":"7636d6f7","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":7,"h":"b13638b3","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":8,"h":"55f91edc","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":9,"h":"bfa9c449","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":10,"h":"9bc52e23","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":11,"h":"98e2e370","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":12,"h":"c28e5801","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":13,"h":"8a2bdf94","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":14,"h":"0c03dde1","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":15,"h":"7622b138","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":16,"h":"e584100c","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":17,"h":"f13c2b36","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":18,"h":"a209391a","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":19,"h":"b377193b","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":20,"h":"a722af53","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":21,"h":"6d596eaa","k":"err","code":1146,"msg":"Table 'test.pg_settings' doesn't exist"}
+{"i":22,"h":"5859604a","k":"err","code":1146,"msg":"Table 'test.pg_stat_activity' doesn't exist"}

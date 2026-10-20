@@ -1,0 +1,81 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":80}
+{"i":1,"h":"26ff9962","k":"rows","cols":["pos_int"],"rows":[["5"]]}
+{"i":2,"h":"4e303310","k":"rows","cols":["neg_int"],"rows":[["5"]]}
+{"i":3,"h":"35155042","k":"rows","cols":["zero_int"],"rows":[["0"]]}
+{"i":4,"h":"5f4cefab","k":"rows","cols":["pos_dec"],"rows":[["3.14"]]}
+{"i":5,"h":"36003a02","k":"rows","cols":["neg_dec"],"rows":[["3.14"]]}
+{"i":6,"h":"ba7cd605","k":"rows","cols":["neg_i32_min"],"rows":[["2147483648"]]}
+{"i":7,"h":"a2095031","k":"err","code":1690,"msg":"BIGINT value is out of range in 'abs(-(9223372036854775808))'"}
+{"i":8,"h":"ecef2ac5","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":9,"h":"30e9e0f3","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ABS'"}
+{"i":10,"h":"538880da","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ABS'"}
+{"i":11,"h":"9dc96180","k":"rows","cols":["down"],"rows":[["3"]]}
+{"i":12,"h":"21247baa","k":"rows","cols":["half_up"],"rows":[["4"]]}
+{"i":13,"h":"726c9a62","k":"rows","cols":["up"],"rows":[["4"]]}
+{"i":14,"h":"213a0358","k":"rows","cols":["neg_half_away"],"rows":[["-4"]]}
+{"i":15,"h":"575b001a","k":"rows","cols":["half_zero_pt_five"],"rows":[["1"]]}
+{"i":16,"h":"1b13a010","k":"rows","cols":["int_identity"],"rows":[["5"]]}
+{"i":17,"h":"5c7f5a42","k":"rows","cols":["tie_2_5_half_away"],"rows":[["3"]]}
+{"i":18,"h":"b0d708d7","k":"rows","cols":["tie_2_5_bankers"],"rows":[["3"]]}
+{"i":19,"h":"92089b88","k":"rows","cols":["round_vs_format_diverge"],"rows":[["0"]]}
+{"i":20,"h":"c0237673","k":"rows","cols":["half_0_5_to_1"],"rows":[["1"]]}
+{"i":21,"h":"11f9ad14","k":"rows","cols":["half_1_5_to_2"],"rows":[["1"]]}
+{"i":22,"h":"b7e4e42b","k":"rows","cols":["half_2_5_to_3"],"rows":[["1"]]}
+{"i":23,"h":"3bdf530f","k":"rows","cols":["neg_half_2_5_to_neg_3"],"rows":[["1"]]}
+{"i":24,"h":"417fee99","k":"rows","cols":["pi_2dp"],"rows":[["3.14"]]}
+{"i":25,"h":"cf3945f6","k":"rows","cols":["pi_4dp"],"rows":[["3.1416"]]}
+{"i":26,"h":"349128c5","k":"rows","cols":["round_up_1dp"],"rows":[["4.0"]]}
+{"i":27,"h":"cecbeb22","k":"rows","cols":["neg_2dp_half_away"],"rows":[["-1.24"]]}
+{"i":28,"h":"7c5c08b4","k":"rows","cols":["to_tens"],"rows":[["12350"]]}
+{"i":29,"h":"9c367e91","k":"rows","cols":["to_hundreds"],"rows":[["12300"]]}
+{"i":30,"h":"980f0e67","k":"rows","cols":["to_thousands"],"rows":[["12000"]]}
+{"i":31,"h":"51e2b5a5","k":"rows","cols":["half_neg_1dp"],"rows":[["150"]]}
+{"i":32,"h":"18cebb36","k":"rows","cols":["int_neg_precision"],"rows":[["120"]]}
+{"i":33,"h":"63cb9cfd","k":"rows","cols":["float_tie_half_away"],"rows":[["2"]]}
+{"i":34,"h":"278a351c","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":35,"h":"884c499a","k":"rows","cols":["null_precision"],"rows":[["1"]]}
+{"i":36,"h":"37b05162","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ROUND'"}
+{"i":37,"h":"c8f13fb8","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ROUND'"}
+{"i":38,"h":"63d95cc2","k":"rows","cols":["to_int"],"rows":[["3"]]}
+{"i":39,"h":"76f6c178","k":"rows","cols":["to_2dp"],"rows":[["3.99"]]}
+{"i":40,"h":"17636713","k":"rows","cols":["neg_to_int"],"rows":[["-3"]]}
+{"i":41,"h":"ed8c117f","k":"rows","cols":["half_truncs_down"],"rows":[["3"]]}
+{"i":42,"h":"c77df1b8","k":"rows","cols":["neg_half_truncs_toward_zero"],"rows":[["-3"]]}
+{"i":43,"h":"9531fc1c","k":"rows","cols":["trunc_vs_round_diverge"],"rows":[["1"]]}
+{"i":44,"h":"77d8677e","k":"rows","cols":["trunc_tens"],"rows":[["12340"]]}
+{"i":45,"h":"9badf84e","k":"rows","cols":["trunc_hundreds"],"rows":[["12300"]]}
+{"i":46,"h":"fc94a665","k":"rows","cols":["trunc_neg_hundreds"],"rows":[["-12300"]]}
+{"i":47,"h":"f4fd7c03","k":"rows","cols":["int_identity"],"rows":[["42"]]}
+{"i":48,"h":"897af7b0","k":"rows","cols":["null_x"],"rows":[["1"]]}
+{"i":49,"h":"1dc83d96","k":"rows","cols":["null_n"],"rows":[["1"]]}
+{"i":50,"h":"496a31d5","k":"rows","cols":["TRUNCATE('3.999', 2)"],"rows":[["3.99"]]}
+{"i":51,"h":"e1cc05de","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":52,"h":"d4cc0a11","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":53,"h":"4f50fe00","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 3)' at line 1"}
+{"i":54,"h":"069a27ae","k":"rows","cols":["dec_up"],"rows":[["4"]]}
+{"i":55,"h":"492c91b9","k":"rows","cols":["neg_dec_toward_zero"],"rows":[["-3"]]}
+{"i":56,"h":"94b18268","k":"rows","cols":["exact"],"rows":[["3"]]}
+{"i":57,"h":"32d0d1f6","k":"rows","cols":["int_identity"],"rows":[["5"]]}
+{"i":58,"h":"a9e7300b","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":59,"h":"0eea3f47","k":"rows","cols":["ceiling_alias"],"rows":[["1"]]}
+{"i":60,"h":"8d52304a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'CEIL'"}
+{"i":61,"h":"dd1600f4","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'CEIL'"}
+{"i":62,"h":"0910eca3","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'CEIL'"}
+{"i":63,"h":"ef471034","k":"rows","cols":["dec_down"],"rows":[["3"]]}
+{"i":64,"h":"51d856b9","k":"rows","cols":["neg_dec_away_zero"],"rows":[["-4"]]}
+{"i":65,"h":"7b17cf83","k":"rows","cols":["exact"],"rows":[["3"]]}
+{"i":66,"h":"c1fba8c8","k":"rows","cols":["int_identity"],"rows":[["5"]]}
+{"i":67,"h":"74fcb937","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":68,"h":"661b2e64","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FLOOR'"}
+{"i":69,"h":"a8b30a90","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FLOOR'"}
+{"i":70,"h":"0e4afa08","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FLOOR'"}
+{"i":71,"h":"7d45c699","k":"rows","cols":["bounds_invariant"],"rows":[["1"]]}
+{"i":72,"h":"6a25a719","k":"rows","cols":["bounds_invariant_neg"],"rows":[["1"]]}
+{"i":73,"h":"f0ba6072","k":"rows","cols":["exact_no_gap"],"rows":[["1"]]}
+{"i":74,"h":"e2a67fe8","k":"rows","cols":["frac_one_gap"],"rows":[["1"]]}
+{"i":75,"h":"bc0f9859","k":"rows","cols":["abs_non_negative"],"rows":[["1"]]}
+{"i":76,"h":"f0b89c26","k":"rows","cols":["abs_det"],"rows":[["1"]]}
+{"i":77,"h":"8079cf9a","k":"rows","cols":["round_det"],"rows":[["1"]]}
+{"i":78,"h":"14b10d9a","k":"rows","cols":["trunc_det"],"rows":[["1"]]}
+{"i":79,"h":"9165e644","k":"rows","cols":["ceil_det"],"rows":[["1"]]}
+{"i":80,"h":"0735763e","k":"rows","cols":["floor_det"],"rows":[["1"]]}

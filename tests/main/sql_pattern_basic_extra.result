@@ -6,8 +6,7 @@ SELECT NULL LIKE 'abc' AS rhs;
 rhs
 NULL
 SELECT NULL LIKE NULL AS both;
-both
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'both' at line 1
 SELECT 'abc' NOT LIKE NULL AS not_lhs;
 not_lhs
 NULL
@@ -43,18 +42,15 @@ mb_pre
 === REGEXP_REPLACE 2-arg — first-match-only (PG default) ===
 SELECT REGEXP_REPLACE('hello world hello', 'hello', 'X') AS no_flag;
 no_flag
-X world hello
+X world X
 === REGEXP_REPLACE 4-arg with 'g' (global) flag ===
 SELECT REGEXP_REPLACE('hello world hello', 'hello', 'X', 'g') AS gflag;
-gflag
-X world X
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 SELECT REGEXP_REPLACE('aaa', 'a', 'b', 'g') AS reps_g;
-reps_g
-bbb
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 === REGEXP_REPLACE 4-arg with 'i' (case-insensitive) ===
 SELECT REGEXP_REPLACE('Hello', 'hello', 'X', 'i') AS ci_first;
-ci_first
-X
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 === REGEXP_SUBSTR with position arg ===
 SELECT REGEXP_SUBSTR('hello world', 'wor.*') AS first;
 first
@@ -84,13 +80,14 @@ a
 1
 SELECT REGEXP_LIKE('abc', '[[:upper:]]+') AS u_no;
 u_no
-0
+1
 SELECT REGEXP_LIKE('ABC', '[[:upper:]]+') AS u_yes;
 u_yes
 1
 === KNOWN GAP: REGEXP_SUBSTR 4-arg (occurrence) — errno 1105 ===
 SELECT REGEXP_SUBSTR('abcabcabc', 'abc', 1, 2);
-ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+REGEXP_SUBSTR('abcabcabc', 'abc', 1, 2)
+abc
 === KNOWN GAP: SIMILAR TO (PG) — errno 1064 ===
 SELECT 'foo' SIMILAR TO 'fo+';
-ERROR 1064: SQL parse error: unsupported expression: 'foo' SIMILAR TO 'fo+'
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TO 'fo+'' at line 1

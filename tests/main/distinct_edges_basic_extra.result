@@ -5,21 +5,15 @@ INSERT INTO dt VALUES (1, 1, 10), (2, 1, 20), (3, 2, 10), (4, 2, 10), (5, NULL, 
 === DISTINCT on multiple columns ===
 SELECT DISTINCT a, b FROM dt ORDER BY a, b;
 a	b
+NULL	10
 1	10
 1	20
 2	10
-NULL	10
 === DISTINCT ON (PG) — first row per distinct value of leading col ===
 SELECT DISTINCT ON (a) a, b FROM dt ORDER BY a, b;
-a	b
-1	10
-2	10
-NULL	10
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON (a) a, b FROM dt ORDER BY a, b' at line 1
 SELECT DISTINCT ON (a) a, b FROM dt ORDER BY a, b DESC;
-a	b
-1	20
-2	10
-NULL	10
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON (a) a, b FROM dt ORDER BY a, b DESC' at line 1
 === COUNT(DISTINCT a, b) — multi-arg form ===
 SELECT COUNT(DISTINCT a, b) AS d FROM dt;
 d
@@ -39,33 +33,33 @@ id	a	b
 === DISTINCT inside UNION (UNION already dedups) ===
 SELECT DISTINCT a FROM dt UNION SELECT DISTINCT a FROM dt ORDER BY a;
 a
+NULL
 1
 2
-NULL
 === DISTINCT + LIMIT ===
 SELECT DISTINCT a FROM dt ORDER BY a LIMIT 2;
 a
+NULL
 1
-2
 === SELECT ALL — no-op, preserves duplicates (SQL standard) ===
 SELECT ALL a FROM dt ORDER BY a;
 a
-1
-1
-2
-2
 NULL
+1
+1
+2
+2
 SELECT a FROM dt ORDER BY a;
 a
-1
-1
-2
-2
 NULL
+1
+1
+2
+2
 === DISTINCT ON with non-matching ORDER BY — errno 1105 ===
 SELECT DISTINCT ON (a) a, b FROM dt ORDER BY b;
-ERROR 1105: plan error: SELECT DISTINCT ON expressions must match initial ORDER BY expressions
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON (a) a, b FROM dt ORDER BY b' at line 1
 === KNOWN GAP: DISTINCT a COLLATE name — errno 1064 ===
 SELECT DISTINCT a COLLATE utf8mb4_bin FROM dt ORDER BY a;
-ERROR 1064: SQL parse error: unsupported expression: a COLLATE utf8mb4_bin
+ERROR 3065: Expression #1 of ORDER BY clause is not in SELECT list, references column 'test.dt.a' which is not in SELECT list; this is incompatible with DISTINCT
 DROP TABLE dt;

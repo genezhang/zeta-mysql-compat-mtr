@@ -1,7 +1,7 @@
 === FORMAT_BYTES — rung ladder ===
 SELECT FORMAT_BYTES(0)              AS zero;
 zero
-0 bytes
+   0 bytes
 SELECT FORMAT_BYTES(1023)           AS sub_kib;
 sub_kib
 1023 bytes
@@ -30,7 +30,7 @@ NULL
 === FORMAT_PICO_TIME — rung ladder ===
 SELECT FORMAT_PICO_TIME(0)                  AS zero;
 zero
-0 ps
+  0 ps
 SELECT FORMAT_PICO_TIME(999)                AS sub_ns;
 sub_ns
 999 ps
@@ -64,18 +64,20 @@ n
 NULL
 === Arity errors ===
 SELECT FORMAT_BYTES();
-ERROR 1105: execution error: FORMAT_BYTES requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FORMAT_BYTES'
 SELECT FORMAT_PICO_TIME();
-ERROR 1105: execution error: FORMAT_PICO_TIME requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FORMAT_PICO_TIME'
 SELECT FORMAT_BYTES(1, 2);
-ERROR 1105: execution error: FORMAT_BYTES requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FORMAT_BYTES'
 SELECT FORMAT_PICO_TIME(1, 2);
-ERROR 1105: execution error: FORMAT_PICO_TIME requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FORMAT_PICO_TIME'
 === Non-numeric input rejected ===
 SELECT FORMAT_BYTES('not a number');
-ERROR 1105: execution error: FORMAT_BYTES argument must be numeric
+FORMAT_BYTES('not a number')
+   0 bytes
 SELECT FORMAT_PICO_TIME('not a number');
-ERROR 1105: execution error: FORMAT_PICO_TIME argument must be numeric
+FORMAT_PICO_TIME('not a number')
+  0 ps
 === Inside a SELECT over a numeric column ===
 DROP TABLE IF EXISTS sizes;
 CREATE TABLE sizes (id INT, b BIGINT);
@@ -86,7 +88,7 @@ INSERT INTO sizes VALUES
   (4, 10485760);
 SELECT id, FORMAT_BYTES(b) AS pretty FROM sizes ORDER BY id;
 id	pretty
-1	0 bytes
+1	   0 bytes
 2	1023 bytes
 3	4.00 KiB
 4	10.00 MiB

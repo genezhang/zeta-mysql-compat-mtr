@@ -148,7 +148,7 @@ id
 === Scalar subquery >1 row — errno 1242 (FIXED via zeta #1143) ===
 # zeta now emits MySQL-standard 1242 (ER_SUBQUERY_NO_1_ROW).
 SELECT (SELECT id FROM emp) AS x FROM emp LIMIT 1;
-ERROR 1242: execution error: scalar subquery returned more than one row
+ERROR 1242: Subquery returns more than 1 row
 === KNOWN DIVERGENCE: LATERAL with correlated subquery ===
 # Returns 0 rows instead of the expected row-per-outer. The
 # correlation binding doesn't fire through the LATERAL boundary.
@@ -160,7 +160,7 @@ SELECT COUNT(*) AS c
   FROM emp e
   JOIN LATERAL (SELECT name FROM dept WHERE id = e.dept_id) d ON 1 = 1;
 c
-0
+5
 === Cleanup ===
 DROP TABLE emp;
 DROP TABLE dept;

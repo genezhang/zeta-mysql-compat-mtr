@@ -1,0 +1,32 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":31}
+{"i":1,"h":"d257fcc6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'UNLOGGED TABLE u1 (id INT)' at line 1"}
+{"i":2,"h":"5956880f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LOGGED TABLE l1 (id INT)' at line 1"}
+{"i":3,"h":"1fbc0ced","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'UNLOGGED TEMP TABLE ut1 (id INT)' at line 1"}
+{"i":4,"h":"bfb2920e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEMP UNLOGGED TABLE ut2 (id INT)' at line 1"}
+{"i":5,"h":"b17c5a68","k":"ok","affected":0}
+{"i":6,"h":"96097e7b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'GLOBAL TEMPORARY TABLE gt1 (id INT)' at line 1"}
+{"i":7,"h":"fb556e58","k":"err","code":1051,"msg":"Unknown table 'test.gt1'"}
+{"i":8,"h":"b17c5aa5","k":"ok","affected":0}
+{"i":9,"h":"e65d798d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'GLOBAL TEMP TABLE gt2 (id INT)' at line 1"}
+{"i":10,"h":"fb556e8d","k":"err","code":1051,"msg":"Unknown table 'test.gt2'"}
+{"i":11,"h":"6215ed55","k":"ok","affected":0}
+{"i":12,"h":"b2286704","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LOCAL TEMPORARY TABLE lt1 (id INT)' at line 1"}
+{"i":13,"h":"132aafad","k":"err","code":1051,"msg":"Unknown table 'test.lt1'"}
+{"i":14,"h":"6215ee18","k":"ok","affected":0}
+{"i":15,"h":"f5ffa6ff","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LOCAL TEMP TABLE lt2 (id INT)' at line 1"}
+{"i":16,"h":"132aad78","k":"err","code":1051,"msg":"Unknown table 'test.lt2'"}
+{"i":17,"h":"837305b9","k":"ok","affected":0}
+{"i":18,"h":"e3c5f020","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON COMMIT DELETE ROWS' at line 1"}
+{"i":19,"h":"1b0ccff5","k":"err","code":1051,"msg":"Unknown table 'test.oc_t1'"}
+{"i":20,"h":"83731da0","k":"ok","affected":0}
+{"i":21,"h":"fcfc5a87","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON COMMIT PRESERVE ROWS' at line 1"}
+{"i":22,"h":"1b0cc7dc","k":"err","code":1051,"msg":"Unknown table 'test.oc_t2'"}
+{"i":23,"h":"050a2c4f","k":"ok","affected":0}
+{"i":24,"h":"5aca37b6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON COMMIT DROP' at line 1"}
+{"i":25,"h":"abc0ac7c","k":"err","code":1051,"msg":"Unknown table 'test.oc_perm'"}
+{"i":26,"h":"1a11a47f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEMP TABLE oc_bad (id INT) ON COMMIT NOSUCHOPT' at line 1"}
+{"i":27,"h":"bfdfeed0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING heap' at line 1"}
+{"i":28,"h":"81678a4c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING noaccess' at line 1"}
+{"i":29,"h":"ef03ba8f","k":"ok","affected":0}
+{"i":30,"h":"70da76ad","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEMP TABLE tt_oc_b (id INT) ON COMMIT DROP' at line 1"}
+{"i":31,"h":"26e5351f","k":"err","code":1051,"msg":"Unknown table 'test.tt_oc_b'"}

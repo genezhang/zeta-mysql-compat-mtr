@@ -53,7 +53,7 @@ id
 3
 === Pinned errno: scalar subquery returns > 1 row → 1242 ===
 SELECT id FROM t WHERE id = (SELECT id FROM s);
-ERROR 1242: execution error: scalar subquery returned more than one row
+ERROR 1242: Subquery returns more than 1 row
 === Cleanup ===
 DROP TABLE t;
 DROP TABLE s;

@@ -10,47 +10,55 @@ adds_eq_date_value_coerce
 SELECT EXTRACT(SECOND FROM DATE_ADD(DATE '2024-03-15', INTERVAL 1 DAY))
                                                               AS seconds_is_0;
 seconds_is_0
-0.000000
+0
 === ADDDATE(int, int) is INTEGER ARITHMETIC (parser quirk) ===
 SELECT ADDDATE(42, 1)                                         AS adddate_int_int_is_arith;
 adddate_int_int_is_arith
-43
+NULL
 SELECT ADDDATE(42, 1) = 43                                    AS adddate_int_arith_eq_43;
 adddate_int_arith_eq_43
-1
+NULL
 SELECT SUBDATE(42, 1) = 41                                    AS subdate_int_arith_eq_41;
 subdate_int_arith_eq_41
-1
+NULL
 === Wrong-type first arg with INTERVAL → ERROR (parser arithmetic path) ===
 SELECT DATE_ADD(42, INTERVAL 1 DAY);
-ERROR 1105: execution error: arithmetic op requires numbers
+DATE_ADD(42, INTERVAL 1 DAY)
+NULL
 SELECT DATE_SUB(42, INTERVAL 1 DAY);
-ERROR 1105: execution error: arithmetic op requires numbers
+DATE_SUB(42, INTERVAL 1 DAY)
+NULL
 SELECT DATE_SUB('not a date', INTERVAL 1 DAY);
-ERROR 1105: execution error: invalid input syntax for type timestamp: "not a date"
+DATE_SUB('not a date', INTERVAL 1 DAY)
+NULL
 SELECT ADDDATE('not a date', 1);
-ERROR 1105: execution error: invalid input syntax for type timestamp: "not a date"
+ADDDATE('not a date', 1)
+NULL
 === DATE_ADD also accepts INT shorthand (parser arith rewrite) ===
 SELECT DATE_ADD(DATE '2024-03-15', 7)
      = ADDDATE(DATE '2024-03-15', 7)                          AS date_add_int_eq_adddate;
-date_add_int_eq_adddate
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '7)
+     = ADDDATE(DATE '2024-03-15', 7)                          AS date_add_int' at line 1
 SELECT DATE_SUB(DATE '2024-03-15', 7)
      = SUBDATE(DATE '2024-03-15', 7)                          AS date_sub_int_eq_subdate;
-date_sub_int_eq_subdate
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '7)
+     = SUBDATE(DATE '2024-03-15', 7)                          AS date_sub_int' at line 1
 === Wrong-type second arg → ERROR ===
 SELECT DATE_ADD(DATE '2024-03-15', '7');
-ERROR 1105: execution error: arithmetic op requires numbers
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''7')' at line 1
 SELECT ADDDATE(DATE '2024-03-15', '7');
-ERROR 1105: execution error: arithmetic op requires numbers
+ADDDATE(DATE '2024-03-15', '7')
+2024-03-22
 === ADDDATE/SUBDATE: Int64 day count overflow ===
 SELECT ADDDATE(DATE '2024-03-15', 3000000000);
-ERROR 1105: execution error: integer overflow in date arithmetic: 3000000000
+ADDDATE(DATE '2024-03-15', 3000000000)
+NULL
 SELECT SUBDATE(DATE '2024-03-15', 3000000000);
-ERROR 1105: execution error: integer overflow in date arithmetic: 3000000000
+SUBDATE(DATE '2024-03-15', 3000000000)
+NULL
 SELECT ADDDATE(DATE '2024-03-15', -3000000000);
-ERROR 1105: execution error: integer overflow in date arithmetic: -3000000000
+ADDDATE(DATE '2024-03-15', -3000000000)
+NULL
 === Unit-variant walk (YEAR/MONTH/WEEK/DAY/HOUR/MINUTE/SECOND) ===
 SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 YEAR)
      = TIMESTAMP '2025-03-15 00:00:00'                        AS plus_1_year;
@@ -78,9 +86,11 @@ plus_45_sec
 1
 === Unit-variant GAPS: QUARTER + MICROSECOND parser-rejected ===
 SELECT DATE_ADD(DATE '2024-03-15', INTERVAL 1 QUARTER);
-ERROR 1064: SQL parse error: unsupported interval field: QUARTER
+DATE_ADD(DATE '2024-03-15', INTERVAL 1 QUARTER)
+2024-06-15
 SELECT DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 1 MICROSECOND);
-ERROR 1064: SQL parse error: unsupported interval field: MICROSECOND
+DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 1 MICROSECOND)
+2024-03-15 14:30:00.000001
 === Pre-1970 date arithmetic ===
 SELECT DATE_ADD(DATE '1900-01-01', INTERVAL 1 YEAR)
      = TIMESTAMP '1901-01-01 00:00:00'                        AS pre_1970_plus_year;

@@ -20,14 +20,14 @@ block_stripped
 SELECT ?
 SELECT STATEMENT_DIGEST_TEXT(CONCAT('SELECT 1 -- ignored', CHAR(10), 'FROM t')) AS line_dashdash;
 line_dashdash
-SELECT ? FROM t
+SELECT ? FROM `t`
 SELECT STATEMENT_DIGEST_TEXT(CONCAT('SELECT 1 # ignored', CHAR(10), 'FROM t')) AS line_hash;
 line_hash
-SELECT ? FROM t
+SELECT ? FROM `t`
 === DIGEST_TEXT: whitespace collapse + trim ===
 SELECT STATEMENT_DIGEST_TEXT('SELECT   *   FROM   t') AS collapsed;
 collapsed
-SELECT * FROM t
+SELECT * FROM `t`
 SELECT STATEMENT_DIGEST_TEXT('   SELECT 1   ') AS trimmed;
 trimmed
 SELECT ?
@@ -64,7 +64,7 @@ hex_format
 SELECT STATEMENT_DIGEST('SELECT 1')
      = SHA2(STATEMENT_DIGEST_TEXT('SELECT 1'), 256) AS digest_eq_sha2_text;
 digest_eq_sha2_text
-1
+0
 === NULL propagation ===
 SELECT STATEMENT_DIGEST_TEXT(NULL) IS NULL AS dt_null;
 dt_null
@@ -74,14 +74,12 @@ d_null
 1
 === Empty string: empty text, SHA2('', 256) digest ===
 SELECT STATEMENT_DIGEST_TEXT('') AS empty_text;
-empty_text
-
+ERROR 3676: Could not parse argument to digest function: "Query was empty".
 SELECT STATEMENT_DIGEST('')
      = SHA2('', 256) AS empty_digest_consistent;
-empty_digest_consistent
-1
+ERROR 3676: Could not parse argument to digest function: "Query was empty".
 === Arity errors ===
 SELECT STATEMENT_DIGEST();
-ERROR 1105: execution error: STATEMENT_DIGEST requires exactly 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'STATEMENT_DIGEST'
 SELECT STATEMENT_DIGEST_TEXT('a', 'b');
-ERROR 1105: execution error: STATEMENT_DIGEST_TEXT requires exactly 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'STATEMENT_DIGEST_TEXT'

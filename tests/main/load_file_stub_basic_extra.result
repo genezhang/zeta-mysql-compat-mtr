@@ -17,12 +17,13 @@ null_in
 1
 === Non-string arg rejected ===
 SELECT LOAD_FILE(42);
-ERROR 1105: execution error: LOAD_FILE path must be a string
+LOAD_FILE(42)
+NULL
 === Arity errors ===
 SELECT LOAD_FILE();
-ERROR 1105: execution error: LOAD_FILE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'LOAD_FILE'
 SELECT LOAD_FILE('/a', '/b');
-ERROR 1105: execution error: LOAD_FILE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'LOAD_FILE'
 === COALESCE pattern (apps that handle NULL stay portable) ===
 SELECT COALESCE(LOAD_FILE('/etc/hostname'), 'fallback') AS hostval;
 hostval

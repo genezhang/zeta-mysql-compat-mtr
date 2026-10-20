@@ -1,0 +1,55 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":54}
+{"i":1,"h":"9119c8d5","k":"err","code":1305,"msg":"FUNCTION test.TO_HEX does not exist"}
+{"i":2,"h":"950404db","k":"err","code":1305,"msg":"FUNCTION test.TO_HEX does not exist"}
+{"i":3,"h":"4083b087","k":"rows","cols":["null_alias_left"],"rows":[["1"]]}
+{"i":4,"h":"c6503482","k":"err","code":1305,"msg":"FUNCTION test.TO_HEX does not exist"}
+{"i":5,"h":"eff219b3","k":"err","code":1305,"msg":"FUNCTION test.FROM_HEX does not exist"}
+{"i":6,"h":"6625da1b","k":"err","code":1305,"msg":"FUNCTION test.FROM_HEX does not exist"}
+{"i":7,"h":"05c4bfdd","k":"rows","cols":["hex_z"],"rows":[["7A"]]}
+{"i":8,"h":"776beeb5","k":"rows","cols":["hex_deadbeef_decimal"],"rows":[["DEADBEEF"]]}
+{"i":9,"h":"0e839573","k":"rows","cols":["hex_z_lower"],"rows":[["7a"]]}
+{"i":10,"h":"7057cc44","k":"rows","cols":["rt_ascii"],"rows":[["1"]]}
+{"i":11,"h":"eca85b09","k":"rows","cols":["rt_utf8_multibyte"],"rows":[["1"]]}
+{"i":12,"h":"47d806a3","k":"rows","cols":["rt_empty"],"rows":[["1"]]}
+{"i":13,"h":"a10812fa","k":"rows","cols":["rt_hex_to_hex"],"rows":[["1"]]}
+{"i":14,"h":"d853db5d","k":"rows","cols":["neg_one"],"rows":[["FFFFFFFFFFFFFFFF"]]}
+{"i":15,"h":"e4717fda","k":"rows","cols":["neg_one_hex_len_is_16"],"rows":[["16"]]}
+{"i":16,"h":"524fb081","k":"rows","cols":["neg_two"],"rows":[["FFFFFFFFFFFFFFFE"]]}
+{"i":17,"h":"527b20f4","k":"rows","cols":["pos_255"],"rows":[["FF"]]}
+{"i":18,"h":"73efc596","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT))               AS i64_max' at line 1"}
+{"i":19,"h":"8459da33","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)))       AS i64_max_len' at line 1"}
+{"i":20,"h":"b81a73f5","k":"rows","cols":["zero"],"rows":[["0"]]}
+{"i":21,"h":"d3ab0500","k":"rows","cols":["hex_bool_true"],"rows":[["1"]]}
+{"i":22,"h":"305e6c7b","k":"rows","cols":["hex_date"],"rows":[["323032342D30332D3135"]]}
+{"i":23,"h":"ebc35b8f","k":"rows","cols":["hex_timestamp"],"rows":[["323032342D30332D31352031343A33303A3030"]]}
+{"i":24,"h":"024dbd8b","k":"rows","cols":["hex_float64"],"rows":[["1"]]}
+{"i":25,"h":"18005527","k":"rows","cols":["hex_of_bytes_FF"],"rows":[["FF"]]}
+{"i":26,"h":"77f95a69","k":"rows","cols":["hex_of_bytes_deadbeef"],"rows":[["DEADBEEF"]]}
+{"i":27,"h":"9f060151","k":"rows","cols":["unhex_string_path_rt"],"rows":[["48656C6C6F"]]}
+{"i":28,"h":"46d5daf6","k":"rows","cols":["unhex_bytes_path_rt"],"rows":[["FF"]]}
+{"i":29,"h":"d176f361","k":"rows","cols":["unhex_string_eq_literal"],"rows":[["1"]]}
+{"i":30,"h":"14d48e62","k":"rows","cols":["odd_one_char_null"],"rows":[["\n"]]}
+{"i":31,"h":"2ac1bf78","k":"rows","cols":["odd_three_char_null"],"rows":[["0x0abc"]]}
+{"i":32,"h":"08b66fa1","k":"rows","cols":["odd_predicate_null"],"rows":[["0"]]}
+{"i":33,"h":"1f54ea5d","k":"rows","cols":["bad_g_h_null"],"rows":[[null]]}
+{"i":34,"h":"ce9a5f14","k":"rows","cols":["mixed_valid_bad_null"],"rows":[[null]]}
+{"i":35,"h":"3a97b2a3","k":"rows","cols":["bad_predicate_null"],"rows":[["1"]]}
+{"i":36,"h":"a9b9d3f3","k":"rows","cols":["space_in_middle_null"],"rows":[[null]]}
+{"i":37,"h":"bbc9e326","k":"rows","cols":["hex_empty"],"rows":[[""]]}
+{"i":38,"h":"85607bfd","k":"rows","cols":["unhex_empty"],"rows":[[""]]}
+{"i":39,"h":"83c10973","k":"rows","cols":["hex_empty_eq"],"rows":[["1"]]}
+{"i":40,"h":"e1bc6a13","k":"rows","cols":["unhex_empty_eq"],"rows":[["1"]]}
+{"i":41,"h":"fd07f2c9","k":"rows","cols":["hex_null"],"rows":[[null]]}
+{"i":42,"h":"df7a7280","k":"rows","cols":["unhex_null"],"rows":[[null]]}
+{"i":43,"h":"7fb6e74a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER))                             AS hex_typed_null' at line 1"}
+{"i":44,"h":"497c0566","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT))                              AS unhex_typed_null' at line 1"}
+{"i":45,"h":"f79e8d65","k":"rows","cols":["hex_null_pred"],"rows":[["1"]]}
+{"i":46,"h":"c0ec28c9","k":"rows","cols":["unhex_null_pred"],"rows":[["1"]]}
+{"i":47,"h":"861aa4a9","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'HEX'"}
+{"i":48,"h":"5f597c10","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'HEX'"}
+{"i":49,"h":"c7757d84","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UNHEX'"}
+{"i":50,"h":"bd56eb75","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UNHEX'"}
+{"i":51,"h":"4ec2bfe7","k":"err","code":1305,"msg":"FUNCTION test.TO_HEX does not exist"}
+{"i":52,"h":"1fb25695","k":"err","code":1305,"msg":"FUNCTION test.FROM_HEX does not exist"}
+{"i":53,"h":"3969cc63","k":"rows","cols":["conv_eq_hex_255"],"rows":[["1"]]}
+{"i":54,"h":"9c25dff5","k":"rows","cols":["conv_eq_hex_0"],"rows":[["1"]]}

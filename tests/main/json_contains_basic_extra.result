@@ -121,33 +121,34 @@ json_null_obj_value_subset
 === Already-typed JSONB inputs (Value::Jsonb arm) ===
 SELECT JSON_CONTAINS(CAST('{"a":1,"b":2}' AS JSONB),
                      CAST('{"a":1}'       AS JSONB))           AS both_typed;
-both_typed
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+                     CAST('{"a":1}'       AS JSONB))           AS both_t' at line 1
 SELECT JSON_CONTAINS(CAST('{"a":1,"b":2}' AS JSONB),
                      '{"a":1}')                                AS target_typed;
-target_typed
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+                     '{"a":1}')                                AS target' at line 1
 SELECT JSON_CONTAINS('{"a":1,"b":2}',
                      CAST('{"a":1}'       AS JSONB))           AS candidate_typed;
-candidate_typed
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))           AS candidate_typed' at line 2
 === Invalid JSON → ERROR (zeta strict; MySQL NULLs) ===
 SELECT JSON_CONTAINS('not json', '1');
-ERROR 1105: execution error: JSON_CONTAINS argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_contains: "Invalid value." at position 1.
 SELECT JSON_CONTAINS('1', 'not json');
-ERROR 1105: execution error: JSON_CONTAINS argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 2 to function json_contains: "Invalid value." at position 1.
 === Non-JSON-typed arg → ERROR ===
 SELECT JSON_CONTAINS(42, '1');
-ERROR 1105: execution error: JSON_CONTAINS requires JSON-typed arguments
+ERROR 3146: Invalid data type for JSON data in argument 1 to function json_contains; a JSON string or JSON type is required.
 SELECT JSON_CONTAINS('1', 42);
-ERROR 1105: execution error: JSON_CONTAINS requires JSON-typed arguments
+ERROR 3146: Invalid data type for JSON data in argument 2 to function json_contains; a JSON string or JSON type is required.
 === Arity errors ===
 SELECT JSON_CONTAINS();
-ERROR 1105: execution error: JSON_CONTAINS requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_CONTAINS'
 SELECT JSON_CONTAINS('1');
-ERROR 1105: execution error: JSON_CONTAINS requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_CONTAINS'
 SELECT JSON_CONTAINS('{"a":1}', '1', '$.a');
-ERROR 1105: execution error: JSON_CONTAINS requires 2 arguments
+JSON_CONTAINS('{"a":1}', '1', '$.a')
+1
 === KNOWN GAP: JSON_CONTAINS_PATH not implemented (sentinel) ===
 SELECT JSON_CONTAINS_PATH('{"a":1}', 'one', '$.a');
-ERROR 1105: execution error: unknown function: JSON_CONTAINS_PATH
+JSON_CONTAINS_PATH('{"a":1}', 'one', '$.a')
+1

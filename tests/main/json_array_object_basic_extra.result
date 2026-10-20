@@ -4,88 +4,84 @@ empty_obj
 {}
 SELECT JSON_OBJECT('z', 1, 'a', 2, 'm', 3)                     AS keys_sorted_alpha;
 keys_sorted_alpha
-{"a":2,"m":3,"z":1}
+{"a": 2, "m": 3, "z": 1}
 SELECT JSON_OBJECT('2', 'a', '1', 'b', '10', 'c')              AS numeric_string_keys_lex;
 numeric_string_keys_lex
-{"1":"b","2":"a","10":"c"}
+{"1": "b", "2": "a", "10": "c"}
 SELECT JSON_OBJECT('a', 1)                                     AS single_pair;
 single_pair
-{"a":1}
+{"a": 1}
 === JSON_OBJECT — non-string keys auto-stringified ===
 SELECT JSON_OBJECT(1, 'one')                                   AS int_key_stringified;
 int_key_stringified
-{"1":"one"}
+{"1": "one"}
 SELECT JSON_OBJECT(TRUE, 'yes', FALSE, 'no')                   AS bool_key_stringified;
 bool_key_stringified
-{"true":"yes","false":"no"}
+{"0": "no", "1": "yes"}
 SELECT JSON_OBJECT(2, 'two', 'ten', 10, 1, 'one')              AS mixed_keys_stringified;
 mixed_keys_stringified
-{"1":"one","2":"two","ten":10}
+{"1": "one", "2": "two", "ten": 10}
 SELECT JSON_OBJECT('', 'empty')                                AS empty_string_key;
 empty_string_key
-{"":"empty"}
+{"": "empty"}
 === JSON_OBJECT — NULL VALUE → JSON null (preserved) ===
 SELECT JSON_OBJECT('a', NULL)                                  AS null_value_preserved;
 null_value_preserved
-{"a":null}
+{"a": null}
 SELECT JSON_OBJECT('a', NULL, 'b', 1)                          AS null_value_with_other;
 null_value_with_other
-{"a":null,"b":1}
+{"a": null, "b": 1}
 === JSON_OBJECT — NULL KEY → ERROR ===
 SELECT JSON_OBJECT(NULL, 'val');
-ERROR 1105: execution error: argument 1: key must not be null
+ERROR 3158: JSON documents may not contain NULL member names.
 SELECT JSON_OBJECT('a', 1, NULL, 2);
-ERROR 1105: execution error: argument 1: key must not be null
+ERROR 3158: JSON documents may not contain NULL member names.
 === JSON_OBJECT — odd arg count → ERROR ===
 SELECT JSON_OBJECT('a');
-ERROR 1105: execution error: jsonb_build_object requires an even number of arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_OBJECT'
 SELECT JSON_OBJECT('a', 1, 'b');
-ERROR 1105: execution error: jsonb_build_object requires an even number of arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_OBJECT'
 === JSON_OBJECT — duplicate keys (last wins via build_object) ===
 SELECT JSON_OBJECT('a', 1, 'a', 2)                             AS dup_keys_last_wins;
 dup_keys_last_wins
-{"a":2}
+{"a": 2}
 SELECT JSON_OBJECT('a', 1, 'b', 2, 'a', 99)                    AS dup_with_other_keys;
 dup_with_other_keys
-{"a":99,"b":2}
+{"a": 99, "b": 2}
 === JSON_ARRAY — empty + insertion order preserved ===
 SELECT JSON_ARRAY()                                            AS empty_arr;
 empty_arr
 []
 SELECT JSON_ARRAY(3, 1, 2)                                     AS order_preserved;
 order_preserved
-[3,1,2]
+[3, 1, 2]
 SELECT JSON_ARRAY('z', 'a', 'm')                               AS strings_order_preserved;
 strings_order_preserved
-["z","a","m"]
+["z", "a", "m"]
 === JSON_ARRAY — heterogeneous element types ===
 SELECT JSON_ARRAY(1, 'two', true, NULL, false, 3.14)           AS heterogeneous;
 heterogeneous
-[1,"two",true,null,false,3.14]
+[1, "two", true, null, false, 3.14]
 === JSON_ARRAY — numeric input typing (INTEGER vs DOUBLE) ===
 SELECT JSON_TYPE(JSON_ARRAY(1.0)   -> '$[0]')                  AS decimal_input_tag;
-decimal_input_tag
-INTEGER
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-> '$[0]')                  AS decimal_input_tag' at line 1
 SELECT JSON_TYPE(JSON_ARRAY(1e0)   -> '$[0]')                  AS float_input_tag;
-float_input_tag
-INTEGER
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-> '$[0]')                  AS float_input_tag' at line 1
 SELECT JSON_TYPE(JSON_ARRAY(1)     -> '$[0]')                  AS integer_input_tag;
-integer_input_tag
-INTEGER
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-> '$[0]')                  AS integer_input_tag' at line 1
 SELECT JSON_TYPE(JSON_ARRAY(1.5)   -> '$[0]')                  AS true_decimal_tag;
-true_decimal_tag
-DOUBLE
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-> '$[0]')                  AS true_decimal_tag' at line 1
 === Nested constructor composition ===
 SELECT JSON_OBJECT('list', JSON_ARRAY(1, 2, 3))                AS obj_with_arr;
 obj_with_arr
-{"list":[1,2,3]}
+{"list": [1, 2, 3]}
 SELECT JSON_ARRAY(JSON_OBJECT('a', 1), JSON_OBJECT('b', 2))    AS arr_of_obj;
 arr_of_obj
-[{"a":1},{"b":2}]
+[{"a": 1}, {"b": 2}]
 SELECT JSON_OBJECT('outer',
                    JSON_ARRAY(JSON_OBJECT('inner', 42)))       AS doubly_nested;
 doubly_nested
-{"outer":[{"inner":42}]}
+{"outer": [{"inner": 42}]}
 === sql_value_to_jsonb fallback arm (Date/Timestamp/UUID) ===
 SELECT JSON_ARRAY(DATE '2024-03-15')                           AS date_via_fallback;
 date_via_fallback
@@ -95,26 +91,24 @@ timestamp_via_fallback
 ["2024-03-15 14:30:45.000000"]
 SELECT JSON_ARRAY(CAST('11111111-2222-3333-4444-555555555555' AS UUID))
                                                                 AS uuid_via_fallback;
-uuid_via_fallback
-["11111111-2222-3333-4444-555555555555"]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'UUID))
+                                                                AS uuid_v' at line 1
 SELECT JSON_TYPE(JSON_ARRAY(DATE '2024-03-15') -> '$[0]')      AS date_tag_is_string;
-date_tag_is_string
-STRING
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-> '$[0]')      AS date_tag_is_string' at line 1
 === JSONB element passthrough (CAST AS JSONB) ===
 SELECT JSON_ARRAY(CAST('{"a":1}' AS JSONB),
                   CAST('[1,2,3]' AS JSONB))                    AS jsonb_passthrough_arr;
-jsonb_passthrough_arr
-[{"a":1},[1,2,3]]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),
+                  CAST('[1,2,3]' AS JSONB))                    AS jsonb_' at line 1
 SELECT JSON_OBJECT('payload', CAST('{"nested":true}' AS JSONB)) AS jsonb_passthrough_obj;
-jsonb_passthrough_obj
-{"payload":{"nested":true}}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)) AS jsonb_passthrough_obj' at line 1
 === Special-character string values (escape round-trip) ===
 SELECT JSON_ARRAY('quote: "')                                  AS value_with_quote;
 value_with_quote
 ["quote: \""]
 SELECT JSON_ARRAY('back: \\')                                  AS value_with_backslash_pg;
 value_with_backslash_pg
-["back: \\\\"]
+["back: \\"]
 SELECT JSON_ARRAY('é')                                         AS value_with_utf8;
 value_with_utf8
 ["é"]

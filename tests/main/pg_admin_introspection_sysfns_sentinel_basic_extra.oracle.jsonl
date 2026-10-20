@@ -1,0 +1,23 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":22}
+{"i":1,"h":"40450b10","k":"err","code":1305,"msg":"FUNCTION test.pg_relation_size does not exist"}
+{"i":2,"h":"0a2ab7b4","k":"err","code":1305,"msg":"FUNCTION test.pg_table_size does not exist"}
+{"i":3,"h":"113193b8","k":"err","code":1305,"msg":"FUNCTION test.pg_total_relation_size does not exist"}
+{"i":4,"h":"52992733","k":"err","code":1305,"msg":"FUNCTION test.pg_database_size does not exist"}
+{"i":5,"h":"a79369b4","k":"err","code":1305,"msg":"FUNCTION test.pg_size_pretty does not exist"}
+{"i":6,"h":"c9554086","k":"err","code":1305,"msg":"FUNCTION test.pg_relation_filepath does not exist"}
+{"i":7,"h":"0cf20388","k":"err","code":1305,"msg":"FUNCTION test.pg_get_indexdef does not exist"}
+{"i":8,"h":"b4d4efb9","k":"err","code":1305,"msg":"FUNCTION test.pg_get_constraintdef does not exist"}
+{"i":9,"h":"9a992dfa","k":"err","code":1305,"msg":"FUNCTION test.pg_get_expr does not exist"}
+{"i":10,"h":"85872e54","k":"err","code":1305,"msg":"FUNCTION test.pg_get_function_identity_arguments does not exist"}
+{"i":11,"h":"88f294df","k":"err","code":1305,"msg":"FUNCTION test.pg_get_serial_sequence does not exist"}
+{"i":12,"h":"9816309a","k":"err","code":1305,"msg":"FUNCTION test.pg_get_userbyid does not exist"}
+{"i":13,"h":"e0d182a0","k":"err","code":1305,"msg":"FUNCTION test.pg_has_role does not exist"}
+{"i":14,"h":"20b54d9f","k":"err","code":1305,"msg":"FUNCTION test.has_table_privilege does not exist"}
+{"i":15,"h":"17cd6bae","k":"err","code":1305,"msg":"FUNCTION test.has_column_privilege does not exist"}
+{"i":16,"h":"e160cc82","k":"err","code":1305,"msg":"FUNCTION test.has_schema_privilege does not exist"}
+{"i":17,"h":"8d40f051","k":"err","code":1305,"msg":"FUNCTION test.pg_notify does not exist"}
+{"i":18,"h":"33c5edd4","k":"err","code":1305,"msg":"FUNCTION test.pg_listening_channels does not exist"}
+{"i":19,"h":"b519fba0","k":"err","code":1305,"msg":"FUNCTION test.pg_notification_queue_usage does not exist"}
+{"i":20,"h":"e2716806","k":"err","code":1305,"msg":"FUNCTION test.current_setting does not exist"}
+{"i":21,"h":"be9faf90","k":"err","code":1305,"msg":"FUNCTION test.set_config does not exist"}
+{"i":22,"h":"19930c74","k":"err","code":1305,"msg":"FUNCTION test.pg_typeof does not exist"}

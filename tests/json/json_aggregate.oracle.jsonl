@@ -1,0 +1,9 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":8}
+{"i":1,"h":"6d546d82","k":"ok","affected":0}
+{"i":2,"h":"c46eb8e9","k":"ok","affected":0}
+{"i":3,"h":"67e66efe","k":"ok","affected":4}
+{"i":4,"h":"166405e0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ORDER BY i) AS arr FROM t1 GROUP BY grp ORDER BY grp' at line 1"}
+{"i":5,"h":"d350c357","k":"rows","cols":["obj"],"rows":[["{\"1\": \"apple\", \"2\": \"banana\", \"3\": \"cherry\", \"4\": \"date\"}"]]}
+{"i":6,"h":"639e6e61","k":"rows","cols":["q"],"rows":[["\"hello \\\"world\\\"\""]]}
+{"i":7,"h":"782fbd08","k":"rows","cols":["u"],"rows":[["hello"]]}
+{"i":8,"h":"c34180fb","k":"ok","affected":0}

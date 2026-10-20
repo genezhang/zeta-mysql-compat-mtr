@@ -1,0 +1,35 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":34}
+{"i":1,"h":"cdfbc056","k":"ok","affected":0}
+{"i":2,"h":"b1edaddf","k":"ok","affected":3}
+{"i":3,"h":"057c34f9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c1 CURSOR FOR SELECT id, n FROM cur_t ORDER BY id' at line 1"}
+{"i":4,"h":"0056b75d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c2 SCROLL CURSOR FOR SELECT id FROM cur_t' at line 1"}
+{"i":5,"h":"23715c8f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c3 NO SCROLL CURSOR FOR SELECT id FROM cur_t' at line 1"}
+{"i":6,"h":"2a7c902e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c4 BINARY CURSOR FOR SELECT id FROM cur_t' at line 1"}
+{"i":7,"h":"9701af75","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c5 CURSOR WITH HOLD FOR SELECT id FROM cur_t' at line 1"}
+{"i":8,"h":"173c2b7d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c6 CURSOR WITHOUT HOLD FOR SELECT id FROM cur_t' at line 1"}
+{"i":9,"h":"a604e2b5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH NEXT FROM c' at line 1"}
+{"i":10,"h":"a152d7ba","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH 2 FROM c' at line 1"}
+{"i":11,"h":"3ccf0a5d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH PRIOR FROM c' at line 1"}
+{"i":12,"h":"f5efb7d8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH ALL FROM c' at line 1"}
+{"i":13,"h":"baf8af5e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH FIRST FROM c' at line 1"}
+{"i":14,"h":"c8d84929","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH ABSOLUTE 2 FROM c' at line 1"}
+{"i":15,"h":"6eba3eeb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MOVE NEXT IN c' at line 1"}
+{"i":16,"h":"11c3989f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MOVE FORWARD 2 IN c' at line 1"}
+{"i":17,"h":"86e09de8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MOVE ALL IN c' at line 1"}
+{"i":18,"h":"378beae6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CLOSE c' at line 1"}
+{"i":19,"h":"f6cb7085","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CLOSE ALL' at line 1"}
+{"i":20,"h":"23a112c6","k":"ok","affected":0}
+{"i":21,"h":"00c2d639","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c CURSOR FOR SELECT id FROM cur_t' at line 1"}
+{"i":22,"h":"7a74ff38","k":"rows","cols":["1"],"rows":[["1"]]}
+{"i":23,"h":"6ba5534a","k":"rows","cols":["id"],"rows":[["1"]]}
+{"i":24,"h":"3a510c02","k":"ok","affected":0}
+{"i":25,"h":"b93f21a9","k":"rows","cols":["after_commit"],"rows":[["1"]]}
+{"i":26,"h":"6ba5534a","k":"rows","cols":["id"],"rows":[["1"]]}
+{"i":27,"h":"23a112c6","k":"ok","affected":0}
+{"i":28,"h":"e954d7db","k":"ok","affected":0}
+{"i":29,"h":"00c2d639","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECLARE c CURSOR FOR SELECT id FROM cur_t' at line 1"}
+{"i":30,"h":"7a74ff38","k":"rows","cols":["1"],"rows":[["1"]]}
+{"i":31,"h":"a5e2745a","k":"ok","affected":0}
+{"i":32,"h":"2bd51889","k":"rows","cols":["after_rollback_to_sp"],"rows":[["1"]]}
+{"i":33,"h":"3a510c02","k":"ok","affected":0}
+{"i":34,"h":"7dfba92b","k":"ok","affected":0}

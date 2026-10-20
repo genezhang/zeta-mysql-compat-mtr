@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"6d6f1348","k":"ok","affected":0}
+{"i":2,"h":"668d1186","k":"ok","affected":0}
+{"i":3,"h":"19ef9079","k":"ok","affected":1}
+{"i":4,"h":"fa2589b4","k":"ok","affected":2}
+{"i":5,"h":"c650c456","k":"rows","cols":["id","v"],"rows":[["1","99"]]}
+{"i":6,"h":"046a9e1a","k":"ok","affected":1}
+{"i":7,"h":"c650dd23","k":"rows","cols":["id","v"],"rows":[["2","20"]]}
+{"i":8,"h":"68c622a9","k":"ok","affected":2}
+{"i":9,"h":"c650c456","k":"rows","cols":["id","v"],"rows":[["1","100"]]}
+{"i":10,"h":"1608fd66","k":"ok","affected":2}
+{"i":11,"h":"c650c456","k":"rows","cols":["id","v"],"rows":[["1","11"]]}
+{"i":12,"h":"9ea6d9e0","k":"ok","affected":1}
+{"i":13,"h":"c650def0","k":"rows","cols":["id","v"],"rows":[["3","33"]]}
+{"i":14,"h":"dbf586eb","k":"ok","affected":0}
+{"i":15,"h":"b5ce0ff0","k":"rows","cols":["@x"],"rows":[["42"]]}
+{"i":16,"h":"c3432a11","k":"ok","affected":0}

@@ -54,13 +54,13 @@ odd_is_null
 1
 === Arity errors ===
 SELECT INET6_ATON();
-ERROR 1105: execution error: INET6_ATON requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'INET6_ATON'
 SELECT INET6_ATON('::1', '::2');
-ERROR 1105: execution error: INET6_ATON requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'INET6_ATON'
 SELECT INET6_NTOA();
-ERROR 1105: execution error: INET6_NTOA requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'INET6_NTOA'
 SELECT INET6_NTOA(UNHEX('00000001'), UNHEX('00000002'));
-ERROR 1105: execution error: INET6_NTOA requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'INET6_NTOA'
 === On TEXT column inside SELECT / WHERE (IPv6 filter) ===
 DROP TABLE IF EXISTS hosts6;
 CREATE TABLE hosts6 (id INT, ip TEXT);

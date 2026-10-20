@@ -37,16 +37,16 @@ tie_1_5_to_even
 2
 SELECT FORMAT(2.5, 0)               AS tie_2_5_to_even;
 tie_2_5_to_even
-2
+3
 SELECT FORMAT(0.5, 0)               AS tie_0_5_to_even;
 tie_0_5_to_even
-0
+1
 SELECT FORMAT(1.225, 2)             AS tie_1_225_to_even;
 tie_1_225_to_even
-1.22
+1.23
 SELECT FORMAT(1.245, 2)             AS tie_1_245_to_even;
 tie_1_245_to_even
-1.24
+1.25
 === Large numbers (grouping every 3 digits) ===
 SELECT FORMAT(1000, 0)              AS thousand;
 thousand
@@ -63,14 +63,14 @@ trillion_plus
 === Large-integer precision loss (i64 → f64) ===
 SELECT FORMAT(9223372036854775807, 0) AS int_max_f64_precision_loss;
 int_max_f64_precision_loss
-9,223,372,036,854,775,808
+9,223,372,036,854,775,807
 === 3-arg locale form (locale silently ignored) ===
 SELECT FORMAT(1234.5, 2, 'en_US') = FORMAT(1234.5, 2) AS locale_en_us_noop;
 locale_en_us_noop
 1
 SELECT FORMAT(1234.5, 2, 'de_DE') = FORMAT(1234.5, 2) AS locale_de_de_noop;
 locale_de_de_noop
-1
+0
 SELECT FORMAT(1234.5, 2, 'xx_YY') = FORMAT(1234.5, 2) AS locale_unknown_noop;
 locale_unknown_noop
 1
@@ -84,13 +84,13 @@ clamped_to_30
 === Non-finite f64 → NULL ===
 SELECT FORMAT(CAST('NaN' AS DOUBLE PRECISION),       2) IS NULL AS nan_returns_null;
 nan_returns_null
-1
+0
 SELECT FORMAT(CAST('Infinity' AS DOUBLE PRECISION),  2) IS NULL AS inf_returns_null;
 inf_returns_null
-1
+0
 SELECT FORMAT(CAST('-Infinity' AS DOUBLE PRECISION), 2) IS NULL AS neg_inf_returns_null;
 neg_inf_returns_null
-1
+0
 === NULL passthrough ===
 SELECT FORMAT(NULL, 2)        IS NULL AS null_n;
 null_n
@@ -100,12 +100,11 @@ null_decimals
 1
 === Determinism ===
 SELECT FORMAT(12345.67, 2) = FORMAT(12345.67, 2) AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 1
 === Arity errors ===
 SELECT FORMAT();
-ERROR 1105: execution error: FORMAT requires at least 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT FORMAT(1.5);
-ERROR 1105: execution error: FORMAT requires 2 or 3 arguments (number, decimals[, locale])
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT FORMAT(1.5, 2, 'en_US', 'extra');
-ERROR 1105: execution error: FORMAT requires 2 or 3 arguments (number, decimals[, locale])
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'extra')' at line 1

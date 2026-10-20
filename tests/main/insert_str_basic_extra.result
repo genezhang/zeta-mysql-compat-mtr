@@ -24,10 +24,10 @@ Quadratic
 === Position == strlen+1: append (in-range boundary) ===
 SELECT INSERT('abc', 4, 0, 'X')          AS append_at_strlen_plus_one;
 append_at_strlen_plus_one
-abcX
+abc
 SELECT INSERT('',    1, 0, 'X')          AS append_into_empty;
 append_into_empty
-X
+
 === Length zero: pure insertion at pos ===
 SELECT INSERT('Quadratic', 2, 0, '__')   AS insert_only_pos2;
 insert_only_pos2
@@ -75,25 +75,28 @@ utf8_replace_multibyte
 cafe
 === Type strictness (zeta-specific) ===
 SELECT INSERT('abc', 'two', 1, 'X');
-ERROR 1105: execution error: INSERT pos must be integer
+INSERT('abc', 'two', 1, 'X')
+abc
 SELECT INSERT('abc', 2, 'three', 'X');
-ERROR 1105: execution error: INSERT len must be integer
+INSERT('abc', 2, 'three', 'X')
+aXbc
 SELECT INSERT('abc', 2.0, 1, 'X');
-ERROR 1105: execution error: INSERT pos must be integer
+INSERT('abc', 2.0, 1, 'X')
+aXc
 SELECT INSERT('abc', 2, 1.0, 'X');
-ERROR 1105: execution error: INSERT len must be integer
+INSERT('abc', 2, 1.0, 'X')
+aXc
 === Determinism ===
 SELECT INSERT('hello', 2, 2, 'XY') = INSERT('hello', 2, 2, 'XY') AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 1
 === Arity errors ===
 SELECT INSERT();
-ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT INSERT('a');
-ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT INSERT('a', 1);
-ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT INSERT('a', 1, 1);
-ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT INSERT('a', 1, 1, 'X', 'extra');
-ERROR 1105: execution error: INSERT requires 4 arguments (str, pos, len, newstr)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'extra')' at line 1

@@ -1,0 +1,48 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":47}
+{"i":1,"h":"b0dc5628","k":"ok","affected":0}
+{"i":2,"h":"27d3edf5","k":"ok","affected":0}
+{"i":3,"h":"384658c3","k":"ok","affected":2}
+{"i":4,"h":"8f54bf1b","k":"rows","cols":["a","b","c"],"rows":[["1","2","3"],["3","4","7"]]}
+{"i":5,"h":"dca5195f","k":"ok","affected":1}
+{"i":6,"h":"8f54bf1b","k":"rows","cols":["a","b","c"],"rows":[["3","4","7"],["10","2","12"]]}
+{"i":7,"h":"78575304","k":"ok","affected":1}
+{"i":8,"h":"23b9b648","k":"rows","cols":["a","b","c"],"rows":[["5",null,null]]}
+{"i":9,"h":"f80cdccb","k":"ok","affected":0}
+{"i":10,"h":"11dfec8d","k":"ok","affected":0}
+{"i":11,"h":"304c5ce2","k":"ok","affected":1}
+{"i":12,"h":"26014f54","k":"rows","cols":["full"],"rows":[["0"]]}
+{"i":13,"h":"96740a76","k":"ok","affected":0}
+{"i":14,"h":"b15977e6","k":"ok","affected":0}
+{"i":15,"h":"829dc7ed","k":"ok","affected":0}
+{"i":16,"h":"38cbbabd","k":"ok","affected":1}
+{"i":17,"h":"64313db2","k":"err","code":1062,"msg":"Duplicate entry '3' for key 'gix.c'"}
+{"i":18,"h":"fb5e055a","k":"ok","affected":0}
+{"i":19,"h":"86fe1276","k":"ok","affected":0}
+{"i":20,"h":"faadbec2","k":"ok","affected":0}
+{"i":21,"h":"f92801bb","k":"err","code":3105,"msg":"The value specified for generated column 'c' in table 'gct' is not allowed."}
+{"i":22,"h":"1a65fd35","k":"ok","affected":0}
+{"i":23,"h":"b15941e2","k":"ok","affected":0}
+{"i":24,"h":"6d4bb5ed","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY, n INT)' at line 1"}
+{"i":25,"h":"67f60148","k":"err","code":1146,"msg":"Table 'test.gid' doesn't exist"}
+{"i":26,"h":"47c6ba8c","k":"err","code":1146,"msg":"Table 'test.gid' doesn't exist"}
+{"i":27,"h":"fb5e3b5e","k":"err","code":1051,"msg":"Unknown table 'test.gid'"}
+{"i":28,"h":"a3523fb5","k":"ok","affected":0}
+{"i":29,"h":"d47cea34","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BY DEFAULT AS IDENTITY, n INT)' at line 1"}
+{"i":30,"h":"6a993c3a","k":"err","code":1146,"msg":"Table 'test.gid2' doesn't exist"}
+{"i":31,"h":"5b234f88","k":"err","code":1146,"msg":"Table 'test.gid2' doesn't exist"}
+{"i":32,"h":"2a7b3c88","k":"err","code":1051,"msg":"Unknown table 'test.gid2'"}
+{"i":33,"h":"b12b6ffa","k":"ok","affected":0}
+{"i":34,"h":"9d76f2cc","k":"ok","affected":0}
+{"i":35,"h":"f926a490","k":"ok","affected":1}
+{"i":36,"h":"5b494bf5","k":"ok","affected":1}
+{"i":37,"h":"47483baa","k":"rows","cols":["a","b","c"],"rows":[["1","2","3"]]}
+{"i":38,"h":"208cb64e","k":"ok","affected":1}
+{"i":39,"h":"465fe74f","k":"rows","cols":["a","b","c"],"rows":[["1","2","3"],["5","6","11"]]}
+{"i":40,"h":"fb29cdf6","k":"ok","affected":0}
+{"i":41,"h":"4c7cce9b","k":"ok","affected":0}
+{"i":42,"h":"02ebe245","k":"err","code":1054,"msg":"Unknown column 'z' in 'generated column function'"}
+{"i":43,"h":"8fe19eb0","k":"err","code":1146,"msg":"Table 'test.gbad' doesn't exist"}
+{"i":44,"h":"3d497086","k":"err","code":1051,"msg":"Unknown table 'test.gbad'"}
+{"i":45,"h":"d3d57147","k":"rows","cols":["Table","Create Table"],"rows":[["gct","CREATE TABLE `gct` (\n  `a` int DEFAULT NULL,\n  `b` int DEFAULT NULL,\n  `c` int GENERATED ALWAYS AS ((`a` + `b`)) STORED\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"]]}
+{"i":46,"h":"fbc418cd","k":"err","code":1054,"msg":"Unknown column 'is_generated' in 'field list'"}
+{"i":47,"h":"fadf795c","k":"ok","affected":0}

@@ -1,0 +1,47 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":46}
+{"i":1,"h":"6cbda360","k":"ok","affected":0}
+{"i":2,"h":"346a4afc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BYTEA)' at line 1"}
+{"i":3,"h":"2ffc33ac","k":"err","code":1146,"msg":"Table 'test.b1' doesn't exist"}
+{"i":4,"h":"c43b6938","k":"err","code":1146,"msg":"Table 'test.b1' doesn't exist"}
+{"i":5,"h":"9b14e21c","k":"err","code":1146,"msg":"Table 'test.b1' doesn't exist"}
+{"i":6,"h":"49534fbd","k":"err","code":1146,"msg":"Table 'test.b1' doesn't exist"}
+{"i":7,"h":"a0b7954f","k":"err","code":1146,"msg":"Table 'test.b1' doesn't exist"}
+{"i":8,"h":"18308486","k":"rows","cols":["r"],"rows":[["0"]]}
+{"i":9,"h":"93efda1d","k":"err","code":1146,"msg":"Table 'test.b1' doesn't exist"}
+{"i":10,"h":"c0dd60d9","k":"err","code":1051,"msg":"Unknown table 'test.b1'"}
+{"i":11,"h":"6cbc25f3","k":"ok","affected":0}
+{"i":12,"h":"6b3c58e4","k":"ok","affected":0}
+{"i":13,"h":"49921eed","k":"ok","affected":1}
+{"i":14,"h":"a2477287","k":"rows","cols":["id","data"],"rows":[["1","xCAFEBABE"]]}
+{"i":15,"h":"c0dd17b2","k":"ok","affected":0}
+{"i":16,"h":"6d545d6b","k":"ok","affected":0}
+{"i":17,"h":"4045d08d","k":"ok","affected":0}
+{"i":18,"h":"34bb74bd","k":"ok","affected":1}
+{"i":19,"h":"7d23d6d7","k":"rows","cols":["id","t"],"rows":[["1","xAA"]]}
+{"i":20,"h":"c34e49a6","k":"ok","affected":0}
+{"i":21,"h":"6cc7113e","k":"ok","affected":0}
+{"i":22,"h":"940cdfb7","k":"ok","affected":0}
+{"i":23,"h":"59e5d82c","k":"ok","affected":1}
+{"i":24,"h":"7df6a61a","k":"rows","cols":["id","t"],"rows":[["1","xBB"]]}
+{"i":25,"h":"c0fea4e3","k":"ok","affected":0}
+{"i":26,"h":"6cff08f3","k":"ok","affected":0}
+{"i":27,"h":"3d2cc174","k":"ok","affected":0}
+{"i":28,"h":"5f9442ba","k":"ok","affected":1}
+{"i":29,"h":"7deb406f","k":"rows","cols":["id","t"],"rows":[["1","xCC"]]}
+{"i":30,"h":"c0f67f4e","k":"ok","affected":0}
+{"i":31,"h":"6cbc6e44","k":"ok","affected":0}
+{"i":32,"h":"9d68aa32","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BYTEA)' at line 1"}
+{"i":33,"h":"63363998","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''\\\\x00')' at line 1"}
+{"i":34,"h":"a247759c","k":"err","code":1146,"msg":"Table 'test.be' doesn't exist"}
+{"i":35,"h":"c0dd2f05","k":"err","code":1051,"msg":"Unknown table 'test.be'"}
+{"i":36,"h":"c6c2eb5f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::BYTEA AS r' at line 1"}
+{"i":37,"h":"c8e52c02","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BYTEA) AS r' at line 1"}
+{"i":38,"h":"7f0b22af","k":"err","code":1305,"msg":"FUNCTION test.ENCODE does not exist"}
+{"i":39,"h":"4b248109","k":"err","code":1305,"msg":"FUNCTION test.DECODE does not exist"}
+{"i":40,"h":"6cdea93c","k":"ok","affected":0}
+{"i":41,"h":"21d6bde2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BYTEA)' at line 1"}
+{"i":42,"h":"877e5110","k":"err","code":1146,"msg":"Table 'test.gb' doesn't exist"}
+{"i":43,"h":"3fead7ed","k":"err","code":1146,"msg":"Table 'test.gb' doesn't exist"}
+{"i":44,"h":"c0b98a49","k":"err","code":1051,"msg":"Unknown table 'test.gb'"}
+{"i":45,"h":"65814146","k":"ok","affected":0}
+{"i":46,"h":"c4fc60e0","k":"ok","affected":0}

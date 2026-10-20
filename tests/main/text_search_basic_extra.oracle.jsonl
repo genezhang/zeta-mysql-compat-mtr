@@ -1,0 +1,39 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":38}
+{"i":1,"h":"ce0f2edd","k":"err","code":1305,"msg":"FUNCTION test.TO_TSVECTOR does not exist"}
+{"i":2,"h":"d8d670b3","k":"err","code":1305,"msg":"FUNCTION test.TO_TSQUERY does not exist"}
+{"i":3,"h":"c13f0dd5","k":"err","code":1305,"msg":"FUNCTION test.PLAINTO_TSQUERY does not exist"}
+{"i":4,"h":"71a3a9e8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@ TO_TSQUERY('quick & fox') AS match' at line 1"}
+{"i":5,"h":"9b181e37","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@ TO_TSQUERY('quick & lazy') AS no_match' at line 1"}
+{"i":6,"h":"c14a5618","k":"err","code":1305,"msg":"FUNCTION test.TS_RANK does not exist"}
+{"i":7,"h":"96180dfc","k":"err","code":1305,"msg":"FUNCTION test.TS_RANK does not exist"}
+{"i":8,"h":"9728c057","k":"ok","affected":0}
+{"i":9,"h":"ebe3adeb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TSVECTOR)' at line 1"}
+{"i":10,"h":"53956ea9","k":"err","code":1146,"msg":"Table 'test.fts1' doesn't exist"}
+{"i":11,"h":"b9d7792c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@ TO_TSQUERY('fox & dog') ORDER BY id' at line 1"}
+{"i":12,"h":"8c964862","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@ TO_TSQUERY('fox | lazy') ORDER BY id' at line 1"}
+{"i":13,"h":"e07fc26b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@ TO_TSQUERY('!fox') ORDER BY id' at line 1"}
+{"i":14,"h":"6b5a655d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@ TO_TSQUERY('fox')\n  ORDER BY TS_RANK(body_tsv, TO_TSQUERY('fox')) DESC, id' at line 1"}
+{"i":15,"h":"6d56abc3","k":"ok","affected":0}
+{"i":16,"h":"7ea6e457","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TSQUERY)' at line 1"}
+{"i":17,"h":"9ae97617","k":"err","code":1146,"msg":"Table 'test.qq' doesn't exist"}
+{"i":18,"h":"e11ef3bc","k":"err","code":1146,"msg":"Table 'test.qq' doesn't exist"}
+{"i":19,"h":"c343a39a","k":"err","code":1051,"msg":"Unknown table 'test.qq'"}
+{"i":20,"h":"0d4ae017","k":"err","code":1305,"msg":"FUNCTION test.TO_TSVECTOR does not exist"}
+{"i":21,"h":"2417c3d9","k":"err","code":1305,"msg":"FUNCTION test.TO_TSQUERY does not exist"}
+{"i":22,"h":"6c4b6e15","k":"err","code":1051,"msg":"Unknown table 'test.fts1'"}
+{"i":23,"h":"015c935b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::TSQUERY AS r' at line 1"}
+{"i":24,"h":"92441653","k":"ok","affected":0}
+{"i":25,"h":"cdfbbee5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TSVECTOR)' at line 1"}
+{"i":26,"h":"6a7de3ea","k":"err","code":1146,"msg":"Table 'test.fts_t' doesn't exist"}
+{"i":27,"h":"43834901","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING fts(tsv)' at line 1"}
+{"i":28,"h":"55066eec","k":"err","code":1051,"msg":"Unknown table 'test.fts_t'"}
+{"i":29,"h":"12d42900","k":"err","code":1305,"msg":"FUNCTION test.TS_RANK_CD does not exist"}
+{"i":30,"h":"189a9134","k":"err","code":1305,"msg":"FUNCTION test.TS_HEADLINE does not exist"}
+{"i":31,"h":"aca0371d","k":"err","code":1305,"msg":"FUNCTION test.SETWEIGHT does not exist"}
+{"i":32,"h":"8ea69082","k":"err","code":1305,"msg":"FUNCTION test.NUMNODE does not exist"}
+{"i":33,"h":"8fa4f04f","k":"err","code":1305,"msg":"FUNCTION test.TO_TSQUERY does not exist"}
+{"i":34,"h":"de7fdadc","k":"ok","affected":0}
+{"i":35,"h":"2b46d0d1","k":"ok","affected":0}
+{"i":36,"h":"53000385","k":"ok","affected":1}
+{"i":37,"h":"07280ab2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@@ TO_TSQUERY('hello')' at line 1"}
+{"i":38,"h":"e080f812","k":"ok","affected":0}

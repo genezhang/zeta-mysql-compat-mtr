@@ -1,0 +1,32 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":31}
+{"i":1,"h":"8f72c04c","k":"rows","cols":["adds_eq_ts_midnight"],"rows":[["1"]]}
+{"i":2,"h":"57ac876a","k":"rows","cols":["adds_eq_date_value_coerce"],"rows":[["1"]]}
+{"i":3,"h":"0be9c11e","k":"rows","cols":["seconds_is_0"],"rows":[["0"]]}
+{"i":4,"h":"0eaacd46","k":"rows","cols":["adddate_int_int_is_arith"],"rows":[[null]]}
+{"i":5,"h":"f0e9a748","k":"rows","cols":["adddate_int_arith_eq_43"],"rows":[[null]]}
+{"i":6,"h":"bd0e31d2","k":"rows","cols":["subdate_int_arith_eq_41"],"rows":[[null]]}
+{"i":7,"h":"1689ed11","k":"rows","cols":["DATE_ADD(42, INTERVAL 1 DAY)"],"rows":[[null]]}
+{"i":8,"h":"7bfd84e4","k":"rows","cols":["DATE_SUB(42, INTERVAL 1 DAY)"],"rows":[[null]]}
+{"i":9,"h":"0697497d","k":"rows","cols":["DATE_SUB('not a date', INTERVAL 1 DAY)"],"rows":[[null]]}
+{"i":10,"h":"55a6d2e6","k":"rows","cols":["ADDDATE('not a date', 1)"],"rows":[[null]]}
+{"i":11,"h":"a4804aad","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '7)\n     = ADDDATE(DATE '2024-03-15', 7)                          AS date_add_int' at line 1"}
+{"i":12,"h":"5957b871","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '7)\n     = SUBDATE(DATE '2024-03-15', 7)                          AS date_sub_int' at line 1"}
+{"i":13,"h":"7efcae27","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''7')' at line 1"}
+{"i":14,"h":"b8d01f5f","k":"rows","cols":["ADDDATE(DATE '2024-03-15', '7')"],"rows":[["2024-03-22"]]}
+{"i":15,"h":"3f6a7ad4","k":"rows","cols":["ADDDATE(DATE '2024-03-15', 3000000000)"],"rows":[[null]]}
+{"i":16,"h":"bed3fd5f","k":"rows","cols":["SUBDATE(DATE '2024-03-15', 3000000000)"],"rows":[[null]]}
+{"i":17,"h":"d97bddbc","k":"rows","cols":["ADDDATE(DATE '2024-03-15', -3000000000)"],"rows":[[null]]}
+{"i":18,"h":"904b2d75","k":"rows","cols":["plus_1_year"],"rows":[["1"]]}
+{"i":19,"h":"442f1494","k":"rows","cols":["plus_1_month"],"rows":[["1"]]}
+{"i":20,"h":"17e9511d","k":"rows","cols":["plus_1_week"],"rows":[["1"]]}
+{"i":21,"h":"ce6cc8b8","k":"rows","cols":["plus_1_hour"],"rows":[["1"]]}
+{"i":22,"h":"3b6be7ba","k":"rows","cols":["plus_30_min"],"rows":[["1"]]}
+{"i":23,"h":"d90f0f3a","k":"rows","cols":["plus_45_sec"],"rows":[["1"]]}
+{"i":24,"h":"5100b822","k":"rows","cols":["DATE_ADD(DATE '2024-03-15', INTERVAL 1 QUARTER)"],"rows":[["2024-06-15"]]}
+{"i":25,"h":"f475685b","k":"rows","cols":["DATE_ADD(TIMESTAMP '2024-03-15 14:30:00', INTERVAL 1 MICROSECOND)"],"rows":[["2024-03-15 14:30:00.000001"]]}
+{"i":26,"h":"2989745c","k":"rows","cols":["pre_1970_plus_year"],"rows":[["1"]]}
+{"i":27,"h":"f75c0219","k":"rows","cols":["pre_1970_year_boundary"],"rows":[["1"]]}
+{"i":28,"h":"39c19754","k":"rows","cols":["crosses_epoch"],"rows":[["1"]]}
+{"i":29,"h":"f29b3eb8","k":"rows","cols":["neg_interval_eq_sub"],"rows":[["1"]]}
+{"i":30,"h":"fbfbe0f6","k":"rows","cols":["neg_month_eq_sub"],"rows":[["1"]]}
+{"i":31,"h":"17f64fff","k":"rows","cols":["adddate_neg_eq_subdate"],"rows":[["1"]]}

@@ -1,26 +1,26 @@
 === Year and month specifiers ===
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d')      AS iso_date;
 iso_date
-2024-03-15 00:00:00
+2024-03-15
 SELECT STR_TO_DATE('24-03-15',   '%y-%m-%d')      AS year_2digit;
 year_2digit
-2024-03-15 00:00:00
+2024-03-15
 SELECT STR_TO_DATE('2024-3-15',  '%Y-%c-%d')      AS month_nopad;
 month_nopad
-2024-03-15 00:00:00
+2024-03-15
 SELECT STR_TO_DATE('March 15 2024', '%M %d %Y')   AS month_name_full;
 month_name_full
-2024-03-15 00:00:00
+2024-03-15
 SELECT STR_TO_DATE('Mar 15 2024', '%b %d %Y')     AS month_abbrev;
 month_abbrev
-2024-03-15 00:00:00
+2024-03-15
 === Day specifiers ===
 SELECT STR_TO_DATE('2024-03-01', '%Y-%m-%d')      AS day_padded;
 day_padded
-2024-03-01 00:00:00
+2024-03-01
 SELECT STR_TO_DATE('2024-3-1',   '%Y-%c-%e')      AS day_nopad;
 day_nopad
-2024-03-01 00:00:00
+2024-03-01
 === Hour specifiers (24h and 12h with AM/PM) ===
 SELECT STR_TO_DATE('2024-03-15 14:30:45', '%Y-%m-%d %H:%i:%S')  AS h24;
 h24
@@ -58,41 +58,50 @@ pretty_rt
 === Default values when specifiers missing ===
 SELECT STR_TO_DATE('2024', '%Y')                  AS year_only;
 year_only
-2024-01-01 00:00:00
+NULL
 SELECT STR_TO_DATE('2024-03', '%Y-%m')            AS year_month_only;
 year_month_only
-2024-03-01 00:00:00
+NULL
 === Out-of-range → 1105 (zeta strict; MySQL NULL) ===
 SELECT STR_TO_DATE('2024-13-01', '%Y-%m-%d');
-ERROR 1105: execution error: STR_TO_DATE: month 13 out of range 1..=12
+STR_TO_DATE('2024-13-01', '%Y-%m-%d')
+NULL
 SELECT STR_TO_DATE('2023-02-30', '%Y-%m-%d');
-ERROR 1105: execution error: STR_TO_DATE: day 30 out of range 1..=28 for 2023-02
+STR_TO_DATE('2023-02-30', '%Y-%m-%d')
+NULL
 SELECT STR_TO_DATE('2024-03-15 25:00:00', '%Y-%m-%d %H:%i:%S');
-ERROR 1105: execution error: STR_TO_DATE: hour 25 out of range 0..=23
+STR_TO_DATE('2024-03-15 25:00:00', '%Y-%m-%d %H:%i:%S')
+NULL
 SELECT STR_TO_DATE('13:00:00 AM', '%h:%i:%S %p');
-ERROR 1105: execution error: STR_TO_DATE: hour 13 out of 12-hour range 1..=12
+STR_TO_DATE('13:00:00 AM', '%h:%i:%S %p')
+NULL
 SELECT STR_TO_DATE('00:00:00 PM', '%h:%i:%S %p');
-ERROR 1105: execution error: STR_TO_DATE: hour 0 out of 12-hour range 1..=12
+STR_TO_DATE('00:00:00 PM', '%h:%i:%S %p')
+NULL
 === Trailing extra input → ERROR (zeta strict; MySQL warns) ===
 SELECT STR_TO_DATE('2024-03-15 extra', '%Y-%m-%d');
-ERROR 1105: execution error: STR_TO_DATE: 6 trailing character(s) after format exhausted
+STR_TO_DATE('2024-03-15 extra', '%Y-%m-%d')
+2024-03-15
 === Unsupported specifier in STR_TO_DATE (asymmetry vs DATE_FORMAT) ===
 SELECT STR_TO_DATE('1',          '%j');
-ERROR 1105: execution error: STR_TO_DATE: directive %j not supported (see zeta #1093)
+STR_TO_DATE('1',          '%j')
+NULL
 SELECT STR_TO_DATE('2024-01',    '%X-%v');
-ERROR 1105: execution error: STR_TO_DATE: directive %X not supported (see zeta #1093)
+STR_TO_DATE('2024-01',    '%X-%v')
+NULL
 SELECT STR_TO_DATE('garbage',    '%z');
-ERROR 1105: execution error: STR_TO_DATE: directive %z not supported (see zeta #1093)
+STR_TO_DATE('garbage',    '%z')
+NULL
 === Consumed-but-unused specifiers (parser accepts, semantics ignored) ===
 SELECT STR_TO_DATE('Friday 2024-03-15', '%W %Y-%m-%d')   AS weekday_name_consumed;
 weekday_name_consumed
-2024-03-15 00:00:00
+2024-03-15
 SELECT STR_TO_DATE('5 2024-03-15',      '%w %Y-%m-%d')   AS weekday_num_consumed;
 weekday_num_consumed
-2024-03-15 00:00:00
+2024-03-15
 SELECT STR_TO_DATE('1st March 2024',    '%D %M %Y')      AS ordinal_consumed;
 ordinal_consumed
-2024-03-01 00:00:00
+2024-03-01
 SELECT STR_TO_DATE('2024-03-15 14:30:45.1', '%Y-%m-%d %H:%i:%S.%f') AS frac_seconds;
 frac_seconds
 2024-03-15 14:30:45.100000
@@ -112,13 +121,12 @@ null_fmt
 1
 === Arity errors ===
 SELECT STR_TO_DATE();
-ERROR 1105: execution error: STR_TO_DATE requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'STR_TO_DATE'
 SELECT STR_TO_DATE('2024-03-15');
-ERROR 1105: execution error: STR_TO_DATE requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'STR_TO_DATE'
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d', 'extra');
-ERROR 1105: execution error: STR_TO_DATE requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'STR_TO_DATE'
 === Determinism ===
 SELECT STR_TO_DATE('2024-03-15', '%Y-%m-%d')
      = STR_TO_DATE('2024-03-15', '%Y-%m-%d')         AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2

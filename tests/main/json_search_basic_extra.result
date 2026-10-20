@@ -75,14 +75,15 @@ null_escape
 1
 === Invalid mode rejected ===
 SELECT JSON_SEARCH('{}', 'foo', 'x');
-ERROR 1105: execution error: JSON_SEARCH one_or_all must be 'one' or 'all'
+ERROR 3154: The oneOrAll argument to json_search may take these values: 'one' or 'all'.
 === Multi-char escape rejected ===
 SELECT JSON_SEARCH('{}', 'one', 'x', 'xy');
-ERROR 1105: execution error: JSON_SEARCH escape_char must be a single character
+ERROR 1210: Incorrect arguments to ESCAPE
 === Arity / unsupported-path-args / invalid-JSON ===
 SELECT JSON_SEARCH('{}', 'one');
-ERROR 1105: execution error: JSON_SEARCH requires (doc, one_or_all, search_str, [escape])
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_SEARCH'
 SELECT JSON_SEARCH('{}', 'one', 'x', '\\', '$.a');
-ERROR 1105: execution error: JSON_SEARCH path-limiting args (5th+) not supported in this scope
+JSON_SEARCH('{}', 'one', 'x', '\\', '$.a')
+NULL
 SELECT JSON_SEARCH('not json', 'one', 'x');
-ERROR 1105: execution error: JSON_SEARCH target is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_search: "Invalid value." at position 1.

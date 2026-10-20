@@ -1,0 +1,45 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":44}
+{"i":1,"h":"0101c5af","k":"rows","cols":["set_missing"],"rows":[["{\"a\": 1, \"b\": 2}"]]}
+{"i":2,"h":"9616cb40","k":"rows","cols":["insert_missing"],"rows":[["{\"a\": 1, \"b\": 2}"]]}
+{"i":3,"h":"b979ca73","k":"rows","cols":["replace_missing"],"rows":[["{\"a\": 1}"]]}
+{"i":4,"h":"7aa6a5cd","k":"rows","cols":["set_existing"],"rows":[["{\"a\": 99}"]]}
+{"i":5,"h":"5ba79998","k":"rows","cols":["insert_existing"],"rows":[["{\"a\": 1}"]]}
+{"i":6,"h":"49511917","k":"rows","cols":["replace_existing"],"rows":[["{\"a\": 99}"]]}
+{"i":7,"h":"c859f14a","k":"rows","cols":["set_two_missing"],"rows":[["{\"a\": 1, \"b\": 2, \"c\": 3}"]]}
+{"i":8,"h":"d37ce2d2","k":"rows","cols":["insert_two_missing"],"rows":[["{\"a\": 1, \"b\": 2, \"c\": 3}"]]}
+{"i":9,"h":"d3883518","k":"rows","cols":["replace_two_missing"],"rows":[["{\"a\": 1}"]]}
+{"i":10,"h":"bc66420a","k":"rows","cols":["set_mixed"],"rows":[["{\"a\": 99, \"b\": 2}"]]}
+{"i":11,"h":"a9328873","k":"rows","cols":["insert_mixed"],"rows":[["{\"a\": 1, \"b\": 2}"]]}
+{"i":12,"h":"70166239","k":"rows","cols":["replace_mixed"],"rows":[["{\"a\": 99}"]]}
+{"i":13,"h":"70b7cfc1","k":"rows","cols":["val_int"],"rows":[["{\"k\": 42}"]]}
+{"i":14,"h":"aa636511","k":"rows","cols":["val_string"],"rows":[["{\"k\": \"hi\"}"]]}
+{"i":15,"h":"9ddd5c23","k":"rows","cols":["val_bool"],"rows":[["{\"k\": true}"]]}
+{"i":16,"h":"40ebe56a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))  AS val_array' at line 1"}
+{"i":17,"h":"a37f2689","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))  AS val_object' at line 1"}
+{"i":18,"h":"2e2ef6b8","k":"rows","cols":["val_sql_null"],"rows":[["{\"k\": null}"]]}
+{"i":19,"h":"513313af","k":"rows","cols":["set_null_target"],"rows":[["1"]]}
+{"i":20,"h":"b2e4c09c","k":"rows","cols":["insert_null_target"],"rows":[["1"]]}
+{"i":21,"h":"8f93c31b","k":"rows","cols":["replace_null_target"],"rows":[["1"]]}
+{"i":22,"h":"60736013","k":"rows","cols":["set_null_path"],"rows":[["1"]]}
+{"i":23,"h":"c32fed84","k":"rows","cols":["set_array_path_null"],"rows":[["0"]]}
+{"i":24,"h":"b2e6da97","k":"rows","cols":["insert_array_path_null"],"rows":[["0"]]}
+{"i":25,"h":"21471a52","k":"err","code":3143,"msg":"Invalid JSON path expression. The error is around character position 1."}
+{"i":26,"h":"d0637b96","k":"err","code":3143,"msg":"Invalid JSON path expression. The error is around character position 1."}
+{"i":27,"h":"019b63a9","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_SET'"}
+{"i":28,"h":"f8370ec6","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_SET'"}
+{"i":29,"h":"920d3ef8","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_SET'"}
+{"i":30,"h":"ab2e49f6","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_SET'"}
+{"i":31,"h":"39e8c97a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_INSERT'"}
+{"i":32,"h":"550c0013","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_INSERT'"}
+{"i":33,"h":"69669679","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_REPLACE'"}
+{"i":34,"h":"98398daf","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_REPLACE'"}
+{"i":35,"h":"94c36ee8","k":"rows","cols":["set_nested_missing"],"rows":[["{\"a\": {\"b\": 1, \"c\": 9}}"]]}
+{"i":36,"h":"c9b88059","k":"rows","cols":["insert_nested_missing"],"rows":[["{\"a\": {\"b\": 1, \"c\": 9}}"]]}
+{"i":37,"h":"7ad46b3a","k":"rows","cols":["replace_nested_missing"],"rows":[["{\"a\": {\"b\": 1}}"]]}
+{"i":38,"h":"1cd7c512","k":"rows","cols":["set_nested_existing"],"rows":[["{\"a\": {\"b\": 9}}"]]}
+{"i":39,"h":"0fe0c1de","k":"rows","cols":["replace_nested_existing"],"rows":[["{\"a\": {\"b\": 9}}"]]}
+{"i":40,"h":"fd47861f","k":"rows","cols":["set_scalar_target"],"rows":[["\"a string\""]]}
+{"i":41,"h":"80a9e849","k":"rows","cols":["insert_scalar_target"],"rows":[["\"a string\""]]}
+{"i":42,"h":"cf088464","k":"rows","cols":["set_idempotent"],"rows":[["1"]]}
+{"i":43,"h":"de69daeb","k":"rows","cols":["set_det"],"rows":[["1"]]}
+{"i":44,"h":"9ffe4a4f","k":"rows","cols":["insert_det"],"rows":[["1"]]}

@@ -8,8 +8,7 @@ single_null	single_set
 NULL	a
 === COALESCE zero-arg — lenient NULL (PG / MySQL would error) ===
 SELECT COALESCE() AS empty;
-empty
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ') AS empty' at line 1
 === COALESCE mixed types — first non-NULL ===
 SELECT COALESCE(NULL, 1, 'a') AS pick_int, COALESCE(NULL, 'a', 1) AS pick_str;
 pick_int	pick_str
@@ -17,11 +16,11 @@ pick_int	pick_str
 === COALESCE short-circuits — bad-cast tail arg not evaluated ===
 SELECT COALESCE(1, 10/0) AS short_div, COALESCE('result', CAST('not-a-date' AS DATE)) AS short_cast;
 short_div	short_cast
-1	result
+1.0000	result
 === NULLIF type coercion — Int/Decimal equal, Int/String not ===
 SELECT NULLIF(1, 1.0) AS int_dec_eq, NULLIF(1, '1') AS int_str_keep, NULLIF('1', 1) AS str_int_keep;
 int_dec_eq	int_str_keep	str_int_keep
-NULL	1	1
+NULL	NULL	NULL
 === NULLIF with NULL — lhs-NULL, rhs-NULL, both-NULL ===
 SELECT NULLIF(NULL, 1) AS lhs_null, NULLIF(1, NULL) AS rhs_null, NULLIF(NULL, NULL) AS both_null;
 lhs_null	rhs_null	both_null
@@ -32,24 +31,21 @@ use_fb	keep_val	both_null
 fb	val	NULL
 === IFNULL arity errors — 1-arg and 3-arg both errno 1105 ===
 SELECT IFNULL(NULL);
-ERROR 1105: execution error: IFNULL requires exactly 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'IFNULL'
 SELECT IFNULL(NULL, NULL, 'three');
-ERROR 1105: execution error: IFNULL requires exactly 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'IFNULL'
 === ISNULL — 1-arg boolean wrapper around IS NULL ===
 SELECT ISNULL(NULL) AS n1, ISNULL('a') AS n2;
 n1	n2
 1	0
 === NVL — Oracle 2-arg alias ===
 SELECT NVL(NULL, 'fb') AS n_null, NVL('a', 'fb') AS n_keep;
-n_null	n_keep
-fb	a
+ERROR 1305: FUNCTION test.NVL does not exist
 === NVL2 — Oracle 3-arg conditional with short-circuit ===
 SELECT NVL2('a', 'first', 'second') AS not_null, NVL2(NULL, 'first', 'second') AS is_null;
-not_null	is_null
-first	second
+ERROR 1305: FUNCTION test.NVL2 does not exist
 SELECT NVL2(NULL, 1/0, 99) AS short_when_null, NVL2('x', 99, 1/0) AS short_when_notnull;
-short_when_null	short_when_notnull
-99	99
+ERROR 1305: FUNCTION test.NVL2 does not exist
 === COALESCE on table column — fallback for NULL rows ===
 DROP TABLE IF EXISTS c;
 CREATE TABLE c (id INT, v INT);

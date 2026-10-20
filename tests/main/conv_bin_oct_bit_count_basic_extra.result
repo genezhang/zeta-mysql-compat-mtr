@@ -29,9 +29,9 @@ SELECT BIN(NULL) IS NULL                 AS null_passes;
 null_passes
 1
 SELECT BIN();
-ERROR 1105: execution error: BIN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'BIN'
 SELECT BIN(1, 2);
-ERROR 1105: execution error: BIN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'BIN'
 === OCT: known small values ===
 SELECT OCT(0)                            AS zero;
 zero
@@ -80,7 +80,7 @@ SELECT BIT_COUNT(NULL) IS NULL           AS null_passes;
 null_passes
 1
 SELECT BIT_COUNT();
-ERROR 1105: execution error: BIT_COUNT requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'BIT_COUNT'
 === CONV: classic vectors ===
 SELECT CONV(255, 10, 16)                 AS dec_to_hex;
 dec_to_hex
@@ -127,7 +127,7 @@ ws_strips_clean
 === CONV: empty / bare-sign input → 0 ===
 SELECT CONV('', 10, 10)                  AS empty_str;
 empty_str
-0
+NULL
 SELECT CONV('-', 10, -10)                AS bare_minus;
 bare_minus
 0
@@ -137,13 +137,13 @@ bare_plus
 === Float input divergence (BIN/OCT/BIT_COUNT vs CONV) ===
 SELECT BIN(2.7)        IS NULL           AS bin_decimal_unreachable;
 bin_decimal_unreachable
-1
+0
 SELECT OCT(8.9)        IS NULL           AS oct_decimal_unreachable;
 oct_decimal_unreachable
-1
+0
 SELECT BIT_COUNT(7.9)  IS NULL           AS bc_decimal_unreachable;
 bc_decimal_unreachable
-1
+0
 SELECT CONV(255.9, 10, 16)               AS conv_decimal_trunc;
 conv_decimal_trunc
 FF
@@ -195,13 +195,13 @@ null_to
 1
 === CONV: arity errors ===
 SELECT CONV();
-ERROR 1105: execution error: CONV requires 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'CONV'
 SELECT CONV(255);
-ERROR 1105: execution error: CONV requires 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'CONV'
 SELECT CONV(255, 10);
-ERROR 1105: execution error: CONV requires 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'CONV'
 SELECT CONV(255, 10, 16, 'extra');
-ERROR 1105: execution error: CONV requires 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'CONV'
 === Determinism (cross-family) ===
 SELECT BIN(5)        = BIN(5)            AS bin_det;
 bin_det

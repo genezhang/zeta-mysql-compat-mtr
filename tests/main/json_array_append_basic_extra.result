@@ -5,7 +5,7 @@ root_append_len
 SELECT JSON_EXTRACT(JSON_ARRAY_APPEND('[1,2]', '$', 3),
                     '$[0]', '$[1]', '$[2]')                 AS root_append_vals;
 root_append_vals
-[1,2,3]
+[1, 2, 3]
 SELECT JSON_TYPE(JSON_ARRAY_APPEND('42', '$', 7))           AS scalar_root_becomes_array;
 scalar_root_becomes_array
 ARRAY
@@ -69,7 +69,7 @@ STRING
 === Nested path (>1 step) → NULL (under-claim) ===
 SELECT JSON_ARRAY_APPEND('{"a":{"b":[1]}}', '$.a.b', 2) IS NULL AS nested_under_claim;
 nested_under_claim
-1
+0
 === SQL NULL anywhere → SQL NULL ===
 SELECT JSON_ARRAY_APPEND(NULL, '$', 1)    IS NULL AS null_target;
 null_target
@@ -79,16 +79,16 @@ null_path
 1
 SELECT JSON_ARRAY_APPEND('[1]', '$', NULL) IS NULL AS null_val;
 null_val
-1
+0
 === Arity errors (odd ≥ 3) ===
 SELECT JSON_ARRAY_APPEND();
-ERROR 1105: execution error: JSON_ARRAY_APPEND requires doc and at least one (path, val) pair (odd arity ≥ 3)
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_ARRAY_APPEND'
 SELECT JSON_ARRAY_APPEND('[1]');
-ERROR 1105: execution error: JSON_ARRAY_APPEND requires doc and at least one (path, val) pair (odd arity ≥ 3)
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_ARRAY_APPEND'
 SELECT JSON_ARRAY_APPEND('[1]', '$');
-ERROR 1105: execution error: JSON_ARRAY_APPEND requires doc and at least one (path, val) pair (odd arity ≥ 3)
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_ARRAY_APPEND'
 === Invalid JSON / wildcard path rejected ===
 SELECT JSON_ARRAY_APPEND('not json', '$', 1);
-ERROR 1105: execution error: JSON_ARRAY_APPEND target is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_array_append: "Invalid value." at position 1.
 SELECT JSON_ARRAY_APPEND('[1,2]', '$.*', 9);
-ERROR 1105: execution error: JSON_ARRAY_APPEND invalid path: $.*
+ERROR 3149: In this situation, path expressions may not contain the * and ** tokens or an array range.

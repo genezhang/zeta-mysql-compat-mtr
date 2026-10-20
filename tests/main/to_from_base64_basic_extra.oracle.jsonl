@@ -1,0 +1,30 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":29}
+{"i":1,"h":"993214cc","k":"rows","cols":["three_byte"],"rows":[["TWFu"]]}
+{"i":2,"h":"f0abea98","k":"rows","cols":["two_byte"],"rows":[["TWE="]]}
+{"i":3,"h":"e6df7809","k":"rows","cols":["one_byte"],"rows":[["TQ=="]]}
+{"i":4,"h":"d34d9a13","k":"rows","cols":["five_byte"],"rows":[["aGVsbG8="]]}
+{"i":5,"h":"905b78a2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":6,"h":"39c1b9ac","k":"rows","cols":["binary_bytes"],"rows":[["AP/u3Q=="]]}
+{"i":7,"h":"2c267229","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":8,"h":"558c46ed","k":"rows","cols":["decode_three"],"rows":[["Man"]]}
+{"i":9,"h":"ce52a985","k":"rows","cols":["decode_two"],"rows":[["Ma"]]}
+{"i":10,"h":"b290fbe5","k":"rows","cols":["decode_one"],"rows":[["M"]]}
+{"i":11,"h":"85b98e94","k":"rows","cols":["decode_hello"],"rows":[["hello"]]}
+{"i":12,"h":"0393aa59","k":"rows","cols":["strip_space_inline"],"rows":[["1"]]}
+{"i":13,"h":"f89eb53d","k":"rows","cols":["strip_around"],"rows":[["1"]]}
+{"i":14,"h":"9e433f53","k":"rows","cols":["strip_multi_space"],"rows":[["1"]]}
+{"i":15,"h":"9c668fb9","k":"rows","cols":["bad_chars"],"rows":[["1"]]}
+{"i":16,"h":"72cb3f9e","k":"rows","cols":["bad_padding"],"rows":[["1"]]}
+{"i":17,"h":"222de1f5","k":"rows","cols":["url_safe_rejected"],"rows":[["1"]]}
+{"i":18,"h":"df654082","k":"rows","cols":["unpadded_two"],"rows":[["1"]]}
+{"i":19,"h":"f46e0026","k":"rows","cols":["unpadded_one"],"rows":[["1"]]}
+{"i":20,"h":"167ea3cd","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":21,"h":"a1b3ce7a","k":"rows","cols":["rt_plain_len"],"rows":[["1"]]}
+{"i":22,"h":"068c51db","k":"rows","cols":["rt_empty_len"],"rows":[["1"]]}
+{"i":23,"h":"a8a044b8","k":"rows","cols":["rt_three_byte_len"],"rows":[["1"]]}
+{"i":24,"h":"469bff12","k":"rows","cols":["rt_plain_bytes"],"rows":[["1"]]}
+{"i":25,"h":"c06c79d2","k":"rows","cols":["rt_binary"],"rows":[["1"]]}
+{"i":26,"h":"31c9b410","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'TO_BASE64'"}
+{"i":27,"h":"939496c8","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'TO_BASE64'"}
+{"i":28,"h":"b2d1d004","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FROM_BASE64'"}
+{"i":29,"h":"ccb15b2d","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FROM_BASE64'"}

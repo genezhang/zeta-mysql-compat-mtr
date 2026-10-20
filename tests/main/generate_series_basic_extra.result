@@ -1,97 +1,67 @@
 === Integer form — basic ascending ===
 SELECT * FROM GENERATE_SERIES(1, 5);
-generate_series
-1
-2
-3
-4
-5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 5)' at line 1
 SELECT * FROM GENERATE_SERIES(1, 10, 2);
-generate_series
-1
-3
-5
-7
-9
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 10, 2)' at line 1
 SELECT * FROM GENERATE_SERIES(7, 7);
-generate_series
-7
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(7, 7)' at line 1
 === Integer form — descending with negative step ===
 SELECT * FROM GENERATE_SERIES(5, 1, -1);
-generate_series
-5
-4
-3
-2
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(5, 1, -1)' at line 1
 SELECT * FROM GENERATE_SERIES(10, 0, -3);
-generate_series
-10
-7
-4
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(10, 0, -3)' at line 1
 === Integer form — empty results ===
 SELECT * FROM GENERATE_SERIES(5, 1);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(5, 1)' at line 1
 SELECT * FROM GENERATE_SERIES(1, 5, -1);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 5, -1)' at line 1
 === Integer form — error cases ===
 SELECT * FROM GENERATE_SERIES(1, 5, 0);
-ERROR 1105: execution error: generate_series step cannot be zero
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 5, 0)' at line 1
 SELECT * FROM GENERATE_SERIES(5);
-ERROR 1105: execution error: generate_series requires at least 2 arguments (start, stop)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(5)' at line 1
 === Timestamp form — default step = INTERVAL 1 DAY ===
 SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01', TIMESTAMP '2024-01-04');
-generate_series
-2024-01-01 00:00:00
-2024-01-02 00:00:00
-2024-01-03 00:00:00
-2024-01-04 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(TIMESTAMP '2024-01-01', TIMESTAMP '2024-01-04')' at line 1
 === Timestamp form — custom INTERVAL step ===
 SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
                               TIMESTAMP '2024-01-10',
                               INTERVAL 3 DAY);
-generate_series
-2024-01-01 00:00:00
-2024-01-04 00:00:00
-2024-01-07 00:00:00
-2024-01-10 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(TIMESTAMP '2024-01-01',
+                              TIMESTAMP '2024-01-10',
+ ' at line 1
 SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01 00:00:00',
                               TIMESTAMP '2024-01-01 06:00:00',
                               INTERVAL 2 HOUR);
-generate_series
-2024-01-01 00:00:00
-2024-01-01 02:00:00
-2024-01-01 04:00:00
-2024-01-01 06:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(TIMESTAMP '2024-01-01 00:00:00',
+                              TIMESTAMP '2024-' at line 1
 === Timestamp form — wrong-type step → ERROR 1105 ===
 SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
                               TIMESTAMP '2024-01-05',
                               1);
-ERROR 1105: execution error: generate_series with timestamps requires an interval step
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(TIMESTAMP '2024-01-01',
+                              TIMESTAMP '2024-01-05',
+ ' at line 1
 === Timestamp form — INTERVAL 0 step → ERROR 1105 ===
 SELECT * FROM GENERATE_SERIES(TIMESTAMP '2024-01-01',
                               TIMESTAMP '2024-01-05',
                               INTERVAL 0 DAY);
-ERROR 1105: execution error: generate_series step cannot be zero
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(TIMESTAMP '2024-01-01',
+                              TIMESTAMP '2024-01-05',
+ ' at line 1
 === SCALAR-EXPRESSION CALL GAP — outside FROM clause ===
 SELECT GENERATE_SERIES(1, 5);
-ERROR 1105: execution error: unknown function: GENERATE_SERIES
+ERROR 1305: FUNCTION test.GENERATE_SERIES does not exist
 SELECT GENERATE_SERIES(1, 5) AS x;
-ERROR 1105: execution error: unknown function: GENERATE_SERIES
+ERROR 1305: FUNCTION test.GENERATE_SERIES does not exist
 === GENERATE_SERIES with WHERE filter ===
 SELECT n FROM GENERATE_SERIES(1, 10) AS t(n) WHERE n % 2 = 0 ORDER BY n;
-n
-2
-4
-6
-8
-10
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 10) AS t(n) WHERE n % 2 = 0 ORDER BY n' at line 1
 === GENERATE_SERIES with AGGREGATE over generated rows ===
 SELECT SUM(n) AS total FROM GENERATE_SERIES(1, 10) AS t(n);
-total
-55
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 10) AS t(n)' at line 1
 SELECT COUNT(*) AS cnt FROM GENERATE_SERIES(1, 100) AS t(n);
-cnt
-100
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 100) AS t(n)' at line 1
 === GENERATE_SERIES JOINed against a table ===
 CREATE TABLE gs_t (id INT, name TEXT);
 INSERT INTO gs_t VALUES (1, 'a'), (2, 'b'), (3, 'c');
@@ -99,8 +69,6 @@ SELECT t.name, gs.n
   FROM gs_t t
   JOIN GENERATE_SERIES(1, 3) AS gs(n) ON t.id = gs.n
  ORDER BY t.id;
-name	n
-a	1
-b	2
-c	3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(1, 3) AS gs(n) ON t.id = gs.n
+ ORDER BY t.id' at line 3
 DROP TABLE gs_t;

@@ -1,0 +1,26 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":25}
+{"i":1,"h":"a6af98d6","k":"rows","cols":["tf","tt","ft","ff"],"rows":[["1","0","1","0"]]}
+{"i":2,"h":"6d534f60","k":"rows","cols":["nt","tn","nn"],"rows":[[null,null,null]]}
+{"i":3,"h":"d8bda110","k":"rows","cols":["or_xor"],"rows":[["1"]]}
+{"i":4,"h":"de1215dc","k":"rows","cols":["or_xor_paren"],"rows":[["0"]]}
+{"i":5,"h":"f0926196","k":"rows","cols":["and_xor_zeta"],"rows":[["1"]]}
+{"i":6,"h":"6787ebc8","k":"rows","cols":["and_xor_mysql_equiv"],"rows":[["1"]]}
+{"i":7,"h":"de168880","k":"rows","cols":["not_xor","not_xor2"],"rows":[["1","1"]]}
+{"i":8,"h":"6d72b321","k":"ok","affected":0}
+{"i":9,"h":"b20c81b2","k":"ok","affected":0}
+{"i":10,"h":"939bf75c","k":"ok","affected":6}
+{"i":11,"h":"718b4cb3","k":"rows","cols":["id","x"],"rows":[["1","0"],["2","1"],["3","1"],["4","0"],["5",null],["6",null]]}
+{"i":12,"h":"bf029ddd","k":"rows","cols":["id"],"rows":[["2"],["3"]]}
+{"i":13,"h":"8462c78c","k":"ok","affected":0}
+{"i":14,"h":"043fc98a","k":"ok","affected":0}
+{"i":15,"h":"8590abed","k":"ok","affected":5}
+{"i":16,"h":"af73e031","k":"rows","cols":["id","x"],"rows":[["1","0"],["2","1"],["3","1"],["4","0"],["5",null]]}
+{"i":17,"h":"910b8494","k":"rows","cols":["triple_true","tft"],"rows":[["1","0"]]}
+{"i":18,"h":"3da5345b","k":"rows","cols":["one_xor_zero","five_xor_zero","one_xor_one"],"rows":[["1","1","0"]]}
+{"i":19,"h":"d1b74d6e","k":"rows","cols":["a","b","c","d","e"],"rows":[["1","1","0","1","0"]]}
+{"i":20,"h":"0f003c70","k":"rows","cols":["fa","fb","fc"],"rows":[["1","1","1"]]}
+{"i":21,"h":"78815b81","k":"rows","cols":["k","l","m","n","o","p"],"rows":[["1","0","0","1","0",null]]}
+{"i":22,"h":"1ec16a0d","k":"rows","cols":["nsl"],"rows":[["1"]]}
+{"i":23,"h":"ce1f5ac0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DISTINCT FROM 1 AS sub1, NULL IS NOT DISTINCT FROM NULL AS sub2, 1 IS NOT DISTIN' at line 1"}
+{"i":24,"h":"c0b86428","k":"ok","affected":0}
+{"i":25,"h":"38055ba4","k":"ok","affected":0}

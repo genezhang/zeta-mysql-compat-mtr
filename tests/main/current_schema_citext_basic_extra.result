@@ -1,78 +1,56 @@
 === CURRENT_SCHEMA — bare form returns 'public' ===
 SELECT CURRENT_SCHEMA                                         AS bare_form;
-bare_form
-public
+ERROR 1054: Unknown column 'CURRENT_SCHEMA' in 'field list'
 SELECT CURRENT_SCHEMA = 'public'                              AS matches_public;
-matches_public
-1
+ERROR 1054: Unknown column 'CURRENT_SCHEMA' in 'field list'
 === CURRENT_SCHEMA() — paren form returns 'public' (same) ===
 SELECT CURRENT_SCHEMA()                                       AS paren_form;
-paren_form
-public
+ERROR 1305: FUNCTION test.CURRENT_SCHEMA does not exist
 SELECT CURRENT_SCHEMA = CURRENT_SCHEMA()                      AS bare_eq_paren;
-bare_eq_paren
-1
+ERROR 1054: Unknown column 'CURRENT_SCHEMA' in 'field list'
 === STRIKING: CURRENT_SCHEMA has NO arity check ===
 SELECT CURRENT_SCHEMA(1)                                      AS one_arg_ignored;
-one_arg_ignored
-public
+ERROR 1305: FUNCTION test.CURRENT_SCHEMA does not exist
 SELECT CURRENT_SCHEMA(1, 2, 'extra')                          AS three_args_ignored;
-three_args_ignored
-public
+ERROR 1305: FUNCTION test.CURRENT_SCHEMA does not exist
 SELECT CURRENT_SCHEMA(NULL)                                   AS null_arg_ignored;
-null_arg_ignored
-public
+ERROR 1305: FUNCTION test.CURRENT_SCHEMA does not exist
 SELECT CURRENT_SCHEMA(NULL) = 'public'                        AS null_still_public;
-null_still_public
-1
+ERROR 1305: FUNCTION test.CURRENT_SCHEMA does not exist
 === CAST AS CITEXT — lowercases String input ===
 SELECT CAST('HELLO' AS CITEXT)                                AS upper_to_lower;
-upper_to_lower
-hello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                                AS upper_to_lower' at line 1
 SELECT CAST('Hello World' AS CITEXT)                          AS mixed_to_lower;
-mixed_to_lower
-hello world
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                          AS mixed_to_lower' at line 1
 SELECT CAST('hello' AS CITEXT)                                AS already_lower;
-already_lower
-hello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                                AS already_lower' at line 1
 SELECT CAST('' AS CITEXT)                                     AS empty_passthrough;
-empty_passthrough
-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                                     AS empty_passthrough' at line 1
 === CITEXT — non-string args stringify (no error) ===
 SELECT CAST(42 AS CITEXT)                                     AS int_to_string;
-int_to_string
-42
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                                     AS int_to_string' at line 1
 SELECT CAST(CAST(3.14 AS DOUBLE PRECISION) AS CITEXT)         AS float_to_string;
-float_to_string
-3.14
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)         AS float_to_string' at line 1
 SELECT CAST(TRUE AS CITEXT)                                   AS bool_true_to_string;
-bool_true_to_string
-true
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                                   AS bool_true_to_string' at line 1
 SELECT CAST(FALSE AS CITEXT)                                  AS bool_false_to_string;
-bool_false_to_string
-false
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                                  AS bool_false_to_string' at line 1
 === CITEXT — NULL CAST → NULL ===
 SELECT CAST(NULL AS CITEXT)                                   AS null_cast;
-null_cast
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)                                   AS null_cast' at line 1
 SELECT CAST(NULL AS CITEXT) IS NULL                           AS null_pred;
-null_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT) IS NULL                           AS null_pred' at line 1
 === STRIKING: CITEXT does NOT make compares case-insensitive ===
 SELECT CAST('Hello' AS CITEXT) = 'hello'                      AS cast_lowered_eq_lower_true;
-cast_lowered_eq_lower_true
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT) = 'hello'                      AS cast_lowered_eq_lower_true' at line 1
 SELECT CAST('Hello' AS CITEXT) = 'Hello'                      AS cast_lowered_ne_orig_case;
-cast_lowered_ne_orig_case
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT) = 'Hello'                      AS cast_lowered_ne_orig_case' at line 1
 SELECT CAST('Hello' AS CITEXT) = CAST('hello' AS CITEXT)      AS both_cast_eq_true;
-both_cast_eq_true
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT) = CAST('hello' AS CITEXT)      AS both_cast_eq_true' at line 1
 SELECT CAST('Hello' AS CITEXT) = CAST('HELLO' AS CITEXT)      AS both_cast_diff_case_eq_true;
-both_cast_diff_case_eq_true
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT) = CAST('HELLO' AS CITEXT)      AS both_cast_diff_case_eq_true' at line 1
 === CITEXT — unsupported source types → 1105 ===
 SELECT CAST(CAST('2026-01-01' AS DATE) AS CITEXT);
-ERROR 1105: execution error: cannot cast to CITEXT
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)' at line 1
 SELECT CAST(3.14 AS CITEXT);
-ERROR 1105: execution error: cannot cast to CITEXT
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CITEXT)' at line 1

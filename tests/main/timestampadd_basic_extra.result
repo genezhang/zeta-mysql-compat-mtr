@@ -14,31 +14,31 @@ plus_h
 === TIMESTAMPADD — day / week ===
 SELECT TIMESTAMPADD(DAY, 10, DATE '2026-05-19')  AS plus_d;
 plus_d
-2026-05-29 00:00:00
+2026-05-29
 SELECT TIMESTAMPADD(WEEK, 2, DATE '2026-05-19')  AS plus_w;
 plus_w
-2026-06-02 00:00:00
+2026-06-02
 === TIMESTAMPADD — month / quarter / year ===
 SELECT TIMESTAMPADD(MONTH, 3, DATE '2026-05-19')   AS plus_mo;
 plus_mo
-2026-08-19 00:00:00
+2026-08-19
 SELECT TIMESTAMPADD(QUARTER, 1, DATE '2026-05-19') AS plus_q;
 plus_q
-2026-08-19 00:00:00
+2026-08-19
 SELECT TIMESTAMPADD(YEAR, 2, DATE '2026-05-19')    AS plus_y;
 plus_y
-2028-05-19 00:00:00
+2028-05-19
 === TIMESTAMPADD — negative N (shifts backward) ===
 SELECT TIMESTAMPADD(DAY, -7, DATE '2026-05-19')   AS minus_d;
 minus_d
-2026-05-12 00:00:00
+2026-05-12
 SELECT TIMESTAMPADD(MONTH, -1, DATE '2026-05-19') AS minus_mo;
 minus_mo
-2026-04-19 00:00:00
+2026-04-19
 === TIMESTAMPADD — case-insensitive unit identifier ===
 SELECT TIMESTAMPADD(day, 1, DATE '2026-05-19') AS lower_unit;
 lower_unit
-2026-05-20 00:00:00
+2026-05-20
 === TIMESTAMPADD — NULL propagation ===
 SELECT TIMESTAMPADD(DAY, NULL, DATE '2026-05-19') AS n_in_n;
 n_in_n
@@ -49,15 +49,15 @@ NULL
 === TIMESTAMPADD — cross-year (DAY units) ===
 SELECT TIMESTAMPADD(DAY, 365, DATE '2026-05-19') AS plus_365d;
 plus_365d
-2027-05-19 00:00:00
+2027-05-19
 === TIMESTAMPADD — month-end clamp (Jan 31 + 1 MONTH → Feb 29 in leap year) ===
 SELECT TIMESTAMPADD(MONTH, 1, DATE '2024-01-31') AS jan31_plus_mo;
 jan31_plus_mo
-2024-02-29 00:00:00
+2024-02-29
 === TIMESTAMPADD — leap-day handling (Feb 29 + 1 YEAR → Feb 28) ===
 SELECT TIMESTAMPADD(YEAR, 1, DATE '2024-02-29') AS leap_plus_y;
 leap_plus_y
-2025-02-28 00:00:00
+2025-02-28
 === TIMESTAMPADD — on TIMESTAMP column inside SELECT and WHERE ===
 DROP TABLE IF EXISTS ts;
 CREATE TABLE ts (id INT, t TIMESTAMP);
@@ -67,9 +67,9 @@ id	plus_6m
 1	2026-07-01 12:00:00
 2	2026-12-15 09:30:00
 SELECT id FROM ts WHERE TIMESTAMPADD(DAY, 30, t) > TIMESTAMP '2026-05-01' ORDER BY id;
-id
-2
+ERROR 1525: Incorrect DATETIME value: '2026-05-01'
 DROP TABLE ts;
 === TIMESTAMPADD — unparseable string target errors 1105 ===
 SELECT TIMESTAMPADD(DAY, 1, 'not a date');
-ERROR 1105: execution error: TIMESTAMPADD: cannot parse "not a date" as a date or timestamp
+TIMESTAMPADD(DAY, 1, 'not a date')
+NULL

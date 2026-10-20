@@ -1,0 +1,77 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":76}
+{"i":1,"h":"6e567a31","k":"ok","affected":0}
+{"i":2,"h":"6e562e14","k":"ok","affected":0}
+{"i":3,"h":"68240bdf","k":"ok","affected":0}
+{"i":4,"h":"e453703f","k":"ok","affected":0}
+{"i":5,"h":"855b2231","k":"ok","affected":1}
+{"i":6,"h":"6477aa86","k":"ok","affected":1}
+{"i":7,"h":"c8cab1e9","k":"err","code":1451,"msg":"Cannot delete or update a parent row: a foreign key constraint fails (`test`.`fkna_c`, CONSTRAINT `fkna_c_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `fkna_p` (`id`))"}
+{"i":8,"h":"a341a1c2","k":"ok","affected":0}
+{"i":9,"h":"a3416e47","k":"ok","affected":0}
+{"i":10,"h":"5df1dd0b","k":"ok","affected":0}
+{"i":11,"h":"89b28352","k":"ok","affected":0}
+{"i":12,"h":"c0176af7","k":"ok","affected":2}
+{"i":13,"h":"d50f9307","k":"ok","affected":1}
+{"i":14,"h":"4f42ed2e","k":"err","code":1451,"msg":"Cannot delete or update a parent row: a foreign key constraint fails (`test`.`fkd_c`, CONSTRAINT `fkd_c_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `fkd_p` (`id`))"}
+{"i":15,"h":"eb280eed","k":"rows","cols":["id","pid"],"rows":[["10","2"]]}
+{"i":16,"h":"fe4f2c19","k":"ok","affected":0}
+{"i":17,"h":"fe4fcf00","k":"ok","affected":0}
+{"i":18,"h":"caed2ea6","k":"ok","affected":0}
+{"i":19,"h":"5ddeaed9","k":"ok","affected":0}
+{"i":20,"h":"4289111b","k":"ok","affected":1}
+{"i":21,"h":"32de056c","k":"ok","affected":1}
+{"i":22,"h":"9e478b31","k":"ok","affected":1}
+{"i":23,"h":"fb0b89ed","k":"err","code":1452,"msg":"Cannot add or update a child row: a foreign key constraint fails (`test`.`fka_c`, CONSTRAINT `fka_fk` FOREIGN KEY (`pid`) REFERENCES `fka_p` (`id`))"}
+{"i":24,"h":"43e86c16","k":"ok","affected":0}
+{"i":25,"h":"fbfffbdb","k":"ok","affected":1}
+{"i":26,"h":"46c7022d","k":"rows","cols":["id","pid"],"rows":[["10","1"],["30","999"]]}
+{"i":27,"h":"ea6aa817","k":"ok","affected":0}
+{"i":28,"h":"ea695692","k":"ok","affected":0}
+{"i":29,"h":"5a4a32b8","k":"ok","affected":0}
+{"i":30,"h":"35d58dc8","k":"ok","affected":0}
+{"i":31,"h":"95c63c63","k":"ok","affected":1}
+{"i":32,"h":"1122bb46","k":"err","code":1452,"msg":"Cannot add or update a child row: a foreign key constraint fails (`test`.`nfk_c`, CONSTRAINT `my_fk` FOREIGN KEY (`pid`) REFERENCES `nfk_p` (`id`))"}
+{"i":33,"h":"dec744e6","k":"ok","affected":0}
+{"i":34,"h":"dec7526b","k":"ok","affected":0}
+{"i":35,"h":"2f775db4","k":"ok","affected":0}
+{"i":36,"h":"2fe24797","k":"ok","affected":0}
+{"i":37,"h":"7b05be5c","k":"ok","affected":1}
+{"i":38,"h":"948437c9","k":"ok","affected":1}
+{"i":39,"h":"ed69285b","k":"ok","affected":1}
+{"i":40,"h":"acaebea1","k":"ok","affected":0}
+{"i":41,"h":"acaee284","k":"ok","affected":0}
+{"i":42,"h":"cb0c729a","k":"ok","affected":0}
+{"i":43,"h":"b76b7ef3","k":"ok","affected":0}
+{"i":44,"h":"3d3a1df2","k":"ok","affected":0}
+{"i":45,"h":"5d5d2f6c","k":"err","code":1824,"msg":"Failed to open the referenced table 'no_such_parent'"}
+{"i":46,"h":"3d39e418","k":"ok","affected":0}
+{"i":47,"h":"b88932ec","k":"ok","affected":0}
+{"i":48,"h":"8e4c2c51","k":"ok","affected":0}
+{"i":49,"h":"3e52796f","k":"err","code":6125,"msg":"Failed to add the foreign key constraint. Missing unique key for constraint 'fknopkc_ibfk_1' in the referenced table 'fknopk'"}
+{"i":50,"h":"950a3bf4","k":"ok","affected":0}
+{"i":51,"h":"950a0b71","k":"ok","affected":0}
+{"i":52,"h":"59aaaefc","k":"ok","affected":0}
+{"i":53,"h":"85bb3ab7","k":"ok","affected":0}
+{"i":54,"h":"04988ca5","k":"ok","affected":1}
+{"i":55,"h":"b235b9e6","k":"ok","affected":1}
+{"i":56,"h":"a641e07b","k":"err","code":3730,"msg":"Cannot drop table 'dr_p' referenced by a foreign key constraint 'dr_c_ibfk_1' on table 'dr_c'."}
+{"i":57,"h":"2adf59a1","k":"err","code":3730,"msg":"Cannot drop table 'dr_p' referenced by a foreign key constraint 'dr_c_ibfk_1' on table 'dr_c'."}
+{"i":58,"h":"9f52f77b","k":"err","code":1701,"msg":"Cannot truncate a table referenced in a foreign key constraint (`test`.`dr_c`, CONSTRAINT `dr_c_ibfk_1`)"}
+{"i":59,"h":"5047929b","k":"rows","cols":["Table","Create Table"],"rows":[["dr_c","CREATE TABLE `dr_c` (\n  `id` int NOT NULL,\n  `pid` int DEFAULT NULL,\n  PRIMARY KEY (`id`),\n  KEY `pid` (`pid`),\n  CONSTRAINT `dr_c_ibfk_1` FOREIGN KEY (`pid`) REFERENCES `dr_p` (`id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"]]}
+{"i":60,"h":"a6b6a286","k":"err","code":1452,"msg":"<varies>"}
+{"i":61,"h":"d3f0c089","k":"err","code":1091,"msg":"Can't DROP 'fka_fk2'; check that column/key exists"}
+{"i":62,"h":"a641b5a2","k":"ok","affected":0}
+{"i":63,"h":"a641e07b","k":"ok","affected":0}
+{"i":64,"h":"1786b6fd","k":"ok","affected":0}
+{"i":65,"h":"1786eb44","k":"ok","affected":0}
+{"i":66,"h":"ee0c8e3f","k":"ok","affected":0}
+{"i":67,"h":"ee0c8326","k":"ok","affected":0}
+{"i":68,"h":"2bb5f342","k":"ok","affected":0}
+{"i":69,"h":"2bb61bcf","k":"ok","affected":0}
+{"i":70,"h":"59743786","k":"ok","affected":0}
+{"i":71,"h":"5974ec0b","k":"ok","affected":0}
+{"i":72,"h":"5a554571","k":"ok","affected":0}
+{"i":73,"h":"5a5550f4","k":"ok","affected":0}
+{"i":74,"h":"080f211b","k":"ok","affected":0}
+{"i":75,"h":"080ff3f6","k":"ok","affected":0}
+{"i":76,"h":"e9d4cd0a","k":"ok","affected":0}

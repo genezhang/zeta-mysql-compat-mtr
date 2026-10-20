@@ -74,31 +74,39 @@ str_eq_date
 1
 === WEEKOFYEAR — 2-arg form rejected (1-arg only) ===
 SELECT WEEKOFYEAR(DATE '2024-05-19', 0);
-ERROR 1105: execution error: WEEKOFYEAR requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'WEEKOFYEAR'
 === WEEK / WEEKOFYEAR arity 0 → ERROR 1105 ===
 SELECT WEEK();
-ERROR 1105: execution error: WEEK requires 1 or 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT WEEKOFYEAR();
-ERROR 1105: execution error: WEEKOFYEAR requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'WEEKOFYEAR'
 === WEEK — mode out of range → ERROR 1105 ===
 SELECT WEEK(DATE '2024-05-19', 8);
-ERROR 1105: execution error: WEEK: mode 8 out of valid range 0..=7
+WEEK(DATE '2024-05-19', 8)
+20
 SELECT WEEK(DATE '2024-05-19', -1);
-ERROR 1105: execution error: WEEK: mode -1 out of valid range 0..=7
+WEEK(DATE '2024-05-19', -1)
+20
 === WEEK / WEEKOFYEAR — wrong-type → ERROR 1105 ===
 SELECT WEEK(20240519);
-ERROR 1105: execution error: WEEK requires a date, timestamp, or parseable string
+WEEK(20240519)
+20
 SELECT WEEK(CAST(1.5 AS DOUBLE PRECISION));
-ERROR 1105: execution error: WEEK requires a date, timestamp, or parseable string
+WEEK(CAST(1.5 AS DOUBLE PRECISION))
+NULL
 SELECT WEEK(TRUE);
-ERROR 1105: execution error: WEEK requires a date, timestamp, or parseable string
+WEEK(TRUE)
+NULL
 SELECT WEEKOFYEAR(20240519);
-ERROR 1105: execution error: WEEKOFYEAR requires a date, timestamp, or parseable string
+WEEKOFYEAR(20240519)
+20
 === WEEK — unparseable string → ERROR 1105 ===
 SELECT WEEK('not a date');
-ERROR 1105: execution error: WEEK: cannot parse "not a date" as a date or timestamp
+WEEK('not a date')
+NULL
 SELECT WEEKOFYEAR('2024-13-99');
-ERROR 1105: execution error: WEEKOFYEAR: cannot parse "2024-13-99" as a date or timestamp
+WEEKOFYEAR('2024-13-99')
+NULL
 === WEEK / WEEKOFYEAR — NULL propagation ===
 SELECT WEEK(NULL)                                             AS week_null_is_null;
 week_null_is_null
@@ -110,8 +118,7 @@ SELECT WEEK(CAST(NULL AS DATE))                               AS week_typed_null
 week_typed_null_is_null
 NULL
 SELECT WEEKOFYEAR(CAST(NULL AS TIMESTAMP))                    AS weekofyear_typed_null_is_null;
-weekofyear_typed_null_is_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP))                    AS weekofyear_typed_null_is_null' at line 1
 SELECT WEEK(NULL) IS NULL                                     AS week_null_predicate;
 week_null_predicate
 1

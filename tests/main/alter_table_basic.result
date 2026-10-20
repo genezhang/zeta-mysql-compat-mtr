@@ -22,10 +22,12 @@ id	city
 2	unknown
 === ADD COLUMN IF NOT EXISTS — silent on duplicate ===
 ALTER TABLE at1 ADD COLUMN IF NOT EXISTS age INT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS age INT' at line 1
 === DROP COLUMN ===
 ALTER TABLE at1 DROP COLUMN age;
 === DROP COLUMN IF EXISTS — silent on missing ===
 ALTER TABLE at1 DROP COLUMN IF EXISTS does_not_exist;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF EXISTS does_not_exist' at line 1
 === RENAME COLUMN ===
 ALTER TABLE at1 RENAME COLUMN status TO state;
 SELECT id, state FROM at1 ORDER BY id;
@@ -53,7 +55,7 @@ CREATE TABLE no_pk (id INT);
 ALTER TABLE no_pk ADD CONSTRAINT pk_id PRIMARY KEY (id);
 INSERT INTO no_pk VALUES (1);
 INSERT INTO no_pk VALUES (1);
-ERROR 1062: duplicate key value violates primary key "test.public.no_pk": Key already exists in table "test.public.no_pk"
+ERROR 1062: Duplicate entry '1' for key 'no_pk.PRIMARY'
 === ADD CONSTRAINT FOREIGN KEY — enforced ===
 DROP TABLE IF EXISTS at_parent;
 DROP TABLE IF EXISTS at_child;
@@ -63,7 +65,7 @@ CREATE TABLE at_child (id INT PRIMARY KEY, pid INT);
 ALTER TABLE at_child ADD CONSTRAINT fk_pid FOREIGN KEY (pid) REFERENCES at_parent(id);
 INSERT INTO at_child VALUES (1, 10);
 INSERT INTO at_child VALUES (2, 999);
-ERROR 1105: foreign key violation: insert or update on table "test.public.at_child" violates foreign key constraint "fk_pid": key is not present in table "test.public.at_parent"
+ERROR 1452: Cannot add or update a child row: a foreign key constraint fails (`test`.`at_child`, CONSTRAINT `fk_pid` FOREIGN KEY (`pid`) REFERENCES `at_parent` (`id`))
 === ADD CONSTRAINT UNIQUE — FIXED via zeta #1160 ===
 # Routes through CREATE UNIQUE INDEX internally.
 DROP TABLE IF EXISTS au_t;
@@ -71,11 +73,10 @@ CREATE TABLE au_t (id INT PRIMARY KEY, code VARCHAR(10));
 ALTER TABLE au_t ADD CONSTRAINT u_code UNIQUE (code);
 INSERT INTO au_t VALUES (1, 'x'), (2, 'y');
 INSERT INTO au_t VALUES (3, 'x');
-ERROR 1062: duplicate key value violates unique constraint "u_code": Key already exists in index "u_code"
+ERROR 1062: Duplicate entry 'x' for key 'au_t.u_code'
 === KNOWN DIVERGENCE: ADD CONSTRAINT CHECK — errno 1064 ===
 # MySQL accepts; zeta rejects. Substitute CHECK at CREATE TABLE.
 ALTER TABLE at1 ADD CONSTRAINT c_id CHECK (id > 0);
-ERROR 1064: SQL parse error: unsupported ALTER TABLE ADD CONSTRAINT type
 === KNOWN DIVERGENCE: ADD INDEX (MySQL form) — silent no-op ===
 # `ALTER TABLE t ADD INDEX idx (col)` parses OK but the index
 # is NOT created. Asserted via SHOW INDEX FROM after the ALTER:
@@ -83,8 +84,9 @@ ERROR 1064: SQL parse error: unsupported ALTER TABLE ADD CONSTRAINT type
 # `CREATE INDEX idx ON t (col)`.
 ALTER TABLE at1 ADD INDEX idx_name (name);
 SHOW INDEX FROM at1;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-at1	0	PRIMARY	1	id	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+at1	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+at1	1	idx_name	1	name	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === DROP INDEX (MySQL form) — FIXED via zeta #1161 ===
 # `ALTER TABLE t DROP INDEX idx` now routes through the
 # standalone DROP INDEX path. Create via CREATE INDEX first
@@ -93,13 +95,13 @@ DROP TABLE IF EXISTS adi;
 CREATE TABLE adi (id INT PRIMARY KEY, name VARCHAR(20));
 CREATE INDEX idx_adi_name ON adi (name);
 SHOW INDEX FROM adi;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-adi	0	PRIMARY	1	id	BTREE
-adi	1	idx_adi_name	1	name	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+adi	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+adi	1	idx_adi_name	1	name	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 ALTER TABLE adi DROP INDEX idx_adi_name;
 SHOW INDEX FROM adi;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-adi	0	PRIMARY	1	id	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+adi	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === Cleanup ===
 DROP TABLE at1;
 DROP TABLE no_pk;

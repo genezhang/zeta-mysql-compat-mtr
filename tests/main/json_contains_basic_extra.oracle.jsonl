@@ -1,0 +1,50 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":49}
+{"i":1,"h":"29951389","k":"rows","cols":["scalar_int_match"],"rows":[["1"]]}
+{"i":2,"h":"9b8b5e24","k":"rows","cols":["scalar_int_mismatch"],"rows":[["0"]]}
+{"i":3,"h":"5d8ee5f7","k":"rows","cols":["scalar_str_match"],"rows":[["1"]]}
+{"i":4,"h":"278b04a4","k":"rows","cols":["scalar_str_mismatch"],"rows":[["0"]]}
+{"i":5,"h":"224b0442","k":"rows","cols":["scalar_bool_match"],"rows":[["1"]]}
+{"i":6,"h":"b00f904a","k":"rows","cols":["scalar_bool_mismatch"],"rows":[["0"]]}
+{"i":7,"h":"f7a5cd8b","k":"rows","cols":["scalar_int_vs_string"],"rows":[["0"]]}
+{"i":8,"h":"5ce9863f","k":"rows","cols":["arr_contains_first"],"rows":[["1"]]}
+{"i":9,"h":"f6acbd45","k":"rows","cols":["arr_contains_last"],"rows":[["1"]]}
+{"i":10,"h":"45678734","k":"rows","cols":["arr_contains_subset"],"rows":[["1"]]}
+{"i":11,"h":"eecdac87","k":"rows","cols":["arr_contains_reordered_full"],"rows":[["1"]]}
+{"i":12,"h":"e4bd626b","k":"rows","cols":["arr_contains_partial_miss"],"rows":[["0"]]}
+{"i":13,"h":"4c95d796","k":"rows","cols":["empty_arr_candidate_matches_any"],"rows":[["1"]]}
+{"i":14,"h":"765d0da6","k":"rows","cols":["arr_contains_dup_candidate"],"rows":[["1"]]}
+{"i":15,"h":"a940ad27","k":"rows","cols":["scalar_target_arr_candidate"],"rows":[["0"]]}
+{"i":16,"h":"2bc969f2","k":"rows","cols":["obj_subset_single"],"rows":[["1"]]}
+{"i":17,"h":"de4ba19d","k":"rows","cols":["obj_subset_full"],"rows":[["1"]]}
+{"i":18,"h":"a69b7e6e","k":"rows","cols":["obj_subset_reordered"],"rows":[["1"]]}
+{"i":19,"h":"d47fc393","k":"rows","cols":["obj_subset_value_mismatch"],"rows":[["0"]]}
+{"i":20,"h":"8e0eb9e0","k":"rows","cols":["obj_subset_missing_key"],"rows":[["0"]]}
+{"i":21,"h":"ab76f6e6","k":"rows","cols":["obj_empty_candidate"],"rows":[["1"]]}
+{"i":22,"h":"a0556164","k":"rows","cols":["empty_obj_in_empty"],"rows":[["1"]]}
+{"i":23,"h":"68b24aa4","k":"rows","cols":["nested_obj_subset"],"rows":[["1"]]}
+{"i":24,"h":"b7d87a25","k":"rows","cols":["nested_obj_value_mismatch"],"rows":[["0"]]}
+{"i":25,"h":"afe6c03c","k":"rows","cols":["nested_arr_elem"],"rows":[["1"]]}
+{"i":26,"h":"71ba23b4","k":"rows","cols":["nested_arr_miss"],"rows":[["0"]]}
+{"i":27,"h":"05cd3220","k":"rows","cols":["arr_of_obj"],"rows":[["1"]]}
+{"i":28,"h":"784df6bc","k":"rows","cols":["arr_of_obj_subset"],"rows":[["1"]]}
+{"i":29,"h":"227a3050","k":"rows","cols":["arr_obj_mismatch"],"rows":[["0"]]}
+{"i":30,"h":"6378d43a","k":"rows","cols":["obj_arr_mismatch"],"rows":[["0"]]}
+{"i":31,"h":"178036db","k":"rows","cols":["null_target"],"rows":[["1"]]}
+{"i":32,"h":"c1f6f674","k":"rows","cols":["null_candidate"],"rows":[["1"]]}
+{"i":33,"h":"913e3860","k":"rows","cols":["null_both"],"rows":[["1"]]}
+{"i":34,"h":"9869f79a","k":"rows","cols":["json_null_in_json_null"],"rows":[["1"]]}
+{"i":35,"h":"08a4dd9d","k":"rows","cols":["json_null_in_arr"],"rows":[["1"]]}
+{"i":36,"h":"e7a664ac","k":"rows","cols":["json_null_in_int"],"rows":[["0"]]}
+{"i":37,"h":"8410beda","k":"rows","cols":["json_null_as_obj_value"],"rows":[["1"]]}
+{"i":38,"h":"779a9ec5","k":"rows","cols":["json_null_obj_value_subset"],"rows":[["1"]]}
+{"i":39,"h":"99395da6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n                     CAST('{\"a\":1}'       AS JSONB))           AS both_t' at line 1"}
+{"i":40,"h":"33dd9860","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n                     '{\"a\":1}')                                AS target' at line 1"}
+{"i":41,"h":"c0ead8ca","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))           AS candidate_typed' at line 2"}
+{"i":42,"h":"5d522751","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_contains: \"Invalid value.\" at position 1."}
+{"i":43,"h":"d4a5130f","k":"err","code":3141,"msg":"Invalid JSON text in argument 2 to function json_contains: \"Invalid value.\" at position 1."}
+{"i":44,"h":"c1fd52fc","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_contains; a JSON string or JSON type is required."}
+{"i":45,"h":"3121948d","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 2 to function json_contains; a JSON string or JSON type is required."}
+{"i":46,"h":"95d288d1","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_CONTAINS'"}
+{"i":47,"h":"b1ad363c","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_CONTAINS'"}
+{"i":48,"h":"5373697d","k":"rows","cols":["JSON_CONTAINS('{\"a\":1}', '1', '$.a')"],"rows":[["1"]]}
+{"i":49,"h":"32b0e1fd","k":"rows","cols":["JSON_CONTAINS_PATH('{\"a\":1}', 'one', '$.a')"],"rows":[["1"]]}

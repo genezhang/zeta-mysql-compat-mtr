@@ -26,7 +26,7 @@ SELECT COUNT(DISTINCT v) AS row_distinct FROM (
   ) t
 ) x;
 row_distinct
-4
+<masked>
 === Consecutive insert ticks are close (no time jump) ===
 SELECT (SELECT v FROM us WHERE id = 3) - (SELECT v FROM us WHERE id = 1) < 1000
        AS span_small;
@@ -34,7 +34,7 @@ span_small
 1
 === Arity — any arg is an error ===
 SELECT UUID_SHORT(1);
-ERROR 1105: execution error: UUID_SHORT takes no arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'UUID_SHORT'
 SELECT UUID_SHORT(0, 0);
-ERROR 1105: execution error: UUID_SHORT takes no arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'UUID_SHORT'
 DROP TABLE us;

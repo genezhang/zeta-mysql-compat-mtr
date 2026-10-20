@@ -24,9 +24,9 @@ SELECT id FROM nw WHERE NULL;
 === GROUP BY collapses NULLs into one group ===
 SELECT x, COUNT(*) AS c FROM nw GROUP BY x ORDER BY x;
 x	c
+NULL	1
 10	1
 30	1
-NULL	1
 === COUNT(*) vs COUNT(col) ===
 SELECT COUNT(*) AS all_rows, COUNT(x) AS nonnull_x FROM nw;
 all_rows	nonnull_x
@@ -34,7 +34,7 @@ all_rows	nonnull_x
 === SUM / AVG / MIN / MAX skip NULL ===
 SELECT SUM(x) AS s, AVG(x) AS a, MIN(x) AS mn, MAX(x) AS mx FROM nw;
 s	a	mn	mx
-40	20	10	30
+40	20.0000	10	30
 === SUM/MIN on all-NULL → NULL (not 0) ===
 SELECT SUM(x) AS s, MIN(x) AS mn FROM nw WHERE x IS NULL;
 s	mn
@@ -45,9 +45,9 @@ CREATE TABLE nd (x INT);
 INSERT INTO nd VALUES (1), (1), (NULL), (NULL), (2);
 SELECT DISTINCT x FROM nd ORDER BY x;
 x
+NULL
 1
 2
-NULL
 === COUNT(DISTINCT col) ignores NULL ===
 SELECT COUNT(DISTINCT x) AS cd FROM nd;
 cd
@@ -83,7 +83,7 @@ id	lv	rv
 DROP TABLE IF EXISTS np;
 CREATE TABLE np (id INT PRIMARY KEY, n INT);
 INSERT INTO np VALUES (NULL, 1);
-ERROR 1105: execution error: null value in column "id" of relation "test.public.np" violates not-null constraint
+ERROR 1048: Column 'id' cannot be null
 === NOT IN (subquery with NULL) — zeta returns rows (different from MySQL) ===
 DROP TABLE IF EXISTS nsi;
 CREATE TABLE nsi (id INT, x INT);
@@ -94,8 +94,7 @@ INSERT INTO nmain VALUES (1), (2), (3), (4);
 SELECT id FROM nmain WHERE id NOT IN (SELECT x FROM nsi);
 === NVL Oracle alias — works (strict 2-arg, returns first non-NULL) ===
 SELECT NVL(NULL, 'fallback') AS use_fb, NVL('val', 'fallback') AS keep;
-use_fb	keep
-fallback	val
+ERROR 1305: FUNCTION test.NVL does not exist
 === Cleanup ===
 DROP TABLE nw;
 DROP TABLE nd;

@@ -1,0 +1,51 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":50}
+{"i":1,"h":"6cd53e4f","k":"ok","affected":0}
+{"i":2,"h":"758e7a63","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS mood' at line 1"}
+{"i":3,"h":"b87d4e43","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE mood AS ENUM ('sad', 'ok', 'happy')' at line 1"}
+{"i":4,"h":"d1b5af8d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'mood)' at line 1"}
+{"i":5,"h":"9b136e5e","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":6,"h":"e08a5538","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":7,"h":"a3510352","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":8,"h":"12027950","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":9,"h":"d3f13203","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":10,"h":"a4abca1a","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":11,"h":"1b670de7","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":12,"h":"e08a5538","k":"err","code":1146,"msg":"Table 'test.e1' doesn't exist"}
+{"i":13,"h":"c0cf6b36","k":"err","code":1051,"msg":"Unknown table 'test.e1'"}
+{"i":14,"h":"6644cdbc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE mood' at line 1"}
+{"i":15,"h":"d8665647","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS color' at line 1"}
+{"i":16,"h":"48da9fa5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE color AS ENUM ('red', 'green', 'blue')' at line 1"}
+{"i":17,"h":"f7376b15","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color AS r1, CAST('blue' AS color) AS r2' at line 1"}
+{"i":18,"h":"ed209257","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color = 'red'::color AS eq, 'red'::color <> 'blue'::color AS neq' at line 1"}
+{"i":19,"h":"edc9f66d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color < 'blue'::color AS lt' at line 1"}
+{"i":20,"h":"f5ae327a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::color AS r' at line 1"}
+{"i":21,"h":"f6e2a995","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE color' at line 1"}
+{"i":22,"h":"11c4f379","k":"ok","affected":0}
+{"i":23,"h":"3fa9da24","k":"ok","affected":0}
+{"i":24,"h":"dfd89c42","k":"ok","affected":2}
+{"i":25,"h":"e5a4595b","k":"rows","cols":["id","c"],"rows":[["1","red"],["2","green"]]}
+{"i":26,"h":"656364cb","k":"err","code":1265,"msg":"Data truncated for column 'c' at row 1"}
+{"i":27,"h":"7bb6b928","k":"ok","affected":0}
+{"i":28,"h":"18827298","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS extending' at line 1"}
+{"i":29,"h":"665b5ce5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE extending AS ENUM ('a', 'b')' at line 1"}
+{"i":30,"h":"be458ce0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE extending ADD VALUE 'c'' at line 1"}
+{"i":31,"h":"daa458de","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::extending AS r' at line 1"}
+{"i":32,"h":"7a789c91","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE extending' at line 1"}
+{"i":33,"h":"92d01402","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS no_such_type' at line 1"}
+{"i":34,"h":"236e2937","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE no_such_type' at line 1"}
+{"i":35,"h":"cc987364","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS empty_enum' at line 1"}
+{"i":36,"h":"48d2d485","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE empty_enum AS ENUM ()' at line 1"}
+{"i":37,"h":"45bb8049","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_enum AS r' at line 1"}
+{"i":38,"h":"a3ab0039","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE empty_enum' at line 1"}
+{"i":39,"h":"efe2f89f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS ws_enum' at line 1"}
+{"i":40,"h":"063f2311","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE ws_enum AS ENUM ('with space', 'no space')' at line 1"}
+{"i":41,"h":"29430984","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::ws_enum AS r' at line 1"}
+{"i":42,"h":"5a7f9fb3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE ws_enum' at line 1"}
+{"i":43,"h":"dc589c75","k":"ok","affected":0}
+{"i":44,"h":"d0e6583a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE IF EXISTS status' at line 1"}
+{"i":45,"h":"0d817f51","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE status AS ENUM ('new', 'open', 'closed')' at line 1"}
+{"i":46,"h":"f45d2692","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'status)' at line 1"}
+{"i":47,"h":"f9e5b1ca","k":"err","code":1146,"msg":"Table 'test.tasks' doesn't exist"}
+{"i":48,"h":"9e0b468f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::status) AS s FROM tasks ORDER BY id' at line 1"}
+{"i":49,"h":"1a1bc60e","k":"err","code":1051,"msg":"Unknown table 'test.tasks'"}
+{"i":50,"h":"e7cd853b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE status' at line 1"}

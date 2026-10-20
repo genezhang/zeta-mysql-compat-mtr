@@ -1,0 +1,26 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":25}
+{"i":1,"h":"9953f4d4","k":"ok","affected":0}
+{"i":2,"h":"99539f57","k":"ok","affected":0}
+{"i":3,"h":"9953fa7e","k":"ok","affected":0}
+{"i":4,"h":"649f16d0","k":"ok","affected":0}
+{"i":5,"h":"a6d06f0b","k":"ok","affected":0}
+{"i":6,"h":"ec9c468b","k":"ok","affected":0}
+{"i":7,"h":"091f5ce4","k":"ok","affected":0}
+{"i":8,"h":"347cfe5f","k":"ok","affected":0}
+{"i":9,"h":"363cf357","k":"ok","affected":0}
+{"i":10,"h":"9c7f8cbe","k":"rows","cols":["TABLE_NAME","TABLE_TYPE"],"rows":[["isr","BASE TABLE"]],"nd":"order","unordered":true}
+{"i":11,"h":"8eda3c26","k":"rows","cols":["COLUMN_NAME","DATA_TYPE","IS_NULLABLE"],"rows":[["id","int","NO"],["n","varchar","YES"]]}
+{"i":12,"h":"004db008","k":"ok","affected":0}
+{"i":13,"h":"bc1898ea","k":"ok","affected":0}
+{"i":14,"h":"be611ca4","k":"rows","cols":["COLUMN_NAME","COLUMN_DEFAULT"],"rows":[["id",null],["x","5"]]}
+{"i":15,"h":"5d56afc0","k":"rows","cols":["TABLE_NAME","INDEX_NAME","COLUMN_NAME"],"rows":[["isr","PRIMARY","id"],["isr","idx_isr_n","n"]],"nd":"order","unordered":true,"sorted":true}
+{"i":16,"h":"9c222466","k":"rows","cols":["TABLE_NAME","VIEW_DEFINITION"],"rows":[["vw_isr","select `test`.`isr`.`id` AS `id` from `test`.`isr`"]],"nd":"order","unordered":true}
+{"i":17,"h":"b4e97290","k":"rows","cols":["TABLE_NAME","CONSTRAINT_NAME","CONSTRAINT_TYPE"],"rows":[["isr","PRIMARY","PRIMARY KEY"]],"nd":"order","unordered":true}
+{"i":18,"h":"88a93514","k":"rows","cols":["TABLE_NAME","COLUMN_NAME"],"rows":[["isr","id"]],"nd":"order","unordered":true}
+{"i":19,"h":"a0f0d3b2","k":"rows","cols":["TABLE_NAME","COLUMN_NAME","REFERENCED_TABLE_NAME","REFERENCED_COLUMN_NAME"],"rows":[["isc","id",null,null],["isc","pid","isp","id"]],"nd":"order","unordered":true,"sorted":true}
+{"i":20,"h":"82cfe61d","k":"rows","cols":["TABLE_NAME","REFERENCED_TABLE_NAME"],"rows":[["isc","isp"]],"nd":"order","unordered":true}
+{"i":21,"h":"75f57ba3","k":"ok","affected":0}
+{"i":22,"h":"3a3921af","k":"ok","affected":0}
+{"i":23,"h":"3a392886","k":"ok","affected":0}
+{"i":24,"h":"3a391920","k":"ok","affected":0}
+{"i":25,"h":"62c2256d","k":"ok","affected":0}

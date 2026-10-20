@@ -1,0 +1,57 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":56}
+{"i":1,"h":"1c1aeda0","k":"ok","affected":0}
+{"i":2,"h":"05e4bf83","k":"ok","affected":0}
+{"i":3,"h":"aa3bd898","k":"ok","affected":0}
+{"i":4,"h":"16692ff9","k":"ok","affected":3}
+{"i":5,"h":"8d0dd3bc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 't_only' at line 1"}
+{"i":6,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":7,"h":"40d52c50","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":8,"h":"9a46fc50","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 't_only' at line 1"}
+{"i":9,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":10,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":11,"h":"bc95d6ee","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 't_only RESTART IDENTITY CASCADE' at line 1"}
+{"i":12,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":13,"h":"45ef7049","k":"ok","affected":0}
+{"i":14,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":15,"h":"bd61cad4","k":"ok","affected":1}
+{"i":16,"h":"888fc0db","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 't_only, t_only2' at line 1"}
+{"i":17,"h":"0ece4e75","k":"rows","cols":["c1"],"rows":[["3"]]}
+{"i":18,"h":"e980714d","k":"rows","cols":["c2"],"rows":[["1"]]}
+{"i":19,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":20,"h":"bd61cad4","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only2.PRIMARY'"}
+{"i":21,"h":"9cd9ff93","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', ONLY t_only2' at line 1"}
+{"i":22,"h":"0ece4e75","k":"rows","cols":["c1"],"rows":[["3"]]}
+{"i":23,"h":"e980714d","k":"rows","cols":["c2"],"rows":[["1"]]}
+{"i":24,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":25,"h":"fbcf94e2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTRICT' at line 1"}
+{"i":26,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":27,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":28,"h":"c31ebaa6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTRICT' at line 1"}
+{"i":29,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":30,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":31,"h":"455326fb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTART IDENTITY RESTRICT' at line 1"}
+{"i":32,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":33,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":34,"h":"1077151e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '*' at line 1"}
+{"i":35,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":36,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":37,"h":"97c45ec5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '* RESTART IDENTITY CASCADE' at line 1"}
+{"i":38,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":39,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":40,"h":"537de5e7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTART IDENTITY CASCADE' at line 1"}
+{"i":41,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["3"]]}
+{"i":42,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":43,"h":"a34f1ed1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE RESTART IDENTITY' at line 1"}
+{"i":44,"h":"9d7b375e","k":"ok","affected":0}
+{"i":45,"h":"26930006","k":"ok","affected":1}
+{"i":46,"h":"e0f2a085","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONTINUE IDENTITY CASCADE' at line 1"}
+{"i":47,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["1"]]}
+{"i":48,"h":"26930006","k":"err","code":1062,"msg":"Duplicate entry '1' for key 't_only.PRIMARY'"}
+{"i":49,"h":"d4efd621","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE CONTINUE IDENTITY' at line 1"}
+{"i":50,"h":"9d7b375e","k":"ok","affected":0}
+{"i":51,"h":"02fa7983","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'noexist_table_xyz' at line 1"}
+{"i":52,"h":"26930006","k":"ok","affected":1}
+{"i":53,"h":"537de5e7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTART IDENTITY CASCADE' at line 1"}
+{"i":54,"h":"86e60c99","k":"rows","cols":["c"],"rows":[["1"]]}
+{"i":55,"h":"4d4fc890","k":"ok","affected":0}
+{"i":56,"h":"31742b17","k":"ok","affected":0}

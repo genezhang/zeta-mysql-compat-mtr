@@ -1,0 +1,38 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":37}
+{"i":1,"h":"23445e14","k":"rows","cols":["basic"],"rows":[["hello earth"]]}
+{"i":2,"h":"eecad402","k":"rows","cols":["single_char"],"rows":[["aBc"]]}
+{"i":3,"h":"fb30aaf1","k":"rows","cols":["no_match"],"rows":[["hello"]]}
+{"i":4,"h":"46675e2f","k":"rows","cols":["all_chars"],"rows":[["bbbb"]]}
+{"i":5,"h":"6018d69e","k":"rows","cols":["every_other"],"rows":[["XbXbXb"]]}
+{"i":6,"h":"ed400419","k":"rows","cols":["case_sensitive_partial"],"rows":[["aaXaa"]]}
+{"i":7,"h":"d2c366b9","k":"rows","cols":["remove_x"],"rows":[["hello"]]}
+{"i":8,"h":"59c466eb","k":"rows","cols":["remove_pair"],"rows":[[""]]}
+{"i":9,"h":"2510ecfc","k":"rows","cols":["remove_spaces"],"rows":[["foobarbaz"]]}
+{"i":10,"h":"ebf165d3","k":"rows","cols":["all_removed_zero_len"],"rows":[["1"]]}
+{"i":11,"h":"5818f3f5","k":"rows","cols":["triple_empty_zero_len"],"rows":[["1"]]}
+{"i":12,"h":"4b2c2164","k":"rows","cols":["empty_from_inserts"],"rows":[["abc"]]}
+{"i":13,"h":"44f95900","k":"rows","cols":["empty_from_inserts_len"],"rows":[["0"]]}
+{"i":14,"h":"92c5e87f","k":"rows","cols":["empty_from_empty_in"],"rows":[[""]]}
+{"i":15,"h":"d2c4aa9f","k":"rows","cols":["empty_from_empty_in_len"],"rows":[["0"]]}
+{"i":16,"h":"94c7d4d0","k":"rows","cols":["case_byte_equal_lower"],"rows":[["ABC"]]}
+{"i":17,"h":"8bed1d86","k":"rows","cols":["case_byte_equal_upper"],"rows":[["abc"]]}
+{"i":18,"h":"2dd60dfd","k":"rows","cols":["utf8_replace"],"rows":[["cafe"]]}
+{"i":19,"h":"71ed25ed","k":"rows","cols":["utf8_len_after"],"rows":[["1"]]}
+{"i":20,"h":"5153878e","k":"rows","cols":["utf8_replace_ascii"],"rows":[["cXfefX"]]}
+{"i":21,"h":"19041ea8","k":"rows","cols":["utf8_to_from"],"rows":[["átá"]]}
+{"i":22,"h":"6dd32f1b","k":"rows","cols":["non_overlap"],"rows":[["ba"]]}
+{"i":23,"h":"3d12e3a2","k":"rows","cols":["to_contains_from"],"rows":[["xxxxxx"]]}
+{"i":24,"h":"77947822","k":"rows","cols":["to_contains_from_len"],"rows":[["1"]]}
+{"i":25,"h":"65d063d8","k":"rows","cols":["to_longer_than_from"],"rows":[["longer"]]}
+{"i":26,"h":"91af90b9","k":"rows","cols":["to_shorter_than_from"],"rows":[["XXX"]]}
+{"i":27,"h":"9dd5f2d6","k":"rows","cols":["null_str"],"rows":[["1"]]}
+{"i":28,"h":"afeb11b2","k":"rows","cols":["null_from"],"rows":[["1"]]}
+{"i":29,"h":"9e3824e7","k":"rows","cols":["null_to"],"rows":[["1"]]}
+{"i":30,"h":"f03447b6","k":"rows","cols":["int_str"],"rows":[["1XY45"]]}
+{"i":31,"h":"607da39b","k":"rows","cols":["int_from"],"rows":[["abc"]]}
+{"i":32,"h":"45350226","k":"rows","cols":["int_to"],"rows":[["1bc"]]}
+{"i":33,"h":"e1248502","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 1"}
+{"i":34,"h":"c8d9fd7b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":35,"h":"ed9c2237","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":36,"h":"93249a5d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":37,"h":"485fad0b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'd')' at line 1"}

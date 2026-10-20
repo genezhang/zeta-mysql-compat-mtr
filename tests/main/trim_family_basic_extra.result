@@ -9,8 +9,7 @@ SELECT TRIM('hello')                     AS no_trim_needed;
 no_trim_needed
 hello
 SELECT TRIM('')                          AS empty;
-empty
-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT TRIM('     ')                     AS only_whitespace;
 only_whitespace
 
@@ -19,25 +18,19 @@ only_ws_zero_len
 1
 === TRIM: tabs / newlines / mixed whitespace ===
 SELECT LENGTH(TRIM(CHR(9) || 'hello' || CHR(9)))   = 5 AS tab;
-tab
-1
+ERROR 1305: FUNCTION test.CHR does not exist
 SELECT LENGTH(TRIM(CHR(10) || 'hello' || CHR(10))) = 5 AS lf;
-lf
-1
+ERROR 1305: FUNCTION test.CHR does not exist
 SELECT LENGTH(TRIM(CHR(13) || 'hello' || CHR(13))) = 5 AS cr;
-cr
-1
+ERROR 1305: FUNCTION test.CHR does not exist
 SELECT TRIM(CHR(9) || ' ' || CHR(10) || 'x' || CHR(10) || ' ' || CHR(9)) = 'x'
        AS mixed_ws;
-mixed_ws
-0
+ERROR 1305: FUNCTION test.CHR does not exist
 === TRIM: Unicode whitespace (zeta divergence from MySQL) ===
 SELECT TRIM(CHR(160) || 'hello' || CHR(160)) = 'hello' AS nbsp_stripped;
-nbsp_stripped
-0
+ERROR 1305: FUNCTION test.CHR does not exist
 SELECT TRIM(CHR(8195) || 'hello' || CHR(8195)) = 'hello' AS em_space_stripped;
-em_space_stripped
-0
+ERROR 1305: FUNCTION test.CHR does not exist
 === TRIM: 2-arg form via standard `TRIM(chars FROM s)` ===
 SELECT TRIM('x' FROM 'xxhelloxx')         AS basic_set;
 basic_set
@@ -62,11 +55,9 @@ SELECT TRIM('' FROM 'hello')              AS trim_empty_set;
 trim_empty_set
 hello
 SELECT LTRIM('hello', '')                 AS ltrim_empty_set;
-ltrim_empty_set
-hello
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM('hello', '')                 AS rtrim_empty_set;
-rtrim_empty_set
-hello
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 SELECT LENGTH(TRIM('' FROM '   hello   '))  = 11 AS trim_empty_set_keeps_ws;
 trim_empty_set_keeps_ws
 1
@@ -97,17 +88,13 @@ rtrim_only_trailing
 1
 === LTRIM / RTRIM: 2-arg form ===
 SELECT LTRIM('xxxhellox', 'x')            AS ltrim_set;
-ltrim_set
-hellox
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM('xhelloxxx', 'x')            AS rtrim_set;
-rtrim_set
-xhello
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 SELECT LTRIM('xyzabcxyz', 'xyz')          AS ltrim_multi;
-ltrim_multi
-abcxyz
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM('xyzabcxyz', 'xyz')          AS rtrim_multi;
-rtrim_multi
-xyzabc
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 === Multi-byte UTF-8 in 2-arg form ===
 SELECT TRIM('é' FROM 'éhelloé')           AS utf8_trim_set;
 utf8_trim_set
@@ -116,21 +103,17 @@ SELECT CHAR_LENGTH(TRIM('é' FROM 'éhelloé')) = 5 AS utf8_trim_char_len;
 utf8_trim_char_len
 1
 SELECT LTRIM('ééhello', 'é')              AS utf8_ltrim;
-utf8_ltrim
-hello
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM('helloéé', 'é')              AS utf8_rtrim;
-utf8_rtrim
-hello
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 === Composition: trimmable char appearing in middle stays ===
 SELECT TRIM('x' FROM 'xhellxoxx')         AS middle_intact;
 middle_intact
 hellxo
 SELECT LTRIM('xhellxoxx', 'x')            AS ltrim_middle_intact;
-ltrim_middle_intact
-hellxoxx
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM('xhellxoxx', 'x')            AS rtrim_middle_intact;
-rtrim_middle_intact
-xhellxo
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 === NULL propagation ===
 SELECT TRIM(NULL)              IS NULL    AS trim_null_s;
 trim_null_s
@@ -142,14 +125,12 @@ SELECT LTRIM(NULL)             IS NULL    AS ltrim_null_s;
 ltrim_null_s
 1
 SELECT LTRIM('hello', NULL)    IS NULL    AS ltrim_null_chars;
-ltrim_null_chars
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM(NULL)             IS NULL    AS rtrim_null_s;
 rtrim_null_s
 1
 SELECT RTRIM('hello', NULL)    IS NULL    AS rtrim_null_chars;
-rtrim_null_chars
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 === Determinism ===
 SELECT TRIM('  x  ')  = TRIM('  x  ')     AS trim_det;
 trim_det
@@ -172,12 +153,12 @@ rtrim_idem
 1
 === Arity errors ===
 SELECT TRIM();
-ERROR 1064: SQL parse error: sql parser error: Expected: an expression, found: ) at Line: 1, Column: 13
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT LTRIM();
-ERROR 1105: execution error: LTRIM requires 1-2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT LTRIM('a', 'b', 'c');
-ERROR 1105: execution error: LTRIM requires 1-2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM();
-ERROR 1105: execution error: RTRIM requires 1-2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 SELECT RTRIM('a', 'b', 'c');
-ERROR 1105: execution error: RTRIM requires 1-2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'

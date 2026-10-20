@@ -1,0 +1,31 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":30}
+{"i":1,"h":"8fb7336e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                      AS jsonb_cast_lands_as_array' at line 1"}
+{"i":2,"h":"b227df8e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$', 3))\n                                                              A' at line 1"}
+{"i":3,"h":"78db469d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$', 3), '$[2]')\n                                                       ' at line 1"}
+{"i":4,"h":"20ea3ee6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$[1]', 9))\n                                                            ' at line 1"}
+{"i":5,"h":"06babec8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$[1]', 9), '$[1]')\n                                                    ' at line 1"}
+{"i":6,"h":"6b9bb345","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$.a'))\n                                                              AS' at line 1"}
+{"i":7,"h":"9de8a0c0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), '$.a'), '$.b')\n                                                         ' at line 1"}
+{"i":8,"h":"fc9bb211","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_array_append; a JSON string or JSON type is required."}
+{"i":9,"h":"db627462","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_array_insert; a JSON string or JSON type is required."}
+{"i":10,"h":"fd60992a","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_remove; a JSON string or JSON type is required."}
+{"i":11,"h":"3ca84f29","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_array_append; a JSON string or JSON type is required."}
+{"i":12,"h":"5872948a","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_array_insert; a JSON string or JSON type is required."}
+{"i":13,"h":"ed93e78c","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_remove; a JSON string or JSON type is required."}
+{"i":14,"h":"3111db3f","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_array_append; a JSON string or JSON type is required."}
+{"i":15,"h":"e3f23cc1","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_array_insert; a JSON string or JSON type is required."}
+{"i":16,"h":"c951e008","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_remove; a JSON string or JSON type is required."}
+{"i":17,"h":"965393c9","k":"rows","cols":["string_appended_as_string"],"rows":[["STRING"]]}
+{"i":18,"h":"a9cc7d27","k":"rows","cols":["string_appended_as_json_via_cast"],"rows":[["OBJECT"]]}
+{"i":19,"h":"c1e24cc3","k":"rows","cols":["array_appended_via_cast"],"rows":[["ARRAY"]]}
+{"i":20,"h":"5806b643","k":"rows","cols":["object_inserted_via_cast"],"rows":[["OBJECT"]]}
+{"i":21,"h":"ada0c6cf","k":"rows","cols":["array_inserted_via_cast"],"rows":[["ARRAY"]]}
+{"i":22,"h":"8dc177ad","k":"rows","cols":["one_removed_one_noop"],"rows":[["1"]]}
+{"i":23,"h":"a794790a","k":"rows","cols":["interleaved_noops"],"rows":[["2"]]}
+{"i":24,"h":"d43482ca","k":"rows","cols":["three_removed"],"rows":[["1"]]}
+{"i":25,"h":"3b37a09e","k":"rows","cols":["empty_obj_after_remove_type"],"rows":[["OBJECT"]]}
+{"i":26,"h":"8a1295d7","k":"rows","cols":["empty_obj_after_remove_len"],"rows":[["0"]]}
+{"i":27,"h":"92a4d218","k":"rows","cols":["empty_arr_after_remove_type"],"rows":[["ARRAY"]]}
+{"i":28,"h":"0f0c5cfd","k":"rows","cols":["empty_arr_after_remove_len"],"rows":[["0"]]}
+{"i":29,"h":"ae77eb72","k":"rows","cols":["same_path_twice_len"],"rows":[["1"]]}
+{"i":30,"h":"85e17bc2","k":"rows","cols":["same_path_twice_survivor"],"rows":[["2"]]}

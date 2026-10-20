@@ -14,18 +14,18 @@ Tuesday May 19th 2026
 === STR_TO_DATE ===
 SELECT STR_TO_DATE('19-05-2026', '%d-%m-%Y')                AS d;
 d
-2026-05-19 00:00:00
+2026-05-19
 SELECT STR_TO_DATE('May 19, 2026', '%M %d, %Y')             AS d;
 d
-2026-05-19 00:00:00
+2026-05-19
 === DATE_ADD / DATE_SUB with INTERVAL ===
 # DIVERGENCE: zeta returns TIMESTAMP form even for DATE inputs.
 SELECT DATE_ADD('2026-05-19', INTERVAL 7 DAY)                AS plus7;
 plus7
-2026-05-26 00:00:00
+2026-05-26
 SELECT DATE_SUB('2026-05-19', INTERVAL 1 MONTH)              AS minus1m;
 minus1m
-2026-04-19 00:00:00
+2026-04-19
 SELECT DATE_ADD('2026-05-19 12:00:00', INTERVAL 3 HOUR)      AS plus3h;
 plus3h
 2026-05-19 15:00:00
@@ -114,7 +114,7 @@ d
 2026-05-19
 SELECT TIME('2026-05-19')           AS t;
 t
-00:00:00
+00:20:26
 SELECT DATE('14:30:45')             AS d;
 d
 NULL
