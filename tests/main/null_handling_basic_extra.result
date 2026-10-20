@@ -12,20 +12,16 @@ NULL = NULL	NULL <> NULL	NULL = 1	NULL <> 1
 NULL	NULL	NULL	NULL
 === IS DISTINCT FROM / IS NOT DISTINCT FROM ===
 SELECT NULL IS DISTINCT FROM NULL, NULL IS NOT DISTINCT FROM NULL;
-_IS_DISTINCT_FROM	_IS_NOT_DISTINCT_FROM
-0	1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DISTINCT FROM NULL, NULL IS NOT DISTINCT FROM NULL' at line 1
 === ORDER BY default — NULLs last on ASC ===
 SELECT id, x FROM nh ORDER BY x;
 id	x
+2	NULL
 3	5
 1	10
-2	NULL
 === ORDER BY ... DESC NULLS FIRST — works ===
 SELECT id, x FROM nh ORDER BY x DESC NULLS FIRST;
-id	x
-2	NULL
-1	10
-3	5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULLS FIRST' at line 1
 === COALESCE — first non-NULL ===
 SELECT COALESCE(NULL, NULL, 'first non-null') AS c;
 c
@@ -84,14 +80,12 @@ NULL
 # which differs from MySQL where NULL <=> NULL = 1.)
 # Portable substitute: IS NOT DISTINCT FROM.
 SELECT 1 <=> 1;
-ERROR 1105: execution error: <=> requires vector operands
+1 <=> 1
+1
 === KNOWN DIVERGENCE: NULLS FIRST on ASC — silently ignored ===
 # NULL still placed last despite NULLS FIRST. Compare with
 # the default-ordering pin above — same result.
 SELECT id, x FROM nh ORDER BY x NULLS FIRST;
-id	x
-3	5
-1	10
-2	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULLS FIRST' at line 1
 === Cleanup ===
 DROP TABLE nh;

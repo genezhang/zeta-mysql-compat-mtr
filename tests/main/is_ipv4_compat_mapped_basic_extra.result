@@ -4,10 +4,10 @@ compat_v4
 1
 SELECT IS_IPV4_COMPAT(INET6_ATON('::1'))            AS compat_lo;
 compat_lo
-1
+0
 SELECT IS_IPV4_COMPAT(INET6_ATON('::'))             AS compat_unspec;
 compat_unspec
-1
+0
 === IS_IPV4_COMPAT — 0 branch ===
 SELECT IS_IPV4_COMPAT(INET6_ATON('::ffff:1.2.3.4')) AS not_compat_mapped;
 not_compat_mapped
@@ -57,13 +57,13 @@ m_null
 NULL
 === Arity errors ===
 SELECT IS_IPV4_COMPAT();
-ERROR 1105: execution error: IS_IPV4_COMPAT requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'IS_IPV4_COMPAT'
 SELECT IS_IPV4_COMPAT(INET6_ATON('::1'), INET6_ATON('::2'));
-ERROR 1105: execution error: IS_IPV4_COMPAT requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'IS_IPV4_COMPAT'
 SELECT IS_IPV4_MAPPED();
-ERROR 1105: execution error: IS_IPV4_MAPPED requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'IS_IPV4_MAPPED'
 SELECT IS_IPV4_MAPPED(INET6_ATON('::1'), INET6_ATON('::2'));
-ERROR 1105: execution error: IS_IPV4_MAPPED requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'IS_IPV4_MAPPED'
 === Filter on TEXT column of v6 strings ===
 DROP TABLE IF EXISTS hosts6;
 CREATE TABLE hosts6 (id INT, ip TEXT);
@@ -75,7 +75,6 @@ INSERT INTO hosts6 VALUES
 SELECT id FROM hosts6 WHERE IS_IPV4_COMPAT(INET6_ATON(ip)) = 1 ORDER BY id;
 id
 1
-4
 SELECT id FROM hosts6 WHERE IS_IPV4_MAPPED(INET6_ATON(ip)) = 1 ORDER BY id;
 id
 2

@@ -53,29 +53,35 @@ c
 0.6420926159343306
 === KNOWN GAP: integer-division operator `DIV` — errno 1064 ===
 SELECT 17 DIV 5;
-ERROR 1064: SQL parse error: sql parser error: No infix parser for token Word(Word { value: "DIV", quote_style: None, keyword: DIV }) at Line: 1, Column: 11
+17 DIV 5
+3
 === KNOWN GAP: modulo operator `MOD` — errno 1064 ===
 SELECT 10 MOD 3;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: 3 at Line: 1, Column: 15
+10 MOD 3
+1
 === PARTIAL FIX: FORMAT 3-arg arity accepted, locale silently ignored ===
 SELECT FORMAT(1234567.891, 2, 'de_DE') AS v;
 v
-1,234,567.89
+1.234.567,89
 === KNOWN DIVERGENCE: math domain errors — errno 1105 (MySQL returns NULL) ===
 SELECT SQRT(-1);
-ERROR 1105: execution error: cannot take square root of a negative number
+SQRT(-1)
+NULL
 SELECT LN(0);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LN(0)
+NULL
 SELECT LN(-1);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LN(-1)
+NULL
 === KNOWN DIVERGENCE: ASIN(2) — float NaN (MySQL: NULL) ===
 SELECT ASIN(2) AS nan_val;
 nan_val
-NaN
+NULL
 === 2-arg ATAN — FIXED via zeta #1185 (delegates to ATAN2) ===
 SELECT ATAN(1, 1) AS at2;
 at2
 0.7853981633974483
 === KNOWN GAP: RAND(seed) — errno 1105 (only no-arg form) ===
 SELECT RAND(42);
-ERROR 1105: execution error: RAND takes no arguments
+RAND(42)
+<masked>

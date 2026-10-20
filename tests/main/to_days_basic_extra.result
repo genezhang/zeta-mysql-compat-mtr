@@ -35,20 +35,21 @@ n_from
 NULL
 === Arity errors ===
 SELECT TO_DAYS();
-ERROR 1105: execution error: TO_DAYS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'TO_DAYS'
 SELECT TO_DAYS(DATE '2026-05-19', DATE '2026-01-01');
-ERROR 1105: execution error: TO_DAYS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'TO_DAYS'
 SELECT FROM_DAYS();
-ERROR 1105: execution error: FROM_DAYS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FROM_DAYS'
 SELECT FROM_DAYS(1, 2);
-ERROR 1105: execution error: FROM_DAYS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FROM_DAYS'
 === TO_DAYS on unparseable string errors 1105 ===
 SELECT TO_DAYS('not a date');
-ERROR 1105: execution error: TO_DAYS: cannot parse "not a date" as a date or timestamp
+TO_DAYS('not a date')
+NULL
 === KNOWN DIVERGENCE: FROM_DAYS(0) accepted (year-0 date) ===
 SELECT FROM_DAYS(0) AS pre_year_one;
 pre_year_one
-0000-01-01
+0000-00-00
 === On DATE column inside SELECT / WHERE ===
 DROP TABLE IF EXISTS dd;
 CREATE TABLE dd (id INT, d DATE);

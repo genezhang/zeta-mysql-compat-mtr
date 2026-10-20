@@ -1,0 +1,26 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":25}
+{"i":1,"h":"e798492b","k":"rows","cols":["str_unquoted"],"rows":[["hello"]]}
+{"i":2,"h":"5102c667","k":"rows","cols":["int_as_string"],"rows":[["42"]]}
+{"i":3,"h":"25e40832","k":"rows","cols":["dec_as_string"],"rows":[["3.14"]]}
+{"i":4,"h":"1baa4cdf","k":"rows","cols":["bool_true"],"rows":[["true"]]}
+{"i":5,"h":"f3ba4f37","k":"rows","cols":["bool_false"],"rows":[["false"]]}
+{"i":6,"h":"53d702d5","k":"rows","cols":["json_null_is_sql_null"],"rows":[["1"]]}
+{"i":7,"h":"84c9c2bb","k":"rows","cols":["arr_at_path_null"],"rows":[["0"]]}
+{"i":8,"h":"4a9efec2","k":"rows","cols":["obj_at_path_null"],"rows":[["0"]]}
+{"i":9,"h":"333ba785","k":"rows","cols":["root_string"],"rows":[["plain"]]}
+{"i":10,"h":"a07927d1","k":"rows","cols":["root_int"],"rows":[["42"]]}
+{"i":11,"h":"a2835f1a","k":"rows","cols":["root_obj_null"],"rows":[["0"]]}
+{"i":12,"h":"27fdb14b","k":"rows","cols":["root_arr_null"],"rows":[["0"]]}
+{"i":13,"h":"a941f4bc","k":"rows","cols":["index_extract"],"rows":[["y"]]}
+{"i":14,"h":"98cd9cfc","k":"rows","cols":["missing_key"],"rows":[["1"]]}
+{"i":15,"h":"ce5a2de5","k":"rows","cols":["oob_index"],"rows":[["1"]]}
+{"i":16,"h":"91f2f06b","k":"rows","cols":["type_mismatch"],"rows":[["1"]]}
+{"i":17,"h":"53e8415b","k":"rows","cols":["nested_under_claim"],"rows":[["0"]]}
+{"i":18,"h":"8e17da97","k":"rows","cols":["null_doc"],"rows":[["1"]]}
+{"i":19,"h":"2854d5d4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL)    IS NULL AS null_path' at line 1"}
+{"i":20,"h":"3182eff0","k":"rows","cols":["value_len"],"rows":[["5"]]}
+{"i":21,"h":"a0b4a7b3","k":"rows","cols":["extract_len_with_quotes"],"rows":[["7"]]}
+{"i":22,"h":"09e54750","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":23,"h":"f1a76655","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":24,"h":"592c1a19","k":"rows","cols":["JSON_VALUE('not json', '$.a')"],"rows":[[null]]}
+{"i":25,"h":"f3c1eea1","k":"rows","cols":["JSON_VALUE('{}', '$.*')"],"rows":[[null]]}

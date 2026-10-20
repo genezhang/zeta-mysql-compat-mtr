@@ -1,0 +1,14 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":13}
+{"i":1,"h":"971ed316","k":"ok","affected":0}
+{"i":2,"h":"4828441e","k":"ok","affected":3}
+{"i":3,"h":"536a97c2","k":"rows","cols":["a","b","c"],"rows":[["1","2","x"]]}
+{"i":4,"h":"7b26a688","k":"rows","cols":["a","b","c"],"rows":[["1","2","x"],["1","3","y"]]}
+{"i":5,"h":"017d6a3a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DISTINCT FROM ROW(2, 0)' at line 1"}
+{"i":6,"h":"2219f45f","k":"rows","cols":["a","b","c"],"rows":[["1","2","x"],["1","3","y"]]}
+{"i":7,"h":"46ef87a5","k":"ok","affected":0}
+{"i":8,"h":"9a3496f8","k":"ok","affected":0}
+{"i":9,"h":"d05011c1","k":"ok","affected":1}
+{"i":10,"h":"901bcecb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONFLICT ON CONSTRAINT oc_pk DO UPDATE SET v = EXCLUDED.v' at line 1"}
+{"i":11,"h":"b93ed8e8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONFLICT ON CONSTRAINT oc_pk DO NOTHING' at line 1"}
+{"i":12,"h":"93eda8cd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONFLICT (id) DO UPDATE SET v = EXCLUDED.v' at line 1"}
+{"i":13,"h":"c0f4a056","k":"ok","affected":0}

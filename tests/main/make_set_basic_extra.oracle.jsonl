@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"1836e0ed","k":"rows","cols":["single"],"rows":[["a"]]}
+{"i":2,"h":"6afd0f87","k":"rows","cols":["bits_0_2"],"rows":[["a,c"]]}
+{"i":3,"h":"61d52d06","k":"rows","cols":["all_three"],"rows":[["a,b,c"]]}
+{"i":4,"h":"035137ed","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":5,"h":"fb084e45","k":"rows","cols":["is_null"],"rows":[["0"]]}
+{"i":6,"h":"45b17c57","k":"rows","cols":["skip_null"],"rows":[["a,c"]]}
+{"i":7,"h":"db7a29ee","k":"rows","cols":["truncated_to_args"],"rows":[["a,b"]]}
+{"i":8,"h":"4630406a","k":"rows","cols":["n_bits"],"rows":[[null]]}
+{"i":9,"h":"15b632d2","k":"rows","cols":["neg_all"],"rows":[["x,y,z"]]}
+{"i":10,"h":"a3a48f84","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'MAKE_SET'"}
+{"i":11,"h":"af912d7b","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'MAKE_SET'"}
+{"i":12,"h":"a4b15541","k":"ok","affected":0}
+{"i":13,"h":"ca45cd12","k":"ok","affected":0}
+{"i":14,"h":"7eb5be53","k":"ok","affected":4}
+{"i":15,"h":"00248ffe","k":"rows","cols":["id","rendered"],"rows":[["1",""],["2","low"],["3","low,mid"],["4","low,mid,high"]]}
+{"i":16,"h":"8b2b8b1c","k":"ok","affected":0}

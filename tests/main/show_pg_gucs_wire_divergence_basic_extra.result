@@ -1,28 +1,30 @@
 === SHOW search_path — silent empty on mysql wire ===
 SHOW search_path;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'search_path' at line 1
 === SHOW STATEMENT_TIMEOUT — silent empty on mysql wire ===
 SHOW STATEMENT_TIMEOUT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'STATEMENT_TIMEOUT' at line 1
 === SHOW TRANSACTION_ISOLATION — silent empty on mysql wire ===
 SHOW TRANSACTION_ISOLATION;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRANSACTION_ISOLATION' at line 1
 === SHOW SESSION_AUTHORIZATION — silent empty on mysql wire ===
 SHOW SESSION_AUTHORIZATION;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SESSION_AUTHORIZATION' at line 1
 === SHOW APPLICATION_NAME — silent empty on mysql wire ===
 SHOW APPLICATION_NAME;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'APPLICATION_NAME' at line 1
 === SHOW client_encoding — silent empty on mysql wire ===
 SHOW client_encoding;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'client_encoding' at line 1
 === Cross-link: @@-syntax DOES work on mysql wire for these ===
 SELECT @@transaction_isolation;
 @@transaction_isolation
 REPEATABLE-READ
 SELECT @@tx_isolation;
-@@tx_isolation
-REPEATABLE-READ
+ERROR 1193: Unknown system variable 'tx_isolation'
 SELECT @@search_path;
-@@search_path
-NULL
+ERROR 1193: Unknown system variable 'search_path'
 SELECT @@statement_timeout;
-@@statement_timeout
-NULL
+ERROR 1193: Unknown system variable 'statement_timeout'
 SELECT @@application_name;
-@@application_name
-NULL
+ERROR 1193: Unknown system variable 'application_name'

@@ -1,0 +1,12 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":11}
+{"i":1,"h":"f96c4e36","k":"ok","affected":0}
+{"i":2,"h":"fc9d3283","k":"ok","affected":0}
+{"i":3,"h":"d02cfd83","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET (fillfactor = 70)' at line 1"}
+{"i":4,"h":"30e5c109","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET (autovacuum_enabled = false)' at line 1"}
+{"i":5,"h":"777f00d2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET (nosuchopt = 99)' at line 1"}
+{"i":6,"h":"2405db00","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESET (fillfactor)' at line 1"}
+{"i":7,"h":"3e9e3382","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET WITHOUT OIDS' at line 1"}
+{"i":8,"h":"bdb719c3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET WITH OIDS' at line 1"}
+{"i":9,"h":"ea91576a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET TABLESPACE pg_default' at line 1"}
+{"i":10,"h":"74f0da34","k":"ok","affected":0}
+{"i":11,"h":"24361822","k":"ok","affected":0}

@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"c3b8529a","k":"rows","cols":["root_append_len"],"rows":[["3"]]}
+{"i":2,"h":"07078a72","k":"rows","cols":["root_append_vals"],"rows":[["[1, 2, 3]"]]}
+{"i":3,"h":"878134a5","k":"rows","cols":["scalar_root_becomes_array"],"rows":[["ARRAY"]]}
+{"i":4,"h":"e8a0fa49","k":"rows","cols":["scalar_root_pair_len"],"rows":[["2"]]}
+{"i":5,"h":"cb3781f6","k":"rows","cols":["obj_root_becomes_array"],"rows":[["ARRAY"]]}
+{"i":6,"h":"1f1f0b97","k":"rows","cols":["inner_arr_pushed"],"rows":[["3"]]}
+{"i":7,"h":"cba2a5b6","k":"rows","cols":["inner_scalar_becomes_array"],"rows":[["ARRAY"]]}
+{"i":8,"h":"144091dd","k":"rows","cols":["inner_scalar_pair_len"],"rows":[["2"]]}
+{"i":9,"h":"4420cf32","k":"rows","cols":["nested_arr_pushed"],"rows":[["3"]]}
+{"i":10,"h":"cb03635c","k":"rows","cols":["index_scalar_becomes_array"],"rows":[["ARRAY"]]}
+{"i":11,"h":"d71faf34","k":"rows","cols":["missing_key_unchanged"],"rows":[["1"]]}
+{"i":12,"h":"7a3a6b42","k":"rows","cols":["oob_index_unchanged"],"rows":[["2"]]}
+{"i":13,"h":"cae4fdc6","k":"rows","cols":["container_mismatch_unchanged"],"rows":[["2"]]}
+{"i":14,"h":"ce8b7e2d","k":"rows","cols":["chain_len"],"rows":[["3"]]}
+{"i":15,"h":"4ced75a3","k":"rows","cols":["str_kept_as_string"],"rows":[["STRING"]]}
+{"i":16,"h":"6ba4fcc0","k":"rows","cols":["nested_under_claim"],"rows":[["0"]]}
+{"i":17,"h":"a4eac13a","k":"rows","cols":["null_target"],"rows":[["1"]]}
+{"i":18,"h":"a8146b4a","k":"rows","cols":["null_path"],"rows":[["1"]]}
+{"i":19,"h":"e4948eed","k":"rows","cols":["null_val"],"rows":[["0"]]}
+{"i":20,"h":"b6a3d840","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_ARRAY_APPEND'"}
+{"i":21,"h":"500c3c72","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_ARRAY_APPEND'"}
+{"i":22,"h":"310e3fee","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_ARRAY_APPEND'"}
+{"i":23,"h":"d7ada477","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_array_append: \"Invalid value.\" at position 1."}
+{"i":24,"h":"18fb4a6c","k":"err","code":3149,"msg":"In this situation, path expressions may not contain the * and ** tokens or an array range."}

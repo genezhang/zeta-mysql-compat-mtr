@@ -1,0 +1,35 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":34}
+{"i":1,"h":"10cf7dbf","k":"ok","affected":0}
+{"i":2,"h":"9114ba9a","k":"ok","affected":5}
+{"i":3,"h":"a49546f3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v) AS median_cont FROM stats_pp' at line 1"}
+{"i":4,"h":"e4d39c2f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v) AS median_disc FROM stats_pp' at line 1"}
+{"i":5,"h":"66c25d9e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v)\n     = PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY v)\n             ' at line 1"}
+{"i":6,"h":"76380035","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v) AS q1_cont FROM stats_pp' at line 1"}
+{"i":7,"h":"f190a96a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v) AS q1_disc FROM stats_pp' at line 1"}
+{"i":8,"h":"eb1512ae","k":"err","code":1305,"msg":"FUNCTION test.PERCENTILE_CONT does not exist"}
+{"i":9,"h":"205905e0","k":"err","code":1305,"msg":"FUNCTION test.PERCENTILE_CONT does not exist"}
+{"i":10,"h":"29fe632f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v)         FROM stats_pp' at line 2"}
+{"i":11,"h":"64be5e03","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v)         AS bug_present_both_collapse FROM stats_pp' at line 2"}
+{"i":12,"h":"86ce5e8d","k":"err","code":1305,"msg":"FUNCTION test.REGR_COUNT does not exist"}
+{"i":13,"h":"ddf2ca5b","k":"err","code":1305,"msg":"FUNCTION test.REGR_AVGY does not exist"}
+{"i":14,"h":"8ebd21ee","k":"err","code":1305,"msg":"FUNCTION test.REGR_AVGX does not exist"}
+{"i":15,"h":"c8260e9c","k":"err","code":1305,"msg":"FUNCTION test.REGR_SLOPE does not exist"}
+{"i":16,"h":"d8f08423","k":"err","code":1305,"msg":"FUNCTION test.REGR_INTERCEPT does not exist"}
+{"i":17,"h":"dd32c033","k":"err","code":1305,"msg":"FUNCTION test.REGR_R2 does not exist"}
+{"i":18,"h":"db2861ef","k":"err","code":1305,"msg":"FUNCTION test.REGR_SXX does not exist"}
+{"i":19,"h":"a14d5ea2","k":"err","code":1305,"msg":"FUNCTION test.REGR_SYY does not exist"}
+{"i":20,"h":"ca27374b","k":"err","code":1305,"msg":"FUNCTION test.REGR_SXY does not exist"}
+{"i":21,"h":"1a9d9617","k":"err","code":1305,"msg":"FUNCTION test.COVAR_POP does not exist"}
+{"i":22,"h":"098a6f2d","k":"err","code":1305,"msg":"FUNCTION test.COVAR_SAMP does not exist"}
+{"i":23,"h":"4461d429","k":"err","code":1305,"msg":"FUNCTION test.CORR does not exist"}
+{"i":24,"h":"8eee15fc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY v) = 3.0   AS median_eq_3_float FROM stats_pp' at line 1"}
+{"i":25,"h":"1d4a7573","k":"ok","affected":0}
+{"i":26,"h":"90e24fed","k":"ok","affected":2}
+{"i":27,"h":"efb7089e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY x) AS cont_interp FROM stats_pair' at line 1"}
+{"i":28,"h":"dafaaa82","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY x) AS disc_pick   FROM stats_pair' at line 1"}
+{"i":29,"h":"13078d08","k":"ok","affected":0}
+{"i":30,"h":"bd1d1999","k":"ok","affected":1}
+{"i":31,"h":"53154bbc","k":"err","code":1305,"msg":"FUNCTION test.REGR_COUNT does not exist"}
+{"i":32,"h":"e85f4fc7","k":"ok","affected":1}
+{"i":33,"h":"1b355275","k":"err","code":1305,"msg":"FUNCTION test.REGR_COUNT does not exist"}
+{"i":34,"h":"229204fc","k":"ok","affected":0}

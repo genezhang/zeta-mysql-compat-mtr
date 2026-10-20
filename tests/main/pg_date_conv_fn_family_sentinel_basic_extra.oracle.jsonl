@@ -1,0 +1,45 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":44}
+{"i":1,"h":"3e955b22","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":2,"h":"799dd11b","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":3,"h":"e579ee0f","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":4,"h":"fe89082c","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":5,"h":"d831ef07","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":6,"h":"37de48ee","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":7,"h":"bedcef1f","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":8,"h":"b3f7eec5","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":9,"h":"763c73d8","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":10,"h":"32b992db","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":11,"h":"3eb64d62","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":12,"h":"956cef9c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')            AS days' at line 1"}
+{"i":13,"h":"3414f38c","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":14,"h":"ecbe26be","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":15,"h":"97fcde4b","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":16,"h":"bebf25a5","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":17,"h":"f91b28bb","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":18,"h":"a9527217","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":19,"h":"d07108c6","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":20,"h":"5e9ecfb9","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":21,"h":"462957cf","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":22,"h":"c79d2dac","k":"err","code":1305,"msg":"FUNCTION test.date_part does not exist"}
+{"i":23,"h":"9e3f1054","k":"ok","affected":0}
+{"i":24,"h":"80c52a44","k":"ok","affected":0}
+{"i":25,"h":"8fc34db5","k":"ok","affected":5}
+{"i":26,"h":"f7d504f6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ALL' at line 1"}
+{"i":27,"h":"ddea7e89","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OFFSET 2 LIMIT ALL' at line 1"}
+{"i":28,"h":"10561c26","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ALL OFFSET 3' at line 1"}
+{"i":29,"h":"6a45fef5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ALL OFFSET 100' at line 1"}
+{"i":30,"h":"ba8634f6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL' at line 1"}
+{"i":31,"h":"6941a10a","k":"ok","affected":0}
+{"i":32,"h":"b20ef288","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(10,   3)   AS pp' at line 1"}
+{"i":33,"h":"265b0230","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(-10,  3)   AS np' at line 1"}
+{"i":34,"h":"b9756d38","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(10,  -3)   AS pn' at line 1"}
+{"i":35,"h":"feb8c25e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(-10, -3)   AS nn' at line 1"}
+{"i":36,"h":"c011030d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(10.5, 3)   AS dec_div' at line 1"}
+{"i":37,"h":"a09f873d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(NULL, 1)   AS null_a' at line 1"}
+{"i":38,"h":"acf349bb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(1, NULL)   AS null_b' at line 1"}
+{"i":39,"h":"f9bf8689","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(10, 0)' at line 1"}
+{"i":40,"h":"85085778","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(1)' at line 1"}
+{"i":41,"h":"50fec517","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'div(1, 2, 3)' at line 1"}
+{"i":42,"h":"3898e2a2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', TIMESTAMP '2024-01-01 12:37:00', TIMESTAMP '2024-01-01 00:00:00')' at line 1"}
+{"i":43,"h":"640de9fb","k":"err","code":1305,"msg":"FUNCTION test.date_bin does not exist"}
+{"i":44,"h":"dc5208c1","k":"err","code":1305,"msg":"FUNCTION test.date_bin does not exist"}

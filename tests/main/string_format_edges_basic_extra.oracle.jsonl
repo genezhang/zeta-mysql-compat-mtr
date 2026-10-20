@@ -1,0 +1,37 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":36}
+{"i":1,"h":"d446029d","k":"rows","cols":["basic"],"rows":[["1,234,567.89"]]}
+{"i":2,"h":"546d56ea","k":"rows","cols":["no_dec"],"rows":[["1,234,568"]]}
+{"i":3,"h":"4da7e861","k":"rows","cols":["pad_dec"],"rows":[["1,234.5000"]]}
+{"i":4,"h":"f627a406","k":"rows","cols":["neg"],"rows":[["-1,234.56"]]}
+{"i":5,"h":"dc9423d5","k":"rows","cols":["nl_n"],"rows":[[null]]}
+{"i":6,"h":"7f8549bb","k":"rows","cols":["nl_d"],"rows":[[null]]}
+{"i":7,"h":"37ce0c54","k":"rows","cols":["hex_dec"],"rows":[["255"]]}
+{"i":8,"h":"03b20a65","k":"rows","cols":["dec_hex"],"rows":[["FF"]]}
+{"i":9,"h":"29d27300","k":"rows","cols":["bin_dec"],"rows":[["10"]]}
+{"i":10,"h":"37d84902","k":"rows","cols":["dec_bin"],"rows":[["1100100"]]}
+{"i":11,"h":"129fd42b","k":"rows","cols":["hex_bin"],"rows":[["11111111"]]}
+{"i":12,"h":"c1b5dcec","k":"rows","cols":["base36"],"rows":[["35"]]}
+{"i":13,"h":"05fe60c2","k":"rows","cols":["nl_n"],"rows":[[null]]}
+{"i":14,"h":"8c115b0e","k":"rows","cols":["nl_f"],"rows":[[null]]}
+{"i":15,"h":"2259070d","k":"rows","cols":["nl_t"],"rows":[[null]]}
+{"i":16,"h":"93487454","k":"rows","cols":["zero_base"],"rows":[[null]]}
+{"i":17,"h":"ae6903c9","k":"rows","cols":["int_hex","zero","str_hex","nl"],"rows":[["FF","0","616263",null]]}
+{"i":18,"h":"5cd23d53","k":"rows","cols":["valid"],"rows":[["abc"]]}
+{"i":19,"h":"adcc8d83","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":20,"h":"5e9af7cf","k":"rows","cols":["odd_len"],"rows":[["\u0001"]]}
+{"i":21,"h":"a039bb45","k":"rows","cols":["invalid"],"rows":[[null]]}
+{"i":22,"h":"14369dcf","k":"rows","cols":["nl"],"rows":[[null]]}
+{"i":23,"h":"52cfb8f8","k":"rows","cols":["bin_neg"],"rows":[["1111111111111111111111111111111111111111111111111111111111111111"]]}
+{"i":24,"h":"9fc6aafd","k":"rows","cols":["oct_neg"],"rows":[["1777777777777777777770"]]}
+{"i":25,"h":"5f20152f","k":"rows","cols":["zero","zero2"],"rows":[["0","0"]]}
+{"i":26,"h":"3c660368","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":27,"h":"f31cfacb","k":"rows","cols":["a"],"rows":[["A"]]}
+{"i":28,"h":"d6e6537a","k":"rows","cols":["abc"],"rows":[["ABC"]]}
+{"i":29,"h":"dc854715","k":"rows","cols":["len_zero"],"rows":[["1"]]}
+{"i":30,"h":"c707f02a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty, ORD(NULL) AS nl' at line 1"}
+{"i":31,"h":"dc0f4989","k":"rows","cols":["sq"],"rows":[["'don\\'t'"]]}
+{"i":32,"h":"2e832237","k":"rows","cols":["num"],"rows":[["'123'"]]}
+{"i":33,"h":"541f993c","k":"rows","cols":["qn","qn_len","is_nl"],"rows":[["NULL","4","0"]]}
+{"i":34,"h":"9b232cd1","k":"rows","cols":["de"],"rows":[["1.234,56"]]}
+{"i":35,"h":"5f3c46dc","k":"rows","cols":["us"],"rows":[["1,234.56"]]}
+{"i":36,"h":"28b3ddc1","k":"rows","cols":["nl"],"rows":[["1,234.56"]]}

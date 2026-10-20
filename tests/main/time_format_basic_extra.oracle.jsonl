@@ -1,0 +1,18 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":17}
+{"i":1,"h":"f0cac7a4","k":"rows","cols":["h24"],"rows":[["13:45:09"]]}
+{"i":2,"h":"2605e324","k":"rows","cols":["h12"],"rows":[["01:45 PM"]]}
+{"i":3,"h":"a70e981f","k":"rows","cols":["midnight_30_12h"],"rows":[["12:30:00 AM"]]}
+{"i":4,"h":"76bb6480","k":"rows","cols":["end_of_day_24h"],"rows":[["23:59:59"]]}
+{"i":5,"h":"bfb715f0","k":"rows","cols":["midnight"],"rows":[["12 AM"]]}
+{"i":6,"h":"728a5667","k":"rows","cols":["noon"],"rows":[["12 PM"]]}
+{"i":7,"h":"912b8736","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP), '%H:%i:%s') AS from_ts' at line 1"}
+{"i":8,"h":"c29d6b0e","k":"rows","cols":["n_val"],"rows":[[null]]}
+{"i":9,"h":"7a3fa3b2","k":"rows","cols":["n_fmt"],"rows":[[null]]}
+{"i":10,"h":"167b446d","k":"rows","cols":["mixed_case"],"rows":[["07:08:09"]]}
+{"i":11,"h":"487d91a7","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'TIME_FORMAT'"}
+{"i":12,"h":"0d097d0f","k":"rows","cols":["TIME_FORMAT('not-a-time', '%H:%i')"],"rows":[[null]]}
+{"i":13,"h":"df637624","k":"ok","affected":0}
+{"i":14,"h":"96e82941","k":"ok","affected":0}
+{"i":15,"h":"29c3520c","k":"ok","affected":3}
+{"i":16,"h":"7676494e","k":"rows","cols":["id","pretty"],"rows":[["1","06:15 AM"],["2","02:00 PM"],["3","11:45 PM"]]}
+{"i":17,"h":"a044e691","k":"ok","affected":0}

@@ -7,10 +7,10 @@ single_string
 "hi"
 SELECT JSON_EXTRACT('{"a":[1,2,3]}', '$.a')      AS single_array;
 single_array
-[1,2,3]
+[1, 2, 3]
 SELECT JSON_EXTRACT('{"a":{"b":99}}', '$.a')     AS single_object;
 single_object
-{"b":99}
+{"b": 99}
 SELECT JSON_EXTRACT('{"a":true}', '$.a')         AS single_bool;
 single_bool
 true
@@ -47,10 +47,10 @@ arr_then_arr
 === Multi-path: wraps in JSON array ===
 SELECT JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.a', '$.c') AS multi_hit_2;
 multi_hit_2
-[1,3]
+[1, 3]
 SELECT JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.c', '$.a') AS multi_hit_2_order;
 multi_hit_2_order
-[3,1]
+[3, 1]
 SELECT JSON_LENGTH(JSON_EXTRACT('{"a":1,"b":2,"c":3}', '$.a', '$.b', '$.c')) = 3
        AS multi_hit_3_length;
 multi_hit_3_length
@@ -78,20 +78,22 @@ null_path_mid
 1
 === Invalid path syntax → ERROR (zeta divergence; MySQL would NULL) ===
 SELECT JSON_EXTRACT('{"a":1}', 'not-a-path');
-ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "not-a-path"
+ERROR 3143: Invalid JSON path expression. The error is around character position 1.
 SELECT JSON_EXTRACT('{"a":1}', '');
-ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path ""
+ERROR 3143: Invalid JSON path expression. The error is around character position 0.
 === JSONPath unsupported features (wildcards / descendant) ===
 SELECT JSON_EXTRACT('{"a":1,"b":2}', '$.*');
-ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$.*"
+JSON_EXTRACT('{"a":1,"b":2}', '$.*')
+[1, 2]
 SELECT JSON_EXTRACT('[10,20]',       '$[*]');
-ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$[*]"
+JSON_EXTRACT('[10,20]',       '$[*]')
+[10, 20]
 SELECT JSON_EXTRACT('{"a":{"b":1}}', '$..b');
-ERROR 1105: execution error: JSON_EXTRACT: invalid JSON path "$..b"
+ERROR 3143: Invalid JSON path expression. The error is around character position 2.
 === Mixed array + multi-path ===
 SELECT JSON_EXTRACT('[10,20]', '$[0]', '$[1]') AS arr_multi_path;
 arr_multi_path
-[10,20]
+[10, 20]
 SELECT JSON_LENGTH(JSON_EXTRACT('[10,20]', '$[0]', '$[1]')) = 2 AS arr_multi_len;
 arr_multi_len
 1
@@ -102,21 +104,20 @@ quoted_key
 === Deeply-nested multi-path: nested objects survive wrap ===
 SELECT JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b') AS nested_multi;
 nested_multi
-[42,{"c":42}]
+[42, {"c": 42}]
 SELECT JSON_LENGTH(JSON_EXTRACT('{"a":{"b":{"c":42}}}', '$.a.b.c', '$.a.b')) = 2
        AS nested_multi_len;
 nested_multi_len
 1
 === Invalid JSON doc → ERROR (zeta strict) ===
 SELECT JSON_EXTRACT('not json at all', '$.a');
-ERROR 1105: execution error: JSON_EXTRACT first argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_extract: "Invalid value." at position 1.
 === Arity errors ===
 SELECT JSON_EXTRACT();
-ERROR 1105: execution error: JSON_EXTRACT requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_EXTRACT'
 SELECT JSON_EXTRACT('{"a":1}');
-ERROR 1105: execution error: JSON_EXTRACT requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_EXTRACT'
 === Determinism ===
 SELECT JSON_EXTRACT('{"a":1}', '$.a')
      = JSON_EXTRACT('{"a":1}', '$.a')            AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2

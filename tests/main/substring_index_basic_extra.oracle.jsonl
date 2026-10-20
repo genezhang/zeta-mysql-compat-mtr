@@ -1,0 +1,48 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":47}
+{"i":1,"h":"75baf973","k":"rows","cols":["left_1"],"rows":[["www"]]}
+{"i":2,"h":"d7e5b986","k":"rows","cols":["left_2"],"rows":[["www.mysql"]]}
+{"i":3,"h":"f8537fa1","k":"rows","cols":["left_3"],"rows":[["www.mysql.com"]]}
+{"i":4,"h":"7b455856","k":"rows","cols":["all_parts"],"rows":[["a,b,c"]]}
+{"i":5,"h":"02305d24","k":"rows","cols":["all_parts_eq"],"rows":[["1"]]}
+{"i":6,"h":"f42ecf56","k":"rows","cols":["more_than_parts"],"rows":[["a,b,c"]]}
+{"i":7,"h":"25f7e66a","k":"rows","cols":["right_1"],"rows":[["com"]]}
+{"i":8,"h":"1ee23bad","k":"rows","cols":["right_2"],"rows":[["mysql.com"]]}
+{"i":9,"h":"489c6d5d","k":"rows","cols":["right_3"],"rows":[["www.mysql.com"]]}
+{"i":10,"h":"0d86493d","k":"rows","cols":["neg_more_than_parts"],"rows":[["a,b,c"]]}
+{"i":11,"h":"0c668bae","k":"rows","cols":["zero_count"],"rows":[[""]]}
+{"i":12,"h":"c71a313a","k":"rows","cols":["zero_count_empty"],"rows":[["1"]]}
+{"i":13,"h":"a3d04862","k":"rows","cols":["zero_count_empty_hay"],"rows":[[""]]}
+{"i":14,"h":"40ab0bcf","k":"rows","cols":["int_min_lit_coerced_zero"],"rows":[["a,b,c,d"]]}
+{"i":15,"h":"3b1e74d3","k":"rows","cols":["int_min_lit_returns_empty"],"rows":[["0"]]}
+{"i":16,"h":"7e097c88","k":"rows","cols":["string_count"],"rows":[[""]]}
+{"i":17,"h":"b7651b0c","k":"rows","cols":["string_count_empty"],"rows":[["1"]]}
+{"i":18,"h":"b15fc081","k":"rows","cols":["empty_delim_pos"],"rows":[[""]]}
+{"i":19,"h":"249d182b","k":"rows","cols":["empty_delim_neg"],"rows":[[""]]}
+{"i":20,"h":"11153bbb","k":"rows","cols":["empty_delim_empty"],"rows":[["1"]]}
+{"i":21,"h":"ffb23df0","k":"rows","cols":["no_match_pos"],"rows":[["abcdef"]]}
+{"i":22,"h":"57086970","k":"rows","cols":["no_match_neg"],"rows":[["abcdef"]]}
+{"i":23,"h":"c553caee","k":"rows","cols":["no_match_big_pos"],"rows":[["abcdef"]]}
+{"i":24,"h":"65eb3ca5","k":"rows","cols":["lead_delim_first"],"rows":[[""]]}
+{"i":25,"h":"abf6026a","k":"rows","cols":["lead_delim_two"],"rows":[[",a"]]}
+{"i":26,"h":"14dad96f","k":"rows","cols":["trail_delim_last"],"rows":[[""]]}
+{"i":27,"h":"2d600645","k":"rows","cols":["trail_delim_two"],"rows":[["b,"]]}
+{"i":28,"h":"a27fd97a","k":"rows","cols":["both_lead"],"rows":[[""]]}
+{"i":29,"h":"9b78f071","k":"rows","cols":["both_trail"],"rows":[[""]]}
+{"i":30,"h":"5bf45c6e","k":"rows","cols":["multichar_left"],"rows":[["foo"]]}
+{"i":31,"h":"5b245e47","k":"rows","cols":["multichar_right"],"rows":[["baz"]]}
+{"i":32,"h":"19ed181b","k":"rows","cols":["multichar_left_two"],"rows":[["foo::bar"]]}
+{"i":33,"h":"2a87aed9","k":"rows","cols":["utf8_delim_left"],"rows":[["a"]]}
+{"i":34,"h":"b0a7046f","k":"rows","cols":["utf8_delim_right"],"rows":[["c"]]}
+{"i":35,"h":"60c9487b","k":"rows","cols":["utf8_delim_two"],"rows":[["aéb "]]}
+{"i":36,"h":"74bd8e1f","k":"rows","cols":["single_part_pos"],"rows":[["only"]]}
+{"i":37,"h":"742506eb","k":"rows","cols":["single_part_neg"],"rows":[["only"]]}
+{"i":38,"h":"488f5455","k":"rows","cols":["empty_hay_pos"],"rows":[[""]]}
+{"i":39,"h":"0dee37d2","k":"rows","cols":["empty_hay_neg"],"rows":[[""]]}
+{"i":40,"h":"2e163323","k":"rows","cols":["null_str"],"rows":[["1"]]}
+{"i":41,"h":"9456d105","k":"rows","cols":["null_delim"],"rows":[["1"]]}
+{"i":42,"h":"083338c4","k":"rows","cols":["null_count"],"rows":[["1"]]}
+{"i":43,"h":"18eb526d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2"}
+{"i":44,"h":"592e54a8","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'"}
+{"i":45,"h":"964b6cea","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'"}
+{"i":46,"h":"30c716e5","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'"}
+{"i":47,"h":"e8011254","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'"}

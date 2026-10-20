@@ -1,0 +1,23 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":22}
+{"i":1,"h":"2174bc02","k":"rows","cols":["mid_len"],"rows":[["4"]]}
+{"i":2,"h":"c13db440","k":"rows","cols":["mid_vals"],"rows":[["[1, 9, 2, 3]"]]}
+{"i":3,"h":"50a8c453","k":"rows","cols":["prepended_head"],"rows":[["9"]]}
+{"i":4,"h":"b4c7b347","k":"rows","cols":["append_at_len"],"rows":[["9"]]}
+{"i":5,"h":"bd43ab4c","k":"rows","cols":["oob_clamped_to_append"],"rows":[["9"]]}
+{"i":6,"h":"85aeaa07","k":"rows","cols":["empty_after"],"rows":[["1"]]}
+{"i":7,"h":"8c27bbc7","k":"rows","cols":["obj_unchanged"],"rows":[["1"]]}
+{"i":8,"h":"ffc95fac","k":"rows","cols":["scalar_unchanged"],"rows":[["INTEGER"]]}
+{"i":9,"h":"98fadbb2","k":"rows","cols":["chain_len"],"rows":[["5"]]}
+{"i":10,"h":"c00e0d9a","k":"rows","cols":["chain_third_elem"],"rows":[["8"]]}
+{"i":11,"h":"443a03bb","k":"rows","cols":["str_kept_as_string"],"rows":[["STRING"]]}
+{"i":12,"h":"a44fe199","k":"err","code":3165,"msg":"A path expression is not a path to a cell in an array."}
+{"i":13,"h":"4f765165","k":"err","code":3165,"msg":"A path expression is not a path to a cell in an array."}
+{"i":14,"h":"30324bdb","k":"rows","cols":["nested_under_claim"],"rows":[["0"]]}
+{"i":15,"h":"b9e2b370","k":"rows","cols":["null_target"],"rows":[["1"]]}
+{"i":16,"h":"9afdf9df","k":"rows","cols":["null_path"],"rows":[["1"]]}
+{"i":17,"h":"dc9447de","k":"rows","cols":["null_val"],"rows":[["0"]]}
+{"i":18,"h":"03da908f","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_ARRAY_INSERT'"}
+{"i":19,"h":"10f9d477","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_ARRAY_INSERT'"}
+{"i":20,"h":"454e4713","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_ARRAY_INSERT'"}
+{"i":21,"h":"e5194dcb","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_array_insert: \"Invalid value.\" at position 1."}
+{"i":22,"h":"9926b062","k":"err","code":3149,"msg":"In this situation, path expressions may not contain the * and ** tokens or an array range."}

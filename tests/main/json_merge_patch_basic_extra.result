@@ -4,7 +4,7 @@ SELECT JSON_EXTRACT(
   '$.a', '$.b', '$.c'
 ) AS abc;
 abc
-[1,99,3]
+[1, 99, 3]
 SELECT JSON_LENGTH(
   JSON_MERGE_PATCH('{"a":1,"b":2}', '{"b":99,"c":3}')
 ) AS keys_after;
@@ -40,7 +40,7 @@ SELECT JSON_EXTRACT(
   '$.a.x', '$.a.y', '$.a.z'
 ) AS nested_xyz;
 nested_xyz
-[1,99,3]
+[1, 99, 3]
 === Non-object patch replaces target entirely ===
 SELECT JSON_TYPE(JSON_MERGE_PATCH('{"a":1}', '[1,2,3]')) AS becomes_array;
 becomes_array
@@ -83,11 +83,11 @@ a_still
 1
 === Arity errors ===
 SELECT JSON_MERGE_PATCH();
-ERROR 1105: execution error: JSON_MERGE_PATCH requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_MERGE_PATCH'
 SELECT JSON_MERGE_PATCH('{"a":1}');
-ERROR 1105: execution error: JSON_MERGE_PATCH requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_MERGE_PATCH'
 === Invalid JSON rejected ===
 SELECT JSON_MERGE_PATCH('not json', '{}');
-ERROR 1105: execution error: JSON_MERGE_PATCH argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_merge_patch: "Invalid value." at position 1.
 SELECT JSON_MERGE_PATCH('{}', 'not json');
-ERROR 1105: execution error: JSON_MERGE_PATCH argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 2 to function json_merge_patch: "Invalid value." at position 1.

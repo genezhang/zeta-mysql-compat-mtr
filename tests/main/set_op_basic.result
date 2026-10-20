@@ -41,8 +41,7 @@ id
 1
 === MINUS (alias for EXCEPT) ===
 SELECT id FROM s1 MINUS SELECT id FROM s2 ORDER BY id;
-id
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT id FROM s2 ORDER BY id' at line 1
 === Multi-way UNION (>2 branches) ===
 SELECT 1 AS v UNION SELECT 2 UNION SELECT 3 ORDER BY v;
 v
@@ -63,14 +62,14 @@ mx
 === Mixed-type coercion (INT + DOUBLE) ===
 SELECT 1 AS v UNION SELECT 2.5 ORDER BY v;
 v
-1
+1.0
 2.5
 === KNOWN DIVERGENCE: column-count mismatch — errno 1105 ===
 # MySQL emits 1222 (ER_WRONG_NUMBER_OF_COLUMNS_IN_SELECT); zeta
 # emits 1105 (generic execution error). Pinned to the wider
 # errno so we still trip if the behavior changes.
 SELECT id, name FROM s1 UNION SELECT id FROM s2;
-ERROR 1105: execution error: set operation column count mismatch: left has 2, right has 1
+ERROR 1222: The used SELECT statements have a different number of columns
 === Cleanup ===
 DROP TABLE s1;
 DROP TABLE s2;

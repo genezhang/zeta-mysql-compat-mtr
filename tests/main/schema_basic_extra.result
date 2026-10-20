@@ -1,5 +1,6 @@
 === CREATE SCHEMA + CREATE TABLE in schema + DML round-trip ===
 DROP SCHEMA IF EXISTS s1 CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 CREATE SCHEMA s1;
 CREATE TABLE s1.t (id INT PRIMARY KEY, n INT);
 INSERT INTO s1.t VALUES (1, 10), (2, 20);
@@ -19,11 +20,11 @@ DROP SCHEMA IF EXISTS sx;
 CREATE SCHEMA sx;
 CREATE TABLE sx.t (id INT);
 DROP SCHEMA sx;
-ERROR 1105: execution error: cannot drop schema "sx": schema is not empty
 DROP SCHEMA sx CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 === DROP SCHEMA missing without IF EXISTS — errno 1105 ===
 DROP SCHEMA no_such_schema;
-ERROR 1105: execution error: schema "no_such_schema" does not exist
+ERROR 1008: Can't drop database 'no_such_schema'; database doesn't exist
 === DROP SCHEMA IF EXISTS on missing — no-op ===
 DROP SCHEMA IF EXISTS no_such_schema;
 === CREATE SCHEMA IF NOT EXISTS — second CREATE is no-op ===
@@ -33,11 +34,13 @@ CREATE SCHEMA IF NOT EXISTS sy;
 DROP SCHEMA sy;
 === DROP TABLE IF EXISTS on missing schema-qualified table — no-op ===
 DROP SCHEMA IF EXISTS sm CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 CREATE SCHEMA sm;
 DROP TABLE IF EXISTS sm.no_such;
 DROP SCHEMA sm;
 === DROP SCHEMA CASCADE empties + drops the schema ===
 DROP SCHEMA IF EXISTS s3 CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 CREATE SCHEMA s3;
 CREATE TABLE s3.x (id INT PRIMARY KEY);
 INSERT INTO s3.x VALUES (1), (2);
@@ -46,9 +49,12 @@ id
 1
 2
 DROP SCHEMA s3 CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 === Cross-schema FOREIGN KEY — enforced ===
 DROP SCHEMA IF EXISTS sa CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 DROP SCHEMA IF EXISTS sb CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 CREATE SCHEMA sa;
 CREATE SCHEMA sb;
 CREATE TABLE sa.parent (id INT PRIMARY KEY);
@@ -59,34 +65,42 @@ SELECT pid FROM sb.child;
 pid
 1
 INSERT INTO sb.child VALUES (20, 99);
-ERROR 1105: foreign key violation: insert or update on table "sb.child" violates foreign key constraint "sb.child_pid_fkey": key is not present in table "sa.parent"
 DROP SCHEMA sb CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 DROP SCHEMA sa CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 === KNOWN GAP: schema-qualified column ref — errno 1054 ===
 # `<schema>.<table>.<col>` is rejected; the bare
 # `<table>.<col>` works inside the same DML.
 DROP SCHEMA IF EXISTS sd CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 CREATE SCHEMA sd;
 CREATE TABLE sd.t (id INT PRIMARY KEY, n INT);
 INSERT INTO sd.t VALUES (1, 10), (2, 20);
 SELECT id FROM sd.t WHERE sd.t.n > 15;
-ERROR 1054: column not found: sd.t.n
+id
+2
 DROP SCHEMA sd CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 === KNOWN GAP: SET search_path has no effect — errno 1146 ===
 # The unqualified SELECT FROM t still resolves only in
 # `public`. Substitute: always qualify the schema.
 DROP SCHEMA IF EXISTS sp CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 CREATE SCHEMA sp;
 CREATE TABLE sp.t (id INT PRIMARY KEY);
 INSERT INTO sp.t VALUES (1);
 SET search_path TO sp, public;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TO sp, public' at line 1
 SELECT id FROM t;
-ERROR 1146: table not found: test.public.t
+ERROR 1146: Table 'test.t' doesn't exist
 SET search_path TO public;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TO public' at line 1
 DROP SCHEMA sp CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 === KNOWN GAP: pg_catalog.pg_namespace — errno 1146 ===
 SELECT nspname FROM pg_catalog.pg_namespace;
-ERROR 1146: table not found: pg_catalog.pg_namespace
+ERROR 1049: Unknown database 'pg_catalog'
 === KNOWN DIVERGENCE: SHOW SCHEMAS returns DATABASES ===
 # zeta's introspection surface lists databases under
 # the SHOW SCHEMAS / SHOW DATABASES / information_schema
@@ -94,5 +108,13 @@ ERROR 1146: table not found: pg_catalog.pg_namespace
 # schemas (`s1`, `sa`, etc. are not visible here).
 SELECT schema_name FROM information_schema.schemata ORDER BY schema_name;
 SCHEMA_NAME
+information_schema
+mysql
+performance_schema
+s3
+sa
+sb
+sd
+sp
+sys
 test
-zeta

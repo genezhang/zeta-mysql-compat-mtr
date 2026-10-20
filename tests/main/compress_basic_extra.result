@@ -41,19 +41,19 @@ too_short
 NULL
 SELECT UNCOMPRESSED_LENGTH('ab')                       AS too_short_hdr;
 too_short_hdr
-NULL
+0
 SELECT UNCOMPRESS(CONCAT(UNHEX('63000000'), 'junk'))   AS bad_zlib;
 bad_zlib
 NULL
 === Arity errors ===
 SELECT COMPRESS();
-ERROR 1105: execution error: COMPRESS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'COMPRESS'
 SELECT UNCOMPRESS();
-ERROR 1105: execution error: UNCOMPRESS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'UNCOMPRESS'
 SELECT UNCOMPRESSED_LENGTH();
-ERROR 1105: execution error: UNCOMPRESSED_LENGTH requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'UNCOMPRESSED_LENGTH'
 SELECT COMPRESS('a', 'b');
-ERROR 1105: execution error: COMPRESS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'COMPRESS'
 === Mixed case ===
 SELECT UNCOMPRESSED_LENGTH(Compress('mixed')) AS mixed_ok;
 mixed_ok

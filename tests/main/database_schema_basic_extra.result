@@ -1,14 +1,14 @@
 === Both names return the runner's connection database ===
 SELECT DATABASE() AS db;
-DATABASE()
+db
 test
 SELECT SCHEMA()   AS schema_name;
-DATABASE()
+schema_name
 test
 === Mixed case (shim's case-insensitive match) ===
 SELECT Database() AS db_mixed;
-DATABASE()
+db_mixed
 test
 SELECT Schema()   AS schema_mixed;
-DATABASE()
+schema_mixed
 test

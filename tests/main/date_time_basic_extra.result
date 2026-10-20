@@ -10,35 +10,28 @@ ts
 2024-01-01 14:30:00
 === DATE + INTERVAL '<n> <unit>' (PG syntax) ===
 SELECT DATE '2024-01-01' + INTERVAL '7 days'   AS d_plus_7;
-d_plus_7
-2024-01-08 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d_plus_7' at line 1
 SELECT DATE '2024-01-01' - INTERVAL '1 month'  AS d_minus_1m;
-d_minus_1m
-2023-12-01 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d_minus_1m' at line 1
 SELECT TIMESTAMP '2024-01-01 12:00:00' + INTERVAL '3 hours' AS ts_plus_3h;
-ts_plus_3h
-2024-01-01 15:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS ts_plus_3h' at line 1
 === Negative-literal INTERVAL ===
 SELECT DATE '2024-05-19' + INTERVAL '-3 days'  AS d_minus_3;
-d_minus_3
-2024-05-16 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d_minus_3' at line 1
 === DATE - DATE → integer days; TIMESTAMP - TIMESTAMP → HH:MM:SS ===
 SELECT DATE '2024-05-19' - DATE '2024-05-10'   AS day_diff;
 day_diff
 9
 SELECT TIMESTAMP '2024-05-19 14:00:00' - TIMESTAMP '2024-05-19 10:00:00' AS hr_diff;
 hr_diff
-04:00:00
+40000
 === INTERVAL syntax variants — all render as HH:MM:SS ===
 SELECT INTERVAL '1 day' AS i_pg;
-i_pg
-24:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS i_pg' at line 1
 SELECT INTERVAL '1' DAY AS i_quoted;
-i_quoted
-24:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS i_quoted' at line 1
 SELECT INTERVAL 1 DAY   AS i_mysql;
-i_mysql
-24:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS i_mysql' at line 1
 === EXTRACT(<field> FROM expr) ===
 SELECT EXTRACT(YEAR  FROM DATE '2024-05-19')                  AS y;
 y
@@ -57,32 +50,27 @@ mi
 30
 SELECT EXTRACT(SECOND FROM TIMESTAMP '2024-05-19 14:30:45')   AS s;
 s
-45.000000
+45
 === DATE_TRUNC('<unit>', ts) ===
 SELECT DATE_TRUNC('year',  TIMESTAMP '2024-05-19 14:30:45') AS d_yr;
-d_yr
-2024-01-01 00:00:00
+ERROR 1305: FUNCTION test.DATE_TRUNC does not exist
 SELECT DATE_TRUNC('month', TIMESTAMP '2024-05-19 14:30:45') AS d_mo;
-d_mo
-2024-05-01 00:00:00
+ERROR 1305: FUNCTION test.DATE_TRUNC does not exist
 SELECT DATE_TRUNC('week',  TIMESTAMP '2024-05-19 14:30:45') AS d_wk;
-d_wk
-2024-05-13 00:00:00
+ERROR 1305: FUNCTION test.DATE_TRUNC does not exist
 SELECT DATE_TRUNC('day',   TIMESTAMP '2024-05-19 14:30:45') AS d_da;
-d_da
-2024-05-19 00:00:00
+ERROR 1305: FUNCTION test.DATE_TRUNC does not exist
 SELECT DATE_TRUNC('hour',  TIMESTAMP '2024-05-19 14:30:45') AS d_hr;
-d_hr
-2024-05-19 14:00:00
+ERROR 1305: FUNCTION test.DATE_TRUNC does not exist
 === CURRENT_DATE / CURRENT_TIMESTAMP — relational only ===
 # Values are wall-clock; only the relational predicates
 # are pinned for stability.
 SELECT CURRENT_DATE = CURRENT_DATE                            AS same_date;
 same_date
-1
+<masked>
 SELECT CURRENT_TIMESTAMP > TIMESTAMP '2020-01-01 00:00:00'    AS in_future;
 in_future
-1
+<masked>
 === DATE / TIMESTAMP filter through WHERE ===
 DROP TABLE IF EXISTS dts;
 CREATE TABLE dts (id INT PRIMARY KEY, d DATE, t TIMESTAMP);
@@ -100,15 +88,12 @@ id
 # returns the input timestamp unchanged. No actual TZ
 # conversion is performed.
 SELECT TIMESTAMP '2024-01-01 14:30:00' AT TIME ZONE 'UTC' AS ts_utc;
-ts_utc
-2024-01-01 14:30:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIME ZONE 'UTC' AS ts_utc' at line 1
 === MAKE_DATE / MAKE_TIME — PG-style constructors (substitutes for MAKEDATE/MAKETIME) ===
 SELECT MAKE_DATE(2024, 5, 19) AS md;
-md
-2024-05-19
+ERROR 1305: FUNCTION test.MAKE_DATE does not exist
 SELECT MAKE_TIME(14, 30, 45)  AS mt;
-mt
-14:30:45
+ERROR 1305: FUNCTION test.MAKE_TIME does not exist
 === WEEKOFYEAR — FIXED via zeta #1182 (alias for WEEK) ===
 SELECT WEEKOFYEAR('2024-05-19') AS w;
 w
@@ -120,10 +105,10 @@ mt
 === FIXED: ADDTIME / SUBTIME (string-string form) now supported ===
 SELECT ADDTIME('14:30:00', '1:30:00') AS r;
 r
-1970-01-01 16:00:00
+16:00:00
 SELECT SUBTIME('14:30:00', '1:30:00') AS r;
 r
-1970-01-01 13:00:00
+13:00:00
 === FIXED: MAKEDATE (year, day-of-year) now supported ===
 SELECT MAKEDATE(2024, 140) AS d;
 d

@@ -1,64 +1,78 @@
 === CREATE SEQUENCE (defaults) + NEXTVAL + CURRVAL ===
 DROP SEQUENCE IF EXISTS s_basic;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_basic' at line 1
 CREATE SEQUENCE s_basic;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_basic' at line 1
 SELECT NEXTVAL('s_basic') AS v1, NEXTVAL('s_basic') AS v2, NEXTVAL('s_basic') AS v3;
-v1	v2	v3
-1	2	3
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 SELECT CURRVAL('s_basic') AS c;
-c
-3
+ERROR 1305: FUNCTION test.CURRVAL does not exist
 DROP SEQUENCE s_basic;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_basic' at line 1
 === CREATE SEQUENCE START WITH <n> ===
 DROP SEQUENCE IF EXISTS s_start;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_start' at line 1
 CREATE SEQUENCE s_start START WITH 100;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_start START WITH 100' at line 1
 SELECT NEXTVAL('s_start') AS v1, NEXTVAL('s_start') AS v2;
-v1	v2
-100	101
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 DROP SEQUENCE s_start;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_start' at line 1
 === CREATE SEQUENCE START WITH + INCREMENT BY ===
 DROP SEQUENCE IF EXISTS s_inc;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_inc' at line 1
 CREATE SEQUENCE s_inc START WITH 10 INCREMENT BY 5;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_inc START WITH 10 INCREMENT BY 5' at line 1
 SELECT NEXTVAL('s_inc') AS v1, NEXTVAL('s_inc') AS v2, NEXTVAL('s_inc') AS v3;
-v1	v2	v3
-10	15	20
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 DROP SEQUENCE s_inc;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_inc' at line 1
 === Descending sequence (negative INCREMENT) ===
 DROP SEQUENCE IF EXISTS s_neg;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_neg' at line 1
 CREATE SEQUENCE s_neg START WITH 100 INCREMENT BY -10;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_neg START WITH 100 INCREMENT BY -10' at line 1
 SELECT NEXTVAL('s_neg') AS v1, NEXTVAL('s_neg') AS v2, NEXTVAL('s_neg') AS v3;
-v1	v2	v3
-100	90	80
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 DROP SEQUENCE s_neg;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_neg' at line 1
 === MAXVALUE enforced for ascending sequence ===
 # After NEXTVAL hits MAXVALUE, the next call errors 1105.
 DROP SEQUENCE IF EXISTS s_maxv;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_maxv' at line 1
 CREATE SEQUENCE s_maxv START WITH 5 MINVALUE 5 MAXVALUE 7;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_maxv START WITH 5 MINVALUE 5 MAXVALUE 7' at line 1
 SELECT NEXTVAL('s_maxv') AS v1, NEXTVAL('s_maxv') AS v2, NEXTVAL('s_maxv') AS v3;
-v1	v2	v3
-5	6	7
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 SELECT NEXTVAL('s_maxv') AS overflow;
-ERROR 1105: execution error: sequence "s_maxv" reached maximum value
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 DROP SEQUENCE s_maxv;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_maxv' at line 1
 === SETVAL (2-arg) + subsequent NEXTVAL ===
 DROP SEQUENCE IF EXISTS s_setval;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_setval' at line 1
 CREATE SEQUENCE s_setval;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_setval' at line 1
 SELECT SETVAL('s_setval', 50) AS s;
-s
-50
+ERROR 1305: FUNCTION test.SETVAL does not exist
 SELECT NEXTVAL('s_setval') AS v;
-v
-51
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 DROP SEQUENCE s_setval;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_setval' at line 1
 === CURRVAL before any NEXTVAL — errno 1105 ===
 DROP SEQUENCE IF EXISTS s_cv0;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_cv0' at line 1
 CREATE SEQUENCE s_cv0;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cv0' at line 1
 SELECT CURRVAL('s_cv0') AS c;
-ERROR 1105: execution error: currval of sequence "s_cv0" is not yet defined in this session
+ERROR 1305: FUNCTION test.CURRVAL does not exist
 DROP SEQUENCE s_cv0;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cv0' at line 1
 === NEXTVAL on missing sequence — errno 1105 ===
 DROP SEQUENCE IF EXISTS s_missing;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_missing' at line 1
 SELECT NEXTVAL('s_missing') AS v;
-ERROR 1105: execution error: sequence "s_missing" does not exist
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 === SERIAL — auto-increment column ===
 DROP TABLE IF EXISTS t_ser;
 CREATE TABLE t_ser (id SERIAL PRIMARY KEY, name TEXT);
@@ -71,30 +85,35 @@ id	name
 DROP TABLE t_ser;
 === DROP SEQUENCE IF EXISTS — no-op on missing ===
 DROP SEQUENCE IF EXISTS s_no_such;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_no_such' at line 1
 DROP SEQUENCE IF EXISTS s_no_such;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_no_such' at line 1
 === KNOWN GAP: CYCLE parsed but not honoured — errno 1105 ===
 # Substitute: DROP + re-CREATE, or wrap NEXTVAL in
 # ((NEXTVAL(x) - 1) % range) + lo.
 DROP SEQUENCE IF EXISTS s_cycle;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_cycle' at line 1
 CREATE SEQUENCE s_cycle START WITH 1 MAXVALUE 3 CYCLE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cycle START WITH 1 MAXVALUE 3 CYCLE' at line 1
 SELECT NEXTVAL('s_cycle') AS v1, NEXTVAL('s_cycle') AS v2, NEXTVAL('s_cycle') AS v3;
-v1	v2	v3
-1	2	3
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 SELECT NEXTVAL('s_cycle') AS should_cycle_back_to_1;
-ERROR 1105: execution error: sequence "s_cycle" reached maximum value
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 DROP SEQUENCE s_cycle;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_cycle' at line 1
 === KNOWN GAP: MINVALUE not enforced for descending ===
 # NEXTVAL silently continues past MINVALUE. Compare
 # with the ascending MAXVALUE case above which errors.
 DROP SEQUENCE IF EXISTS s_minneg;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_minneg' at line 1
 CREATE SEQUENCE s_minneg START WITH 0 INCREMENT BY -1 MINVALUE -3;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_minneg START WITH 0 INCREMENT BY -1 MINVALUE -3' at line 1
 SELECT NEXTVAL('s_minneg') AS v1, NEXTVAL('s_minneg') AS v2, NEXTVAL('s_minneg') AS v3, NEXTVAL('s_minneg') AS v4;
-v1	v2	v3	v4
-0	-1	-2	-3
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 SELECT NEXTVAL('s_minneg') AS past_minvalue;
-past_minvalue
--4
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 DROP SEQUENCE s_minneg;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_minneg' at line 1
 === KNOWN GAP: column DEFAULT NEXTVAL — errno 1105 (type) ===
 # "type mismatch … expected Int64, got String" — NEXTVAL
 # in a DEFAULT clause is bound as a text-returning
@@ -102,26 +121,36 @@ DROP SEQUENCE s_minneg;
 # NEXTVAL in each INSERT's VALUES list.
 DROP TABLE IF EXISTS t_dflt;
 DROP SEQUENCE IF EXISTS s_dflt;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_dflt' at line 1
 CREATE SEQUENCE s_dflt START WITH 100;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_dflt START WITH 100' at line 1
 CREATE TABLE t_dflt (id BIGINT DEFAULT NEXTVAL('s_dflt') PRIMARY KEY, name TEXT);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NEXTVAL('s_dflt') PRIMARY KEY, name TEXT)' at line 1
 INSERT INTO t_dflt (name) VALUES ('x');
-ERROR 1105: internal error: key codec error: type mismatch at field 0: expected Int64, got String
+ERROR 1146: Table 'test.t_dflt' doesn't exist
 DROP TABLE t_dflt;
+ERROR 1051: Unknown table 'test.t_dflt'
 DROP SEQUENCE s_dflt;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_dflt' at line 1
 === KNOWN GAP: ALTER SEQUENCE — errno 1064 ===
 # Substitute: DROP + re-CREATE.
 DROP SEQUENCE IF EXISTS s_alt;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_alt' at line 1
 CREATE SEQUENCE s_alt START WITH 1;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_alt START WITH 1' at line 1
 ALTER SEQUENCE s_alt INCREMENT BY 10;
-ERROR 1064: SQL parse error: sql parser error: Expected: one of VIEW or TYPE or TABLE or INDEX or ROLE or POLICY or CONNECTOR or ICEBERG or SCHEMA or USER or OPERATOR, found: SEQUENCE at Line: 1, Column: 7
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_alt INCREMENT BY 10' at line 1
 DROP SEQUENCE s_alt;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_alt' at line 1
 === KNOWN GAP: LASTVAL() — errno 1105 ===
 # Substitute: CURRVAL('<name>').
 DROP SEQUENCE IF EXISTS s_lv;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE IF EXISTS s_lv' at line 1
 CREATE SEQUENCE s_lv;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_lv' at line 1
 SELECT NEXTVAL('s_lv') AS n;
-n
-1
+ERROR 1305: FUNCTION test.NEXTVAL does not exist
 SELECT LASTVAL() AS l;
-ERROR 1105: execution error: unknown function: LASTVAL
+ERROR 1305: FUNCTION test.LASTVAL does not exist
 DROP SEQUENCE s_lv;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEQUENCE s_lv' at line 1

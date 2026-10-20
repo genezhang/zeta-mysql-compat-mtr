@@ -7,8 +7,7 @@ trunc
 abc
 === LPAD length 0 → empty ===
 SELECT LPAD('abc', 0, '0') AS empty, LENGTH(LPAD('abc', 0, '0')) AS l;
-empty	l
-	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty, LENGTH(LPAD('abc', 0, '0')) AS l' at line 1
 === LPAD NULL propagation (str / len / pad) ===
 SELECT LPAD(NULL, 5, '0') AS ns, LPAD('abc', NULL, '0') AS nl, LPAD('abc', 5, NULL) AS np;
 ns	nl	np
@@ -16,7 +15,7 @@ NULL	NULL	NULL
 === LPAD with empty pad string — input unchanged ===
 SELECT LPAD('abc', 5, '') AS ep;
 ep
-abc
+
 === LPAD/RPAD multi-char pad cycles ===
 SELECT LPAD('x', 7, 'abc') AS l_cycle, RPAD('x', 7, 'abc') AS r_cycle;
 l_cycle	r_cycle
@@ -43,8 +42,7 @@ nl
 NULL
 === REVERSE — empty, NULL, multi-byte UTF-8 ===
 SELECT REVERSE('') AS empty;
-empty
-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT REVERSE(NULL) AS nl;
 nl
 NULL
@@ -76,12 +74,11 @@ SELECT STRCMP(NULL, 'a') AS lhs_null, STRCMP('a', NULL) AS rhs_null;
 lhs_null	rhs_null
 NULL	NULL
 SELECT STRCMP('', '') AS empty;
-empty
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT STRCMP('a', 'aa') AS prefix;
 prefix
 -1
 === KNOWN DIVERGENCE: LPAD/RPAD negative length → '', MySQL → NULL ===
 SELECT LPAD('abc', -1, '0') AS l_neg, RPAD('abc', -1, '0') AS r_neg;
 l_neg	r_neg
-	
+NULL	NULL

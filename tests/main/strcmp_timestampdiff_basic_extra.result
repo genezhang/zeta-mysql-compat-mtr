@@ -24,10 +24,10 @@ prefix_longer_pos
 === STRCMP: case sensitivity (zeta byte-equal divergence) ===
 SELECT STRCMP('a', 'A')                  AS case_byte_equal;
 case_byte_equal
-1
+0
 SELECT STRCMP('hello', 'Hello')          AS case_mixed;
 case_mixed
-1
+0
 === STRCMP: empty + NULL ===
 SELECT STRCMP('', '')                    AS both_empty;
 both_empty
@@ -63,14 +63,14 @@ float_str_format
 === STRCMP: multi-byte UTF-8 byte-level compare ===
 SELECT STRCMP('é', 'e')                  AS utf8_byte_cmp;
 utf8_byte_cmp
-1
+0
 === STRCMP: arity ===
 SELECT STRCMP();
-ERROR 1105: execution error: STRCMP requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'STRCMP'
 SELECT STRCMP('a');
-ERROR 1105: execution error: STRCMP requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'STRCMP'
 SELECT STRCMP('a', 'b', 'c');
-ERROR 1105: execution error: STRCMP requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'STRCMP'
 === TIMESTAMPDIFF: MICROSECOND / SECOND / MINUTE / HOUR ===
 SELECT TIMESTAMPDIFF(MICROSECOND, '2024-01-01 00:00:00', '2024-01-01 00:00:01') AS us_one_sec;
 us_one_sec
@@ -133,7 +133,7 @@ unit_mixed
 1
 === TIMESTAMPDIFF: invalid unit identifier ===
 SELECT TIMESTAMPDIFF(FOOBAR, '2024-01-01', '2024-01-02');
-ERROR 1054: column not found: FOOBAR
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FOOBAR, '2024-01-01', '2024-01-02')' at line 1
 === TIMESTAMPDIFF: cross-year reverse ===
 SELECT TIMESTAMPDIFF(MONTH, '2024-02-01', '2022-11-01')              AS cross_year_reverse;
 cross_year_reverse
@@ -143,8 +143,7 @@ cross_year_reverse_year
 -1
 === TIMESTAMPDIFF: NULL on any arg ===
 SELECT TIMESTAMPDIFF(NULL, '2024-01-01', '2024-01-02') IS NULL         AS null_unit;
-null_unit
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL, '2024-01-01', '2024-01-02') IS NULL         AS null_unit' at line 1
 SELECT TIMESTAMPDIFF(DAY,  NULL,         '2024-01-02') IS NULL         AS null_start;
 null_start
 1
@@ -153,13 +152,13 @@ null_end
 1
 === TIMESTAMPDIFF: arity ===
 SELECT TIMESTAMPDIFF();
-ERROR 1105: execution error: TIMESTAMPDIFF requires 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT TIMESTAMPDIFF(DAY);
-ERROR 1054: column not found: DAY
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT TIMESTAMPDIFF(DAY, '2024-01-01');
-ERROR 1054: column not found: DAY
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT TIMESTAMPDIFF(DAY, '2024-01-01', '2024-01-02', 'extra');
-ERROR 1054: column not found: DAY
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'extra')' at line 1
 === Determinism ===
 SELECT STRCMP('a', 'b')     = STRCMP('a', 'b')               AS strcmp_det;
 strcmp_det

@@ -1,15 +1,12 @@
 === ILIKE — case-insensitive LIKE ===
 SELECT 'ABC' ILIKE 'abc' AS r1, 'aBc' ILIKE 'abc%' AS r2, 'XYZ' ILIKE 'a%' AS r3;
-r1	r2	r3
-1	1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''abc' AS r1, 'aBc' ILIKE 'abc%' AS r2, 'XYZ' ILIKE 'a%' AS r3' at line 1
 === ILIKE NULL propagation ===
 SELECT NULL ILIKE 'abc' AS r1, 'abc' ILIKE NULL AS r2;
-r1	r2
-NULL	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''abc' AS r1, 'abc' ILIKE NULL AS r2' at line 1
 === NOT LIKE / NOT ILIKE ===
 SELECT 'abc' NOT LIKE 'def' AS r1, 'abc' NOT LIKE 'abc' AS r2, 'ABC' NOT ILIKE 'abc' AS r3;
-r1	r2	r3
-1	0	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ILIKE 'abc' AS r3' at line 1
 === REGEXP (MySQL) — basic match / non-match / anchors ===
 SELECT 'abc123' REGEXP '[0-9]+' AS r1, 'hello' REGEXP '^h' AS r2, 'hello' REGEXP 'c$' AS r3, 'hello' REGEXP '^hello$' AS r4, 'hello' REGEXP 'x' AS no_match;
 r1	r2	r3	r4	no_match
@@ -24,20 +21,16 @@ r1	r2
 1	0
 === REGEXP empty pattern — matches everything ===
 SELECT 'abc' REGEXP '' AS r;
-r
-1
+ERROR 3685: Illegal argument to a regular expression.
 === PG ~ — case-sensitive regex match, Bool result ===
 SELECT 'abc' ~ 'b' AS r1, 'ABC' ~ 'abc' AS r2;
-r1	r2
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '~ 'b' AS r1, 'ABC' ~ 'abc' AS r2' at line 1
 === PG ~* — case-insensitive regex match ===
 SELECT 'ABC' ~* 'abc' AS r1, 'XYZ' ~* '^a' AS r2;
-r1	r2
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '~* 'abc' AS r1, 'XYZ' ~* '^a' AS r2' at line 1
 === PG !~ / !~* — negated regex match ===
 SELECT 'abc' !~ 'x' AS r1, 'ABC' !~* 'abc' AS r2;
-r1	r2
-1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '!~ 'x' AS r1, 'ABC' !~* 'abc' AS r2' at line 1
 === LIKE with literal regex meta-chars — treated as literal ===
 SELECT 'a.b' LIKE 'a.b' AS dot_literal, 'aXb' LIKE 'a.b' AS dot_not_meta;
 dot_literal	dot_not_meta
@@ -56,22 +49,18 @@ INSERT INTO strs VALUES (1,'hello'),(2,'HELLO'),(3,'World'),(4,'wHoP');
 SELECT id FROM strs WHERE s LIKE 'h%' ORDER BY id;
 id
 1
+2
 === ILIKE in WHERE — Bool result accepted ===
 SELECT id FROM strs WHERE s ILIKE 'h%' ORDER BY id;
-id
-1
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ILIKE 'h%' ORDER BY id' at line 1
 === NOT LIKE in WHERE ===
 SELECT id FROM strs WHERE s NOT LIKE 'h%' ORDER BY id;
 id
-2
 3
 4
 === PG ~* in WHERE — Bool result accepted ===
 SELECT id FROM strs WHERE s ~* '^h' ORDER BY id;
-id
-1
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '~* '^h' ORDER BY id' at line 1
 === REGEXP / RLIKE / NOT REGEXP in WHERE — Bool result accepted (zeta#1219) ===
 SELECT id FROM strs WHERE s REGEXP '^[Hh]' ORDER BY id;
 id
@@ -80,6 +69,7 @@ id
 SELECT id FROM strs WHERE s RLIKE 'o' ORDER BY id;
 id
 1
+2
 3
 4
 SELECT id FROM strs WHERE s NOT REGEXP '^[Hh]' ORDER BY id;

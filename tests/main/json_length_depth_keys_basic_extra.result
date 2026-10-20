@@ -1,7 +1,7 @@
 === JSON-null vs SQL-null asymmetry (LENGTH vs DEPTH) ===
 SELECT JSON_LENGTH('null') IS NULL           AS length_json_null_is_sql_null;
 length_json_null_is_sql_null
-1
+0
 SELECT JSON_DEPTH('null')                    AS depth_json_null_is_1;
 depth_json_null_is_1
 1
@@ -100,22 +100,21 @@ empty_obj_keys_is_null_false
 0
 === JSON_KEYS object keys with special chars ===
 SELECT JSON_KEYS('{"a\"b":1,"c":2}')         AS key_with_quote;
-key_with_quote
-["c","a\"b"]
+ERROR 3141: Invalid JSON text in argument 1 to function json_keys: "Missing a colon after a name of object member." at position 4.
 SELECT JSON_KEYS('{"a\\b":1,"c":2}')         AS key_with_backslash;
 key_with_backslash
-["c","a\\b"]
+["c", "a\b"]
 === JSON_KEYS sort order — length-then-alpha (zeta-jsonb binary) ===
 SELECT JSON_KEYS('{"z":1,"a":2,"m":3}')      AS sorted_alpha;
 sorted_alpha
-["a","m","z"]
+["a", "m", "z"]
 SELECT JSON_KEYS('{"banana":1,"apple":2,"cherry":3}')
                                               AS sorted_alpha_words;
 sorted_alpha_words
-["apple","banana","cherry"]
+["apple", "banana", "cherry"]
 SELECT JSON_KEYS('{"2":1,"1":2,"10":3}')     AS sorted_alpha_numeric_keys;
 sorted_alpha_numeric_keys
-["1","2","10"]
+["1", "2", "10"]
 === JSON_KEYS on non-object root → SQL NULL ===
 SELECT JSON_KEYS('[1,2,3]')   IS NULL        AS array_root_null;
 array_root_null
@@ -131,18 +130,18 @@ json_null_null
 1
 === Invalid JSON → ERROR (zeta strict; MySQL NULLs) ===
 SELECT JSON_LENGTH('not json');
-ERROR 1105: execution error: JSON_LENGTH first argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_length: "Invalid value." at position 1.
 SELECT JSON_DEPTH('not json');
-ERROR 1105: execution error: JSON_DEPTH first argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_depth: "Invalid value." at position 1.
 SELECT JSON_KEYS('not json');
-ERROR 1105: execution error: JSON_KEYS first argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_keys: "Invalid value." at position 1.
 === Arity errors ===
 SELECT JSON_LENGTH();
-ERROR 1105: execution error: JSON_LENGTH requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_LENGTH'
 SELECT JSON_DEPTH();
-ERROR 1105: execution error: JSON_DEPTH requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_DEPTH'
 SELECT JSON_DEPTH('{"a":1}', '$.a');
-ERROR 1105: execution error: JSON_DEPTH requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_DEPTH'
 === Determinism ===
 SELECT JSON_LENGTH('{"a":1,"b":2}')
      = JSON_LENGTH('{"a":1,"b":2}')          AS length_det;

@@ -1,0 +1,30 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":29}
+{"i":1,"h":"4a98a4f1","k":"err","code":1305,"msg":"FUNCTION test.JSONB_BUILD_OBJECT does not exist"}
+{"i":2,"h":"91e4e204","k":"err","code":1305,"msg":"FUNCTION test.JSONB_BUILD_ARRAY does not exist"}
+{"i":3,"h":"00c1eacc","k":"err","code":1305,"msg":"FUNCTION test.JSONB_BUILD_OBJECT does not exist"}
+{"i":4,"h":"7101232f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB) AS t1,\n       JSONB_TYPEOF('[1,2]'::JSONB) AS t2,\n       JSONB_TYPEOF('' at line 1"}
+{"i":5,"h":"7c0d1434","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB) AS n' at line 1"}
+{"i":6,"h":"963ff4c1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB, 'a', 'b') AS r' at line 1"}
+{"i":7,"h":"cf026b67","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB, 'a', 'b') AS r' at line 1"}
+{"i":8,"h":"27cfbf9d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB) AS s' at line 1"}
+{"i":9,"h":"bba17ed7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::TEXT) AS r2' at line 1"}
+{"i":10,"h":"8b45f991","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('a', 1), ('b', 2)) AS t(k, v)' at line 1"}
+{"i":11,"h":"6cc9a9b5","k":"ok","affected":0}
+{"i":12,"h":"ca88b46e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)' at line 1"}
+{"i":13,"h":"16439746","k":"err","code":1146,"msg":"Table 'test.jb' doesn't exist"}
+{"i":14,"h":"156b05ce","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ORDER BY id) AS agg FROM jb' at line 1"}
+{"i":15,"h":"fd7ae22b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(data) AS k WHERE id = 2 ORDER BY k.key' at line 1"}
+{"i":16,"h":"27ac6341","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(data) AS k WHERE id = 2 ORDER BY k.key' at line 1"}
+{"i":17,"h":"7e36dbfa","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(data) AS k WHERE id = 2 ORDER BY k' at line 1"}
+{"i":18,"h":"588c3736","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?& ARRAY['a', 'b'] AS has_both FROM jb WHERE id = 2' at line 1"}
+{"i":19,"h":"4d212028","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?| ARRAY['a', 'b'] AS has_any FROM jb WHERE id = 1' at line 1"}
+{"i":20,"h":"ca46ac8d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB, '{b,c}', '99'::JSONB) AS r' at line 1"}
+{"i":21,"h":"c46c5317","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB @> '{\"a\":{}}'::JSONB AS r' at line 1"}
+{"i":22,"h":"dc29890d","k":"err","code":1146,"msg":"Table 'test.jb' doesn't exist"}
+{"i":23,"h":"93809cb0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB AS merged FROM jb WHERE id = 1' at line 1"}
+{"i":24,"h":"fd3ca56c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB) AS p' at line 1"}
+{"i":25,"h":"2a86f6d1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('[1,2,3]'::JSONB) AS v' at line 1"}
+{"i":26,"h":"b4f808c0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB)' at line 1"}
+{"i":27,"h":"679ef892","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - ARRAY['a', 'b'] AS r' at line 1"}
+{"i":28,"h":"898630fd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB @@ '$.a == 1' AS r' at line 1"}
+{"i":29,"h":"c0d3d468","k":"err","code":1051,"msg":"Unknown table 'test.jb'"}

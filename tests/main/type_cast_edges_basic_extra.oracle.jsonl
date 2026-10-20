@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"5da509ab","k":"rows","cols":["d"],"rows":[["2024-05-19"]]}
+{"i":2,"h":"7a1ab13b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP) AS ts' at line 1"}
+{"i":3,"h":"7f78c6ab","k":"rows","cols":["t"],"rows":[["14:30:00"]]}
+{"i":4,"h":"df2498c9","k":"rows","cols":["CAST('not-a-date' AS DATE)"],"rows":[[null]]}
+{"i":5,"h":"5a0adb67","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SMALLINT)' at line 1"}
+{"i":6,"h":"f16e7ca5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT)' at line 1"}
+{"i":7,"h":"cf9117e6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT) AS max_i64' at line 1"}
+{"i":8,"h":"6a1dcdf3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT) AS overflow_clamp' at line 1"}
+{"i":9,"h":"ad9139f6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::INT AS pg_cast, '2024-05-19'::DATE AS pg_date, 42::TEXT::INT AS chained' at line 1"}
+{"i":10,"h":"2969e189","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT) AS int_strip, CAST('  42.5  ' AS DECIMAL(5,2)) AS dec_strip' at line 1"}
+{"i":11,"h":"11f4a1dc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT) AS text_keep' at line 1"}
+{"i":12,"h":"3e0570a3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT) AS pos, CAST(-3.7 AS INT) AS neg' at line 1"}
+{"i":13,"h":"6b482dd1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BOOLEAN) AS zero, CAST(1 AS BOOLEAN) AS one, CAST(-1 AS BOOLEAN) AS neg, CAST(42' at line 1"}
+{"i":14,"h":"9b7cc292","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT[]) AS arr' at line 1"}
+{"i":15,"h":"af2ea1af","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT)' at line 1"}
+{"i":16,"h":"04cbc8f3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1,2,3] AS TEXT)' at line 1"}

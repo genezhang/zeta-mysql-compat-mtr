@@ -1,0 +1,33 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":32}
+{"i":1,"h":"6d6f1348","k":"ok","affected":0}
+{"i":2,"h":"cfac3ea2","k":"ok","affected":0}
+{"i":3,"h":"11beb13d","k":"ok","affected":3}
+{"i":4,"h":"deb658a5","k":"err","code":1093,"msg":"You can't specify target table 'up' for update in FROM clause"}
+{"i":5,"h":"840e334d","k":"rows","cols":["id","n"],"rows":[["1","10"],["2","20"],["3","30"]]}
+{"i":6,"h":"dd735c6d","k":"ok","affected":0}
+{"i":7,"h":"667afebc","k":"ok","affected":2}
+{"i":8,"h":"5ac69c63","k":"ok","affected":0}
+{"i":9,"h":"1746f85a","k":"ok","affected":1}
+{"i":10,"h":"86c1bb2b","k":"ok","affected":1}
+{"i":11,"h":"9ddd4967","k":"rows","cols":["id","n"],"rows":[["1","-1"],["2","200"]]}
+{"i":12,"h":"ac0801c5","k":"ok","affected":0}
+{"i":13,"h":"792599fb","k":"ok","affected":0}
+{"i":14,"h":"e6b38446","k":"ok","affected":2}
+{"i":15,"h":"1eddae3d","k":"ok","affected":2}
+{"i":16,"h":"ede0e427","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FROM upo WHERE upf.id = upo.id' at line 1"}
+{"i":17,"h":"eacba901","k":"rows","cols":["id","n"],"rows":[["1","0"],["2","0"]]}
+{"i":18,"h":"6dc51340","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RETURNING id, n' at line 1"}
+{"i":19,"h":"eacba901","k":"rows","cols":["id","n"],"rows":[["1","0"],["2","0"]]}
+{"i":20,"h":"88a772ff","k":"ok","affected":1}
+{"i":21,"h":"eacba901","k":"rows","cols":["id","n"],"rows":[["1","999"],["2","0"]]}
+{"i":22,"h":"104b53bc","k":"ok","affected":1}
+{"i":23,"h":"eacba901","k":"rows","cols":["id","n"],"rows":[["1","999"],["2",null]]}
+{"i":24,"h":"a20fd66e","k":"ok","affected":2}
+{"i":25,"h":"eacba901","k":"rows","cols":["id","n"],"rows":[["1","42"],["2","42"]]}
+{"i":26,"h":"afcabbe3","k":"ok","affected":1}
+{"i":27,"h":"d6fc8f90","k":"ok","affected":2}
+{"i":28,"h":"c3432a11","k":"ok","affected":0}
+{"i":29,"h":"b1729d73","k":"ok","affected":0}
+{"i":30,"h":"b1739e01","k":"ok","affected":0}
+{"i":31,"h":"b173ae5f","k":"ok","affected":0}
+{"i":32,"h":"b173a178","k":"ok","affected":0}

@@ -1,0 +1,32 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":31}
+{"i":1,"h":"175a4c36","k":"rows","cols":["plain"],"rows":[["\"hello\""]]}
+{"i":2,"h":"a827dc0b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":3,"h":"03a2922b","k":"rows","cols":["embedded_quote"],"rows":[["\"he\\\"llo\""]]}
+{"i":4,"h":"c568814c","k":"rows","cols":["embedded_backslash"],"rows":[["\"back\\\\slash\""]]}
+{"i":5,"h":"74ad6a87","k":"rows","cols":["embedded_newline"],"rows":[["\"a\\nb\""]]}
+{"i":6,"h":"cdab995b","k":"rows","cols":["embedded_tab"],"rows":[["\"a\\tb\""]]}
+{"i":7,"h":"c3ecf099","k":"rows","cols":["forward_slash"],"rows":[["\"a/b\""]]}
+{"i":8,"h":"b367f7f6","k":"rows","cols":["multi_byte"],"rows":[["\"héllo\""]]}
+{"i":9,"h":"578a70a7","k":"err","code":3064,"msg":"Incorrect type for argument 1 in function json_quote."}
+{"i":10,"h":"ced0aeeb","k":"err","code":3064,"msg":"Incorrect type for argument 1 in function json_quote."}
+{"i":11,"h":"3d591da7","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":12,"h":"9ca0e6f8","k":"rows","cols":["basic"],"rows":[["hello"]]}
+{"i":13,"h":"c9feb633","k":"rows","cols":["empty_str"],"rows":[[""]]}
+{"i":14,"h":"dbc5cfb2","k":"rows","cols":["quote_unescape_invalid_json_passthrough"],"rows":[["he\"llo"]]}
+{"i":15,"h":"b28c31c5","k":"rows","cols":["newline_unescape"],"rows":[["a\nb"]]}
+{"i":16,"h":"95e600e8","k":"rows","cols":["unq_obj_still_json"],"rows":[["1"]]}
+{"i":17,"h":"e884d65e","k":"rows","cols":["unq_arr_still_json"],"rows":[["1"]]}
+{"i":18,"h":"78b19c51","k":"rows","cols":["unq_number"],"rows":[["123"]]}
+{"i":19,"h":"a0a870ce","k":"rows","cols":["unq_bool"],"rows":[["true"]]}
+{"i":20,"h":"91617513","k":"rows","cols":["not_json"],"rows":[["plain text"]]}
+{"i":21,"h":"8cc28aea","k":"rows","cols":["empty_input"],"rows":[[""]]}
+{"i":22,"h":"62b2cd4a","k":"rows","cols":["null_passes"],"rows":[["1"]]}
+{"i":23,"h":"f6b63611","k":"rows","cols":["rt_plain"],"rows":[["1"]]}
+{"i":24,"h":"4459b956","k":"rows","cols":["rt_empty"],"rows":[["1"]]}
+{"i":25,"h":"924cf391","k":"rows","cols":["rt_quote"],"rows":[["1"]]}
+{"i":26,"h":"27c4dd51","k":"rows","cols":["rt_newline"],"rows":[["1"]]}
+{"i":27,"h":"eb1da679","k":"rows","cols":["rt_len_independent"],"rows":[["1"]]}
+{"i":28,"h":"f45e8133","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_QUOTE'"}
+{"i":29,"h":"7470237f","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_QUOTE'"}
+{"i":30,"h":"31a2ad83","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_UNQUOTE'"}
+{"i":31,"h":"da36d06b","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_UNQUOTE'"}

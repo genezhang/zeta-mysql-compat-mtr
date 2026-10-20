@@ -5,43 +5,44 @@ INSERT INTO pa VALUES (1, 'a'), (2, 'b');
 === ALTER TABLE ADD PRIMARY KEY (col) — builds PK from existing data ===
 ALTER TABLE pa ADD PRIMARY KEY (id);
 SHOW INDEX FROM pa;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-pa	0	PRIMARY	1	id	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+pa	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === ADD PRIMARY KEY when one already exists — errno 1105 ===
 ALTER TABLE pa ADD PRIMARY KEY (name);
-ERROR 1105: execution error: table 'test.public.pa' already has a primary key
+ERROR 1068: Multiple primary key defined
 === Composite PRIMARY KEY (a, b) — duplicate tuple → 1062 ===
 DROP TABLE IF EXISTS pc;
 CREATE TABLE pc (a INT, b INT, PRIMARY KEY (a, b));
 INSERT INTO pc VALUES (1, 2), (1, 3), (2, 2);
 INSERT INTO pc VALUES (1, 2);
-ERROR 1062: duplicate key value violates primary key "test.public.pc": Key already exists in table "test.public.pc"
+ERROR 1062: Duplicate entry '1-2' for key 'pc.PRIMARY'
 === PK on TEXT column — duplicate → 1062 ===
 DROP TABLE IF EXISTS pt;
 CREATE TABLE pt (name VARCHAR(20) PRIMARY KEY, n INT);
 INSERT INTO pt VALUES ('alice', 1), ('bob', 2);
 INSERT INTO pt VALUES ('alice', 99);
-ERROR 1062: duplicate key value violates primary key "test.public.pt": Key already exists in table "test.public.pt"
+ERROR 1062: Duplicate entry 'alice' for key 'pt.PRIMARY'
 === INSERT NULL into PK column — errno 1105 (PK implies NOT NULL) ===
 DROP TABLE IF EXISTS pn;
 CREATE TABLE pn (id INT PRIMARY KEY, n INT);
 INSERT INTO pn (id, n) VALUES (NULL, 1);
-ERROR 1105: execution error: null value in column "id" of relation "test.public.pn" violates not-null constraint
+ERROR 1048: Column 'id' cannot be null
 === CREATE TABLE id INT NULL PRIMARY KEY — NULL silently overridden ===
 DROP TABLE IF EXISTS pnnull;
 CREATE TABLE pnnull (id INT NULL PRIMARY KEY);
+ERROR 1171: All parts of a PRIMARY KEY must be NOT NULL; if you need NULL in a key, use UNIQUE instead
 INSERT INTO pnnull VALUES (NULL);
-ERROR 1105: execution error: null value in column "id" of relation "test.public.pnnull" violates not-null constraint
+ERROR 1146: Table 'test.pnnull' doesn't exist
 INSERT INTO pnnull VALUES (1);
+ERROR 1146: Table 'test.pnnull' doesn't exist
 SELECT id FROM pnnull;
-id
-1
+ERROR 1146: Table 'test.pnnull' doesn't exist
 === ADD PRIMARY KEY on duplicate data — errno 1105 ===
 DROP TABLE IF EXISTS pad;
 CREATE TABLE pad (id INT, n INT);
 INSERT INTO pad VALUES (1, 10), (1, 20);
 ALTER TABLE pad ADD PRIMARY KEY (id);
-ERROR 1105: execution error: could not create primary key: duplicate key values found
+ERROR 1062: Duplicate entry '1' for key 'pad.PRIMARY'
 === AUTO_INCREMENT batch INSERT — sequential IDs from 1 ===
 DROP TABLE IF EXISTS pi;
 CREATE TABLE pi (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(20));
@@ -53,15 +54,16 @@ id	name
 3	c
 === LAST_INSERT_ID() — returns FIRST id of last batch (MySQL semantics) ===
 SELECT LAST_INSERT_ID() AS first_id;
-LAST_INSERT_ID()
+first_id
 1
 === KNOWN GAP: ALTER TABLE DROP PRIMARY KEY — errno 1064 ===
 ALTER TABLE pi DROP PRIMARY KEY;
-ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: DROP PRIMARY KEY
+ERROR 1075: Incorrect table definition; there can be only one auto column and it must be defined as a key
 DROP TABLE pa;
 DROP TABLE pc;
 DROP TABLE pt;
 DROP TABLE pn;
 DROP TABLE pnnull;
+ERROR 1051: Unknown table 'test.pnnull'
 DROP TABLE pad;
 DROP TABLE pi;

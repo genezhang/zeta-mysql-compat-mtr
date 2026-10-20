@@ -50,7 +50,7 @@ DROP VIEW IF EXISTS emp_dept;
 # — "Unknown table 'X'") for DROP VIEW against a non-existent
 # object.
 DROP VIEW does_not_exist;
-ERROR 1051: execution error: view 'test.public.does_not_exist' does not exist
+ERROR 1051: Unknown table 'test.does_not_exist'
 === Cleanup ===
 DROP TABLE emp;
 DROP TABLE dept;

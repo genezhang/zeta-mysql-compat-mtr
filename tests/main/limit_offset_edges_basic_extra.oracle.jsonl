@@ -1,0 +1,20 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":19}
+{"i":1,"h":"6cff3470","k":"ok","affected":0}
+{"i":2,"h":"1db94948","k":"ok","affected":0}
+{"i":3,"h":"f46f4e8d","k":"ok","affected":5}
+{"i":4,"h":"d7167a8b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OFFSET 100' at line 1"}
+{"i":5,"h":"34d52f38","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OFFSET NULL' at line 1"}
+{"i":6,"h":"b5cb47c3","k":"rows","cols":["id"],"rows":[]}
+{"i":7,"h":"8bb3b8c3","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"],["4"],["5"]]}
+{"i":8,"h":"e4b1a1c5","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"],["4"],["5"]]}
+{"i":9,"h":"dca1af45","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH FIRST 2 ROWS WITH TIES' at line 1"}
+{"i":10,"h":"31598454","k":"ok","affected":1}
+{"i":11,"h":"9c307a20","k":"ok","affected":1}
+{"i":12,"h":"3f5b6153","k":"ok","affected":4}
+{"i":13,"h":"a935b085","k":"rows","cols":["before_cnt"],"rows":[["4"]]}
+{"i":14,"h":"e0fcff6c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LIMIT 1' at line 1"}
+{"i":15,"h":"36e7f0d4","k":"rows","cols":["after_cnt"],"rows":[["4"]]}
+{"i":16,"h":"ee30a002","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'PERCENT' at line 1"}
+{"i":17,"h":"e4b1a23c","k":"rows","cols":["id"],"rows":[["2"],["3"],["4"],["5"]]}
+{"i":18,"h":"041596ac","k":"err","code":1327,"msg":"Undeclared variable: id"}
+{"i":19,"h":"c0f59c9d","k":"ok","affected":0}

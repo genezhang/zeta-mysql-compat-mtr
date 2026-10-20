@@ -1,0 +1,29 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":28}
+{"i":1,"h":"834d12a3","k":"ok","affected":0}
+{"i":2,"h":"1093abed","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)' at line 1"}
+{"i":3,"h":"26e0c3bd","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":4,"h":"178ecae8","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":5,"h":"cf6b0ccf","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":6,"h":"c1b80298","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":7,"h":"0a733bf7","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":8,"h":"7df5d389","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@> '{\"a\": 1}' ORDER BY id' at line 1"}
+{"i":9,"h":"b696927e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@> '{\"c\": {\"d\": \"deep\"}}' ORDER BY id' at line 1"}
+{"i":10,"h":"e78a7bb9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@> '{\"c\": {\"d\": \"wrong\"}}' ORDER BY id' at line 1"}
+{"i":11,"h":"1064a6b6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@> '[20]' ORDER BY id' at line 1"}
+{"i":12,"h":"9c26d7df","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?| ARRAY['a', 'name'] ORDER BY id' at line 1"}
+{"i":13,"h":"85d01d5a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?& ARRAY['a', 'b'] ORDER BY id' at line 1"}
+{"i":14,"h":"2f7fa175","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '?& ARRAY['a', 'no_such'] ORDER BY id' at line 1"}
+{"i":15,"h":"83eb216b","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":16,"h":"8e3f4150","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB) AS dep_deep' at line 1"}
+{"i":17,"h":"60dfdb00","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":18,"h":"fda3c479","k":"rows","cols":["ok","bad"],"rows":[["1","0"]]}
+{"i":19,"h":"95e30ac5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB) AS stripped' at line 1"}
+{"i":20,"h":"3d6bc39f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('{\"a\":1,\"b\":2}'::JSONB) AS t(k)' at line 1"}
+{"i":21,"h":"71d4929c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('{\"a\":1,\"b\":2}'::JSONB) AS t(k, v)' at line 1"}
+{"i":22,"h":"8644bd58","k":"err","code":1146,"msg":"Table 'test.j' doesn't exist"}
+{"i":23,"h":"fc2c37d9","k":"err","code":1305,"msg":"FUNCTION test.jsonb_path_query does not exist"}
+{"i":24,"h":"ddd25536","k":"rows","cols":["x"],"rows":[["1"],["2"],["3"]]}
+{"i":25,"h":"1e12c631","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('{\"a\":1,\"b\":2}'::JSONB) AS t(k)' at line 1"}
+{"i":26,"h":"21e0fc70","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('{\"a\":1,\"b\":2}'::JSONB) AS t(k, v)' at line 1"}
+{"i":27,"h":"a996a168","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('{\"a\":1,\"b\":2}'::JSONB) AS t(k, v)' at line 1"}
+{"i":28,"h":"46efb76d","k":"err","code":1051,"msg":"Unknown table 'test.j'"}

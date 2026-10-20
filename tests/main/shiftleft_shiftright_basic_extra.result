@@ -1,135 +1,103 @@
 === SHIFTLEFT — basic shifts (bare literal = BIGINT) ===
 SELECT SHIFTLEFT(1, 4)                                        AS one_lsh_4_eq_16;
-one_lsh_4_eq_16
-16
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTLEFT(3, 2)                                        AS three_lsh_2_eq_12;
-three_lsh_2_eq_12
-12
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTLEFT(0, 100)                                      AS zero_lsh_anything_zero;
-zero_lsh_anything_zero
-0
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 === SHIFTLEFT — INT-WIDTH mask-by-31 (explicit CAST AS INTEGER) ===
 SELECT SHIFTLEFT(CAST(1 AS INTEGER), 31)                      AS int_one_lsh_31_min;
-int_one_lsh_31_min
--2147483648
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 31)                      AS int_one_lsh_31_min' at line 1
 SELECT SHIFTLEFT(CAST(1 AS INTEGER), 32)                      AS int_one_lsh_32_eq_1;
-int_one_lsh_32_eq_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 32)                      AS int_one_lsh_32_eq_1' at line 1
 SELECT SHIFTLEFT(CAST(1 AS INTEGER), 33)                      AS int_one_lsh_33_eq_2;
-int_one_lsh_33_eq_2
-2
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 33)                      AS int_one_lsh_33_eq_2' at line 1
 SELECT SHIFTLEFT(CAST(1 AS INTEGER), 63)
      = SHIFTLEFT(CAST(1 AS INTEGER), 31)                      AS int_lsh_63_eq_31;
-int_lsh_63_eq_31
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 63)
+     = SHIFTLEFT(CAST(1 AS INTEGER), 31)                      AS i' at line 1
 === SHIFTLEFT — TRAP: bare-literal version uses BIGINT mask ===
 SELECT SHIFTLEFT(1, 31)                                       AS bigint_default_one_lsh_31;
-bigint_default_one_lsh_31
-2147483648
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTLEFT(1, 32)                                       AS bigint_default_one_lsh_32;
-bigint_default_one_lsh_32
-4294967296
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTLEFT(1, 33)                                       AS bigint_default_one_lsh_33;
-bigint_default_one_lsh_33
-8589934592
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 === SHIFTLEFT — BIGINT mask-by-63 (explicit) ===
 SELECT SHIFTLEFT(CAST(1 AS BIGINT), 31)                       AS bigint_one_lsh_31;
-bigint_one_lsh_31
-2147483648
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 31)                       AS bigint_one_lsh_31' at line 1
 SELECT SHIFTLEFT(CAST(1 AS BIGINT), 64)                       AS bigint_one_lsh_64_eq_1;
-bigint_one_lsh_64_eq_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 64)                       AS bigint_one_lsh_64_eq_1' at line 1
 SELECT SHIFTLEFT(CAST(1 AS BIGINT), 63)                       AS bigint_one_lsh_63_min;
-bigint_one_lsh_63_min
--9223372036854775808
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 63)                       AS bigint_one_lsh_63_min' at line 1
 === SHIFTRIGHT — ARITHMETIC (sign-extending) ===
 SELECT SHIFTRIGHT(16, 2)                                      AS sixteen_rsh_2_eq_4;
-sixteen_rsh_2_eq_4
-4
+ERROR 1305: FUNCTION test.SHIFTRIGHT does not exist
 SELECT SHIFTRIGHT(256, 4)                                     AS twofiftysix_rsh_4_eq_16;
-twofiftysix_rsh_4_eq_16
-16
+ERROR 1305: FUNCTION test.SHIFTRIGHT does not exist
 SELECT SHIFTRIGHT(CAST(-1 AS INTEGER), 1)                     AS neg_one_arith_rsh_neg_one;
-neg_one_arith_rsh_neg_one
--1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 1)                     AS neg_one_arith_rsh_neg_one' at line 1
 SELECT SHIFTRIGHT(CAST(-1 AS INTEGER), 31)                    AS neg_one_arith_rsh_full_neg_one;
-neg_one_arith_rsh_full_neg_one
--1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 31)                    AS neg_one_arith_rsh_full_neg_one' at line 1
 SELECT SHIFTRIGHT(CAST(-8 AS INTEGER), 1)                     AS neg_eight_arith_rsh_neg_four;
-neg_eight_arith_rsh_neg_four
--4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 1)                     AS neg_eight_arith_rsh_neg_four' at line 1
 === SHIFTRIGHTUNSIGNED — LOGICAL (zero-fill) ===
 SELECT SHIFTRIGHTUNSIGNED(16, 2)                              AS sixteen_logic_rsh_4;
-sixteen_logic_rsh_4
-4
+ERROR 1305: FUNCTION test.SHIFTRIGHTUNSIGNED does not exist
 SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS INTEGER), 1)             AS neg_one_logic_rsh_int_max;
-neg_one_logic_rsh_int_max
-2147483647
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 1)             AS neg_one_logic_rsh_int_max' at line 1
 SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS INTEGER), 31)            AS neg_one_logic_rsh_31_eq_1;
-neg_one_logic_rsh_31_eq_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), 31)            AS neg_one_logic_rsh_31_eq_1' at line 1
 SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS BIGINT), 1)              AS bigint_neg_one_logic_rsh;
-bigint_neg_one_logic_rsh
-9223372036854775807
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 1)              AS bigint_neg_one_logic_rsh' at line 1
 === Negative shift count — `as u32` reinterpret + mask ===
 SELECT SHIFTLEFT(CAST(1 AS INTEGER), -1)                      AS int_lsh_neg_one_min;
-int_lsh_neg_one_min
--2147483648
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), -1)                      AS int_lsh_neg_one_min' at line 1
 SELECT SHIFTLEFT(CAST(1 AS BIGINT), -1)                       AS bigint_lsh_neg_one_min;
-bigint_lsh_neg_one_min
--9223372036854775808
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), -1)                       AS bigint_lsh_neg_one_min' at line 1
 SELECT SHIFTRIGHT(CAST(1 AS INTEGER), -1)                     AS int_rsh_neg_one_eq_0;
-int_rsh_neg_one_eq_0
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), -1)                     AS int_rsh_neg_one_eq_0' at line 1
 SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS INTEGER), -1)            AS int_unsigned_rsh_neg_one_eq_1;
-int_unsigned_rsh_neg_one_eq_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER), -1)            AS int_unsigned_rsh_neg_one_eq_1' at line 1
 === Contrast: zeta `>>` is i64-ARITHMETIC, not MySQL u64-widen ===
 SELECT -1 >> 1                                                AS zeta_op_arith_not_u64;
 zeta_op_arith_not_u64
--1
-SELECT SHIFTRIGHT(CAST(-1 AS BIGINT), 1)                      AS shiftright_bigint_neg_one;
-shiftright_bigint_neg_one
--1
-SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS BIGINT), 1)              AS shiftrightunsigned_bigint_int64_max;
-shiftrightunsigned_bigint_int64_max
 9223372036854775807
+SELECT SHIFTRIGHT(CAST(-1 AS BIGINT), 1)                      AS shiftright_bigint_neg_one;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 1)                      AS shiftright_bigint_neg_one' at line 1
+SELECT SHIFTRIGHTUNSIGNED(CAST(-1 AS BIGINT), 1)              AS shiftrightunsigned_bigint_int64_max;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 1)              AS shiftrightunsigned_bigint_int64_max' at line 1
 === NULL propagation ===
 SELECT SHIFTLEFT(NULL, 4)                                     AS null_base;
-null_base
-NULL
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTLEFT(1, NULL)                                     AS null_count;
-null_count
-NULL
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTRIGHT(NULL, NULL)                                 AS null_both;
-null_both
-NULL
+ERROR 1305: FUNCTION test.SHIFTRIGHT does not exist
 SELECT SHIFTRIGHTUNSIGNED(NULL, 1)                            AS null_base_rsu;
-null_base_rsu
-NULL
+ERROR 1305: FUNCTION test.SHIFTRIGHTUNSIGNED does not exist
 SELECT SHIFTLEFT(NULL, 4) IS NULL                             AS null_pred;
-null_pred
-1
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 === Wrong-type first arg → ERROR 1105 ===
 SELECT SHIFTLEFT('hello', 1);
-ERROR 1105: execution error: SHIFTLEFT requires an integer first argument
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTRIGHT(CAST(1.5 AS DOUBLE PRECISION), 1);
-ERROR 1105: execution error: SHIFTRIGHT requires an integer first argument
+ERROR 1305: FUNCTION test.SHIFTRIGHT does not exist
 SELECT SHIFTRIGHTUNSIGNED(CAST('2026-01-01' AS DATE), 1);
-ERROR 1105: execution error: SHIFTRIGHTUNSIGNED requires an integer first argument
+ERROR 1305: FUNCTION test.SHIFTRIGHTUNSIGNED does not exist
 === Wrong-type shift count → ERROR 1105 ===
 SELECT SHIFTLEFT(1, 'one');
-ERROR 1105: execution error: SHIFTLEFT: shift count must be an integer
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTRIGHT(1, CAST(1.5 AS DOUBLE PRECISION));
-ERROR 1105: execution error: SHIFTRIGHT: shift count must be an integer
+ERROR 1305: FUNCTION test.SHIFTRIGHT does not exist
 === Arity errors → 1105 ===
 SELECT SHIFTLEFT();
-ERROR 1105: execution error: SHIFTLEFT requires 2 arguments
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTLEFT(1);
-ERROR 1105: execution error: SHIFTLEFT requires 2 arguments
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTLEFT(1, 2, 3);
-ERROR 1105: execution error: SHIFTLEFT requires 2 arguments
+ERROR 1305: FUNCTION test.SHIFTLEFT does not exist
 SELECT SHIFTRIGHT();
-ERROR 1105: execution error: SHIFTRIGHT requires 2 arguments
+ERROR 1305: FUNCTION test.SHIFTRIGHT does not exist
 SELECT SHIFTRIGHTUNSIGNED();
-ERROR 1105: execution error: SHIFTRIGHTUNSIGNED requires 2 arguments
+ERROR 1305: FUNCTION test.SHIFTRIGHTUNSIGNED does not exist

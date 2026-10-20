@@ -3,53 +3,46 @@ SELECT CAST('2024-05-19' AS DATE) AS d;
 d
 2024-05-19
 SELECT CAST('2024-05-19 14:30:00' AS TIMESTAMP) AS ts;
-ts
-2024-05-19 14:30:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP) AS ts' at line 1
 SELECT CAST('14:30:00' AS TIME) AS t;
 t
 14:30:00
 === TEXT → DATE malformed — errno 1105 ===
 SELECT CAST('not-a-date' AS DATE);
-ERROR 1105: execution error: cannot cast 'not-a-date' to DATE
+CAST('not-a-date' AS DATE)
+NULL
 === CAST narrow INT overflow — errno 1105 ===
 SELECT CAST(99999 AS SMALLINT);
-ERROR 1105: execution error: smallint out of range for INT2: 99999
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SMALLINT)' at line 1
 === CAST INT overflow at i32 boundary — errno 1105 ===
 SELECT CAST(2147483648 AS INT);
-ERROR 1105: execution error: integer out of range for INT4: 2147483648
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT)' at line 1
 === CAST BIGINT — i64::MAX works ===
 SELECT CAST(9223372036854775807 AS BIGINT) AS max_i64;
-max_i64
-9223372036854775807
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT) AS max_i64' at line 1
 === FIXED: CAST i64::MAX + 1 AS BIGINT now errors instead of silent clamp ===
 SELECT CAST(9223372036854775808 AS BIGINT) AS overflow_clamp;
-ERROR 1105: execution error: decimal out of range for BIGINT: 9223372036854775808
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT) AS overflow_clamp' at line 1
 === PG ::TYPE postfix and chained casts ===
 SELECT '42'::INT AS pg_cast, '2024-05-19'::DATE AS pg_date, 42::TEXT::INT AS chained;
-pg_cast	pg_date	chained
-42	2024-05-19	42
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::INT AS pg_cast, '2024-05-19'::DATE AS pg_date, 42::TEXT::INT AS chained' at line 1
 === Whitespace handling ===
 SELECT CAST('  42  ' AS INT) AS int_strip, CAST('  42.5  ' AS DECIMAL(5,2)) AS dec_strip;
-int_strip	dec_strip
-42	42.5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT) AS int_strip, CAST('  42.5  ' AS DECIMAL(5,2)) AS dec_strip' at line 1
 SELECT CAST('  hello  ' AS TEXT) AS text_keep;
-text_keep
-  hello  
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT) AS text_keep' at line 1
 === FLOAT → INT rounds half-away-from-zero (PG truncates; MySQL rounds) ===
 SELECT CAST(3.7 AS INT) AS pos, CAST(-3.7 AS INT) AS neg;
-pos	neg
-4	-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT) AS pos, CAST(-3.7 AS INT) AS neg' at line 1
 === INT → BOOLEAN ===
 SELECT CAST(0 AS BOOLEAN) AS zero, CAST(1 AS BOOLEAN) AS one, CAST(-1 AS BOOLEAN) AS neg, CAST(42 AS BOOLEAN) AS big;
-zero	one	neg	big
-0	1	1	1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BOOLEAN) AS zero, CAST(1 AS BOOLEAN) AS one, CAST(-1 AS BOOLEAN) AS neg, CAST(42' at line 1
 === String → INT[] (PG array literal) ===
 SELECT CAST('{1,2,3}' AS INT[]) AS arr;
-arr
-Array { element_type: Int32, elements: [Int32(1), Int32(2), Int32(3)] }
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT[]) AS arr' at line 1
 === KNOWN GAP: CAST BOOL → INT — errno 1105 ===
 SELECT CAST(TRUE AS INT);
-ERROR 1105: execution error: cannot cast to INT
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT)' at line 1
 === KNOWN GAP: CAST ARRAY → TEXT — errno 1105 ===
 SELECT CAST(ARRAY[1,2,3] AS TEXT);
-ERROR 1105: execution error: cannot cast to TEXT
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[1,2,3] AS TEXT)' at line 1

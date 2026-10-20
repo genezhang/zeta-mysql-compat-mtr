@@ -1,0 +1,20 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":19}
+{"i":1,"h":"adbaec3e","k":"ok","affected":0}
+{"i":2,"h":"46a3b328","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ SELECT x + 1 $body$ LANGUAGE SQL' at line 1"}
+{"i":3,"h":"0514e627","k":"err","code":1305,"msg":"FUNCTION test.sqlfn does not exist"}
+{"i":4,"h":"0722be8f","k":"err","code":1305,"msg":"FUNCTION test.sqlfn does not exist"}
+{"i":5,"h":"c49b2bfc","k":"ok","affected":0}
+{"i":6,"h":"7832a283","k":"err","code":1305,"msg":"FUNCTION test.no_such_fn does not exist"}
+{"i":7,"h":"ae261d27","k":"ok","affected":0}
+{"i":8,"h":"b70902a5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FUNCTION bump(x INT) RETURNS INT AS $body$ SELECT x + 1 $body$ LANGUAGE SQL' at line 1"}
+{"i":9,"h":"f09c0c80","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FUNCTION bump(x INT) RETURNS INT AS $body$ SELECT x + 10 $body$ LANGUAGE SQL' at line 1"}
+{"i":10,"h":"5435c559","k":"err","code":1305,"msg":"FUNCTION test.bump does not exist"}
+{"i":11,"h":"8993355e","k":"ok","affected":0}
+{"i":12,"h":"c44f2cf4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TABLE(x INT, y INT) AS $body$ SELECT 1, 2 $body$ LANGUAGE SQL' at line 1"}
+{"i":13,"h":"40a11b9e","k":"err","code":1305,"msg":"FUNCTION test.srf does not exist"}
+{"i":14,"h":"66c43a7e","k":"ok","affected":0}
+{"i":15,"h":"6c118dfa","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ SELECT a + 1 $body$ LANGUAGE SQL' at line 1"}
+{"i":16,"h":"0812b119","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ SELECT a + b $body$ LANGUAGE SQL' at line 1"}
+{"i":17,"h":"86830810","k":"err","code":1305,"msg":"FUNCTION test.multi does not exist"}
+{"i":18,"h":"e96c82bb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '$body$ SELECT 1 $body$ LANGUAGE SQL' at line 1"}
+{"i":19,"h":"43ae4447","k":"err","code":1305,"msg":"PROCEDURE test.no_proc does not exist"}

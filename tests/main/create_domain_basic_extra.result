@@ -1,61 +1,81 @@
 === CREATE DOMAIN — basic type alias ===
 CREATE DOMAIN dom_email AS TEXT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_email AS TEXT' at line 1
 CREATE DOMAIN dom_score AS INTEGER;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_score AS INTEGER' at line 1
 === Use domain in CREATE TABLE — column gets base type ===
 CREATE TABLE users_with_dom (
     id    INT PRIMARY KEY,
     email dom_email,
     score dom_score
 );
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'dom_email,
+    score dom_score
+)' at line 3
 INSERT INTO users_with_dom VALUES (1, 'alice@example.com', 42);
+ERROR 1146: Table 'test.users_with_dom' doesn't exist
 SELECT id, email, score FROM users_with_dom ORDER BY id;
-id	email	score
-1	alice@example.com	42
+ERROR 1146: Table 'test.users_with_dom' doesn't exist
 === CREATE DOMAIN — DEFAULT clause parses (NOT propagated to column) ===
 CREATE DOMAIN dom_with_default AS INTEGER DEFAULT 99;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_with_default AS INTEGER DEFAULT 99' at line 1
 CREATE TABLE need_default (id INT, val dom_with_default);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'dom_with_default)' at line 1
 INSERT INTO need_default VALUES (1, 5);
+ERROR 1146: Table 'test.need_default' doesn't exist
 INSERT INTO need_default (id) VALUES (2);
+ERROR 1146: Table 'test.need_default' doesn't exist
 SELECT id, val FROM need_default ORDER BY id;
-id	val
-1	5
-2	NULL
+ERROR 1146: Table 'test.need_default' doesn't exist
 === CREATE DOMAIN — CHECK clause parses (NOT ENFORCED on insert) ===
 CREATE DOMAIN dom_positive_check AS INTEGER CHECK (VALUE > 0);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_positive_check AS INTEGER CHECK (VALUE > 0)' at line 1
 CREATE TABLE check_test (id INT, val dom_positive_check);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'dom_positive_check)' at line 1
 INSERT INTO check_test VALUES (1, 5);
+ERROR 1146: Table 'test.check_test' doesn't exist
 INSERT INTO check_test VALUES (2, -1);
-ERROR 1105: execution error: new row violates check constraint "dom_positive_check_check"
+ERROR 1146: Table 'test.check_test' doesn't exist
 INSERT INTO check_test VALUES (3, 0);
-ERROR 1105: execution error: new row violates check constraint "dom_positive_check_check"
+ERROR 1146: Table 'test.check_test' doesn't exist
 SELECT * FROM check_test ORDER BY id;
-id	val
-1	5
+ERROR 1146: Table 'test.check_test' doesn't exist
 === STRIKING: NOT NULL clause is NOT PARSEABLE ===
 CREATE DOMAIN dom_required AS TEXT NOT NULL;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: NOT at Line: 1, Column: 36
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_required AS TEXT NOT NULL' at line 1
 CREATE DOMAIN dom_required2 AS TEXT CONSTRAINT nn NOT NULL;
-ERROR 1064: SQL parse error: sql parser error: Expected: PRIMARY, UNIQUE, FOREIGN, or CHECK, found: NOT at Line: 1, Column: 51
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_required2 AS TEXT CONSTRAINT nn NOT NULL' at line 1
 === STRIKING: CHECK + DEFAULT in one CREATE DOMAIN — not parseable ===
 CREATE DOMAIN dom_combined AS INTEGER CHECK (VALUE > 0) DEFAULT 99;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: DEFAULT at Line: 1, Column: 57
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_combined AS INTEGER CHECK (VALUE > 0) DEFAULT 99' at line 1
 === DROP DOMAIN — basic + idempotent IF EXISTS ===
 CREATE DOMAIN dom_disposable AS TEXT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_disposable AS TEXT' at line 1
 DROP DOMAIN dom_disposable;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_disposable' at line 1
 DROP DOMAIN dom_disposable;
-ERROR 1105: execution error: domain "dom_disposable" does not exist
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_disposable' at line 1
 DROP DOMAIN IF EXISTS dom_disposable;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN IF EXISTS dom_disposable' at line 1
 DROP DOMAIN IF EXISTS dom_never_existed;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN IF EXISTS dom_never_existed' at line 1
 === STRIKING: DROP DOMAIN with dependent table — succeeds ===
 DROP DOMAIN dom_email;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_email' at line 1
 INSERT INTO users_with_dom VALUES (4, 'survives@example.com', 99);
+ERROR 1146: Table 'test.users_with_dom' doesn't exist
 SELECT id, email FROM users_with_dom WHERE id = 4;
-id	email
-4	survives@example.com
+ERROR 1146: Table 'test.users_with_dom' doesn't exist
 === Cleanup ===
 DROP TABLE users_with_dom;
+ERROR 1051: Unknown table 'test.users_with_dom'
 DROP TABLE need_default;
+ERROR 1051: Unknown table 'test.need_default'
 DROP TABLE check_test;
+ERROR 1051: Unknown table 'test.check_test'
 DROP DOMAIN dom_score;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_score' at line 1
 DROP DOMAIN dom_with_default;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_with_default' at line 1
 DROP DOMAIN dom_positive_check;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DOMAIN dom_positive_check' at line 1

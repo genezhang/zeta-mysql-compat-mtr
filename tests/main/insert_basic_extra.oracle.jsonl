@@ -1,0 +1,38 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":37}
+{"i":1,"h":"6cc9c051","k":"ok","affected":0}
+{"i":2,"h":"79280d3e","k":"ok","affected":0}
+{"i":3,"h":"97320665","k":"ok","affected":1}
+{"i":4,"h":"7871d88e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONFLICT DO NOTHING' at line 1"}
+{"i":5,"h":"14287758","k":"rows","cols":["id","n"],"rows":[["1","10"]]}
+{"i":6,"h":"f88b025e","k":"ok","affected":0}
+{"i":7,"h":"10fe18f1","k":"ok","affected":0}
+{"i":8,"h":"a1c678a2","k":"ok","affected":0}
+{"i":9,"h":"1eb12fdf","k":"ok","affected":0}
+{"i":10,"h":"0e31b519","k":"ok","affected":2}
+{"i":11,"h":"e71eedcd","k":"ok","affected":2}
+{"i":12,"h":"cd81ea5c","k":"ok","affected":2}
+{"i":13,"h":"01bd6d5d","k":"rows","cols":["id","name","val"],"rows":[["1","a","100"],["2","b","200"]]}
+{"i":14,"h":"99462f2c","k":"ok","affected":0}
+{"i":15,"h":"1dfda3d1","k":"err","code":1101,"msg":"BLOB, TEXT, GEOMETRY or JSON column 's' can't have a default value"}
+{"i":16,"h":"a4c5179e","k":"err","code":1146,"msg":"Table 'test.imd' doesn't exist"}
+{"i":17,"h":"1c1069c6","k":"err","code":1146,"msg":"Table 'test.imd' doesn't exist"}
+{"i":18,"h":"6cc9c59d","k":"ok","affected":0}
+{"i":19,"h":"d222c88b","k":"ok","affected":0}
+{"i":20,"h":"ec59b43f","k":"ok","affected":1}
+{"i":21,"h":"268832e2","k":"ok","affected":1}
+{"i":22,"h":"3f8da381","k":"rows","cols":["id","n"],"rows":[["1","10"],["2","20"]]}
+{"i":23,"h":"6cc93c32","k":"ok","affected":0}
+{"i":24,"h":"f0ee210e","k":"ok","affected":0}
+{"i":25,"h":"509c34c7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RETURNING id, n' at line 1"}
+{"i":26,"h":"9db7cfc6","k":"rows","cols":["id","n"],"rows":[]}
+{"i":27,"h":"8502dd02","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONFLICT (id) DO UPDATE SET n = EXCLUDED.n' at line 1"}
+{"i":28,"h":"6cccb4d7","k":"ok","affected":0}
+{"i":29,"h":"d317dd7d","k":"ok","affected":0}
+{"i":30,"h":"dfc4a690","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DEFAULT VALUES' at line 1"}
+{"i":31,"h":"e956337e","k":"rows","cols":["row_count"],"rows":[["0"]]}
+{"i":32,"h":"c0d3bb14","k":"ok","affected":0}
+{"i":33,"h":"28cc73ff","k":"ok","affected":0}
+{"i":34,"h":"3bfbcbec","k":"err","code":1051,"msg":"Unknown table 'test.imd'"}
+{"i":35,"h":"c0d3a8d8","k":"ok","affected":0}
+{"i":36,"h":"c0d3db97","k":"ok","affected":0}
+{"i":37,"h":"c0caef32","k":"ok","affected":0}

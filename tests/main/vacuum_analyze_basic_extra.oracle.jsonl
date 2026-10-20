@@ -1,0 +1,21 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":20}
+{"i":1,"h":"6d77d98f","k":"ok","affected":0}
+{"i":2,"h":"d9c4c3b0","k":"ok","affected":0}
+{"i":3,"h":"d0b1730b","k":"ok","affected":2}
+{"i":4,"h":"4028bc65","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VACUUM' at line 1"}
+{"i":5,"h":"d3c1ef72","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VACUUM vt' at line 1"}
+{"i":6,"h":"915c8563","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VACUUM ANALYZE' at line 1"}
+{"i":7,"h":"ac803e56","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VACUUM FULL vt' at line 1"}
+{"i":8,"h":"6ed8bb8d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1"}
+{"i":9,"h":"1e2f6552","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'vt' at line 1"}
+{"i":10,"h":"26f6a073","k":"rows","cols":["Table","Op","Msg_type","Msg_text"],"rows":[["test.vt","analyze","status","OK"]]}
+{"i":11,"h":"a3eaddc2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VACUUM ANALYZE vt' at line 1"}
+{"i":12,"h":"52acf1a6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VACUUM (VERBOSE) vt' at line 1"}
+{"i":13,"h":"7e71e7fc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REINDEX TABLE vt' at line 1"}
+{"i":14,"h":"daecafaf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REINDEX INDEX no_such' at line 1"}
+{"i":15,"h":"253f031c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REINDEX DATABASE test' at line 1"}
+{"i":16,"h":"941b7e8d","k":"rows","cols":["Table","Checksum"],"rows":[["test.vt","1066846319"]]}
+{"i":17,"h":"47bc19ec","k":"rows","cols":["Table","Op","Msg_type","Msg_text"],"rows":[["test.vt","optimize","note","Table does not support optimize, doing recreate + analyze instead"],["test.vt","optimize","status","OK"]]}
+{"i":18,"h":"b514a6bf","k":"rows","cols":["Table","Op","Msg_type","Msg_text"],"rows":[["test.vt","repair","note","The storage engine for the table doesn't support repair"]]}
+{"i":19,"h":"f40034d9","k":"rows","cols":["Table","Op","Msg_type","Msg_text"],"rows":[["test.vt","check","status","OK"]]}
+{"i":20,"h":"c3432eee","k":"ok","affected":0}

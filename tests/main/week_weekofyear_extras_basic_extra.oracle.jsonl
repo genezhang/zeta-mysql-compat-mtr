@@ -1,0 +1,39 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":38}
+{"i":1,"h":"bebb24ff","k":"rows","cols":["may_eq"],"rows":[["1"]]}
+{"i":2,"h":"f64ee17d","k":"rows","cols":["jan_diverge"],"rows":[["0"]]}
+{"i":3,"h":"3b68062c","k":"rows","cols":["dec_diverge"],"rows":[["0"]]}
+{"i":4,"h":"6f96d268","k":"rows","cols":["ts_eq"],"rows":[["1"]]}
+{"i":5,"h":"3f8f1fc5","k":"rows","cols":["mon_jan1_2024_w0"],"rows":[["0"]]}
+{"i":6,"h":"b29ac462","k":"rows","cols":["sun_jan1_2023_w1"],"rows":[["1"]]}
+{"i":7,"h":"b7a5d48c","k":"rows","cols":["mon_dec30_2024_w52"],"rows":[["52"]]}
+{"i":8,"h":"cea05825","k":"rows","cols":["thu_jan1_2026_w0"],"rows":[["0"]]}
+{"i":9,"h":"96c7d02d","k":"rows","cols":["fri_dec31_2021_w52"],"rows":[["52"]]}
+{"i":10,"h":"d14d65e4","k":"rows","cols":["iso_jan1_2024_w1"],"rows":[["1"]]}
+{"i":11,"h":"6498c2ba","k":"rows","cols":["iso_jan1_2023_w52"],"rows":[["52"]]}
+{"i":12,"h":"d9d6b59a","k":"rows","cols":["iso_dec30_2024_w1"],"rows":[["1"]]}
+{"i":13,"h":"e976dc85","k":"rows","cols":["may_mode0"],"rows":[["20"]]}
+{"i":14,"h":"2f1cd626","k":"rows","cols":["may_mode3"],"rows":[["20"]]}
+{"i":15,"h":"70706985","k":"rows","cols":["may_mode7"],"rows":[["20"]]}
+{"i":16,"h":"8d65fbf5","k":"rows","cols":["jan_mode2_w53"],"rows":[["53"]]}
+{"i":17,"h":"cb15a855","k":"rows","cols":["midnight"],"rows":[["20"]]}
+{"i":18,"h":"47ffa940","k":"rows","cols":["one_sec_before_midnight"],"rows":[["20"]]}
+{"i":19,"h":"a534d9fb","k":"rows","cols":["time_of_day_irrelevant"],"rows":[["1"]]}
+{"i":20,"h":"89861122","k":"rows","cols":["str_date_only"],"rows":[["20"]]}
+{"i":21,"h":"ad5a167b","k":"rows","cols":["str_with_time"],"rows":[["20"]]}
+{"i":22,"h":"638cdcd8","k":"rows","cols":["str_eq_date"],"rows":[["1"]]}
+{"i":23,"h":"7f540cfb","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'WEEKOFYEAR'"}
+{"i":24,"h":"23f0075c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":25,"h":"c4f35f1a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'WEEKOFYEAR'"}
+{"i":26,"h":"6acd2747","k":"rows","cols":["WEEK(DATE '2024-05-19', 8)"],"rows":[["20"]]}
+{"i":27,"h":"5bd1e159","k":"rows","cols":["WEEK(DATE '2024-05-19', -1)"],"rows":[["20"]]}
+{"i":28,"h":"3ea97df1","k":"rows","cols":["WEEK(20240519)"],"rows":[["20"]]}
+{"i":29,"h":"6a48ca49","k":"rows","cols":["WEEK(CAST(1.5 AS DOUBLE PRECISION))"],"rows":[[null]]}
+{"i":30,"h":"2bf3ded2","k":"rows","cols":["WEEK(TRUE)"],"rows":[[null]]}
+{"i":31,"h":"1c14b9fa","k":"rows","cols":["WEEKOFYEAR(20240519)"],"rows":[["20"]]}
+{"i":32,"h":"eb28c7b6","k":"rows","cols":["WEEK('not a date')"],"rows":[[null]]}
+{"i":33,"h":"b71c9cba","k":"rows","cols":["WEEKOFYEAR('2024-13-99')"],"rows":[[null]]}
+{"i":34,"h":"e32d6a28","k":"rows","cols":["week_null_is_null"],"rows":[[null]]}
+{"i":35,"h":"119fd348","k":"rows","cols":["weekofyear_null_is_null"],"rows":[[null]]}
+{"i":36,"h":"acccf85a","k":"rows","cols":["week_typed_null_is_null"],"rows":[[null]]}
+{"i":37,"h":"98c864cd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP))                    AS weekofyear_typed_null_is_null' at line 1"}
+{"i":38,"h":"778c7629","k":"rows","cols":["week_null_predicate"],"rows":[["1"]]}

@@ -1,0 +1,11 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":10}
+{"i":1,"h":"c7fbba2e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMETZ)' at line 1"}
+{"i":2,"h":"1d530c4c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WITH TIME ZONE)' at line 1"}
+{"i":3,"h":"c7ba3dae","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WITHOUT TIME ZONE)' at line 1"}
+{"i":4,"h":"9f994193","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP WITHOUT TIME ZONE) AS timestamp_without_tz_works' at line 1"}
+{"i":5,"h":"1ceaa42d","k":"rows","cols":["CAST('a' AS NCHAR(5))"],"rows":[["a"]]}
+{"i":6,"h":"b99c9c9d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'name)' at line 1"}
+{"i":7,"h":"266024c2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'xid)' at line 1"}
+{"i":8,"h":"4cd72a9b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '\"char\") AS char_internal_works' at line 1"}
+{"i":9,"h":"2fd98b21","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VARYING(10))' at line 1"}
+{"i":10,"h":"3499a319","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::float8 AS TIMESTAMP)' at line 1"}

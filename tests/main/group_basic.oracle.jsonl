@@ -1,0 +1,27 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":26}
+{"i":1,"h":"4ec4ea56","k":"ok","affected":0}
+{"i":2,"h":"ddd0408d","k":"ok","affected":0}
+{"i":3,"h":"a4d0be8e","k":"ok","affected":6}
+{"i":4,"h":"fbdefc4c","k":"rows","cols":["c_all","c_region","c_distinct"],"rows":[["6","6","3"]]}
+{"i":5,"h":"085ac5a4","k":"rows","cols":["sum_q","min_q","max_q"],"rows":[["22","1","7"]]}
+{"i":6,"h":"f3eb107c","k":"rows","cols":["sum_a","min_a","max_a"],"rows":[["490.00","30.00","200.00"]]}
+{"i":7,"h":"e68516dd","k":"rows","cols":["region","c"],"rows":[["AP","1"],["EU","2"],["NA","3"]]}
+{"i":8,"h":"aba0a17e","k":"rows","cols":["region","product","sum_q"],"rows":[["AP","widget","4"],["EU","gadget","1"],["EU","widget","7"],["NA","gadget","2"],["NA","widget","8"]]}
+{"i":9,"h":"9efc0744","k":"rows","cols":["region","sum_q"],"rows":[["AP","4"],["EU","8"],["NA","10"]]}
+{"i":10,"h":"93f027a0","k":"rows","cols":["region","c"],"rows":[["EU","2"],["NA","3"]]}
+{"i":11,"h":"ac05385a","k":"rows","cols":["region","c"],"rows":[["AP","1"],["EU","1"],["NA","2"]]}
+{"i":12,"h":"4fd8ffcb","k":"rows","cols":["region"],"rows":[["AP"],["EU"],["NA"]]}
+{"i":13,"h":"6035c639","k":"rows","cols":["region","product"],"rows":[["AP","widget"],["EU","gadget"],["EU","widget"],["NA","gadget"],["NA","widget"]]}
+{"i":14,"h":"aae4007f","k":"err","code":1305,"msg":"FUNCTION test.STRING_AGG does not exist"}
+{"i":15,"h":"b2f53789","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ORDER BY product) AS products\n  FROM sales\n  GROUP BY region\n  ORDER BY region' at line 1"}
+{"i":16,"h":"e687b84f","k":"ok","affected":0}
+{"i":17,"h":"041330d7","k":"ok","affected":0}
+{"i":18,"h":"00a9bbef","k":"rows","cols":["c","mn","mx","s"],"rows":[["0",null,null,null]]}
+{"i":19,"h":"7f885d9d","k":"rows","cols":["region","c"],"rows":[["EU","2"],["NA","3"]]}
+{"i":20,"h":"920dbe20","k":"rows","cols":["region","p"],"rows":[["AP","widget"],["EU","widget,gadget"],["NA","widget,widget,gadget"]]}
+{"i":21,"h":"864e3196","k":"rows","cols":["region","p"],"rows":[["AP","widget|"],["EU","widget|,gadget|"],["NA","widget|,widget|,gadget|"]]}
+{"i":22,"h":"e55e838e","k":"rows","cols":["region","p"],"rows":[["AP","widget,"],["EU","gadget,,widget,"],["NA","gadget,,widget,,widget,"]]}
+{"i":23,"h":"189b7cde","k":"rows","cols":["region","p"],"rows":[["AP","widget"],["EU","widget"],["NA","widget"]]}
+{"i":24,"h":"f69577bd","k":"err","code":1055,"msg":"Expression #2 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'test.sales.product' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by"}
+{"i":25,"h":"7140e1b1","k":"ok","affected":0}
+{"i":26,"h":"8107b432","k":"ok","affected":0}

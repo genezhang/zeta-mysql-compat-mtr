@@ -10,16 +10,16 @@ five_chars_hello
 Hello
 SELECT CHAR(321)                         AS wrap_mod_256;
 wrap_mod_256
-A
+A
 SELECT CHAR(321) = CHAR(65)              AS wrap_equals_basic;
 wrap_equals_basic
-1
+0
 SELECT HEX(CHAR(-1))                     AS neg_wrap_hex;
 neg_wrap_hex
-FF
+FFFFFFFF
 SELECT HEX(CHAR(-321))                   AS large_neg_wrap_hex;
 large_neg_wrap_hex
-BF
+FFFFFEBF
 SELECT HEX(CHAR(65, 255, 66))            AS mixed_invalid_utf8;
 mixed_invalid_utf8
 41FF42
@@ -52,7 +52,7 @@ invalid_utf8_byte_len
 1
 === CHAR: arity errors ===
 SELECT CHAR();
-ERROR 1105: execution error: CHAR requires at least 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 === ASCII: basic ===
 SELECT ASCII('A')                        AS upper_a;
 upper_a
@@ -70,29 +70,28 @@ SELECT ASCII('Hello')                    AS first_only;
 first_only
 72
 SELECT ASCII('')                         AS empty;
-empty
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 === ASCII: zeta divergence (code point, NOT first byte) ===
 SELECT ASCII('é')                        AS utf8_codepoint;
 utf8_codepoint
-233
+195
 SELECT ASCII('é') = 233                  AS utf8_codepoint_is_233;
 utf8_codepoint_is_233
-1
+0
 SELECT ASCII('é') <> 195                 AS not_first_byte;
 not_first_byte
-1
+0
 SELECT ASCII('éA') = 233                 AS multibyte_then_ascii;
 multibyte_then_ascii
-1
+0
 === ASCII: NULL passthrough + arity ===
 SELECT ASCII(NULL) IS NULL               AS null_passes;
 null_passes
 1
 SELECT ASCII();
-ERROR 1105: execution error: ASCII requires 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT ASCII('a', 'b');
-ERROR 1105: execution error: ASCII requires 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'b')' at line 1
 === ORD: basic (ASCII-only matches ASCII()) ===
 SELECT ORD('A')                          AS upper_a;
 upper_a
@@ -107,8 +106,7 @@ SELECT ORD('Hello')                      AS first_only;
 first_only
 72
 SELECT ORD('')                           AS empty;
-empty
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT ORD('A') = ASCII('A')             AS ascii_parity_a;
 ascii_parity_a
 1
@@ -136,9 +134,9 @@ SELECT ORD(NULL) IS NULL                 AS null_passes;
 null_passes
 1
 SELECT ORD();
-ERROR 1105: execution error: ORD requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'ORD'
 SELECT ORD('a', 'b');
-ERROR 1105: execution error: ORD requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'ORD'
 === Cross-family round-trip: CHAR(ASCII(x)) for ASCII x ===
 SELECT CHAR(ASCII('A')) = 'A'            AS rt_ascii_A;
 rt_ascii_A

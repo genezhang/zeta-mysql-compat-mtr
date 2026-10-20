@@ -1,0 +1,36 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":35}
+{"i":1,"h":"4867dff0","k":"ok","affected":0}
+{"i":2,"h":"ef7e2179","k":"ok","affected":0}
+{"i":3,"h":"ef266058","k":"ok","affected":1}
+{"i":4,"h":"23a112c6","k":"ok","affected":0}
+{"i":5,"h":"7c9c57b6","k":"ok","affected":1}
+{"i":6,"h":"20ba1445","k":"rows","cols":["id","v"],"rows":[["1","10"],["2","20"]]}
+{"i":7,"h":"fa87415b","k":"ok","affected":0}
+{"i":8,"h":"20ba1445","k":"rows","cols":["id","v"],"rows":[["1","10"]]}
+{"i":9,"h":"23a112c6","k":"ok","affected":0}
+{"i":10,"h":"e9542654","k":"ok","affected":0}
+{"i":11,"h":"b94653f6","k":"ok","affected":0}
+{"i":12,"h":"3a510c02","k":"ok","affected":0}
+{"i":13,"h":"bc6dfac7","k":"ok","affected":0}
+{"i":14,"h":"082d7a2a","k":"ok","affected":0}
+{"i":15,"h":"dd63b517","k":"ok","affected":0}
+{"i":16,"h":"0b86e909","k":"ok","affected":0}
+{"i":17,"h":"bf489dfa","k":"skip","why":"global or persisted server variable"}
+{"i":18,"h":"9bf7afaf","k":"ok","affected":0}
+{"i":19,"h":"9bf7a97c","k":"ok","affected":0}
+{"i":20,"h":"84f5c02c","k":"ok","affected":0}
+{"i":21,"h":"84f5c0ff","k":"ok","affected":0}
+{"i":22,"h":"c906a3b6","k":"ok","affected":0}
+{"i":23,"h":"3a510c02","k":"ok","affected":0}
+{"i":24,"h":"23a112c6","k":"ok","affected":0}
+{"i":25,"h":"b8a7875b","k":"ok","affected":0}
+{"i":26,"h":"fa87415b","k":"ok","affected":0}
+{"i":27,"h":"23a112c6","k":"ok","affected":0}
+{"i":28,"h":"a0ea3ac1","k":"ok","affected":0}
+{"i":29,"h":"fa87415b","k":"ok","affected":0}
+{"i":30,"h":"71542d2b","k":"ok","affected":0}
+{"i":31,"h":"368134e7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ISOLATION LEVEL SERIALIZABLE' at line 1"}
+{"i":32,"h":"23a112c6","k":"ok","affected":0}
+{"i":33,"h":"e87ce486","k":"err","code":1305,"msg":"SAVEPOINT no_such_sp does not exist"}
+{"i":34,"h":"fa87415b","k":"ok","affected":0}
+{"i":35,"h":"948752e0","k":"ok","affected":0}

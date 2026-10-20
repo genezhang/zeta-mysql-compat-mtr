@@ -1,7 +1,7 @@
 === 1-arg form (preserved behavior) ===
 SELECT JSON_KEYS('{"a":1,"b":2,"c":3}')  AS three_keys;
 three_keys
-["a","b","c"]
+["a", "b", "c"]
 SELECT JSON_LENGTH(JSON_KEYS('{}'))      AS empty_object_zero;
 empty_object_zero
 0
@@ -11,15 +11,15 @@ array_root_null
 === 2-arg form: root path equivalent to 1-arg ===
 SELECT JSON_KEYS('{"a":1,"b":2}', '$')   AS root_path;
 root_path
-["a","b"]
+["a", "b"]
 === 2-arg form: drill into nested object via $.key ===
 SELECT JSON_KEYS('{"a":1,"b":{"x":1,"y":2}}', '$.b') AS via_key;
 via_key
-["x","y"]
+["x", "y"]
 === 2-arg form: drill into array-of-objects via $[N] ===
 SELECT JSON_KEYS('[{"a":1},{"b":2,"c":3}]', '$[1]') AS via_index;
 via_index
-["b","c"]
+["b", "c"]
 === Non-object value at path → NULL ===
 SELECT JSON_KEYS('{"a":[1,2,3]}', '$.a') IS NULL AS arr_at_path_null;
 arr_at_path_null
@@ -40,7 +40,7 @@ type_mismatch_null
 === Nested path (>1 step) → NULL (under-claim) ===
 SELECT JSON_KEYS('{"a":{"b":{"x":1}}}', '$.a.b') IS NULL AS nested_under_claim;
 nested_under_claim
-1
+0
 === SQL NULL anywhere → NULL ===
 SELECT JSON_KEYS(NULL)         IS NULL AS null_doc_one_arg;
 null_doc_one_arg
@@ -53,10 +53,10 @@ null_path
 1
 === Invalid JSON / wildcard / arity ===
 SELECT JSON_KEYS('not json');
-ERROR 1105: execution error: JSON_KEYS first argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_keys: "Invalid value." at position 1.
 SELECT JSON_KEYS();
-ERROR 1105: execution error: JSON_KEYS requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_KEYS'
 SELECT JSON_KEYS('{}', '$', 'extra');
-ERROR 1105: execution error: JSON_KEYS requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_KEYS'
 SELECT JSON_KEYS('{}', '$.*');
-ERROR 1105: execution error: JSON_KEYS invalid path: $.*
+ERROR 3149: In this situation, path expressions may not contain the * and ** tokens or an array range.

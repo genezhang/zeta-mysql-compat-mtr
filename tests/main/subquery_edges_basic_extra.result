@@ -10,7 +10,7 @@ zero_row
 NULL
 === Scalar subquery returning > 1 row — errno 1242 ===
 SELECT (SELECT id FROM sq);
-ERROR 1242: execution error: scalar subquery returned more than one row
+ERROR 1242: Subquery returns more than 1 row
 === SOME — synonym for ANY ===
 SELECT 20 = SOME (SELECT n FROM sq) AS some_match, 99 = SOME (SELECT n FROM sq) AS some_nomatch;
 some_match	some_nomatch
@@ -46,7 +46,7 @@ scalar_lt
 1
 === Multi-row scalar in SELECT-list errors 1242 ===
 SELECT id, (SELECT n FROM sq) FROM sq;
-ERROR 1242: execution error: scalar subquery returned more than one row
+ERROR 1242: Subquery returns more than 1 row
 === NULL in subquery — 3VL semantics ===
 SELECT (SELECT NULL) AS nl;
 nl
@@ -69,6 +69,7 @@ eq_any_miss
 0
 === KNOWN GAP: = ALL (subquery) — errno 1064 with rewrite hint ===
 SELECT 1 = ALL (SELECT id FROM empty_t);
-ERROR 1064: SQL parse error: = ALL(subquery) is not supported; use = ANY(subquery) or IN (subquery) instead
+1 = ALL (SELECT id FROM empty_t)
+1
 DROP TABLE sq;
 DROP TABLE empty_t;

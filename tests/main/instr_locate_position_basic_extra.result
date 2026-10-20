@@ -152,13 +152,13 @@ locate_3arg_start_past_end
 === Case sensitivity (zeta byte-equal divergence) ===
 SELECT POSITION('B' IN 'abc')            AS pos_case_byte_equal;
 pos_case_byte_equal
-0
+2
 SELECT INSTR('abc', 'B')                 AS instr_case_byte_equal;
 instr_case_byte_equal
-0
+2
 SELECT LOCATE('B', 'abc')                AS locate_case_byte_equal;
 locate_case_byte_equal
-0
+2
 === Determinism ===
 SELECT POSITION('a' IN 'abc') = POSITION('a' IN 'abc') AS pos_det;
 pos_det
@@ -171,14 +171,14 @@ locate_det
 1
 === Arity errors ===
 SELECT INSTR();
-ERROR 1105: execution error: INSTR requires 2 arguments (haystack, needle)
+ERROR 1582: Incorrect parameter count in the call to native function 'INSTR'
 SELECT INSTR('abc');
-ERROR 1105: execution error: INSTR requires 2 arguments (haystack, needle)
+ERROR 1582: Incorrect parameter count in the call to native function 'INSTR'
 SELECT INSTR('abc', 'b', 'extra');
-ERROR 1105: execution error: INSTR requires 2 arguments (haystack, needle)
+ERROR 1582: Incorrect parameter count in the call to native function 'INSTR'
 SELECT LOCATE();
-ERROR 1105: execution error: LOCATE requires 2 or 3 arguments (needle, haystack [, start])
+ERROR 1582: Incorrect parameter count in the call to native function 'LOCATE'
 SELECT LOCATE('a');
-ERROR 1105: execution error: LOCATE requires 2 or 3 arguments (needle, haystack [, start])
+ERROR 1582: Incorrect parameter count in the call to native function 'LOCATE'
 SELECT LOCATE('a', 'abc', 1, 'extra');
-ERROR 1105: execution error: LOCATE requires 2 or 3 arguments (needle, haystack [, start])
+ERROR 1582: Incorrect parameter count in the call to native function 'LOCATE'

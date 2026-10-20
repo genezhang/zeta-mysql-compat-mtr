@@ -90,14 +90,16 @@ mn_null
 1
 === Unparseable string → ERROR (impl reject path) ===
 SELECT DAYNAME('not a date');
-ERROR 1105: execution error: DAYNAME: cannot parse "not a date" as a date or timestamp
+DAYNAME('not a date')
+NULL
 SELECT MONTHNAME('not a date');
-ERROR 1105: execution error: MONTHNAME: cannot parse "not a date" as a date or timestamp
+MONTHNAME('not a date')
+NULL
 === Arity errors ===
 SELECT DAYNAME();
-ERROR 1105: execution error: DAYNAME requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'DAYNAME'
 SELECT MONTHNAME();
-ERROR 1105: execution error: MONTHNAME requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'MONTHNAME'
 === Determinism ===
 SELECT DAYNAME('2024-03-15')   = DAYNAME('2024-03-15')   AS dn_det;
 dn_det

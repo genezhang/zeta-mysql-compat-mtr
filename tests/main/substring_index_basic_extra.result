@@ -45,11 +45,11 @@ zero_count_empty_hay
 SELECT SUBSTRING_INDEX('a,b,c,d', ',', -9223372036854775808)
        AS int_min_lit_coerced_zero;
 int_min_lit_coerced_zero
-
+a,b,c,d
 SELECT LENGTH(SUBSTRING_INDEX('a,b,c,d', ',', -9223372036854775808)) = 0
        AS int_min_lit_returns_empty;
 int_min_lit_returns_empty
-1
+0
 === Non-numeric count silently coerces to 0 ===
 SELECT SUBSTRING_INDEX('a,b,c', ',', 'two')      AS string_count;
 string_count
@@ -143,14 +143,13 @@ null_count
 === Determinism ===
 SELECT SUBSTRING_INDEX('a,b,c', ',', 2) = SUBSTRING_INDEX('a,b,c', ',', 2)
        AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2
 === Arity errors ===
 SELECT SUBSTRING_INDEX();
-ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
+ERROR 1582: Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'
 SELECT SUBSTRING_INDEX('a');
-ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
+ERROR 1582: Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'
 SELECT SUBSTRING_INDEX('a', ',');
-ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
+ERROR 1582: Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'
 SELECT SUBSTRING_INDEX('a', ',', 1, 'extra');
-ERROR 1105: execution error: SUBSTRING_INDEX requires 3 arguments (str, delim, count)
+ERROR 1582: Incorrect parameter count in the call to native function 'SUBSTRING_INDEX'

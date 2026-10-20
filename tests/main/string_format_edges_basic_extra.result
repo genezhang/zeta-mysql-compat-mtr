@@ -59,11 +59,10 @@ SELECT UNHEX('616263') AS valid;
 valid
 abc
 SELECT UNHEX('') AS empty;
-empty
-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT UNHEX('1') AS odd_len;
 odd_len
-NULL
+
 SELECT UNHEX('XYZ') AS invalid;
 invalid
 NULL
@@ -82,8 +81,7 @@ zero	zero2
 0	0
 === ASCII empty / multi-byte ===
 SELECT ASCII('') AS empty;
-empty
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 === CHAR — single, multi-arg, NULL ===
 SELECT CHAR(65) AS a;
 a
@@ -96,8 +94,7 @@ len_zero
 1
 === ORD on single vs multi-char ===
 SELECT ORD('A') AS single, ORD('AB') AS multi, ORD('') AS empty, ORD(NULL) AS nl;
-single	multi	empty	nl
-65	65	0	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty, ORD(NULL) AS nl' at line 1
 === QUOTE — escape single quote and backslash ===
 SELECT QUOTE('don''t') AS sq;
 sq
@@ -112,7 +109,7 @@ NULL	4	0
 === FORMAT(n, dec, 'locale') — accepted, locale silently ignored ===
 SELECT FORMAT(1234.56, 2, 'de_DE') AS de;
 de
-1,234.56
+1.234,56
 SELECT FORMAT(1234.56, 2, 'en_US') AS us;
 us
 1,234.56

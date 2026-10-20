@@ -1,0 +1,60 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":59}
+{"i":1,"h":"2906701f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":2,"h":"a413fb7b","k":"ok","affected":1}
+{"i":3,"h":"f90f8237","k":"ok","affected":0}
+{"i":4,"h":"f4d83c29","k":"ok","affected":2}
+{"i":5,"h":"8d2ed25a","k":"rows","cols":["id","n"],"rows":[["1","10"],["2","20"]]}
+{"i":6,"h":"ce3e1e45","k":"ok","affected":1}
+{"i":7,"h":"9d0059ae","k":"ok","affected":1}
+{"i":8,"h":"6904d721","k":"rows","cols":["id","n"],"rows":[["1","99"]]}
+{"i":9,"h":"49134d63","k":"ok","affected":0}
+{"i":10,"h":"3294a0fd","k":"ok","affected":0}
+{"i":11,"h":"f71e3c9a","k":"ok","affected":0}
+{"i":12,"h":"a410c470","k":"ok","affected":1}
+{"i":13,"h":"21c3f61c","k":"ok","affected":0}
+{"i":14,"h":"3297db6a","k":"ok","affected":1}
+{"i":15,"h":"57c6f6ca","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":16,"h":"f1228d17","k":"err","code":1008,"msg":"Can't drop database 'no_such_schema'; database doesn't exist"}
+{"i":17,"h":"f50769e0","k":"ok","affected":0}
+{"i":18,"h":"f71e23ed","k":"ok","affected":0}
+{"i":19,"h":"498d4a08","k":"ok","affected":1}
+{"i":20,"h":"498d4a08","k":"ok","affected":1}
+{"i":21,"h":"3297d9d5","k":"ok","affected":0}
+{"i":22,"h":"7ca97803","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":23,"h":"a410fb2f","k":"ok","affected":1}
+{"i":24,"h":"91b813d0","k":"ok","affected":0}
+{"i":25,"h":"3297dbd9","k":"ok","affected":0}
+{"i":26,"h":"fd1d74f0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":27,"h":"a413f61d","k":"ok","affected":1}
+{"i":28,"h":"9348c0f4","k":"ok","affected":0}
+{"i":29,"h":"274e6ed3","k":"ok","affected":2}
+{"i":30,"h":"3aedbec4","k":"rows","cols":["id"],"rows":[["1"],["2"]]}
+{"i":31,"h":"1af87404","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":32,"h":"07567f03","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":33,"h":"0cc1f701","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":34,"h":"a410c38b","k":"ok","affected":1}
+{"i":35,"h":"a410c372","k":"ok","affected":1}
+{"i":36,"h":"27e04fb3","k":"ok","affected":0}
+{"i":37,"h":"1911f686","k":"ok","affected":0}
+{"i":38,"h":"76e02e90","k":"ok","affected":1}
+{"i":39,"h":"1cb02874","k":"ok","affected":1}
+{"i":40,"h":"6de615d6","k":"rows","cols":["pid"],"rows":[["1"]]}
+{"i":41,"h":"247cbc5b","k":"ok","affected":1}
+{"i":42,"h":"f5bc647b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":43,"h":"ada17a8e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":44,"h":"6cdccb7f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":45,"h":"a410c414","k":"ok","affected":1}
+{"i":46,"h":"6442349b","k":"ok","affected":0}
+{"i":47,"h":"e9c90cd2","k":"ok","affected":2}
+{"i":48,"h":"a6fb22de","k":"rows","cols":["id"],"rows":[["2"]]}
+{"i":49,"h":"7dac399f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":50,"h":"bab78653","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":51,"h":"a4104a08","k":"ok","affected":1}
+{"i":52,"h":"a20e718a","k":"ok","affected":0}
+{"i":53,"h":"6b6aea27","k":"ok","affected":1}
+{"i":54,"h":"02155518","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TO sp, public' at line 1"}
+{"i":55,"h":"069737ec","k":"err","code":1146,"msg":"Table 'test.t' doesn't exist"}
+{"i":56,"h":"1acb0215","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TO public' at line 1"}
+{"i":57,"h":"1db7e1e4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":58,"h":"ef4dc8e3","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":59,"h":"5aab788d","k":"rows","cols":["SCHEMA_NAME"],"rows":[["information_schema"],["mysql"],["performance_schema"],["s3"],["sa"],["sb"],["sd"],["sp"],["sys"],["test"]]}

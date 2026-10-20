@@ -43,18 +43,18 @@ null_path
 === Nested path → NULL (first-pass scope) ===
 SELECT JSON_REMOVE('{"a":{"b":1}}', '$.a.b') IS NULL AS nested_null;
 nested_null
-1
+0
 === Removing root $ is an error ===
 SELECT JSON_REMOVE('{"a":1}', '$');
-ERROR 1105: execution error: JSON_REMOVE: path expression $ is not allowed (removes root)
+ERROR 3153: The path expression '$' is not allowed in this context.
 === Invalid JSON target → error ===
 SELECT JSON_REMOVE('not json', '$.a');
-ERROR 1105: execution error: JSON_REMOVE target is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_remove: "Invalid value." at position 1.
 === Arity errors ===
 SELECT JSON_REMOVE();
-ERROR 1105: execution error: JSON_REMOVE requires target and at least one path
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_REMOVE'
 SELECT JSON_REMOVE('{"a":1}');
-ERROR 1105: execution error: JSON_REMOVE requires target and at least one path
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_REMOVE'
 === On TEXT column ===
 DROP TABLE IF EXISTS jd;
 CREATE TABLE jd (id INT, doc TEXT);

@@ -1,0 +1,66 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":65}
+{"i":1,"h":"63d7a621","k":"rows","cols":["object_tag"],"rows":[["OBJECT"]]}
+{"i":2,"h":"b0fa12bf","k":"rows","cols":["array_tag"],"rows":[["ARRAY"]]}
+{"i":3,"h":"24975642","k":"rows","cols":["string_tag"],"rows":[["STRING"]]}
+{"i":4,"h":"0a663b30","k":"rows","cols":["boolean_true_tag"],"rows":[["BOOLEAN"]]}
+{"i":5,"h":"860061cf","k":"rows","cols":["boolean_false_tag"],"rows":[["BOOLEAN"]]}
+{"i":6,"h":"6360d0f1","k":"rows","cols":["integer_pos_tag"],"rows":[["INTEGER"]]}
+{"i":7,"h":"84df7dcb","k":"rows","cols":["integer_neg_tag"],"rows":[["INTEGER"]]}
+{"i":8,"h":"594b826d","k":"rows","cols":["double_tag"],"rows":[["DOUBLE"]]}
+{"i":9,"h":"85229c51","k":"rows","cols":["exp_notation_collapses_to_integer"],"rows":[["DOUBLE"]]}
+{"i":10,"h":"ca42cbef","k":"rows","cols":["json_null_returns_string_tag"],"rows":[["NULL"]]}
+{"i":11,"h":"3a711543","k":"rows","cols":["json_null_eq_string_NULL"],"rows":[["1"]]}
+{"i":12,"h":"1a7fb886","k":"rows","cols":["sql_null_returns_sql_null"],"rows":[["1"]]}
+{"i":13,"h":"13684c6c","k":"rows","cols":["sql_null_eq_string_NULL_is_unknown"],"rows":[["1"]]}
+{"i":14,"h":"cd5d2a6a","k":"rows","cols":["one_point_zero_is_integer"],"rows":[["DOUBLE"]]}
+{"i":15,"h":"1e589c0c","k":"rows","cols":["zero_point_zero_is_integer"],"rows":[["DOUBLE"]]}
+{"i":16,"h":"b0bf258c","k":"rows","cols":["one_exp_zero_is_integer"],"rows":[["DOUBLE"]]}
+{"i":17,"h":"d2e77cc4","k":"rows","cols":["five_exp_zero_is_integer"],"rows":[["DOUBLE"]]}
+{"i":18,"h":"4126f344","k":"rows","cols":["fraction_exp_evaluates_to_integer"],"rows":[["DOUBLE"]]}
+{"i":19,"h":"85713554","k":"rows","cols":["true_fraction_stays_double"],"rows":[["DOUBLE"]]}
+{"i":20,"h":"b5539b63","k":"rows","cols":["small_fraction_stays_double"],"rows":[["DOUBLE"]]}
+{"i":21,"h":"6d16ecb5","k":"rows","cols":["empty_array_still_array"],"rows":[["ARRAY"]]}
+{"i":22,"h":"0bebb4af","k":"rows","cols":["empty_object_still_object"],"rows":[["OBJECT"]]}
+{"i":23,"h":"432c70c7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))    AS typed_object' at line 1"}
+{"i":24,"h":"fa3d5fcb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))    AS typed_array' at line 1"}
+{"i":25,"h":"e684b341","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))    AS typed_integer' at line 1"}
+{"i":26,"h":"eb39b02d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))    AS typed_json_null' at line 1"}
+{"i":27,"h":"7eaed126","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_type: \"Invalid value.\" at position 1."}
+{"i":28,"h":"32ffa445","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_type: \"Missing a name for object member.\" at position 1."}
+{"i":29,"h":"7c6214a7","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_type; a JSON string or JSON type is required."}
+{"i":30,"h":"58a2be12","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_type; a JSON string or JSON type is required."}
+{"i":31,"h":"7123c648","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_type; a JSON string or JSON type is required."}
+{"i":32,"h":"5b2d6e26","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_TYPE'"}
+{"i":33,"h":"03a48889","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_TYPE'"}
+{"i":34,"h":"c4972c04","k":"rows","cols":["valid_json_null"],"rows":[["1"]]}
+{"i":35,"h":"4b94c4ba","k":"rows","cols":["valid_true"],"rows":[["1"]]}
+{"i":36,"h":"db0c1be2","k":"rows","cols":["valid_false"],"rows":[["1"]]}
+{"i":37,"h":"a7376d21","k":"rows","cols":["valid_int"],"rows":[["1"]]}
+{"i":38,"h":"fa8420db","k":"rows","cols":["valid_neg_int"],"rows":[["1"]]}
+{"i":39,"h":"8531f973","k":"rows","cols":["valid_decimal"],"rows":[["1"]]}
+{"i":40,"h":"9da8fdb9","k":"rows","cols":["valid_exponent"],"rows":[["1"]]}
+{"i":41,"h":"fb113279","k":"rows","cols":["valid_string"],"rows":[["1"]]}
+{"i":42,"h":"45d66d6d","k":"rows","cols":["valid_empty_string"],"rows":[["1"]]}
+{"i":43,"h":"27d16835","k":"rows","cols":["valid_empty_array"],"rows":[["1"]]}
+{"i":44,"h":"d620568c","k":"rows","cols":["valid_empty_object"],"rows":[["1"]]}
+{"i":45,"h":"220680e1","k":"rows","cols":["valid_nested_array"],"rows":[["1"]]}
+{"i":46,"h":"5afb044f","k":"rows","cols":["valid_nested_object"],"rows":[["1"]]}
+{"i":47,"h":"fac832dc","k":"rows","cols":["bad_unquoted_key"],"rows":[["0"]]}
+{"i":48,"h":"93de2496","k":"rows","cols":["bad_single_quoted_value"],"rows":[["0"]]}
+{"i":49,"h":"59bb1608","k":"rows","cols":["bad_trailing_comma_arr"],"rows":[["0"]]}
+{"i":50,"h":"f1b915ac","k":"rows","cols":["bad_trailing_comma_obj"],"rows":[["0"]]}
+{"i":51,"h":"19645882","k":"rows","cols":["bad_mismatched_bracket"],"rows":[["0"]]}
+{"i":52,"h":"1d20dab9","k":"rows","cols":["bad_empty_string"],"rows":[["0"]]}
+{"i":53,"h":"7af3cf02","k":"rows","cols":["bad_whitespace_only"],"rows":[["0"]]}
+{"i":54,"h":"4a6d085d","k":"rows","cols":["bad_truncated"],"rows":[["0"]]}
+{"i":55,"h":"90a347a3","k":"rows","cols":["sql_null_passthrough"],"rows":[["1"]]}
+{"i":56,"h":"a6eefa7b","k":"rows","cols":["int_input_zero"],"rows":[["0"]]}
+{"i":57,"h":"6987961a","k":"rows","cols":["double_input_zero"],"rows":[["0"]]}
+{"i":58,"h":"41c27201","k":"rows","cols":["bool_input_zero"],"rows":[["0"]]}
+{"i":59,"h":"b7f0d1ee","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))   AS jsonb_obj_valid' at line 1"}
+{"i":60,"h":"20ae7f3f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))  AS jsonb_null_valid' at line 1"}
+{"i":61,"h":"f3220956","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))  AS jsonb_empty_valid' at line 1"}
+{"i":62,"h":"53b5afb3","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_VALID'"}
+{"i":63,"h":"5850ea28","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_VALID'"}
+{"i":64,"h":"2614885c","k":"rows","cols":["type_det"],"rows":[["1"]]}
+{"i":65,"h":"dcc600d2","k":"rows","cols":["valid_det"],"rows":[["1"]]}

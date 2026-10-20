@@ -10,16 +10,14 @@ SELECT SLEEP(0)       AS zero_again;
 zero_again
 0
 SELECT SLEEP(-5)      AS negative;
-negative
-0
+ERROR 1210: Incorrect arguments to sleep.
 === Fractional seconds — accepted ===
 SELECT SLEEP(0.5)     AS half;
 half
 0
 === NULL propagation ===
 SELECT SLEEP(NULL)    AS n;
-n
-NULL
+ERROR 1210: Incorrect arguments to sleep.
 === Mixed case ===
 SELECT Sleep(0)       AS mixed;
 mixed
@@ -29,9 +27,10 @@ lower
 0
 === Arity errors ===
 SELECT SLEEP();
-ERROR 1105: execution error: SLEEP requires 1 argument (seconds)
+ERROR 1582: Incorrect parameter count in the call to native function 'SLEEP'
 SELECT SLEEP(1, 2);
-ERROR 1105: execution error: SLEEP requires 1 argument (seconds)
+ERROR 1582: Incorrect parameter count in the call to native function 'SLEEP'
 === Non-numeric arg — error ===
 SELECT SLEEP('abc');
-ERROR 1105: execution error: SLEEP seconds must be numeric
+SLEEP('abc')
+0

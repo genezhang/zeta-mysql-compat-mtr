@@ -1,0 +1,39 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":38}
+{"i":1,"h":"314b2404","k":"ok","affected":0}
+{"i":2,"h":"1a8f37f9","k":"ok","affected":0}
+{"i":3,"h":"35d5ac3c","k":"ok","affected":0}
+{"i":4,"h":"7f9bc0f1","k":"ok","affected":0}
+{"i":5,"h":"ae5d5a5c","k":"ok","affected":0}
+{"i":6,"h":"fcb3cae9","k":"ok","affected":0}
+{"i":7,"h":"5029979f","k":"ok","affected":0}
+{"i":8,"h":"e3253308","k":"ok","affected":0}
+{"i":9,"h":"e40b6eed","k":"err","code":3822,"msg":"Duplicate check constraint name 'cx'."}
+{"i":10,"h":"bf865cd9","k":"ok","affected":1}
+{"i":11,"h":"21e8b296","k":"err","code":3819,"msg":"Check constraint 'chk_inline_col_chk_1' is violated."}
+{"i":12,"h":"5cfb046b","k":"rows","cols":["id","v"],"rows":[["1","5"]]}
+{"i":13,"h":"07f105e3","k":"ok","affected":0}
+{"i":14,"h":"361baf34","k":"ok","affected":0}
+{"i":15,"h":"191f625c","k":"err","code":1051,"msg":"Unknown table 'test.chk_inline_named'"}
+{"i":16,"h":"ac0b48c1","k":"ok","affected":0}
+{"i":17,"h":"0df5fea2","k":"ok","affected":0}
+{"i":18,"h":"eb363388","k":"ok","affected":0}
+{"i":19,"h":"64544040","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXCLUDE USING gist (v WITH =)' at line 1"}
+{"i":20,"h":"99735056","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXCLUDE (v WITH =)' at line 1"}
+{"i":21,"h":"036904fa","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING gist (v WITH =)' at line 1"}
+{"i":22,"h":"9755ad57","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'EXCLUDE USING gist (v WITH =))' at line 1"}
+{"i":23,"h":"dbb73cac","k":"ok","affected":0}
+{"i":24,"h":"61e10778","k":"ok","affected":0}
+{"i":25,"h":"facd78ab","k":"ok","affected":0}
+{"i":26,"h":"f0f28d84","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VALID' at line 1"}
+{"i":27,"h":"484ae641","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DEFERRABLE' at line 1"}
+{"i":28,"h":"b81cc95f","k":"ok","affected":0}
+{"i":29,"h":"d68b8c8e","k":"ok","affected":0}
+{"i":30,"h":"6cac10a2","k":"ok","affected":0}
+{"i":31,"h":"44e0ac2d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VALIDATE CONSTRAINT cx' at line 1"}
+{"i":32,"h":"66747c6b","k":"ok","affected":0}
+{"i":33,"h":"62874fd2","k":"ok","affected":0}
+{"i":34,"h":"130ba78e","k":"ok","affected":0}
+{"i":35,"h":"81561620","k":"err","code":3940,"msg":"Constraint 'cx' does not exist."}
+{"i":36,"h":"e8a5b4a9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1"}
+{"i":37,"h":"c3601366","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF EXISTS cx CASCADE' at line 1"}
+{"i":38,"h":"c1274ad8","k":"ok","affected":0}

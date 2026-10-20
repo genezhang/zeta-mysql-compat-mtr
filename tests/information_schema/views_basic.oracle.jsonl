@@ -1,0 +1,23 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":22}
+{"i":1,"h":"42140ddf","k":"ok","affected":0}
+{"i":2,"h":"e45ea260","k":"err","code":1170,"msg":"BLOB/TEXT column 'email' used in key specification without a key length"}
+{"i":3,"h":"05731125","k":"ok","affected":0}
+{"i":4,"h":"5cd6dfcd","k":"ok","affected":0}
+{"i":5,"h":"2ec9cdd4","k":"rows","cols":["SCHEMA_NAME"],"rows":[["test"]],"nd":"order","unordered":true}
+{"i":6,"h":"0d6b90c1","k":"rows","cols":["TABLE_NAME"],"rows":[["customers"],["orders"]]}
+{"i":7,"h":"21a49590","k":"rows","cols":["COLUMN_NAME","DATA_TYPE","IS_NULLABLE","COLUMN_KEY"],"rows":[["id","int","NO","PRI"],["email","text","NO",""],["name","varchar","YES","MUL"]]}
+{"i":8,"h":"7be76029","k":"rows","cols":["INDEX_NAME","SEQ_IN_INDEX","COLUMN_NAME","NON_UNIQUE"],"rows":[["customers_name_idx","1","name","1"],["PRIMARY","1","id","0"]]}
+{"i":9,"h":"cc9380af","k":"rows","cols":["CONSTRAINT_NAME","TABLE_NAME","COLUMN_NAME","ORDINAL_POSITION","POSITION_IN_UNIQUE_CONSTRAINT","REFERENCED_TABLE_NAME","REFERENCED_COLUMN_NAME"],"rows":[["PRIMARY","customers","id","1",null,null,null],["orders_ibfk_1","orders","customer_id","1","1","customers","id"],["PRIMARY","orders","id","1",null,null,null]]}
+{"i":10,"h":"53a0697a","k":"rows","cols":["CONSTRAINT_NAME","TABLE_NAME","CONSTRAINT_TYPE"],"rows":[["PRIMARY","customers","PRIMARY KEY"],["orders_ibfk_1","orders","FOREIGN KEY"],["PRIMARY","orders","PRIMARY KEY"]]}
+{"i":11,"h":"533b9970","k":"rows","cols":["CONSTRAINT_NAME","TABLE_NAME","REFERENCED_TABLE_NAME","UNIQUE_CONSTRAINT_NAME","UPDATE_RULE","DELETE_RULE"],"rows":[["orders_ibfk_1","orders","customers","PRIMARY","NO ACTION","NO ACTION"]],"nd":"order","unordered":true}
+{"i":12,"h":"57c42df3","k":"rows","cols":["TABLE_NAME","IS_UPDATABLE"],"rows":[],"nd":"order","unordered":true}
+{"i":13,"h":"53311c5f","k":"ok","affected":0}
+{"i":14,"h":"22164f1b","k":"rows","cols":["TABLE_NAME","VIEW_DEFINITION","CHECK_OPTION","IS_UPDATABLE"],"rows":[["customer_emails","select `test`.`customers`.`id` AS `id`,`test`.`customers`.`email` AS `email` from `test`.`customers`","NONE","YES"]],"nd":"order","unordered":true}
+{"i":15,"h":"d13b7477","k":"rows","cols":["CHARACTER_SET_NAME","DEFAULT_COLLATE_NAME","DESCRIPTION","MAXLEN"],"rows":[["utf8mb4","utf8mb4_0900_ai_ci","UTF-8 Unicode","4"]],"nd":"order","unordered":true}
+{"i":16,"h":"21010e28","k":"rows","cols":["CHARACTER_SET_NAME","DEFAULT_COLLATE_NAME","DESCRIPTION","MAXLEN"],"rows":[["latin1","latin1_swedish_ci","cp1252 West European","1"]],"nd":"order","unordered":true}
+{"i":17,"h":"4c9a5fbe","k":"rows","cols":["COLLATION_NAME","CHARACTER_SET_NAME","ID","IS_DEFAULT","IS_COMPILED","SORTLEN","PAD_ATTRIBUTE"],"rows":[["utf8mb4_general_ci","utf8mb4","45","","Yes","1","PAD SPACE"]],"nd":"order","unordered":true}
+{"i":18,"h":"e822d8a8","k":"rows","cols":["ENGINE","SUPPORT","COMMENT","TRANSACTIONS","XA","SAVEPOINTS"],"rows":[["ARCHIVE","YES","Archive storage engine","NO","NO","NO"],["BLACKHOLE","YES","/dev/null storage engine (anything you write to it disappears)","NO","NO","NO"],["CSV","YES","CSV storage engine","NO","NO","NO"],["FEDERATED","NO","Federated MySQL storage engine",null,null,null],["InnoDB","DEFAULT","Supports transactions, row-level locking, and foreign keys","YES","YES","YES"],["MEMORY","YES","Hash based, stored in memory, useful for temporary tables","NO","NO","NO"],["MRG_MYISAM","YES","Collection of identical MyISAM tables","NO","NO","NO"],["MyISAM","YES","MyISAM storage engine","NO","NO","NO"],["PERFORMANCE_SCHEMA","YES","Performance Schema","NO","NO","NO"],["ndbcluster","NO","Clustered, fault-tolerant tables",null,null,null],["ndbinfo","NO","MySQL Cluster system information storage engine",null,null,null]],"nd":"order","unordered":true}
+{"i":19,"h":"ed7876d7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'trigger AS 'BEGIN RETURN NEW; END' LANGUAGE plpgsql' at line 1"}
+{"i":20,"h":"2d7d5a37","k":"rows","cols":["ROUTINE_SCHEMA","ROUTINE_NAME","ROUTINE_TYPE","DATA_TYPE","ROUTINE_BODY","EXTERNAL_LANGUAGE","SECURITY_TYPE"],"rows":[],"nd":"order","unordered":true}
+{"i":21,"h":"48e77c6b","k":"rows","cols":["ORDINAL_POSITION","PARAMETER_NAME"],"rows":[],"nd":"order","unordered":true}
+{"i":22,"h":"a75b9d77","k":"rows","cols":["COUNT(*)"],"rows":[["3"]],"nd":"order","unordered":true}

@@ -1,0 +1,50 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":49}
+{"i":1,"h":"6c37a8fb","k":"rows","cols":["length_json_null_is_sql_null"],"rows":[["0"]]}
+{"i":2,"h":"f652dbae","k":"rows","cols":["depth_json_null_is_1"],"rows":[["1"]]}
+{"i":3,"h":"b472f44f","k":"rows","cols":["length_sql_null"],"rows":[["1"]]}
+{"i":4,"h":"4e41927e","k":"rows","cols":["depth_sql_null"],"rows":[["1"]]}
+{"i":5,"h":"ed17402d","k":"rows","cols":["scalar_string_1"],"rows":[["1"]]}
+{"i":6,"h":"381909c1","k":"rows","cols":["scalar_bool_true_1"],"rows":[["1"]]}
+{"i":7,"h":"ee0d5689","k":"rows","cols":["scalar_bool_false_1"],"rows":[["1"]]}
+{"i":8,"h":"de21f63b","k":"rows","cols":["scalar_int_1"],"rows":[["1"]]}
+{"i":9,"h":"614101d9","k":"rows","cols":["scalar_double_1"],"rows":[["1"]]}
+{"i":10,"h":"cd76eae9","k":"rows","cols":["empty_array_0"],"rows":[["0"]]}
+{"i":11,"h":"43e4ceac","k":"rows","cols":["empty_object_0"],"rows":[["0"]]}
+{"i":12,"h":"9d8970d6","k":"rows","cols":["one_elem_array"],"rows":[["1"]]}
+{"i":13,"h":"5f6a4e78","k":"rows","cols":["one_key_object"],"rows":[["1"]]}
+{"i":14,"h":"a63ee19e","k":"rows","cols":["object_one_complex_value"],"rows":[["1"]]}
+{"i":15,"h":"db976caf","k":"rows","cols":["depth_scalar"],"rows":[["1"]]}
+{"i":16,"h":"dab835d3","k":"rows","cols":["depth_string"],"rows":[["1"]]}
+{"i":17,"h":"ee72d4f1","k":"rows","cols":["depth_bool"],"rows":[["1"]]}
+{"i":18,"h":"98548d34","k":"rows","cols":["depth_empty_array"],"rows":[["1"]]}
+{"i":19,"h":"aa947667","k":"rows","cols":["depth_empty_object"],"rows":[["1"]]}
+{"i":20,"h":"43e5286f","k":"rows","cols":["depth_arr_1"],"rows":[["2"]]}
+{"i":21,"h":"65030627","k":"rows","cols":["depth_arr_2"],"rows":[["3"]]}
+{"i":22,"h":"5d124a64","k":"rows","cols":["depth_arr_3"],"rows":[["4"]]}
+{"i":23,"h":"cbe88024","k":"rows","cols":["depth_arr_4"],"rows":[["5"]]}
+{"i":24,"h":"393137c0","k":"rows","cols":["depth_obj_2"],"rows":[["2"]]}
+{"i":25,"h":"98f44225","k":"rows","cols":["depth_obj_3"],"rows":[["3"]]}
+{"i":26,"h":"0a213329","k":"rows","cols":["mixed_oa_3"],"rows":[["3"]]}
+{"i":27,"h":"8eb4fd54","k":"rows","cols":["mixed_ao_3"],"rows":[["3"]]}
+{"i":28,"h":"117fe098","k":"rows","cols":["mixed_oaoa_5"],"rows":[["5"]]}
+{"i":29,"h":"6b243bc8","k":"rows","cols":["depth_max_over_siblings"],"rows":[["4"]]}
+{"i":30,"h":"b483b641","k":"rows","cols":["empty_obj_keys"],"rows":[["[]"]]}
+{"i":31,"h":"b8be5b89","k":"rows","cols":["empty_obj_keys_is_null_false"],"rows":[["0"]]}
+{"i":32,"h":"1be24500","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_keys: \"Missing a colon after a name of object member.\" at position 4."}
+{"i":33,"h":"e579bd31","k":"rows","cols":["key_with_backslash"],"rows":[["[\"c\", \"a\\b\"]"]]}
+{"i":34,"h":"2ebc9237","k":"rows","cols":["sorted_alpha"],"rows":[["[\"a\", \"m\", \"z\"]"]]}
+{"i":35,"h":"a6a7ca2d","k":"rows","cols":["sorted_alpha_words"],"rows":[["[\"apple\", \"banana\", \"cherry\"]"]]}
+{"i":36,"h":"f8deb3c5","k":"rows","cols":["sorted_alpha_numeric_keys"],"rows":[["[\"1\", \"2\", \"10\"]"]]}
+{"i":37,"h":"70f717b0","k":"rows","cols":["array_root_null"],"rows":[["1"]]}
+{"i":38,"h":"434ceb86","k":"rows","cols":["scalar_string_null"],"rows":[["1"]]}
+{"i":39,"h":"c54f8e31","k":"rows","cols":["scalar_int_null"],"rows":[["1"]]}
+{"i":40,"h":"5810042b","k":"rows","cols":["json_null_null"],"rows":[["1"]]}
+{"i":41,"h":"14aaae43","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_length: \"Invalid value.\" at position 1."}
+{"i":42,"h":"3773ab50","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_depth: \"Invalid value.\" at position 1."}
+{"i":43,"h":"49913279","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_keys: \"Invalid value.\" at position 1."}
+{"i":44,"h":"808ee015","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_LENGTH'"}
+{"i":45,"h":"279f7f4e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_DEPTH'"}
+{"i":46,"h":"a7cc8458","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_DEPTH'"}
+{"i":47,"h":"fcfaaca2","k":"rows","cols":["length_det"],"rows":[["1"]]}
+{"i":48,"h":"145aedc0","k":"rows","cols":["depth_det"],"rows":[["1"]]}
+{"i":49,"h":"e29d879d","k":"rows","cols":["keys_det"],"rows":[["1"]]}

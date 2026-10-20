@@ -1,0 +1,54 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":53}
+{"i":1,"h":"f96c4e36","k":"ok","affected":0}
+{"i":2,"h":"8b858b4c","k":"ok","affected":0}
+{"i":3,"h":"f4216e6f","k":"ok","affected":2}
+{"i":4,"h":"7a1698e1","k":"ok","affected":0}
+{"i":5,"h":"b097e4aa","k":"rows","cols":["id","age"],"rows":[["1",null],["2",null]]}
+{"i":6,"h":"0e2b2dc5","k":"ok","affected":0}
+{"i":7,"h":"77ae7ce6","k":"rows","cols":["id","status"],"rows":[["1","active"],["2","active"]]}
+{"i":8,"h":"19a37d1d","k":"ok","affected":0}
+{"i":9,"h":"c65df8e2","k":"rows","cols":["id","city"],"rows":[["1","unknown"],["2","unknown"]]}
+{"i":10,"h":"eaf3f473","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS age INT' at line 1"}
+{"i":11,"h":"dca7a050","k":"ok","affected":0}
+{"i":12,"h":"71f6da73","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF EXISTS does_not_exist' at line 1"}
+{"i":13,"h":"75ecae5d","k":"ok","affected":0}
+{"i":14,"h":"40f56b2a","k":"rows","cols":["id","state"],"rows":[["1","active"],["2","active"]]}
+{"i":15,"h":"61e51603","k":"ok","affected":0}
+{"i":16,"h":"fd87129e","k":"ok","affected":0}
+{"i":17,"h":"0ad2034f","k":"rows","cols":["id","town"],"rows":[["1","unknown"],["2","unknown"]]}
+{"i":18,"h":"d236960a","k":"ok","affected":0}
+{"i":19,"h":"890702f9","k":"rows","cols":["id"],"rows":[["1"],["2"]]}
+{"i":20,"h":"f17608d9","k":"ok","affected":0}
+{"i":21,"h":"9ffc614d","k":"ok","affected":0}
+{"i":22,"h":"e0d51026","k":"ok","affected":0}
+{"i":23,"h":"6662ce7b","k":"ok","affected":0}
+{"i":24,"h":"6e50f224","k":"ok","affected":1}
+{"i":25,"h":"6e50f224","k":"err","code":1062,"msg":"Duplicate entry '1' for key 'no_pk.PRIMARY'"}
+{"i":26,"h":"7f929ff8","k":"ok","affected":0}
+{"i":27,"h":"3d4017cb","k":"ok","affected":0}
+{"i":28,"h":"f739a7ec","k":"ok","affected":0}
+{"i":29,"h":"7fed697c","k":"ok","affected":2}
+{"i":30,"h":"8fbee439","k":"ok","affected":0}
+{"i":31,"h":"34d8aa2d","k":"ok","affected":0}
+{"i":32,"h":"ae11a2d4","k":"ok","affected":1}
+{"i":33,"h":"fb2642f8","k":"err","code":1452,"msg":"Cannot add or update a child row: a foreign key constraint fails (`test`.`at_child`, CONSTRAINT `fk_pid` FOREIGN KEY (`pid`) REFERENCES `at_parent` (`id`))"}
+{"i":34,"h":"2ad4bd36","k":"ok","affected":0}
+{"i":35,"h":"eba2e8ee","k":"ok","affected":0}
+{"i":36,"h":"2382a95c","k":"ok","affected":0}
+{"i":37,"h":"81d9d501","k":"ok","affected":2}
+{"i":38,"h":"7eb2f045","k":"err","code":1062,"msg":"Duplicate entry 'x' for key 'au_t.u_code'"}
+{"i":39,"h":"c03eb9a4","k":"ok","affected":2}
+{"i":40,"h":"22572fe9","k":"ok","affected":0}
+{"i":41,"h":"eb023a16","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["at1","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null],["at1","1","idx_name","1","name","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null]],"nd":"cells","masked":[6,7],"sorted":true}
+{"i":42,"h":"f924ed3e","k":"ok","affected":0}
+{"i":43,"h":"9046ed60","k":"ok","affected":0}
+{"i":44,"h":"e7b8901e","k":"ok","affected":0}
+{"i":45,"h":"eb7f969e","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["adi","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null],["adi","1","idx_adi_name","1","name","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null]],"nd":"cells","masked":[6,7],"sorted":true}
+{"i":46,"h":"059cab7d","k":"ok","affected":0}
+{"i":47,"h":"eb7f969e","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["adi","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7],"sorted":true}
+{"i":48,"h":"24361822","k":"ok","affected":0}
+{"i":49,"h":"742d0097","k":"ok","affected":0}
+{"i":50,"h":"82dcbff8","k":"ok","affected":0}
+{"i":51,"h":"a0184b93","k":"ok","affected":0}
+{"i":52,"h":"49c4dd20","k":"ok","affected":0}
+{"i":53,"h":"242e18ca","k":"ok","affected":0}

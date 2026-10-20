@@ -1,0 +1,21 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":20}
+{"i":1,"h":"6d5cd0bd","k":"ok","affected":0}
+{"i":2,"h":"6d5cd1f0","k":"ok","affected":0}
+{"i":3,"h":"5d2d68d8","k":"ok","affected":0}
+{"i":4,"h":"34837fd6","k":"ok","affected":0}
+{"i":5,"h":"e263c336","k":"ok","affected":3}
+{"i":6,"h":"f4927b20","k":"ok","affected":3}
+{"i":7,"h":"4e82e3c4","k":"rows","cols":["id"],"rows":[["2"]]}
+{"i":8,"h":"af0ec896","k":"rows","cols":["id"],"rows":[["1"],["1"]]}
+{"i":9,"h":"9e808cdd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT id FROM sb ORDER BY id' at line 1"}
+{"i":10,"h":"bbb1c5bb","k":"err","code":1222,"msg":"The used SELECT statements have a different number of columns"}
+{"i":11,"h":"89cf8673","k":"err","code":1222,"msg":"The used SELECT statements have a different number of columns"}
+{"i":12,"h":"f577dbe7","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"]]}
+{"i":13,"h":"06aca355","k":"rows","cols":["v"],"rows":[[null]]}
+{"i":14,"h":"0364e48b","k":"rows","cols":["v"],"rows":[[null],[null],["1"]]}
+{"i":15,"h":"c850248c","k":"rows","cols":["id","name"],"rows":[["1","a"],["2","b"],["3","c"]]}
+{"i":16,"h":"6c45fd25","k":"rows","cols":["id","name"],"rows":[["3","c"],["2","b"],["1","a"]]}
+{"i":17,"h":"2c58c3f8","k":"err","code":1054,"msg":"Unknown column 'name' in 'order clause'"}
+{"i":18,"h":"b4392bbc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CORRESPONDING SELECT name, id FROM sb' at line 1"}
+{"i":19,"h":"c346ee24","k":"ok","affected":0}
+{"i":20,"h":"c346983d","k":"ok","affected":0}

@@ -1,0 +1,41 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":40}
+{"i":1,"h":"97f57ed2","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":2,"h":"f57ba35f","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":3,"h":"8638642f","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":4,"h":"1d37bb22","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":5,"h":"ac8ddd97","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":6,"h":"d3ec5dc7","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":7,"h":"55dfc362","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":8,"h":"faca8f8e","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":9,"h":"c1cd56a9","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":10,"h":"a51bfdb4","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":11,"h":"ee079ca5","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":12,"h":"eb062808","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":13,"h":"ecc10457","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":14,"h":"45fe8384","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":15,"h":"68c84808","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":16,"h":"5ce06382","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":17,"h":"751dc2b8","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":18,"h":"ab9b2444","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":19,"h":"dd317e55","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":20,"h":"1b97f1bb","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":21,"h":"c202f8e2","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":22,"h":"d37f550b","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":23,"h":"a0dc116e","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":24,"h":"f3ca6e16","k":"err","code":1305,"msg":"FUNCTION test.MAKE_TIMESTAMP does not exist"}
+{"i":25,"h":"0d80ef25","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":26,"h":"5807033b","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":27,"h":"e4c3a924","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":28,"h":"61e2357d","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":29,"h":"942fa02a","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":30,"h":"6639c269","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":31,"h":"527238a6","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":32,"h":"e10f4321","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":33,"h":"3e48ed06","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":34,"h":"88f83fb7","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":35,"h":"33d1d623","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":36,"h":"fb69a4ca","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":37,"h":"b807ec30","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":38,"h":"c46e0355","k":"err","code":1305,"msg":"FUNCTION test.MAKE_INTERVAL does not exist"}
+{"i":39,"h":"aca112d3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 0)' at line 1"}
+{"i":40,"h":"37fdcfe1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT), 0)' at line 1"}

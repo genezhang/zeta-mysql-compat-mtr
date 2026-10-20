@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"6cff3470","k":"ok","affected":0}
+{"i":2,"h":"1db94948","k":"ok","affected":0}
+{"i":3,"h":"f46f4e8d","k":"ok","affected":5}
+{"i":4,"h":"d33a910b","k":"rows","cols":["id"],"rows":[["2"],["3"]]}
+{"i":5,"h":"d0dcb315","k":"rows","cols":["id"],"rows":[["2"],["3"]]}
+{"i":6,"h":"961401e6","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"]]}
+{"i":7,"h":"9614035b","k":"rows","cols":["id"],"rows":[]}
+{"i":8,"h":"fcc005ec","k":"rows","cols":["id"],"rows":[["1"],["2"],["3"],["4"],["5"]]}
+{"i":9,"h":"977fbe52","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OFFSET 3' at line 1"}
+{"i":10,"h":"9a26b1cd","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FETCH FIRST 2 ROWS ONLY' at line 1"}
+{"i":11,"h":"d699c413","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OFFSET 2 ROWS FETCH NEXT 2 ROWS ONLY' at line 1"}
+{"i":12,"h":"6da85132","k":"rows","cols":["mx"],"rows":[["3"]]}
+{"i":13,"h":"175e8cdb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL' at line 1"}
+{"i":14,"h":"034bbcc0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '+1' at line 1"}
+{"i":15,"h":"a09308a8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '-1' at line 1"}
+{"i":16,"h":"c0f59c9d","k":"ok","affected":0}

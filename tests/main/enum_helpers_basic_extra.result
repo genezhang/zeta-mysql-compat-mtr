@@ -1,65 +1,58 @@
 === Setup: create an enum type with 3 labels in declaration order ===
 CREATE TYPE mood_ehb AS ENUM ('sad', 'ok', 'happy');
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE mood_ehb AS ENUM ('sad', 'ok', 'happy')' at line 1
 === ENUM_FIRST returns first label ===
 SELECT ENUM_FIRST(NULL::mood_ehb)                             AS first_label;
-first_label
-sad
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::mood_ehb)                             AS first_label' at line 1
 === ENUM_LAST returns last label ===
 SELECT ENUM_LAST(NULL::mood_ehb)                              AS last_label;
-last_label
-happy
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::mood_ehb)                              AS last_label' at line 1
 === ENUM_RANGE returns Array of all labels (declaration order) ===
 SELECT ENUM_RANGE(NULL::mood_ehb)                             AS all_labels;
-all_labels
-Array { element_type: Enum { type_name: "mood_ehb", labels: ["sad", "ok", "happy"] }, elements: [Enum { type_name: "mood_ehb", label: "sad", ordinal: 0 }, Enum { type_name: "mood_ehb", label: "ok", ordinal: 1 }, Enum { type_name: "mood_ehb", label: "happy", ordinal: 2 }] }
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::mood_ehb)                             AS all_labels' at line 1
 === Equality of ENUM_FIRST/LAST results against label strings ===
 SELECT CAST(ENUM_FIRST(NULL::mood_ehb) AS TEXT) = 'sad'       AS first_eq_sad;
-first_eq_sad
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::mood_ehb) AS TEXT) = 'sad'       AS first_eq_sad' at line 1
 SELECT CAST(ENUM_LAST(NULL::mood_ehb)  AS TEXT) = 'happy'     AS last_eq_happy;
-last_eq_happy
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::mood_ehb)  AS TEXT) = 'happy'     AS last_eq_happy' at line 1
 === Error: unknown type name → 1105 ===
 SELECT ENUM_FIRST(NULL::nonexistent_type);
-ERROR 1105: execution error: enum_first() requires an enum type, but "nonexistent_type" is not an enum
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::nonexistent_type)' at line 1
 SELECT ENUM_LAST(NULL::nonexistent_type);
-ERROR 1105: execution error: enum_last() requires an enum type, but "nonexistent_type" is not an enum
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::nonexistent_type)' at line 1
 SELECT ENUM_RANGE(NULL::nonexistent_type);
-ERROR 1105: execution error: enum_range() requires an enum type, but "nonexistent_type" is not an enum
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::nonexistent_type)' at line 1
 === Error: known non-enum type (INT) → SAME 1105 message ===
 SELECT ENUM_FIRST(NULL::INT);
-ERROR 1105: execution error: enum_first() requires an enum type, but "INT" is not an enum
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::INT)' at line 1
 SELECT ENUM_LAST(NULL::INT);
-ERROR 1105: execution error: enum_last() requires an enum type, but "INT" is not an enum
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::INT)' at line 1
 === Error: arity (0, 2 args) → 1105 ===
 SELECT ENUM_FIRST();
-ERROR 1105: execution error: enum_first() requires exactly 1 argument
+ERROR 1305: FUNCTION test.ENUM_FIRST does not exist
 SELECT ENUM_LAST();
-ERROR 1105: execution error: enum_last() requires exactly 1 argument
+ERROR 1305: FUNCTION test.ENUM_LAST does not exist
 SELECT ENUM_RANGE();
-ERROR 1105: execution error: enum_range() requires exactly 1 argument
+ERROR 1305: FUNCTION test.ENUM_RANGE does not exist
 SELECT ENUM_FIRST(NULL::mood_ehb, NULL::mood_ehb);
-ERROR 1105: execution error: enum_first() requires exactly 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::mood_ehb, NULL::mood_ehb)' at line 1
 === Empty enum: ENUM_FIRST/LAST → NULL, ENUM_RANGE → empty Array ===
 CREATE TYPE empty_ehb AS ENUM ();
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE empty_ehb AS ENUM ()' at line 1
 SELECT ENUM_FIRST(NULL::empty_ehb)                            AS empty_first_null;
-empty_first_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_ehb)                            AS empty_first_null' at line 1
 SELECT ENUM_LAST(NULL::empty_ehb)                             AS empty_last_null;
-empty_last_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_ehb)                             AS empty_last_null' at line 1
 SELECT ENUM_FIRST(NULL::empty_ehb) IS NULL                    AS empty_first_pred;
-empty_first_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_ehb) IS NULL                    AS empty_first_pred' at line 1
 SELECT ENUM_LAST(NULL::empty_ehb)  IS NULL                    AS empty_last_pred;
-empty_last_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_ehb)  IS NULL                    AS empty_last_pred' at line 1
 SELECT ENUM_RANGE(NULL::empty_ehb)                            AS empty_range_array;
-empty_range_array
-Array { element_type: Enum { type_name: "empty_ehb", labels: [] }, elements: [] }
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_ehb)                            AS empty_range_array' at line 1
 SELECT ENUM_RANGE(NULL::empty_ehb) IS NULL                    AS empty_range_NOT_null;
-empty_range_NOT_null
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::empty_ehb) IS NULL                    AS empty_range_NOT_null' at line 1
 DROP TYPE empty_ehb;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE empty_ehb' at line 1
 === Cleanup ===
 DROP TYPE mood_ehb;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE mood_ehb' at line 1

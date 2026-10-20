@@ -73,7 +73,7 @@ p	p2	s
 1024	1024	3
 SELECT LN(EXP(1)) AS ln1, LOG(EXP(1)) AS log10_e;
 ln1	log10_e
-1	0.4342944819032518
+1	1
 SELECT GREATEST(1, 2, 3) AS g, LEAST(1, 2, 3) AS l;
 g	l
 3	1
@@ -95,8 +95,7 @@ SELECT EXTRACT(YEAR FROM DATE '2023-04-05') AS y;
 y
 2023
 SELECT DATE_TRUNC('month', DATE '2023-04-05') AS m;
-m
-2023-04-01
+ERROR 1305: FUNCTION test.DATE_TRUNC does not exist
 SELECT YEAR(DATE '2023-04-05') AS y2;
 y2
 2023
@@ -104,26 +103,21 @@ SELECT DATEDIFF(DATE '2023-03-01', DATE '2023-01-01') AS d;
 d
 59
 SELECT AGE(DATE '2023-04-05', DATE '2020-01-01') AS a;
-a
-3 years 3 mons 4 days
+ERROR 1305: FUNCTION test.AGE does not exist
 === Date/time: DATE_FORMAT (MySQL) / TO_CHAR (PG) ===
 SELECT DATE_FORMAT(DATE '2023-04-05', '%Y/%m/%d') AS f;
 f
 2023/04/05
 SELECT TO_CHAR(DATE '2023-04-05', 'YYYY-MM-DD') AS f;
-f
-2023-04-05
+ERROR 1305: FUNCTION test.TO_CHAR does not exist
 === Date arith: PG-style string-literal INTERVAL ===
 SELECT DATE '2023-01-15' + INTERVAL '10 days' AS d;
-d
-2023-01-25 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d' at line 1
 === Casts: standard target types supported ===
 SELECT CAST(123 AS CHAR) AS c, CAST('123' AS INTEGER) AS i;
-c	i
-123	123
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER) AS i' at line 1
 SELECT CAST(3.7 AS INTEGER) AS r;
-r
-4
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER) AS r' at line 1
 === IFNULL — FIXED via zeta #1127 ===
 # 2-arg alias for COALESCE. NULL first arg returns the second;
 # non-NULL first arg returns it unchanged.
@@ -159,7 +153,7 @@ no
 # the wire-level handshake's Server_version field carries.
 SELECT VERSION() AS v;
 v
-8.0.36-zeta
+<masked>
 === CAST(x AS SIGNED) — FIXED via zeta #1128 ===
 # Signed 64-bit cast; same range/rounding as BIGINT.
 SELECT CAST('123' AS SIGNED) AS r;
@@ -192,20 +186,19 @@ r
 # result type — date + interval produces DATETIME).
 SELECT DATE '2023-01-15' + INTERVAL 10 DAY AS d;
 d
-2023-01-25 00:00:00
+2023-01-25
 SELECT DATE_ADD(DATE '2023-01-15', INTERVAL 10 DAY) AS d;
 d
-2023-01-25 00:00:00
+2023-01-25
 SELECT DATE_SUB(DATE '2023-01-15', INTERVAL 1 MONTH) AS d;
 d
-2022-12-15 00:00:00
+2022-12-15
 SELECT DATE '2023-01-15' + INTERVAL -5 DAY AS d;
 d
-2023-01-10 00:00:00
+2023-01-10
 SELECT DATE_ADD(DATE '2023-01-15', INTERVAL 6 HOUR) AS d;
 d
 2023-01-15 06:00:00
 SELECT DATE_ADD(DATE '2023-01-15', INTERVAL '10 days') AS d;
-d
-2023-01-25 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ') AS d' at line 1
 === Cleanup ===

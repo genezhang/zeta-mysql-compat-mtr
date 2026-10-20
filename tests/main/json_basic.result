@@ -8,33 +8,30 @@ INSERT INTO j VALUES
 === Stored JSON round-trips (keys sort lexicographically) ===
 SELECT id, data FROM j ORDER BY id;
 id	data
-1	{"age":30,"name":"alice"}
-2	[1,2,3]
-3	{"a":{"b":42}}
+1	{"age": 30, "name": "alice"}
+2	[1, 2, 3]
+3	{"a": {"b": 42}}
 === JSON_OBJECT ===
 SELECT JSON_OBJECT('k1', 'v1', 'k2', 42) AS o;
 o
-{"k1":"v1","k2":42}
+{"k1": "v1", "k2": 42}
 === JSON_ARRAY ===
 SELECT JSON_ARRAY(1, 2, 3, 'x') AS a;
 a
-[1,2,3,"x"]
+[1, 2, 3, "x"]
 === JSON_EXTRACT ===
 SELECT JSON_EXTRACT(data, '$.name') AS name FROM j WHERE id = 1;
 name
 "alice"
 === -> (path) returns quoted ===
 SELECT data->'name' AS n FROM j WHERE id = 1;
-n
-"alice"
+ERROR 3143: Invalid JSON path expression. The error is around character position 1.
 === ->> (path) returns unquoted text ===
 SELECT data->>'name' AS n FROM j WHERE id = 1;
-n
-alice
+ERROR 3143: Invalid JSON path expression. The error is around character position 1.
 === Numeric path on array ===
 SELECT data->0 AS first FROM j WHERE id = 2;
-first
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '0 AS first FROM j WHERE id = 2' at line 1
 === JSON_TYPE ===
 SELECT id, JSON_TYPE(data) AS t FROM j ORDER BY id;
 id	t
@@ -55,14 +52,12 @@ hello
 === CAST AS JSON ===
 SELECT CAST('{"x":1}' AS JSON) AS c;
 c
-{"x":1}
+{"x": 1}
 === Zeta extras: @> containment and ? key-exists (PG) ===
 SELECT data @> '{"name":"alice"}' AS contains FROM j WHERE id = 1;
-contains
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@> '{"name":"alice"}' AS contains FROM j WHERE id = 1' at line 1
 SELECT data ? 'name' AS has_name FROM j WHERE id = 1;
-has_name
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '? 'name' AS has_name FROM j WHERE id = 1' at line 1
 === JSON_LENGTH — FIXED via zeta #1162 ===
 # array → element count, object → key count, scalar → 1,
 # NULL → NULL. Single-arg form only; the two-arg path form
@@ -84,7 +79,7 @@ NULL
 # → SQL NULL.
 SELECT JSON_KEYS(data) AS k FROM j WHERE id = 1;
 k
-["age","name"]
+["age", "name"]
 SELECT JSON_KEYS(data) AS k FROM j WHERE id = 2;
 k
 NULL
@@ -102,27 +97,27 @@ NULL
 # Replaces existing keys; adds new ones. Variadic (path, value).
 SELECT JSON_SET('{"a":1}', '$.a', 99) AS s;
 s
-{"a":99}
+{"a": 99}
 SELECT JSON_SET('{"a":1}', '$.b', 2) AS s;
 s
-{"a":1,"b":2}
+{"a": 1, "b": 2}
 SELECT JSON_SET('{"a":1}', '$.a', 2, '$.b', 3) AS s;
 s
-{"a":2,"b":3}
+{"a": 2, "b": 3}
 === JSON_INSERT — FIXED via zeta #1173 (skip if path exists) ===
 SELECT JSON_INSERT('{"a":1}', '$.b', 2) AS s;
 s
-{"a":1,"b":2}
+{"a": 1, "b": 2}
 SELECT JSON_INSERT('{"a":1}', '$.a', 99) AS s;
 s
-{"a":1}
+{"a": 1}
 === JSON_REPLACE — FIXED via zeta #1173 (skip if path missing) ===
 SELECT JSON_REPLACE('{"a":1}', '$.a', 99) AS s;
 s
-{"a":99}
+{"a": 99}
 SELECT JSON_REPLACE('{"a":1}', '$.b', 2) AS s;
 s
-{"a":1}
+{"a": 1}
 === JSON_DEPTH — FIXED via zeta #1164 ===
 # Recursive max depth. Scalar / empty container → 1;
 # non-empty container → 1 + max(depth of children).
@@ -171,7 +166,7 @@ CREATE TABLE kv (k VARCHAR(10), v INT);
 INSERT INTO kv VALUES ('a', 1), ('b', 2), ('c', 3);
 SELECT JSON_OBJECTAGG(k, v) AS o FROM kv;
 o
-{"a":1,"b":2,"c":3}
+{"a": 1, "b": 2, "c": 3}
 DROP TABLE kv;
 === Cleanup ===
 DROP TABLE j;

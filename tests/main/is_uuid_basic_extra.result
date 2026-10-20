@@ -13,8 +13,7 @@ upper_hex
 1
 === Invalid input — return 0 ===
 SELECT IS_UUID('')                                  AS empty;
-empty
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT IS_UUID('not-a-uuid')                        AS junk;
 junk
 0
@@ -47,9 +46,9 @@ mixed_case
 1
 === Arity error ===
 SELECT IS_UUID();
-ERROR 1105: execution error: IS_UUID requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'IS_UUID'
 SELECT IS_UUID('a', 'b');
-ERROR 1105: execution error: IS_UUID requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'IS_UUID'
 === Filter a TEXT column on validity ===
 DROP TABLE IF EXISTS uu_test;
 CREATE TABLE uu_test (id INT, s TEXT);

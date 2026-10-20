@@ -12,7 +12,7 @@ id	email
 2	b@x
 === Duplicate unique value — errno 1062 ===
 INSERT INTO u VALUES (3, 'a@x', 'alice2', 28);
-ERROR 1062: duplicate key value violates unique constraint "idx_email": Key already exists in index "idx_email"
+ERROR 1062: Duplicate entry 'a@x' for key 'u.idx_email'
 === DROP INDEX ===
 DROP INDEX idx_name ON u;
 === CREATE INDEX IF NOT EXISTS — first call creates ===
@@ -22,22 +22,22 @@ DROP INDEX idx_name ON u;
 # zeta #1137), but the no-op semantics are still wrong —
 # tracked as a follow-up.
 CREATE INDEX IF NOT EXISTS idx_age ON u(age);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS idx_age ON u(age)' at line 1
 === Multi-column CREATE INDEX ===
 DROP TABLE IF EXISTS mc;
 CREATE TABLE mc (id INT PRIMARY KEY, a INT, b INT);
 CREATE INDEX idx_ab ON mc(a, b);
 === SHOW INDEX FROM u — 6-column shape ===
 SHOW INDEX FROM u;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-u	0	PRIMARY	1	id	BTREE
-u	0	idx_email	1	email	BTREE
-u	1	idx_age	1	age	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+u	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+u	0	idx_email	1	email	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === SHOW INDEX FROM mc — multi-column index has one row per column ===
 SHOW INDEX FROM mc;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-mc	0	PRIMARY	1	id	BTREE
-mc	1	idx_ab	1	a	BTREE
-mc	1	idx_ab	2	b	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+mc	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+mc	1	idx_ab	1	a	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
+mc	1	idx_ab	2	b	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === information_schema.STATISTICS metadata ===
 # zeta does not currently honor ORDER BY on
 # information_schema.STATISTICS rows; --sorted_result
@@ -50,7 +50,6 @@ mc	PRIMARY	id
 mc	idx_ab	a
 mc	idx_ab	b
 u	PRIMARY	id
-u	idx_age	age
 u	idx_email	email
 === Cleanup ===
 DROP TABLE u;

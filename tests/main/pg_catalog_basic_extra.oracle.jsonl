@@ -1,0 +1,22 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":21}
+{"i":1,"h":"c924427d","k":"ok","affected":0}
+{"i":2,"h":"0b211876","k":"ok","affected":0}
+{"i":3,"h":"81875944","k":"err","code":1170,"msg":"BLOB/TEXT column 'name' used in key specification without a key length"}
+{"i":4,"h":"0b76a303","k":"rows","cols":["Database"],"rows":[["information_schema"],["mysql"],["performance_schema"],["sys"],["test"]]}
+{"i":5,"h":"13599f25","k":"rows","cols":["Tables_in_test"],"rows":[["pct"]]}
+{"i":6,"h":"829891e6","k":"rows","cols":["Field","Type","Null","Key","Default","Extra"],"rows":[["id","int","NO","PRI",null,""],["name","text","NO","",null,""],["age","int","YES","","0",""]]}
+{"i":7,"h":"4f455687","k":"rows","cols":["Field","Type","Null","Key","Default","Extra"],"rows":[["id","int","NO","PRI",null,""],["name","text","NO","",null,""],["age","int","YES","","0",""]]}
+{"i":8,"h":"4e834299","k":"rows","cols":["TABLE_SCHEMA","TABLE_NAME"],"rows":[["test","pct"]]}
+{"i":9,"h":"a726ffd6","k":"rows","cols":["COLUMN_NAME","DATA_TYPE","IS_NULLABLE","COLUMN_DEFAULT"],"rows":[["id","int","NO",null],["name","text","NO",null],["age","int","YES","0"]]}
+{"i":10,"h":"5aab788d","k":"rows","cols":["SCHEMA_NAME"],"rows":[["information_schema"],["mysql"],["performance_schema"],["sys"],["test"]]}
+{"i":11,"h":"d6f687d9","k":"rows","cols":["CONSTRAINT_NAME","CONSTRAINT_TYPE"],"rows":[["PRIMARY","PRIMARY KEY"]],"nd":"order","unordered":true}
+{"i":12,"h":"814b8233","k":"rows","cols":["engine","support"],"rows":[["ARCHIVE","YES"],["BLACKHOLE","YES"],["CSV","YES"],["FEDERATED","NO"],["InnoDB","DEFAULT"],["MEMORY","YES"],["MRG_MYISAM","YES"],["MyISAM","YES"],["PERFORMANCE_SCHEMA","YES"],["ndbcluster","NO"],["ndbinfo","NO"]],"nd":"order","unordered":true}
+{"i":13,"h":"4ab0d5bf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1"}
+{"i":14,"h":"6c4d8f09","k":"ok","affected":0}
+{"i":15,"h":"223f4fa3","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":16,"h":"01c0c732","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":17,"h":"21861356","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":18,"h":"c3c5ba59","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":19,"h":"7b62e040","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":20,"h":"d070ad8c","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}
+{"i":21,"h":"ef4dc8e3","k":"err","code":1049,"msg":"Unknown database 'pg_catalog'"}

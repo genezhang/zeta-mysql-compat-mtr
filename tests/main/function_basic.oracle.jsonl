@@ -1,0 +1,61 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":60}
+{"i":1,"h":"f482d2aa","k":"rows","cols":["r"],"rows":[["abc"]]}
+{"i":2,"h":"05bd7aeb","k":"rows","cols":["l"],"rows":[["5"]]}
+{"i":3,"h":"db4b8978","k":"rows","cols":["s"],"rows":[["hello"]]}
+{"i":4,"h":"c4afda92","k":"rows","cols":["s2"],"rows":[["world"]]}
+{"i":5,"h":"dd3492a3","k":"rows","cols":["c1","c2"],"rows":[["3","3"]]}
+{"i":6,"h":"5eb93531","k":"rows","cols":["u","l"],"rows":[["HELLO","hello"]]}
+{"i":7,"h":"5e4ff147","k":"rows","cols":["t","lt","rt"],"rows":[["hi","hi","hi"]]}
+{"i":8,"h":"98bbd419","k":"rows","cols":["r"],"rows":[["heLLo"]]}
+{"i":9,"h":"fb8b3f50","k":"rows","cols":["l","r"],"rows":[["hel","llo"]]}
+{"i":10,"h":"6c803f28","k":"rows","cols":["r","rv"],"rows":[["ababab","olleh"]]}
+{"i":11,"h":"1a6459b5","k":"rows","cols":["r"],"rows":[["a-b-c"]]}
+{"i":12,"h":"25a28958","k":"rows","cols":["p"],"rows":[["3"]]}
+{"i":13,"h":"6bdee78c","k":"rows","cols":["p"],"rows":[["3"]]}
+{"i":14,"h":"0f2be308","k":"rows","cols":["r"],"rows":[["abcX"]]}
+{"i":15,"h":"150422a4","k":"rows","cols":["a1","a2"],"rows":[["5","5"]]}
+{"i":16,"h":"c6b0a64e","k":"rows","cols":["r1","r2"],"rows":[["4","3.5"]]}
+{"i":17,"h":"15804a78","k":"rows","cols":["r3","r4","r5"],"rows":[["3","4","-3"]]}
+{"i":18,"h":"531de647","k":"rows","cols":["c","f"],"rows":[["4","3"]]}
+{"i":19,"h":"38d73e2d","k":"rows","cols":["m1","m2"],"rows":[["1","1"]]}
+{"i":20,"h":"f95157c9","k":"rows","cols":["m3"],"rows":[["-1"]]}
+{"i":21,"h":"c3e2b8d6","k":"rows","cols":["s1","s2","s3"],"rows":[["-1","0","1"]]}
+{"i":22,"h":"d3c7a042","k":"rows","cols":["p","p2","s"],"rows":[["1024","1024","3"]]}
+{"i":23,"h":"3207f1bf","k":"rows","cols":["ln1","log10_e"],"rows":[["1","1"]]}
+{"i":24,"h":"cddf739c","k":"rows","cols":["g","l"],"rows":[["3","1"]]}
+{"i":25,"h":"39a932fd","k":"rows","cols":["c"],"rows":[["x"]]}
+{"i":26,"h":"e6446a5d","k":"rows","cols":["n1","n2"],"rows":[[null,"1"]]}
+{"i":27,"h":"0f11daa1","k":"rows","cols":["c1"],"rows":[["yes"]]}
+{"i":28,"h":"9d918e04","k":"rows","cols":["c2"],"rows":[["no"]]}
+{"i":29,"h":"22cb0068","k":"rows","cols":["y"],"rows":[["2023"]]}
+{"i":30,"h":"4b95fac2","k":"err","code":1305,"msg":"FUNCTION test.DATE_TRUNC does not exist"}
+{"i":31,"h":"b2414ade","k":"rows","cols":["y2"],"rows":[["2023"]]}
+{"i":32,"h":"718a4fa5","k":"rows","cols":["d"],"rows":[["59"]]}
+{"i":33,"h":"73593a7b","k":"err","code":1305,"msg":"FUNCTION test.AGE does not exist"}
+{"i":34,"h":"297e1920","k":"rows","cols":["f"],"rows":[["2023/04/05"]]}
+{"i":35,"h":"070db770","k":"err","code":1305,"msg":"FUNCTION test.TO_CHAR does not exist"}
+{"i":36,"h":"01a8c8ec","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS d' at line 1"}
+{"i":37,"h":"d51ef07c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER) AS i' at line 1"}
+{"i":38,"h":"cdcbdc1a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER) AS r' at line 1"}
+{"i":39,"h":"e6ab69cd","k":"rows","cols":["f"],"rows":[["fallback"]]}
+{"i":40,"h":"67327feb","k":"rows","cols":["f"],"rows":[["x"]]}
+{"i":41,"h":"05fab647","k":"rows","cols":["f"],"rows":[["42"]]}
+{"i":42,"h":"e8014825","k":"rows","cols":["r"],"rows":[["yes"]]}
+{"i":43,"h":"09e94790","k":"rows","cols":["r"],"rows":[["no"]]}
+{"i":44,"h":"a1078c48","k":"rows","cols":["r"],"rows":[["no"]]}
+{"i":45,"h":"6511c666","k":"rows","cols":["r"],"rows":[["yes"]]}
+{"i":46,"h":"7af18695","k":"rows","cols":["r"],"rows":[["no"]]}
+{"i":47,"h":"198ab308","k":"rows","cols":["v"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":48,"h":"ee955894","k":"rows","cols":["r"],"rows":[["123"]]}
+{"i":49,"h":"73528981","k":"rows","cols":["r"],"rows":[["-42"]]}
+{"i":50,"h":"9b7d1302","k":"rows","cols":["r"],"rows":[["4"]]}
+{"i":51,"h":"1ccec2bb","k":"rows","cols":["r"],"rows":[["-4"]]}
+{"i":52,"h":"70d6c592","k":"rows","cols":["r"],"rows":[["123"]]}
+{"i":53,"h":"0e0f922f","k":"rows","cols":["r"],"rows":[["9999999999"]]}
+{"i":54,"h":"4415e8cd","k":"rows","cols":["r"],"rows":[["18446744073709551615"]]}
+{"i":55,"h":"31697668","k":"rows","cols":["d"],"rows":[["2023-01-25"]]}
+{"i":56,"h":"8dbb86ac","k":"rows","cols":["d"],"rows":[["2023-01-25"]]}
+{"i":57,"h":"068a8f5b","k":"rows","cols":["d"],"rows":[["2022-12-15"]]}
+{"i":58,"h":"b65cdba1","k":"rows","cols":["d"],"rows":[["2023-01-10"]]}
+{"i":59,"h":"50bc62b7","k":"rows","cols":["d"],"rows":[["2023-01-15 06:00:00"]]}
+{"i":60,"h":"a7a323d2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ') AS d' at line 1"}

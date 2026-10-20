@@ -1,0 +1,22 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":21}
+{"i":1,"h":"d818f8e0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n                   'one', 'world')                            AS typed_d' at line 1"}
+{"i":2,"h":"6cbdb15f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n                             'one', 'x'))                     AS typed_a' at line 1"}
+{"i":3,"h":"962019d9","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_search; a JSON string or JSON type is required."}
+{"i":4,"h":"6754f6fa","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_search; a JSON string or JSON type is required."}
+{"i":5,"h":"18022052","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_search; a JSON string or JSON type is required."}
+{"i":6,"h":"801c3481","k":"err","code":3154,"msg":"The oneOrAll argument to json_search may take these values: 'one' or 'all'."}
+{"i":7,"h":"bdeb18d4","k":"rows","cols":["JSON_SEARCH('{\"a\":\"x\"}', 'one', 42)"],"rows":[[null]]}
+{"i":8,"h":"a6b55f59","k":"err","code":1210,"msg":"Incorrect arguments to ESCAPE"}
+{"i":9,"h":"231568a5","k":"rows","cols":["JSON_SEARCH('{\"a\":\"x\"}', 'one', 'x', '')"],"rows":[["\"$.a\""]]}
+{"i":10,"h":"61ed4b4a","k":"rows","cols":["quoted_key_space"],"rows":[["\"$.\\\"weird key\\\"\""]]}
+{"i":11,"h":"f955abd4","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_search: \"Missing a colon after a name of object member.\" at position 4."}
+{"i":12,"h":"719c4e68","k":"rows","cols":["quoted_key_backslash"],"rows":[["\"$.\\\"a\\\\b\\\"\""]]}
+{"i":13,"h":"4b991df4","k":"rows","cols":["bare_underscore_leading"],"rows":[["\"$._a\""]]}
+{"i":14,"h":"2109dea0","k":"rows","cols":["digit_leading_quoted"],"rows":[["\"$.\\\"1a\\\"\""]]}
+{"i":15,"h":"4fdec5b2","k":"rows","cols":["arr_then_quoted_key"],"rows":[["\"$[0].\\\"weird key\\\"\""]]}
+{"i":16,"h":"7daf7b5e","k":"rows","cols":["default_escape_backslash"],"rows":[["\"$.a\""]]}
+{"i":17,"h":"f5b95805","k":"rows","cols":["default_escape_extra_bs_no_match"],"rows":[["0"]]}
+{"i":18,"h":"f863ccbb","k":"rows","cols":["empty_pattern_matches_empty"],"rows":[["\"$.a\""]]}
+{"i":19,"h":"b89ab7e3","k":"rows","cols":["empty_pattern_no_match"],"rows":[["1"]]}
+{"i":20,"h":"76b996da","k":"rows","cols":["utf8_exact_match"],"rows":[["\"$.a\""]]}
+{"i":21,"h":"afa0f4fb","k":"rows","cols":["utf8_wildcard_match"],"rows":[["\"$.a\""]]}

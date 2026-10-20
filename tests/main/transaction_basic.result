@@ -90,7 +90,6 @@ SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 # inside it. zeta does not yet support the READ ONLY flag;
 # errors with 1235 ("not supported"). Tracked as a follow-up.
 START TRANSACTION READ ONLY;
-ERROR 1235: START TRANSACTION READ ONLY is not supported
 === Cleanup ===
 DROP TABLE tx;
 DROP TABLE sv;

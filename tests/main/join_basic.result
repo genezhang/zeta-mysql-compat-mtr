@@ -37,12 +37,7 @@ carol	sales
 === FULL OUTER JOIN — preserves both sides ===
 SELECT e.name AS emp, d.name AS dept
   FROM emp e FULL OUTER JOIN dept d ON e.dept_id = d.id;
-emp	dept
-NULL	ops
-alice	eng
-bob	eng
-carol	sales
-dan	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FULL OUTER JOIN dept d ON e.dept_id = d.id' at line 2
 === CROSS JOIN — cartesian product, no ON ===
 SELECT e.name AS emp, d.name AS dept
   FROM emp e CROSS JOIN dept d;
@@ -78,7 +73,7 @@ INSERT INTO e1 VALUES (1, 100), (2, 200);
 CREATE TABLE e2 (cid INT, y VARCHAR(5));
 INSERT INTO e2 VALUES (1, 'a'), (2, 'b');
 SELECT * FROM e1 JOIN e2 USING (cid) ORDER BY cid;
-e1.cid	e1.x	e2.y
+cid	x	y
 1	100	a
 2	200	b
 === NATURAL JOIN — KNOWN DIVERGENCE (no projection dedup) ===
@@ -86,9 +81,9 @@ e1.cid	e1.x	e2.y
 # both sides. Predicate inference still matches on `cid`,
 # so the row count is correct (one per matching pair).
 SELECT * FROM e1 NATURAL JOIN e2 ORDER BY e1.cid;
-e1.cid	e1.x	e2.cid	e2.y
-1	100	1	a
-2	200	2	b
+cid	x	y
+1	100	a
+2	200	b
 === Multi-table JOIN chain — A JOIN B JOIN C ===
 SELECT e.name AS emp, d.name AS dept, s.amt
   FROM emp e

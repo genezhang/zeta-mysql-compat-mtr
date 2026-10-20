@@ -139,12 +139,7 @@ id	rn	rk
 # as a zeta extra. Portable substitute: ORDER BY x IS NULL …
 SELECT id, ROW_NUMBER() OVER (ORDER BY amt NULLS FIRST) AS rn
 FROM sales ORDER BY id;
-id	rn
-1	1
-2	3
-3	5
-4	2
-5	4
-6	6
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULLS FIRST) AS rn
+FROM sales ORDER BY id' at line 1
 === Cleanup ===
 DROP TABLE sales;

@@ -37,6 +37,7 @@ id	v
 # constants into the SQL or use a temp table.
 SET @x = 42;
 SELECT @x;
-ERROR 1064: SQL parse error: unsupported unary operator: @
+@x
+42
 === Cleanup ===
 DROP TABLE up;

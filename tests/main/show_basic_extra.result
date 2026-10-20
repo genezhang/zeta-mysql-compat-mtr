@@ -6,8 +6,11 @@ CREATE TABLE sh2 (id INT PRIMARY KEY, name VARCHAR(20));
 === SHOW DATABASES ===
 SHOW DATABASES;
 Database
+information_schema
+mysql
+performance_schema
+sys
 test
-zeta
 === SHOW TABLES — single column ===
 SHOW TABLES;
 Tables_in_test
@@ -31,12 +34,12 @@ SHOW CREATE TABLE sh2;
 Table	Create Table
 sh2	CREATE TABLE `sh2` (
   `id` int NOT NULL,
-  `name` varchar(20),
+  `name` varchar(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 === SHOW TABLES LIKE pattern ===
 SHOW TABLES LIKE 'sh%';
-Tables_in_test
+Tables_in_test (sh%)
 sh1
 sh2
 === Cleanup ===

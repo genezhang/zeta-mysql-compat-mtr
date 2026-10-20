@@ -3,12 +3,13 @@ DROP TABLE IF EXISTS act;
 CREATE TABLE act (id INT, n INT);
 INSERT INTO act VALUES (1, 10), (2, 20);
 ALTER TABLE act ALTER COLUMN n TYPE BIGINT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE BIGINT' at line 1
 INSERT INTO act VALUES (3, 9223372036854775807);
+ERROR 1264: Out of range value for column 'n' at row 1
 SELECT id, n FROM act ORDER BY id;
 id	n
 1	10
 2	20
-3	9223372036854775807
 === MySQL MODIFY COLUMN ===
 DROP TABLE IF EXISTS amod;
 CREATE TABLE amod (id INT, n INT);
@@ -27,27 +28,27 @@ DROP TABLE IF EXISTS acpk;
 CREATE TABLE acpk (id INT PRIMARY KEY, n INT);
 INSERT INTO acpk VALUES (1, 10);
 ALTER TABLE acpk ALTER COLUMN id TYPE BIGINT;
-ERROR 1105: execution error: cannot change type of primary key column "id": key encoding would change; re-create the table instead
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE BIGINT' at line 1
 === ALTER COLUMN TYPE on indexed column — errno 1105 ===
 DROP TABLE IF EXISTS aci2;
 CREATE TABLE aci2 (id INT PRIMARY KEY, n INT);
 CREATE INDEX aci2_n ON aci2 (n);
 INSERT INTO aci2 VALUES (1, 10);
 ALTER TABLE aci2 ALTER COLUMN n TYPE BIGINT;
-ERROR 1105: execution error: cannot change type of column "n": index "aci2_n" uses it; drop the index first, then change the type
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE BIGINT' at line 1
 === ALTER COLUMN TYPE on FOREIGN KEY column — errno 1105 ===
 DROP TABLE IF EXISTS acfk_p;
 DROP TABLE IF EXISTS acfk_c;
 CREATE TABLE acfk_p (id INT PRIMARY KEY);
 CREATE TABLE acfk_c (id INT PRIMARY KEY, pid INT, FOREIGN KEY (pid) REFERENCES acfk_p(id));
 ALTER TABLE acfk_c ALTER COLUMN pid TYPE BIGINT;
-ERROR 1105: execution error: cannot change type of column "pid": index "test.public.acfk_c_pid_fkey_fk_idx" uses it; drop the index first, then change the type
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE BIGINT' at line 1
 === KNOWN GAP: ALTER COLUMN TYPE USING <expr> (PG) — errno 1105 with hint ===
 DROP TABLE IF EXISTS acu;
 CREATE TABLE acu (id INT, t TEXT);
 INSERT INTO acu VALUES (1, '100');
 ALTER TABLE acu ALTER COLUMN t TYPE INT USING t::INT;
-ERROR 1105: execution error: USING clause in ALTER COLUMN TYPE is not yet supported; omit it and use a separate UPDATE to convert existing values if needed
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE INT USING t::INT' at line 1
 === KNOWN BUG: narrow with overflow data silently accepted ===
 # ALTER INT → SMALLINT on a column containing 99999 succeeds;
 # value stays at 99999 (no truncation); subsequent inserts of
@@ -56,6 +57,7 @@ DROP TABLE IF EXISTS acn;
 CREATE TABLE acn (id INT, n INT);
 INSERT INTO acn VALUES (1, 99999);
 ALTER TABLE acn ALTER COLUMN n TYPE SMALLINT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE SMALLINT' at line 1
 INSERT INTO acn VALUES (2, 99999);
 SELECT id, n FROM acn ORDER BY id;
 id	n
@@ -66,11 +68,12 @@ DROP TABLE IF EXISTS aci;
 CREATE TABLE aci (id INT, n INT);
 INSERT INTO aci VALUES (1, 10);
 ALTER TABLE aci ALTER COLUMN n TYPE TEXT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE TEXT' at line 1
 INSERT INTO aci VALUES (2, 'hello');
+ERROR 1366: Incorrect integer value: 'hello' for column 'n' at row 1
 SELECT id, n FROM aci ORDER BY id;
 id	n
 1	10
-2	hello
 DROP TABLE act;
 DROP TABLE amod;
 DROP TABLE acpk;

@@ -3,8 +3,7 @@ SELECT LPAD('abc', 6, '*')      AS basic;
 basic
 ***abc
 SELECT LPAD('abc', 5)           AS default_space;
-default_space
-  abc
+ERROR 1582: Incorrect parameter count in the call to native function 'LPAD'
 === LPAD: truncate long to length ===
 SELECT LPAD('abcdef', 3, '*')   AS truncate;
 truncate
@@ -24,8 +23,7 @@ SELECT RPAD('abc', 6, '*')      AS basic;
 basic
 abc***
 SELECT RPAD('abc', 5)           AS default_space;
-default_space
-abc  
+ERROR 1582: Incorrect parameter count in the call to native function 'RPAD'
 === RPAD: truncate long to length ===
 SELECT RPAD('abcdef', 3, '*')   AS truncate;
 truncate
@@ -56,17 +54,17 @@ rpad_trunc_len
 === Negative length → empty string ===
 SELECT LENGTH(LPAD('abc', -1, '*')) = 0 AS lpad_neg_empty;
 lpad_neg_empty
-1
+NULL
 SELECT LENGTH(RPAD('abc', -1, '*')) = 0 AS rpad_neg_empty;
 rpad_neg_empty
-1
+NULL
 === Empty fill returns input (zeta divergence from MySQL) ===
 SELECT LPAD('abc', 6, '') = 'abc' AS lpad_empty_fill;
 lpad_empty_fill
-1
+0
 SELECT RPAD('abc', 6, '') = 'abc' AS rpad_empty_fill;
 rpad_empty_fill
-1
+0
 SELECT LPAD('abcdef', 3, '')      AS lpad_empty_fill_no_pad_needed;
 lpad_empty_fill_no_pad_needed
 abc
@@ -82,10 +80,10 @@ rpad_utf8
 café**
 SELECT LENGTH(LPAD('café', 6, '*'))     = 6 AS lpad_utf8_pg_len;
 lpad_utf8_pg_len
-1
+0
 SELECT LENGTH(RPAD('café', 6, '*'))     = 6 AS rpad_utf8_pg_len;
 rpad_utf8_pg_len
-1
+0
 SELECT LPAD('café', 3, '*')             AS lpad_utf8_trunc;
 lpad_utf8_trunc
 caf
@@ -133,14 +131,14 @@ rpad_null_fill
 1
 === Arity errors (0-arg + 4-arg only; see header note on 1-arg gap) ===
 SELECT LPAD();
-ERROR 1105: execution error: LPAD requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'LPAD'
 SELECT LPAD('a', 5, '*', 'extra');
-ERROR 1105: execution error: LPAD requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'LPAD'
 SELECT LPAD('a', 5, '*', 99);
-ERROR 1105: execution error: LPAD requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'LPAD'
 SELECT RPAD();
-ERROR 1105: execution error: RPAD requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'RPAD'
 SELECT RPAD('a', 5, '*', 'extra');
-ERROR 1105: execution error: RPAD requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'RPAD'
 SELECT RPAD('a', 5, '*', 99);
-ERROR 1105: execution error: RPAD requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'RPAD'

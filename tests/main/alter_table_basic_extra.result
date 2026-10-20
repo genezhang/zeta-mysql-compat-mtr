@@ -12,49 +12,52 @@ id	age
 === ALTER COLUMN DROP DEFAULT ===
 ALTER TABLE ae ALTER COLUMN age DROP DEFAULT;
 INSERT INTO ae (id, name) VALUES (3, 'c');
+ERROR 1364: Field 'age' doesn't have a default value
 SELECT id, age FROM ae ORDER BY id;
 id	age
 1	10
 2	99
-3	NULL
 === ALTER COLUMN DROP NOT NULL ===
 # Backfill the column first so SET NOT NULL is meaningful.
 DROP TABLE IF EXISTS aen;
 CREATE TABLE aen (id INT PRIMARY KEY, x INT NOT NULL);
 INSERT INTO aen VALUES (1, 10), (2, 20);
 ALTER TABLE aen ALTER COLUMN x DROP NOT NULL;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT NULL' at line 1
 INSERT INTO aen (id, x) VALUES (3, NULL);
+ERROR 1048: Column 'x' cannot be null
 SELECT id, x FROM aen;
 id	x
 1	10
 2	20
-3	NULL
 === ALTER COLUMN SET NOT NULL — only when no existing NULL ===
 DROP TABLE IF EXISTS aen2;
 CREATE TABLE aen2 (id INT PRIMARY KEY, x INT);
 INSERT INTO aen2 VALUES (1, 10), (2, 20);
 ALTER TABLE aen2 ALTER COLUMN x SET NOT NULL;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT NULL' at line 1
 # Now NULL insert is rejected.
 INSERT INTO aen2 (id, x) VALUES (3, NULL);
-ERROR 1105: execution error: null value in column "x" of relation "test.public.aen2" violates not-null constraint
 === KNOWN DIVERGENCE: SET NOT NULL with existing NULL — errno 1105 ===
 DROP TABLE IF EXISTS aen3;
 CREATE TABLE aen3 (id INT PRIMARY KEY, x INT);
 INSERT INTO aen3 (id) VALUES (1);
 ALTER TABLE aen3 ALTER COLUMN x SET NOT NULL;
-ERROR 1105: execution error: column "x" of relation "test.public.aen3" contains null values
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT NULL' at line 1
 === ALTER COLUMN TYPE — widen INT → BIGINT ===
 DROP TABLE IF EXISTS atp;
 CREATE TABLE atp (id INT PRIMARY KEY, n INT);
 INSERT INTO atp VALUES (1, 100);
 ALTER TABLE atp ALTER COLUMN n TYPE BIGINT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TYPE BIGINT' at line 1
 INSERT INTO atp VALUES (2, 4294967296);
+ERROR 1264: Out of range value for column 'n' at row 1
 SELECT id, n FROM atp ORDER BY id;
 id	n
 1	100
-2	4294967296
 === ALTER COLUMN SET DATA TYPE (alt syntax) ===
 ALTER TABLE atp ALTER COLUMN n SET DATA TYPE BIGINT;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DATA TYPE BIGINT' at line 1
 === ADD COLUMN with COMMENT clause ===
 ALTER TABLE atp ADD COLUMN note VARCHAR(50) COMMENT 'free-form annotation';
 === ADD COLUMN GENERATED ALWAYS AS (expr) STORED ===
@@ -69,6 +72,7 @@ id	x	y	z
 DROP TABLE IF EXISTS adc;
 CREATE TABLE adc (id INT PRIMARY KEY, code VARCHAR(10));
 ALTER TABLE adc DROP CONSTRAINT IF EXISTS no_such_constraint;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF EXISTS no_such_constraint' at line 1
 === DROP CONSTRAINT <fk_name> — supported ===
 DROP TABLE IF EXISTS afp;
 DROP TABLE IF EXISTS afc;
@@ -94,16 +98,13 @@ DROP TABLE IF EXISTS auc;
 CREATE TABLE auc (id INT PRIMARY KEY, code VARCHAR(10));
 ALTER TABLE auc ADD CONSTRAINT u_code UNIQUE (code);
 ALTER TABLE auc DROP CONSTRAINT u_code;
-ERROR 1105: execution error: constraint "u_code" does not exist on table "test.public.auc"
 === KNOWN GAP: ALTER TABLE ENGINE = <name> — errno 1064 ===
 ALTER TABLE ae ENGINE = InnoDB;
-ERROR 1064: SQL parse error: sql parser error: Expected: ADD, RENAME, PARTITION, SWAP, DROP, REPLICA IDENTITY, SET, or SET TBLPROPERTIES after ALTER TABLE, found: ENGINE at Line: 1, Column: 16
 === KNOWN GAP: ALTER TABLE AUTO_INCREMENT = N — errno 1064 ===
 ALTER TABLE ae AUTO_INCREMENT = 1000;
-ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: AUTO_INCREMENT = 1000
 === KNOWN GAP: RENAME CONSTRAINT — errno 1064 ===
 ALTER TABLE afc RENAME CONSTRAINT fk_p TO fk_p_new;
-ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: RENAME CONSTRAINT fk_p TO fk_p_new
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONSTRAINT fk_p TO fk_p_new' at line 1
 === KNOWN DIVERGENCE: GENERATED ALWAYS AS IDENTITY — silent, leaves NULL ===
 # The IDENTITY counter is not wired through ADD COLUMN.
 # INSERTs that omit the column leave it NULL instead of
@@ -112,11 +113,10 @@ ERROR 1064: SQL parse error: unsupported ALTER TABLE operation: RENAME CONSTRAIN
 DROP TABLE IF EXISTS ai;
 CREATE TABLE ai (id INT PRIMARY KEY);
 ALTER TABLE ai ADD COLUMN seq INT GENERATED ALWAYS AS IDENTITY;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IDENTITY' at line 1
 INSERT INTO ai (id) VALUES (1), (2);
 SELECT id, seq FROM ai ORDER BY id;
-id	seq
-1	NULL
-2	NULL
+ERROR 1054: Unknown column 'seq' in 'field list'
 === Cleanup ===
 DROP TABLE ae;
 DROP TABLE aen;

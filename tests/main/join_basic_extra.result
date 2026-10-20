@@ -38,7 +38,7 @@ CREATE TABLE jb (x INT, y INT, z INT);
 INSERT INTO ja VALUES (1, 10), (2, 20);
 INSERT INTO jb VALUES (1, 10, 100), (2, 20, 200), (3, 30, 300);
 SELECT * FROM ja JOIN jb USING (x, y) ORDER BY x;
-ja.x	ja.y	jb.z
+x	y	z
 1	10	100
 2	20	200
 === LEFT JOIN with grouped subquery on right ===
@@ -68,6 +68,9 @@ c
 # join produces an empty result instead of N rows.
 # Portable substitute: rewrite as correlated subquery.
 SELECT 1 FROM jp, LATERAL (SELECT x FROM jc WHERE jc.pid = jp.id) AS l;
+1
+1
+1
 === Cleanup ===
 DROP TABLE jp; DROP TABLE jc;
 DROP TABLE ja; DROP TABLE jb;

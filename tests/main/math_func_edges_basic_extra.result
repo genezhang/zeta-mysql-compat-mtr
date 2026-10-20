@@ -20,16 +20,15 @@ gs
 c
 SELECT GREATEST(1, 'a', 2) AS mixed_coerced;
 mixed_coerced
-2
+a
 SELECT GREATEST(1, NULL, 2) AS with_null;
 with_null
 NULL
 SELECT GREATEST(1.5, 2, 1) AS flt;
 flt
-2
+2.0
 SELECT GREATEST(1) AS one_arg;
-one_arg
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'GREATEST'
 === CEIL / FLOOR — negative inputs ===
 SELECT CEIL(-3.2) AS c_neg, FLOOR(-3.8) AS f_neg;
 c_neg	f_neg
@@ -60,22 +59,25 @@ p_zero	p_frac	p_neg_base
 1	1.4142135623730951	-8
 === KNOWN DIVERGENCE: MOD by zero errors 1105 (MySQL → NULL) ===
 SELECT MOD(10, 0);
-ERROR 1105: execution error: division by zero
+MOD(10, 0)
+NULL
 === KNOWN DIVERGENCE: % by zero same ===
 SELECT 10 % 0;
-ERROR 1105: execution error: division by zero
+10 % 0
+NULL
 === KNOWN DIVERGENCE: ABS i64::MIN cast overflows ===
 SELECT ABS(CAST(-9223372036854775808 AS BIGINT)) AS abs_i64_min;
-abs_i64_min
--9223372036854775808
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)) AS abs_i64_min' at line 1
 === KNOWN DIVERGENCE: POWER(-2, 0.5) returns NaN (MySQL → NULL) ===
 SELECT POWER(-2, 0.5) AS p_neg_sqrt;
-p_neg_sqrt
-NaN
+ERROR 1690: DOUBLE value is out of range in 'pow(-(2),0.5)'
 === KNOWN DIVERGENCE: LOG family errors on zero / negative (MySQL → NULL) ===
 SELECT LOG(0);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LOG(0)
+NULL
 SELECT LOG10(0);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LOG10(0)
+NULL
 SELECT LOG2(-1);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LOG2(-1)
+NULL

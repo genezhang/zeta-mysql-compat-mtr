@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"be97a423","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":2,"h":"69ea4a0d","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":3,"h":"3a85a91b","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":4,"h":"a278902c","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":5,"h":"2021fd49","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":6,"h":"696d75c5","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":7,"h":"56888139","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":8,"h":"0b722f61","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":9,"h":"eafb8ba8","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":10,"h":"ef79f515","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":11,"h":"adda6887","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":12,"h":"044b007d","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":13,"h":"70d1e5e7","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":14,"h":"c595213e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP))          AS ts_identity' at line 1"}
+{"i":15,"h":"898db229","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":16,"h":"e742e867","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                          AS jsonb_identity' at line 1"}
+{"i":17,"h":"35ee6b89","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":18,"h":"4d4a5c9e","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":19,"h":"fd72de97","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":20,"h":"eea50bcf","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":21,"h":"69612830","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":22,"h":"caf0801d","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":23,"h":"6a519c58","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}
+{"i":24,"h":"51e59abf","k":"err","code":1305,"msg":"FUNCTION test.VOL does not exist"}

@@ -1,0 +1,28 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":27}
+{"i":1,"h":"dc2b9aec","k":"rows","cols":["object_path"],"rows":[["\"$.a\""]]}
+{"i":2,"h":"754f406e","k":"rows","cols":["array_path"],"rows":[["\"$[1]\""]]}
+{"i":3,"h":"6ae0b41c","k":"rows","cols":["root_string"],"rows":[["\"$\""]]}
+{"i":4,"h":"f86e1743","k":"rows","cols":["obj_arr_obj_path"],"rows":[["\"$.a[0].b\""]]}
+{"i":5,"h":"400ef69b","k":"rows","cols":["obj_arr_path"],"rows":[["\"$.a[1]\""]]}
+{"i":6,"h":"16dbe95a","k":"rows","cols":["deep_obj_path"],"rows":[["\"$.a.b.c\""]]}
+{"i":7,"h":"51bc176b","k":"rows","cols":["pct_wild"],"rows":[["\"$.a\""]]}
+{"i":8,"h":"2a4ba437","k":"rows","cols":["underscore_wild"],"rows":[["\"$.a\""]]}
+{"i":9,"h":"2d783559","k":"rows","cols":["custom_escape"],"rows":[["\"$.a\""]]}
+{"i":10,"h":"0507d4af","k":"rows","cols":["all_count"],"rows":[["3"]]}
+{"i":11,"h":"22c4af17","k":"rows","cols":["all_is_array"],"rows":[["ARRAY"]]}
+{"i":12,"h":"a81090b8","k":"rows","cols":["single_is_string"],"rows":[["STRING"]]}
+{"i":13,"h":"1712a482","k":"rows","cols":["single_path"],"rows":[["\"$.a\""]]}
+{"i":14,"h":"ff9b4537","k":"rows","cols":["one_no_match"],"rows":[["1"]]}
+{"i":15,"h":"6d8e0af4","k":"rows","cols":["all_no_match"],"rows":[["1"]]}
+{"i":16,"h":"0b13f5b8","k":"rows","cols":["no_strings_skipped"],"rows":[["1"]]}
+{"i":17,"h":"7039f1be","k":"rows","cols":["upper_one"],"rows":[["\"$.a\""]]}
+{"i":18,"h":"79181996","k":"rows","cols":["mixed_all"],"rows":[["\"$.a\""]]}
+{"i":19,"h":"b40543fd","k":"rows","cols":["null_doc"],"rows":[["1"]]}
+{"i":20,"h":"452206f0","k":"rows","cols":["null_mode"],"rows":[["1"]]}
+{"i":21,"h":"817673ff","k":"rows","cols":["null_search"],"rows":[["1"]]}
+{"i":22,"h":"8b9bee67","k":"rows","cols":["null_escape"],"rows":[["1"]]}
+{"i":23,"h":"767851ee","k":"err","code":3154,"msg":"The oneOrAll argument to json_search may take these values: 'one' or 'all'."}
+{"i":24,"h":"05efb66b","k":"err","code":1210,"msg":"Incorrect arguments to ESCAPE"}
+{"i":25,"h":"fd6e39ce","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'JSON_SEARCH'"}
+{"i":26,"h":"8a5b1387","k":"rows","cols":["JSON_SEARCH('{}', 'one', 'x', '\\\\', '$.a')"],"rows":[[null]]}
+{"i":27,"h":"5525040a","k":"err","code":3141,"msg":"Invalid JSON text in argument 1 to function json_search: \"Invalid value.\" at position 1."}

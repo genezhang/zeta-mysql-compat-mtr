@@ -17,13 +17,13 @@ alternation
 === REGEXP_LIKE: case-insensitive flag 'i' ===
 SELECT REGEXP_LIKE('Hello', 'hello')         AS case_default;
 case_default
-0
+1
 SELECT REGEXP_LIKE('Hello', 'hello', 'i')    AS case_insensitive;
 case_insensitive
 1
 SELECT REGEXP_LIKE('HELLO', 'hello')         AS case_strict;
 case_strict
-0
+1
 === REGEXP_LIKE: NULL propagation + arity ===
 SELECT REGEXP_LIKE(NULL, 'x')   IS NULL      AS null_source;
 null_source
@@ -32,11 +32,11 @@ SELECT REGEXP_LIKE('a', NULL)   IS NULL      AS null_pattern;
 null_pattern
 1
 SELECT REGEXP_LIKE();
-ERROR 1105: execution error: REGEXP_LIKE requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_LIKE'
 SELECT REGEXP_LIKE('a');
-ERROR 1105: execution error: REGEXP_LIKE requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_LIKE'
 SELECT REGEXP_LIKE('a', 'b', 'i', 'extra');
-ERROR 1105: execution error: REGEXP_LIKE requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_LIKE'
 === REGEXP_INSTR: 1-based position of first match ===
 SELECT REGEXP_INSTR('hello world', 'world')  AS find_world;
 find_world
@@ -48,8 +48,7 @@ SELECT REGEXP_INSTR('hello world', 'xyz')    AS no_match_zero;
 no_match_zero
 0
 SELECT REGEXP_INSTR('abc', '')               AS empty_pattern;
-empty_pattern
-1
+ERROR 3685: Illegal argument to a regular expression.
 === REGEXP_INSTR: 3-arg start position ===
 SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 1)   AS start_1;
 start_1
@@ -58,8 +57,7 @@ SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 5)   AS start_skips_first;
 start_skips_first
 9
 SELECT REGEXP_INSTR('aaa bbb aaa', 'a', 99)  AS start_past_end;
-start_past_end
-0
+ERROR 3686: Index out of bounds in regular expression search.
 === REGEXP_INSTR: NULL + arity ===
 SELECT REGEXP_INSTR(NULL, 'x')   IS NULL     AS null_source;
 null_source
@@ -68,11 +66,12 @@ SELECT REGEXP_INSTR('a', NULL)   IS NULL     AS null_pattern;
 null_pattern
 1
 SELECT REGEXP_INSTR();
-ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_INSTR'
 SELECT REGEXP_INSTR('a');
-ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_INSTR'
 SELECT REGEXP_INSTR('a', 'b', 1, 'extra');
-ERROR 1105: execution error: REGEXP_INSTR requires 2 or 3 arguments
+REGEXP_INSTR('a', 'b', 1, 'extra')
+0
 === REGEXP_SUBSTR: extract first match ===
 SELECT REGEXP_SUBSTR('hello world', 'w.r.d')  AS substr_word;
 substr_word
@@ -104,39 +103,36 @@ SELECT REGEXP_SUBSTR('a', NULL)   IS NULL    AS null_pattern;
 null_pattern
 1
 SELECT REGEXP_SUBSTR();
-ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_SUBSTR'
 SELECT REGEXP_SUBSTR('a');
-ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_SUBSTR'
 SELECT REGEXP_SUBSTR('a', 'b', 1, 'extra');
-ERROR 1105: execution error: REGEXP_SUBSTR requires 2 or 3 arguments
+REGEXP_SUBSTR('a', 'b', 1, 'extra')
+NULL
 === REGEXP_REPLACE: replace first by default ===
 SELECT REGEXP_REPLACE('aaa', 'a', 'X')        AS replace_first;
 replace_first
-Xaa
+XXX
 SELECT REGEXP_REPLACE('aaa', 'a', 'X') = 'Xaa' AS replace_first_value;
 replace_first_value
-1
+0
 === REGEXP_REPLACE: global 'g' flag ===
 SELECT REGEXP_REPLACE('aaa', 'a', 'X', 'g')   AS replace_all;
-replace_all
-XXX
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 SELECT REGEXP_REPLACE('foo bar foo', 'foo', 'baz', 'g') AS replace_all_word;
-replace_all_word
-baz bar baz
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 === REGEXP_REPLACE: case-insensitive 'i' flag ===
 SELECT REGEXP_REPLACE('Hello World', 'hello', 'X', 'i')  AS ci_replace;
-ci_replace
-X World
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 SELECT REGEXP_REPLACE('AAA bbb AAA', 'aaa', 'X', 'gi')   AS gi_replace;
-gi_replace
-X bbb X
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 === REGEXP_REPLACE: capture groups + backrefs ===
 SELECT REGEXP_REPLACE('John Smith', '([A-Z]\w+) ([A-Z]\w+)', '$2, $1') AS swap_names;
 swap_names
-Smith, John
+John Smith
 SELECT REGEXP_REPLACE('2024-01-15', '(\d+)-(\d+)-(\d+)', '$3/$2/$1')   AS reformat_date;
 reformat_date
-15/01/2024
+2024-01-15
 === REGEXP_REPLACE: NULL + arity ===
 SELECT REGEXP_REPLACE(NULL, 'x', 'y')   IS NULL  AS null_source;
 null_source
@@ -148,13 +144,13 @@ SELECT REGEXP_REPLACE('a', 'x', NULL)   IS NULL  AS null_replacement;
 null_replacement
 1
 SELECT REGEXP_REPLACE();
-ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_REPLACE'
 SELECT REGEXP_REPLACE('a');
-ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_REPLACE'
 SELECT REGEXP_REPLACE('a', 'b');
-ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'REGEXP_REPLACE'
 SELECT REGEXP_REPLACE('a', 'b', 'c', 'g', 'extra');
-ERROR 1105: execution error: REGEXP_REPLACE requires 3 or 4 arguments
+ERROR 1583: Incorrect parameters in the call to native function 'regexp_replace'
 === Multi-byte UTF-8 patterns ===
 SELECT REGEXP_LIKE('café', 'é')                AS utf8_like;
 utf8_like
@@ -170,22 +166,16 @@ utf8_replace_value
 1
 === Lookbehind / lookahead pattern rejected ===
 SELECT REGEXP_LIKE('abc', '(?<=foo)bar');
-ERROR 1105: execution error: invalid regex: regex parse error:
-    (?<=foo)bar
-    ^^^^
-error: look-around, including look-ahead and look-behind, is not supported
+REGEXP_LIKE('abc', '(?<=foo)bar')
+0
 SELECT REGEXP_REPLACE('abc', '(?<=foo)bar', 'X');
-ERROR 1105: execution error: invalid regex: regex parse error:
-    (?<=foo)bar
-    ^^^^
-error: look-around, including look-ahead and look-behind, is not supported
+REGEXP_REPLACE('abc', '(?<=foo)bar', 'X')
+abc
 === REGEXP_REPLACE: literal `$` in replacement ===
 SELECT REGEXP_REPLACE('Hello', 'Hello', '$word')        AS dollar_word_named_group;
-dollar_word_named_group
-
+ERROR 3887: A capture group has an invalid name.
 SELECT REGEXP_REPLACE('Hello', 'Hello', '$$')           AS dollar_escaped;
-dollar_escaped
-$
+ERROR 3887: A capture group has an invalid name.
 === Empty source string on all four ===
 SELECT REGEXP_LIKE('', 'abc')                           AS empty_source_like;
 empty_source_like

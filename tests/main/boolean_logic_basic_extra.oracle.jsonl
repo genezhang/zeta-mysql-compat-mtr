@@ -1,0 +1,44 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":43}
+{"i":1,"h":"6cbc54cb","k":"ok","affected":0}
+{"i":2,"h":"1f7823a5","k":"ok","affected":0}
+{"i":3,"h":"5e9e5dca","k":"ok","affected":3}
+{"i":4,"h":"9d1c2442","k":"rows","cols":["id","flag"],"rows":[["1","1"],["2","0"],["3",null]]}
+{"i":5,"h":"a155402f","k":"rows","cols":["id"],"rows":[["1"]]}
+{"i":6,"h":"8fe6eb4a","k":"rows","cols":["id"],"rows":[["2"]]}
+{"i":7,"h":"3039cb71","k":"rows","cols":["id"],"rows":[["1"]]}
+{"i":8,"h":"2ea2e1d1","k":"rows","cols":["id"],"rows":[["2"],["3"]]}
+{"i":9,"h":"0137670b","k":"rows","cols":["id"],"rows":[["2"]]}
+{"i":10,"h":"4cb527d4","k":"rows","cols":["id"],"rows":[["1"],["3"]]}
+{"i":11,"h":"3c38e91d","k":"rows","cols":["id"],"rows":[["3"]]}
+{"i":12,"h":"d241b328","k":"rows","cols":["id"],"rows":[["3"]]}
+{"i":13,"h":"8668dbf5","k":"rows","cols":["id"],"rows":[["1"]]}
+{"i":14,"h":"4a13d12c","k":"rows","cols":["aa","oo","nt"],"rows":[["0","1","0"]]}
+{"i":15,"h":"4bf11b1f","k":"rows","cols":["tan","fan","ton","fon"],"rows":[[null,"0","1",null]]}
+{"i":16,"h":"a2cbc9c2","k":"rows","cols":["r"],"rows":[[null]]}
+{"i":17,"h":"b36c17b4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DISTINCT FROM NULL AS nidn, NULL IS DISTINCT FROM true AS nidt,\n       true IS D' at line 1"}
+{"i":18,"h":"5b087c17","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DISTINCT FROM NULL AS r' at line 1"}
+{"i":19,"h":"e7556ff6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE flag) AS yes_cnt, COUNT(*) AS total FROM bt' at line 1"}
+{"i":20,"h":"81990d13","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(flag) AS ev FROM bt' at line 1"}
+{"i":21,"h":"1d66a8cb","k":"err","code":1305,"msg":"FUNCTION test.BOOL_AND does not exist"}
+{"i":22,"h":"82b46a82","k":"rows","cols":["id","flag"],"rows":[["3",null],["2","0"],["1","1"]]}
+{"i":23,"h":"36139f02","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::BOOLEAN, 'f'::BOOLEAN, '1'::BOOLEAN, '0'::BOOLEAN,\n       'true'::BOOLEAN, 'fa' at line 1"}
+{"i":24,"h":"97d5511c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BOOLEAN) AS r1, CAST(0 AS BOOLEAN) AS r2' at line 1"}
+{"i":25,"h":"68f7a529","k":"ok","affected":0}
+{"i":26,"h":"24b12d26","k":"ok","affected":0}
+{"i":27,"h":"0e2aaccc","k":"ok","affected":1}
+{"i":28,"h":"8fca92ba","k":"rows","cols":["id","b1","b2"],"rows":[["1","1","0"]]}
+{"i":29,"h":"d8fede55","k":"ok","affected":0}
+{"i":30,"h":"0b243bd5","k":"ok","affected":0}
+{"i":31,"h":"f3f35189","k":"ok","affected":0}
+{"i":32,"h":"7dfed79b","k":"ok","affected":2}
+{"i":33,"h":"89e2410a","k":"rows","cols":["id","flag"],"rows":[["1","0"],["2","0"]]}
+{"i":34,"h":"b52638e5","k":"ok","affected":0}
+{"i":35,"h":"2348ec8a","k":"ok","affected":0}
+{"i":36,"h":"6c74fa1c","k":"ok","affected":0}
+{"i":37,"h":"f9616524","k":"ok","affected":1}
+{"i":38,"h":"481d709a","k":"err","code":3819,"msg":"Check constraint 'bool_chk_chk_1' is violated."}
+{"i":39,"h":"c1ac32d6","k":"ok","affected":0}
+{"i":40,"h":"bc4d03df","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::BOOLEAN, true) AS r1, COALESCE(NULL::BOOLEAN, NULL) AS r2' at line 1"}
+{"i":41,"h":"33cec997","k":"rows","cols":["id","s"],"rows":[["1","on"],["2","off"],["3","off"]]}
+{"i":42,"h":"ba6320a5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::INT FROM bt WHERE id = 1' at line 1"}
+{"i":43,"h":"c0ddf91a","k":"ok","affected":0}

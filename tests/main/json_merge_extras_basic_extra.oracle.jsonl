@@ -1,0 +1,30 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":29}
+{"i":1,"h":"939dc716","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))                  AS jsonb_cast_lands_as_object' at line 1"}
+{"i":2,"h":"18f6f705","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n  CAST('{\"b\":99,\"c\":3}' AS JSONB)))                          AS patch_bo' at line 2"}
+{"i":3,"h":"a6628d69","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n  CAST('{\"b\":99,\"c\":3}' AS JSONB)),\n  '$.b')                            ' at line 2"}
+{"i":4,"h":"797c0990","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n  CAST('[3,4]' AS JSONB)))                                   AS preserve' at line 2"}
+{"i":5,"h":"fd6af40d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n  '{\"b\":2}'))                                                AS patch_ty' at line 2"}
+{"i":6,"h":"93e4e963","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)))                                 AS patch_str_left_typed_right' at line 3"}
+{"i":7,"h":"51d56cd3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB),\n  '[2,3]'))                                                  AS preserve' at line 2"}
+{"i":8,"h":"4e6b93ce","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_merge_patch; a JSON string or JSON type is required."}
+{"i":9,"h":"200fc945","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_merge_preserve; a JSON string or JSON type is required."}
+{"i":10,"h":"c8dbe35d","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_merge_patch; a JSON string or JSON type is required."}
+{"i":11,"h":"c8baadc4","k":"err","code":3146,"msg":"Invalid data type for JSON data in argument 1 to function json_merge_preserve; a JSON string or JSON type is required."}
+{"i":12,"h":"d67b4b18","k":"rows","cols":["preserve_empty_arr_arr_type"],"rows":[["ARRAY"]]}
+{"i":13,"h":"f739adf7","k":"rows","cols":["preserve_empty_arr_arr_len"],"rows":[["0"]]}
+{"i":14,"h":"f1f4854e","k":"rows","cols":["preserve_empty_obj_obj_type"],"rows":[["OBJECT"]]}
+{"i":15,"h":"1f9ba49f","k":"rows","cols":["preserve_empty_obj_obj_len"],"rows":[["0"]]}
+{"i":16,"h":"b028016c","k":"rows","cols":["preserve_empty_plus_arr"],"rows":[["3"]]}
+{"i":17,"h":"367e1d72","k":"rows","cols":["preserve_empty_plus_obj"],"rows":[["2"]]}
+{"i":18,"h":"5d4f771e","k":"rows","cols":["preserve_obj_scalar_type"],"rows":[["ARRAY"]]}
+{"i":19,"h":"cf04d81e","k":"rows","cols":["preserve_obj_scalar_len"],"rows":[["2"]]}
+{"i":20,"h":"31b4fcc6","k":"rows","cols":["preserve_scalar_obj_type"],"rows":[["ARRAY"]]}
+{"i":21,"h":"83226021","k":"rows","cols":["preserve_scalar_obj_len"],"rows":[["2"]]}
+{"i":22,"h":"182e1416","k":"rows","cols":["deep_delete_inner_len"],"rows":[["1"]]}
+{"i":23,"h":"d2789056","k":"rows","cols":["deep_delete_survivor"],"rows":[["2"]]}
+{"i":24,"h":"16fbbc64","k":"rows","cols":["deep_delete_leaf_gone"],"rows":[["1"]]}
+{"i":25,"h":"aca084d4","k":"rows","cols":["patch_json_null_target_type"],"rows":[["OBJECT"]]}
+{"i":26,"h":"d0dabf16","k":"rows","cols":["patch_json_null_target_len"],"rows":[["1"]]}
+{"i":27,"h":"6a2b5be3","k":"rows","cols":["patch_json_null_as_patch_type"],"rows":[["NULL"]]}
+{"i":28,"h":"55cbe093","k":"rows","cols":["patch_shared_key_not_commutative"],"rows":[["1"]]}
+{"i":29,"h":"a9ed893c","k":"rows","cols":["preserve_shared_key_not_commutative"],"rows":[["1"]]}

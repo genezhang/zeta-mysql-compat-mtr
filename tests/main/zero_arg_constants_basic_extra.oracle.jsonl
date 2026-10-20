@@ -1,0 +1,16 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":15}
+{"i":1,"h":"2391b538","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}
+{"i":2,"h":"fb08f3e8","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}
+{"i":3,"h":"e237ad41","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}
+{"i":4,"h":"d2b84660","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}
+{"i":5,"h":"76642d70","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}
+{"i":6,"h":"e099c53b","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}
+{"i":7,"h":"88ba9b52","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}
+{"i":8,"h":"ee8b922c","k":"err","code":1305,"msg":"FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist"}
+{"i":9,"h":"7fc55c75","k":"err","code":1305,"msg":"FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist"}
+{"i":10,"h":"23a112c6","k":"ok","affected":0}
+{"i":11,"h":"3a510c02","k":"ok","affected":0}
+{"i":12,"h":"ad227775","k":"err","code":1305,"msg":"FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist"}
+{"i":13,"h":"001270b4","k":"err","code":1305,"msg":"FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist"}
+{"i":14,"h":"4b7b01f5","k":"err","code":1305,"msg":"FUNCTION test.ZETA_LAST_COMMIT_HLC does not exist"}
+{"i":15,"h":"c350d426","k":"err","code":1305,"msg":"FUNCTION test.UUID_NIL does not exist"}

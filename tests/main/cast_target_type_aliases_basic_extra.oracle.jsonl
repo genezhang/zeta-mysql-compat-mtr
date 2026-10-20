@@ -1,0 +1,39 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":38}
+{"i":1,"h":"6f84b0c0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB) AS json_eq_jsonb' at line 1"}
+{"i":2,"h":"a48168b8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '@> '{\"a\":1}'           AS json_alias_supports_containment' at line 1"}
+{"i":3,"h":"b3f0a487","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'STRING) = CAST(42 AS TEXT)                AS string_eq_text' at line 1"}
+{"i":4,"h":"96c2d507","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NUMERIC(10,2)) = CAST('3.14' AS DECIMAL(10,2))\n                                 ' at line 1"}
+{"i":5,"h":"15d9c7ac","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NUMERIC) = CAST('3.14' AS DECIMAL)    AS bare_numeric_eq_bare_decimal' at line 1"}
+{"i":6,"h":"93f97542","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SMALLINT) = CAST(42 AS INT2)              AS smallint_eq_int2' at line 1"}
+{"i":7,"h":"d82f8b23","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER)  = CAST(42 AS INT4)              AS integer_eq_int4' at line 1"}
+{"i":8,"h":"666deb16","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)   = CAST(42 AS INT8)              AS bigint_eq_int8' at line 1"}
+{"i":9,"h":"6c0215da","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INT)      = CAST(42 AS INTEGER)           AS int_eq_integer' at line 1"}
+{"i":10,"h":"b7dde48b","k":"rows","cols":["real_eq_float4"],"rows":[["1"]]}
+{"i":11,"h":"43b78c4d","k":"rows","cols":["double_prec_eq_float8"],"rows":[["1"]]}
+{"i":12,"h":"be69575c","k":"rows","cols":["double_eq_double_prec"],"rows":[["1"]]}
+{"i":13,"h":"7e188fe4","k":"rows","cols":["bare_float_eq_double"],"rows":[["1"]]}
+{"i":14,"h":"3bc1ae81","k":"rows","cols":["char_eq_character"],"rows":[["1"]]}
+{"i":15,"h":"8f2d2053","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VARCHAR(10))              = CAST(42 AS CHARACTER VARYING(10)) AS varchar_eq_char' at line 1"}
+{"i":16,"h":"0ddc116c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)            AS signed_eq_bigint' at line 1"}
+{"i":17,"h":"be9ddb1b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT)            AS signed_integer_eq_bigint' at line 1"}
+{"i":18,"h":"2dd01d83","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT) AS UNSIGNED)                         AS unsigned_eq_cast_chain' at line 2"}
+{"i":19,"h":"e4fa34f7","k":"rows","cols":["CAST('2024-05-19 14:30:00' AS DATETIME)"],"rows":[["2024-05-19 14:30:00"]]}
+{"i":20,"h":"fd438194","k":"rows","cols":["CAST('2024-05-19 14:30:00' AS DATETIME(6))"],"rows":[["2024-05-19 14:30:00.000000"]]}
+{"i":21,"h":"382de94b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BLOB)' at line 1"}
+{"i":22,"h":"2ac0f4e8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TINYBLOB)' at line 1"}
+{"i":23,"h":"08ba57e5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MEDIUMBLOB)' at line 1"}
+{"i":24,"h":"0a6eeaa8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LONGBLOB)' at line 1"}
+{"i":25,"h":"1087e7e5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TINYTEXT)' at line 1"}
+{"i":26,"h":"f04ed99c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MEDIUMTEXT)' at line 1"}
+{"i":27,"h":"c1ef6e68","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LONGTEXT)' at line 1"}
+{"i":28,"h":"f3c88896","k":"rows","cols":["CAST('abc' AS BINARY)"],"rows":[["abc"]]}
+{"i":29,"h":"cb57d270","k":"rows","cols":["CAST('abc' AS BINARY(10))"],"rows":[["abc\u0000\u0000\u0000\u0000\u0000\u0000\u0000"]]}
+{"i":30,"h":"8d6d7ab4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VARBINARY(10))' at line 1"}
+{"i":31,"h":"783c05c9","k":"rows","cols":["CAST(2024 AS YEAR)"],"rows":[["2024"]]}
+{"i":32,"h":"738f7fee","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NVARCHAR(10))' at line 1"}
+{"i":33,"h":"8448f17a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NTEXT)' at line 1"}
+{"i":34,"h":"11328976","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BYTEA)' at line 1"}
+{"i":35,"h":"80e84154","k":"err","code":1146,"msg":"Table 'test.bytea_plan_check' doesn't exist"}
+{"i":36,"h":"4c18f40c","k":"err","code":1146,"msg":"Table 'test.bytea_plan_check' doesn't exist"}
+{"i":37,"h":"318fa6fd","k":"err","code":1051,"msg":"Unknown table 'test.bytea_plan_check'"}
+{"i":38,"h":"32425238","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BYTEA)' at line 1"}

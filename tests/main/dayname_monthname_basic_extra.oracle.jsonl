@@ -1,0 +1,35 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":34}
+{"i":1,"h":"61b7e82b","k":"rows","cols":["sunday"],"rows":[["Sunday"]]}
+{"i":2,"h":"0f3d75c2","k":"rows","cols":["monday"],"rows":[["Monday"]]}
+{"i":3,"h":"3f407256","k":"rows","cols":["tuesday"],"rows":[["Tuesday"]]}
+{"i":4,"h":"040f3790","k":"rows","cols":["wednesday"],"rows":[["Wednesday"]]}
+{"i":5,"h":"dae2d507","k":"rows","cols":["thursday"],"rows":[["Thursday"]]}
+{"i":6,"h":"02fa8d42","k":"rows","cols":["friday"],"rows":[["Friday"]]}
+{"i":7,"h":"5a1d4a76","k":"rows","cols":["saturday"],"rows":[["Saturday"]]}
+{"i":8,"h":"3087ac30","k":"rows","cols":["epoch_thursday"],"rows":[["Thursday"]]}
+{"i":9,"h":"8fb0dbb5","k":"rows","cols":["jan"],"rows":[["January"]]}
+{"i":10,"h":"4518671a","k":"rows","cols":["feb"],"rows":[["February"]]}
+{"i":11,"h":"aab32bdb","k":"rows","cols":["mar"],"rows":[["March"]]}
+{"i":12,"h":"2eef802b","k":"rows","cols":["apr"],"rows":[["April"]]}
+{"i":13,"h":"ee7ec2f3","k":"rows","cols":["may"],"rows":[["May"]]}
+{"i":14,"h":"f20bdbc5","k":"rows","cols":["jun"],"rows":[["June"]]}
+{"i":15,"h":"95b2edc4","k":"rows","cols":["jul"],"rows":[["July"]]}
+{"i":16,"h":"141316d6","k":"rows","cols":["aug"],"rows":[["August"]]}
+{"i":17,"h":"5666faa2","k":"rows","cols":["sep"],"rows":[["September"]]}
+{"i":18,"h":"0de63acb","k":"rows","cols":["oct"],"rows":[["October"]]}
+{"i":19,"h":"18d9960a","k":"rows","cols":["nov"],"rows":[["November"]]}
+{"i":20,"h":"bd0d5004","k":"rows","cols":["dec_month"],"rows":[["December"]]}
+{"i":21,"h":"d08ecc13","k":"rows","cols":["ts_friday"],"rows":[["Friday"]]}
+{"i":22,"h":"bb6a3aaf","k":"rows","cols":["ts_march"],"rows":[["March"]]}
+{"i":23,"h":"6d1ae77c","k":"rows","cols":["pre_1970_monday"],"rows":[["Monday"]]}
+{"i":24,"h":"890d9561","k":"rows","cols":["pre_1970_january"],"rows":[["January"]]}
+{"i":25,"h":"43089824","k":"rows","cols":["wednesday_len_9"],"rows":[["1"]]}
+{"i":26,"h":"f36f84c2","k":"rows","cols":["september_len_9"],"rows":[["1"]]}
+{"i":27,"h":"2b823dfe","k":"rows","cols":["dn_null"],"rows":[["1"]]}
+{"i":28,"h":"db8b7f65","k":"rows","cols":["mn_null"],"rows":[["1"]]}
+{"i":29,"h":"822ddffb","k":"rows","cols":["DAYNAME('not a date')"],"rows":[[null]]}
+{"i":30,"h":"6310750d","k":"rows","cols":["MONTHNAME('not a date')"],"rows":[[null]]}
+{"i":31,"h":"724808de","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DAYNAME'"}
+{"i":32,"h":"89bbe4de","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'MONTHNAME'"}
+{"i":33,"h":"16cbebab","k":"rows","cols":["dn_det"],"rows":[["1"]]}
+{"i":34,"h":"197431a8","k":"rows","cols":["mn_det"],"rows":[["1"]]}

@@ -1,0 +1,42 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":41}
+{"i":1,"h":"7adfeda2","k":"rows","cols":["hit_second"],"rows":[["2"]]}
+{"i":2,"h":"5c65ce7a","k":"rows","cols":["hit_first"],"rows":[["1"]]}
+{"i":3,"h":"b54fbdcf","k":"rows","cols":["hit_last"],"rows":[["3"]]}
+{"i":4,"h":"6e39538b","k":"rows","cols":["miss"],"rows":[["0"]]}
+{"i":5,"h":"ea1dfdca","k":"rows","cols":["null_needle"],"rows":[["0"]]}
+{"i":6,"h":"87040407","k":"rows","cols":["skips_null"],"rows":[["3"]]}
+{"i":7,"h":"68073ee6","k":"rows","cols":["int_needle"],"rows":[["2"]]}
+{"i":8,"h":"1fcc8587","k":"rows","cols":["string_needle_int_hay"],"rows":[["2"]]}
+{"i":9,"h":"87450970","k":"rows","cols":["case_byte_equal"],"rows":[["2"]]}
+{"i":10,"h":"1c8b31fc","k":"rows","cols":["hit_second"],"rows":[["2"]]}
+{"i":11,"h":"b69a78b0","k":"rows","cols":["hit_first"],"rows":[["1"]]}
+{"i":12,"h":"b3d0045f","k":"rows","cols":["hit_last"],"rows":[["3"]]}
+{"i":13,"h":"59c22207","k":"rows","cols":["miss"],"rows":[["0"]]}
+{"i":14,"h":"1b9d642e","k":"rows","cols":["single_member"],"rows":[["1"]]}
+{"i":15,"h":"54eab116","k":"rows","cols":["empty_both"],"rows":[["0"]]}
+{"i":16,"h":"2d8ca7ec","k":"rows","cols":["empty_needle"],"rows":[["0"]]}
+{"i":17,"h":"4ba648af","k":"rows","cols":["empty_csv"],"rows":[["0"]]}
+{"i":18,"h":"9a1caed5","k":"rows","cols":["comma_needle"],"rows":[["0"]]}
+{"i":19,"h":"6c2fc9ef","k":"rows","cols":["null_needle"],"rows":[["1"]]}
+{"i":20,"h":"fddcf25a","k":"rows","cols":["null_csv"],"rows":[["1"]]}
+{"i":21,"h":"02fb4327","k":"rows","cols":["case_byte_equal"],"rows":[["2"]]}
+{"i":22,"h":"f44d7f5f","k":"rows","cols":["pick_first"],"rows":[["a"]]}
+{"i":23,"h":"7d9b09db","k":"rows","cols":["pick_second"],"rows":[["b"]]}
+{"i":24,"h":"8a35651d","k":"rows","cols":["pick_last"],"rows":[["c"]]}
+{"i":25,"h":"3ac86dd9","k":"rows","cols":["zero_n"],"rows":[["1"]]}
+{"i":26,"h":"ef8faea5","k":"rows","cols":["neg_n"],"rows":[["1"]]}
+{"i":27,"h":"3d40fcbf","k":"rows","cols":["overshoot"],"rows":[["1"]]}
+{"i":28,"h":"6d1677c9","k":"rows","cols":["null_n"],"rows":[["1"]]}
+{"i":29,"h":"606ce36c","k":"rows","cols":["null_element"],"rows":[["1"]]}
+{"i":30,"h":"09e836c5","k":"rows","cols":["string_n_nonnum"],"rows":[["1"]]}
+{"i":31,"h":"10e39d42","k":"rows","cols":["string_n_digits_zeta_null"],"rows":[["0"]]}
+{"i":32,"h":"e336223e","k":"rows","cols":["field_det"],"rows":[["1"]]}
+{"i":33,"h":"fedb5811","k":"rows","cols":["fis_det"],"rows":[["1"]]}
+{"i":34,"h":"06fb07cd","k":"rows","cols":["elt_det"],"rows":[["1"]]}
+{"i":35,"h":"ed2b08f9","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FIELD'"}
+{"i":36,"h":"1d97efe1","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FIELD'"}
+{"i":37,"h":"ead29f32","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FIND_IN_SET'"}
+{"i":38,"h":"d3c92591","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FIND_IN_SET'"}
+{"i":39,"h":"57b50e8a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'FIND_IN_SET'"}
+{"i":40,"h":"754d1a24","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ELT'"}
+{"i":41,"h":"442244f9","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ELT'"}

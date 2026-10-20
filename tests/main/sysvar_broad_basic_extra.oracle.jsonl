@@ -1,0 +1,48 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":47}
+{"i":1,"h":"63eb4bf7","k":"rows","cols":["@@version"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":2,"h":"ee6926ad","k":"rows","cols":["@@version_comment"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":3,"h":"c7b3d668","k":"rows","cols":["@@version_compile_os"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":4,"h":"56aace64","k":"rows","cols":["@@version_compile_machine"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":5,"h":"150b10e2","k":"rows","cols":["@@license"],"rows":[["GPL"]]}
+{"i":6,"h":"c5ac8a97","k":"rows","cols":["@@character_set_client"],"rows":[["utf8mb4"]]}
+{"i":7,"h":"89c9839a","k":"rows","cols":["@@character_set_connection"],"rows":[["utf8mb4"]]}
+{"i":8,"h":"19eaadb9","k":"rows","cols":["@@character_set_results"],"rows":[["utf8mb4"]]}
+{"i":9,"h":"295ee5f7","k":"rows","cols":["@@character_set_server"],"rows":[["utf8mb4"]]}
+{"i":10,"h":"ac175e25","k":"rows","cols":["@@character_set_database"],"rows":[["utf8mb4"]]}
+{"i":11,"h":"3ce4b6a9","k":"rows","cols":["@@character_set_system"],"rows":[["utf8mb3"]]}
+{"i":12,"h":"7d25b0d6","k":"rows","cols":["@@character_set_filesystem"],"rows":[["binary"]]}
+{"i":13,"h":"22c9d4ab","k":"rows","cols":["@@collation_connection"],"rows":[["utf8mb4_0900_ai_ci"]]}
+{"i":14,"h":"0c524362","k":"rows","cols":["@@collation_server"],"rows":[["utf8mb4_0900_ai_ci"]]}
+{"i":15,"h":"786efc01","k":"rows","cols":["@@collation_database"],"rows":[["utf8mb4_0900_ai_ci"]]}
+{"i":16,"h":"e6dbbb71","k":"rows","cols":["@@protocol_version"],"rows":[["10"]]}
+{"i":17,"h":"fbc59e3c","k":"rows","cols":["@@hostname"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":18,"h":"adae391c","k":"rows","cols":["@@max_allowed_packet"],"rows":[["67108864"]]}
+{"i":19,"h":"ba73376d","k":"rows","cols":["@@max_connections"],"rows":[["151"]]}
+{"i":20,"h":"6568c729","k":"rows","cols":["@@wait_timeout"],"rows":[["28800"]]}
+{"i":21,"h":"368c346e","k":"rows","cols":["@@interactive_timeout"],"rows":[["28800"]]}
+{"i":22,"h":"e9d24613","k":"rows","cols":["@@connect_timeout"],"rows":[["10"]]}
+{"i":23,"h":"ef0043db","k":"rows","cols":["@@net_buffer_length"],"rows":[["16384"]]}
+{"i":24,"h":"89a897fa","k":"rows","cols":["@@net_read_timeout"],"rows":[["30"]]}
+{"i":25,"h":"b9a2e127","k":"rows","cols":["@@net_write_timeout"],"rows":[["60"]]}
+{"i":26,"h":"0eabb640","k":"rows","cols":["@@group_concat_max_len"],"rows":[["1024"]]}
+{"i":27,"h":"a2d50568","k":"rows","cols":["@@lower_case_table_names"],"rows":[["0"]]}
+{"i":28,"h":"4cd063c5","k":"rows","cols":["@@max_execution_time"],"rows":[["0"]]}
+{"i":29,"h":"d753906c","k":"rows","cols":["@@socket"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":30,"h":"aad70722","k":"err","code":1193,"msg":"Unknown system variable 'ssl_version'"}
+{"i":31,"h":"f296ee3d","k":"rows","cols":["@@ssl_cipher"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":32,"h":"0d003136","k":"rows","cols":["@@ssl_ca"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":33,"h":"efa69bd1","k":"rows","cols":["@@ssl_cert"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":34,"h":"ec91760c","k":"rows","cols":["@@ssl_key"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":35,"h":"cc260bbc","k":"rows","cols":["@@time_zone"],"rows":[["+00:00"]]}
+{"i":36,"h":"aa70e950","k":"rows","cols":["@@system_time_zone"],"rows":[["<masked>"]],"nd":"volatile","class":"server"}
+{"i":37,"h":"0b8330c2","k":"rows","cols":["@@sql_mode"],"rows":[["ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"]]}
+{"i":38,"h":"1e1777b6","k":"rows","cols":["@@default_storage_engine"],"rows":[["InnoDB"]]}
+{"i":39,"h":"908f4310","k":"err","code":1193,"msg":"Unknown system variable 'storage_engine'"}
+{"i":40,"h":"70e3eaa7","k":"rows","cols":["@@innodb_version"],"rows":[["8.4.6"]]}
+{"i":41,"h":"ccc777ae","k":"rows","cols":["@@lc_time_names"],"rows":[["en_US"]]}
+{"i":42,"h":"08c0029a","k":"ok","affected":0}
+{"i":43,"h":"ccc777ae","k":"rows","cols":["@@lc_time_names"],"rows":[["fr_FR"]]}
+{"i":44,"h":"ff58c5ee","k":"err","code":1193,"msg":"Unknown system variable 'nonexistent_var'"}
+{"i":45,"h":"ffee37e9","k":"err","code":1193,"msg":"Unknown system variable 'made_up_variable'"}
+{"i":46,"h":"0f2c7d2d","k":"err","code":1193,"msg":"Unknown system variable 'some_other_garbage'"}
+{"i":47,"h":"b93d7441","k":"err","code":1193,"msg":"Unknown system variable 'nonexistent_var'"}

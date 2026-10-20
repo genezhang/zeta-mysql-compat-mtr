@@ -1,0 +1,21 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":20}
+{"i":1,"h":"c3f3491c","k":"rows","cols":["and_op","or_op"],"rows":[["2","7"]]}
+{"i":2,"h":"1ccffb4f","k":"rows","cols":["shl","shr"],"rows":[["10","4"]]}
+{"i":3,"h":"ce469bb1","k":"rows","cols":["r"],"rows":[["18446744073709551610"]]}
+{"i":4,"h":"63086db0","k":"rows","cols":["h_int","h_text"],"rows":[["FF","68656C6C6F"]]}
+{"i":5,"h":"d822985e","k":"rows","cols":["r"],"rows":[["FFFFFFFFFFFFFFFF"]]}
+{"i":6,"h":"28d78155","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1"}
+{"i":7,"h":"e00a065c","k":"rows","cols":["r"],"rows":[[null]]}
+{"i":8,"h":"f90692d7","k":"rows","cols":["r"],"rows":[["1010"]]}
+{"i":9,"h":"26be7eaf","k":"rows","cols":["r"],"rows":[["1111111111111111111111111111111111111111111111111111111111111111"]]}
+{"i":10,"h":"2e98e46e","k":"rows","cols":["r"],"rows":[["10"]]}
+{"i":11,"h":"adede093","k":"rows","cols":["h","b","o","u"],"rows":[[null,null,null,null]]}
+{"i":12,"h":"5b333849","k":"rows","cols":["bl5","bl10"],"rows":[["8","16"]]}
+{"i":13,"h":"cc5e410a","k":"rows","cols":["xor_workaround"],"rows":[["5"]]}
+{"i":14,"h":"8ce6bd77","k":"rows","cols":["r"],"rows":[["0"]]}
+{"i":15,"h":"58bf2d7d","k":"rows","cols":["r"],"rows":[["1"]]}
+{"i":16,"h":"1f9dbc31","k":"rows","cols":["r"],"rows":[["0"]]}
+{"i":17,"h":"d9dd4af1","k":"rows","cols":["r"],"rows":[[null]]}
+{"i":18,"h":"08eeacf0","k":"rows","cols":["r"],"rows":[["5"]]}
+{"i":19,"h":"85399bb0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'XOR(6, 3) AS r' at line 1"}
+{"i":20,"h":"be9963f0","k":"err","code":1305,"msg":"FUNCTION test.TO_HEX does not exist"}

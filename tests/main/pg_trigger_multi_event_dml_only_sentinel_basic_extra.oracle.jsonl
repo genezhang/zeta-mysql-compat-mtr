@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"6dae8649","k":"ok","affected":0}
+{"i":2,"h":"fa416470","k":"ok","affected":0}
+{"i":3,"h":"234f5bdc","k":"ok","affected":1}
+{"i":4,"h":"e96c2e39","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OR UPDATE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn()' at line 1"}
+{"i":5,"h":"26cf301e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OR DELETE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn()' at line 1"}
+{"i":6,"h":"3b8d84e6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OR UPDATE OR DELETE ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn()' at line 1"}
+{"i":7,"h":"1cb4c246","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OF v ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn()' at line 1"}
+{"i":8,"h":"cc72293b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OF id, v ON pt FOR EACH ROW EXECUTE FUNCTION trg_fn()' at line 1"}
+{"i":9,"h":"1142f32c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WHEN (NEW.v > 10) EXECUTE FUNCTION trg_fn()' at line 1"}
+{"i":10,"h":"f5279f8c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WHEN (true) EXECUTE FUNCTION trg_fn()' at line 1"}
+{"i":11,"h":"d1d97ec7","k":"err","code":1146,"msg":"Table 'test.ONLY' doesn't exist"}
+{"i":12,"h":"2d0011b6","k":"err","code":1146,"msg":"Table 'test.ONLY' doesn't exist"}
+{"i":13,"h":"ed457a47","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OVERRIDING SYSTEM VALUE VALUES (1, 2)' at line 1"}
+{"i":14,"h":"4753a22a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OVERRIDING USER VALUE VALUES (3, 4)' at line 1"}
+{"i":15,"h":"470afb1f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FUNCTION trg_fn()' at line 1"}
+{"i":16,"h":"c3439710","k":"ok","affected":0}

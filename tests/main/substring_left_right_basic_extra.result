@@ -1,7 +1,7 @@
 === SUBSTRING basics — start=1 / start>1 / start=0 ===
 SELECT SUBSTRING('hello world', 1, 5) AS sub1, SUBSTRING('hello world', 7) AS sub2, SUBSTRING('hello world', 0) AS sub0;
 sub1	sub2	sub0
-hello	world	hello world
+hello	world	
 === SUBSTRING edge lengths — len=0 / len<0 / len>length ===
 SELECT SUBSTRING('hello world', 1, 0) AS l0, SUBSTRING('hello world', 1, -1) AS lneg, SUBSTRING('hello world', 1, 100) AS lover;
 l0	lneg	lover
@@ -31,8 +31,7 @@ SELECT SUBSTRING_INDEX('a,b,c,d', ',', 0) AS si0, SUBSTRING_INDEX('a,b,c,d', ','
 si0	si_over	no_delim
 	a,b,c,d	a,b,c,d
 SELECT SUBSTRING_INDEX('', ',', 2) AS empty, SUBSTRING_INDEX(NULL, ',', 2) AS nl;
-empty	nl
-	NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty, SUBSTRING_INDEX(NULL, ',', 2) AS nl' at line 1
 === Combined call shapes ===
 SELECT LPAD(FORMAT(1234.5, 2), 12, '*') AS combo_lf;
 combo_lf
@@ -48,11 +47,11 @@ HEL
 # with RIGHT(str, N) for MySQL-compatible behavior.
 SELECT SUBSTRING('hello world', -5) AS bug_neg, SUBSTRING('hello world', -5, 3) AS bug_neg3;
 bug_neg	bug_neg3
-hello world	
+world	wor
 === KNOWN DIVERGENCE: LEFT(s, -1) / RIGHT(s, -1) — PG semantics ===
 # zeta: LEFT(s,-1) = "all but last 1" → 'hell';
 #       RIGHT(s,-1) = "all but first 1" → 'ello'.
 # MySQL: both return empty string for negative N.
 SELECT LEFT('hello', -1) AS lneg, RIGHT('hello', -1) AS rneg;
 lneg	rneg
-hell	ello
+	

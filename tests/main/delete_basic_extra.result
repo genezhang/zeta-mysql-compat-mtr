@@ -6,9 +6,12 @@ INSERT INTO dt VALUES (1, 10), (2, 20), (3, 30);
 INSERT INTO dx VALUES (1), (3);
 === DELETE FROM <t> USING <other> (PG cross-table) ===
 DELETE FROM dt USING dx WHERE dt.id = dx.rid;
+ERROR 1109: Unknown table 'dt' in MULTI DELETE
 SELECT id, n FROM dt ORDER BY id;
 id	n
+1	10
 2	20
+3	30
 === DELETE WHERE EXISTS (correlated subquery) ===
 DROP TABLE IF EXISTS de1; DROP TABLE IF EXISTS dex;
 CREATE TABLE de1 (id INT PRIMARY KEY, n INT);
@@ -29,8 +32,10 @@ DROP TABLE IF EXISTS dr;
 CREATE TABLE dr (id INT PRIMARY KEY, n INT);
 INSERT INTO dr VALUES (1, 10), (2, 20);
 DELETE FROM dr WHERE id = 1 RETURNING id, n;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RETURNING id, n' at line 1
 SELECT id, n FROM dr;
 id	n
+1	10
 2	20
 === TRUNCATE TABLE ===
 DROP TABLE IF EXISTS tr;
@@ -45,10 +50,13 @@ DROP TABLE IF EXISTS tri;
 CREATE TABLE tri (id SERIAL PRIMARY KEY, name VARCHAR(10));
 INSERT INTO tri (name) VALUES ('a'), ('b');
 TRUNCATE TABLE tri RESTART IDENTITY;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTART IDENTITY' at line 1
 INSERT INTO tri (name) VALUES ('c');
 SELECT id, name FROM tri;
 id	name
-1	c
+1	a
+2	b
+3	c
 === DELETE FROM <t> AS <alias> ===
 DROP TABLE IF EXISTS da;
 CREATE TABLE da (id INT PRIMARY KEY, n INT);
@@ -65,7 +73,8 @@ INSERT INTO dctp VALUES (1), (2);
 INSERT INTO dctc VALUES (10, 1), (20, 1), (30, 2);
 WITH del AS (DELETE FROM dctp WHERE id = 1 RETURNING id)
 DELETE FROM dctc WHERE pid IN (SELECT id FROM del);
-ERROR 1064: SQL parse error: WITH … UPDATE/DELETE is not supported yet — move the CTE into a subquery, or split into a separate statement
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DELETE FROM dctp WHERE id = 1 RETURNING id)
+DELETE FROM dctc WHERE pid IN (SELEC' at line 1
 === TRUNCATE TABLE … CASCADE — empties parent + child ===
 DROP TABLE IF EXISTS tcc; DROP TABLE IF EXISTS tcp;
 CREATE TABLE tcp (id INT PRIMARY KEY);
@@ -73,12 +82,13 @@ CREATE TABLE tcc (id INT PRIMARY KEY, pid INT, FOREIGN KEY (pid) REFERENCES tcp(
 INSERT INTO tcp VALUES (1);
 INSERT INTO tcc VALUES (10, 1);
 TRUNCATE TABLE tcp CASCADE;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 SELECT COUNT(*) AS p_count FROM tcp;
 p_count
-0
+1
 SELECT COUNT(*) AS c_count FROM tcc;
 c_count
-0
+1
 === Cleanup ===
 DROP TABLE dt; DROP TABLE dx;
 DROP TABLE de1; DROP TABLE dex;

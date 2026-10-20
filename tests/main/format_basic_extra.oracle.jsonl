@@ -1,0 +1,35 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":34}
+{"i":1,"h":"a767a85b","k":"rows","cols":["basic"],"rows":[["12,345.68"]]}
+{"i":2,"h":"58803bf8","k":"rows","cols":["int_no_dec"],"rows":[["1,234,567"]]}
+{"i":3,"h":"9decd07f","k":"rows","cols":["zero"],"rows":[["0.00"]]}
+{"i":4,"h":"ebf598f1","k":"rows","cols":["half"],"rows":[["0.5"]]}
+{"i":5,"h":"bbe9d2c2","k":"rows","cols":["neg_basic"],"rows":[["-1,234,567.89"]]}
+{"i":6,"h":"148d8ffe","k":"rows","cols":["neg_half"],"rows":[["-0.5"]]}
+{"i":7,"h":"2c2d90ee","k":"rows","cols":["pad_int"],"rows":[["1.00"]]}
+{"i":8,"h":"b1a7b84a","k":"rows","cols":["pad_extra"],"rows":[["1.5000"]]}
+{"i":9,"h":"aa208c06","k":"rows","cols":["pad_big_int"],"rows":[["123,456,789.000"]]}
+{"i":10,"h":"21ff979f","k":"rows","cols":["round_down_nontie"],"rows":[["1.23"]]}
+{"i":11,"h":"45aa0e18","k":"rows","cols":["tie_1_5_to_even"],"rows":[["2"]]}
+{"i":12,"h":"32895370","k":"rows","cols":["tie_2_5_to_even"],"rows":[["3"]]}
+{"i":13,"h":"137313b4","k":"rows","cols":["tie_0_5_to_even"],"rows":[["1"]]}
+{"i":14,"h":"e0a7075d","k":"rows","cols":["tie_1_225_to_even"],"rows":[["1.23"]]}
+{"i":15,"h":"d95a0eb5","k":"rows","cols":["tie_1_245_to_even"],"rows":[["1.25"]]}
+{"i":16,"h":"9c990be5","k":"rows","cols":["thousand"],"rows":[["1,000"]]}
+{"i":17,"h":"e94bb868","k":"rows","cols":["million"],"rows":[["1,000,000"]]}
+{"i":18,"h":"589e2ec3","k":"rows","cols":["billion"],"rows":[["1,000,000,000"]]}
+{"i":19,"h":"80a2d7df","k":"rows","cols":["trillion_plus"],"rows":[["1,234,567,890,123.00"]]}
+{"i":20,"h":"d25b91a7","k":"rows","cols":["int_max_f64_precision_loss"],"rows":[["9,223,372,036,854,775,807"]]}
+{"i":21,"h":"506e0391","k":"rows","cols":["locale_en_us_noop"],"rows":[["1"]]}
+{"i":22,"h":"552d0aff","k":"rows","cols":["locale_de_de_noop"],"rows":[["0"]]}
+{"i":23,"h":"ccc3aafa","k":"rows","cols":["locale_unknown_noop"],"rows":[["1"]]}
+{"i":24,"h":"13b53e90","k":"rows","cols":["neg_decimals"],"rows":[["2"]]}
+{"i":25,"h":"b72aee71","k":"rows","cols":["clamped_to_30"],"rows":[["1"]]}
+{"i":26,"h":"4423f23e","k":"rows","cols":["nan_returns_null"],"rows":[["0"]]}
+{"i":27,"h":"07d3f012","k":"rows","cols":["inf_returns_null"],"rows":[["0"]]}
+{"i":28,"h":"7c641720","k":"rows","cols":["neg_inf_returns_null"],"rows":[["0"]]}
+{"i":29,"h":"a0c41707","k":"rows","cols":["null_n"],"rows":[["1"]]}
+{"i":30,"h":"390c32d8","k":"rows","cols":["null_decimals"],"rows":[["1"]]}
+{"i":31,"h":"9989cc30","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 1"}
+{"i":32,"h":"8a12b3b4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":33,"h":"81d64f70","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1"}
+{"i":34,"h":"8674d2c8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'extra')' at line 1"}

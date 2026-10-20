@@ -1,0 +1,18 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":17}
+{"i":1,"h":"ed201369","k":"ok","affected":0}
+{"i":2,"h":"a5e58981","k":"err","code":1049,"msg":"Unknown database 'public'"}
+{"i":3,"h":"41930adc","k":"err","code":1049,"msg":"Unknown database 'public'"}
+{"i":4,"h":"f0529d83","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED VIEW public.mv AS SELECT id, v*2 AS dbl FROM public.mvb' at line 1"}
+{"i":5,"h":"d4abbdb2","k":"err","code":1049,"msg":"Unknown database 'public'"}
+{"i":6,"h":"2a8f92ec","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REFRESH MATERIALIZED VIEW public.mv' at line 1"}
+{"i":7,"h":"d4abbdb2","k":"err","code":1049,"msg":"Unknown database 'public'"}
+{"i":8,"h":"515654df","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv' at line 1"}
+{"i":9,"h":"02e64455","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REFRESH MATERIALIZED VIEW public.mv WITH DATA' at line 1"}
+{"i":10,"h":"0151e807","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REFRESH MATERIALIZED VIEW public.mv WITH NO DATA' at line 1"}
+{"i":11,"h":"2e4c146a","k":"ok","affected":0}
+{"i":12,"h":"0c9d11fc","k":"err","code":1049,"msg":"Unknown database 'public'"}
+{"i":13,"h":"357b7fef","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED VIEW public.mv2 AS SELECT id FROM public.mvb2 WITH NO DATA' at line 1"}
+{"i":14,"h":"d4abbdb2","k":"err","code":1049,"msg":"Unknown database 'public'"}
+{"i":15,"h":"ca053c4b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED VIEW public.mv' at line 1"}
+{"i":16,"h":"5fad7d33","k":"err","code":1051,"msg":"Unknown table 'public.mvb'"}
+{"i":17,"h":"5798661e","k":"err","code":1051,"msg":"Unknown table 'public.mvb2'"}

@@ -1,0 +1,19 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":18}
+{"i":1,"h":"f432c40f","k":"rows","cols":["rt_identity"],"rows":[["1"]]}
+{"i":2,"h":"098eb69d","k":"rows","cols":["rt_len"],"rows":[["1"]]}
+{"i":3,"h":"b18f3cbe","k":"rows","cols":["empty_compressed_len"],"rows":[["0"]]}
+{"i":4,"h":"df209722","k":"rows","cols":["empty_uncompressed_len"],"rows":[["0"]]}
+{"i":5,"h":"014f243f","k":"rows","cols":["empty_header_len"],"rows":[["0"]]}
+{"i":6,"h":"98e6a9a8","k":"rows","cols":["shrinks"],"rows":[["1"]]}
+{"i":7,"h":"de7a6fe7","k":"rows","cols":["recorded_len"],"rows":[["500"]]}
+{"i":8,"h":"38291c61","k":"rows","cols":["c_null"],"rows":[[null]]}
+{"i":9,"h":"b3686b2f","k":"rows","cols":["u_null"],"rows":[[null]]}
+{"i":10,"h":"063484f1","k":"rows","cols":["l_null"],"rows":[[null]]}
+{"i":11,"h":"07596299","k":"rows","cols":["too_short"],"rows":[[null]]}
+{"i":12,"h":"fd16270c","k":"rows","cols":["too_short_hdr"],"rows":[["0"]]}
+{"i":13,"h":"dec7ce94","k":"rows","cols":["bad_zlib"],"rows":[[null]]}
+{"i":14,"h":"be110b32","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'COMPRESS'"}
+{"i":15,"h":"25df023d","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UNCOMPRESS'"}
+{"i":16,"h":"f0e8bb68","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UNCOMPRESSED_LENGTH'"}
+{"i":17,"h":"0e22e062","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'COMPRESS'"}
+{"i":18,"h":"33988783","k":"rows","cols":["mixed_ok"],"rows":[["5"]]}

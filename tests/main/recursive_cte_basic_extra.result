@@ -98,7 +98,10 @@ WITH RECURSIVE c(id, next, path) AS (
     FROM cyc c2 JOIN c ON c2.id = c.next WHERE NOT c2.id = ANY(path)
 )
 SELECT id FROM c;
-ERROR 1064: SQL parse error: unsupported right operand for ANY: path
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[id] FROM cyc WHERE id = 1
+  UNION ALL
+  SELECT c2.id, c2.next, path || c2.id
+  ' at line 2
 DROP TABLE cyc;
 === KNOWN GAP: SEARCH DEPTH FIRST modifier — errno 1064 ===
 DROP TABLE IF EXISTS emp2;
@@ -110,7 +113,8 @@ WITH RECURSIVE chain(id, name) AS (
   SELECT e.id, e.name FROM emp2 e JOIN chain c ON e.mgr = c.id
 ) SEARCH DEPTH FIRST BY id SET seq
 SELECT id, name FROM chain;
-ERROR 1064: SQL parse error: sql parser error: Expected: SELECT, VALUES, or a subquery in the query body, found: SEARCH at Line: 5, Column: 3
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEARCH DEPTH FIRST BY id SET seq
+SELECT id, name FROM chain' at line 5
 DROP TABLE emp2;
 === KNOWN GAP: mutual recursion forward reference — errno 1146 ===
 # CTE `odd` references CTE `even` which is declared
@@ -123,7 +127,7 @@ even(n) AS (
   SELECT 2 UNION ALL SELECT n + 1 FROM odd WHERE n < 6
 )
 SELECT n FROM odd ORDER BY n;
-ERROR 1146: table not found: even
+ERROR 1146: Table 'test.even' doesn't exist
 === KNOWN GAP: RECURSIVE INTERSECT — errno 1105 ===
 # PG also forbids; pinned as the correct error.
 WITH RECURSIVE r(n) AS (
@@ -132,7 +136,7 @@ WITH RECURSIVE r(n) AS (
   SELECT n + 1 FROM r WHERE n < 5
 )
 SELECT n FROM r;
-ERROR 1105: plan error: recursive CTE requires UNION or UNION ALL
+ERROR 3573: Recursive Common Table Expression 'r' should contain a UNION
 === KNOWN DIVERGENCE: aggregate in recursive arm — errno 1105 at runtime ===
 # PG rejects at parse time. zeta accepts and runs to
 # the 1000-iteration recursion-depth limit, then errors.
@@ -142,4 +146,4 @@ WITH RECURSIVE bad(n) AS (
   SELECT MAX(n) + 1 FROM bad WHERE n < 5
 )
 SELECT n FROM bad;
-ERROR 1105: execution error: recursive CTE 'bad' exceeded maximum recursion depth (1000)
+ERROR 3575: Recursive Common Table Expression 'bad' can contain neither aggregation nor window functions in recursive query block

@@ -1,0 +1,66 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":65}
+{"i":1,"h":"022a9940","k":"rows","cols":["sin_pi_2_is_1"],"rows":[["1"]]}
+{"i":2,"h":"660cf1c8","k":"rows","cols":["cos_pi_2_is_0"],"rows":[["1"]]}
+{"i":3,"h":"0d032bbb","k":"rows","cols":["sin_pi_is_0"],"rows":[["1"]]}
+{"i":4,"h":"ef0b44e6","k":"rows","cols":["cos_pi_is_neg_1"],"rows":[["1"]]}
+{"i":5,"h":"3f5dd914","k":"rows","cols":["tan_pi_2_very_large"],"rows":[["1"]]}
+{"i":6,"h":"9e036b56","k":"rows","cols":["tan_pi_2_finite"],"rows":[["1"]]}
+{"i":7,"h":"390ac539","k":"err","code":1690,"msg":"DOUBLE value is out of range in 'cot(0)'"}
+{"i":8,"h":"e2cca40f","k":"err","code":1690,"msg":"DOUBLE value is out of range in 'cot(0)'"}
+{"i":9,"h":"8e91b8cd","k":"rows","cols":["acos_neg_1_is_pi"],"rows":[["1"]]}
+{"i":10,"h":"30aaa60c","k":"rows","cols":["acos_0_is_pi_2"],"rows":[["1"]]}
+{"i":11,"h":"d0566e56","k":"rows","cols":["asin_2_is_nan"],"rows":[[null]]}
+{"i":12,"h":"dfec8289","k":"rows","cols":["acos_2_is_nan"],"rows":[[null]]}
+{"i":13,"h":"ba16bb0f","k":"rows","cols":["asin_neg_2_is_nan"],"rows":[[null]]}
+{"i":14,"h":"67c1a734","k":"rows","cols":["atan_2arg_eq_atan2"],"rows":[["1"]]}
+{"i":15,"h":"f02b82b7","k":"rows","cols":["atan_2arg_neg_eq"],"rows":[["1"]]}
+{"i":16,"h":"affe781c","k":"rows","cols":["atan2_q2"],"rows":[["1"]]}
+{"i":17,"h":"f54c20f1","k":"rows","cols":["atan2_q3"],"rows":[["1"]]}
+{"i":18,"h":"4e7cbf45","k":"rows","cols":["atan2_q4"],"rows":[["1"]]}
+{"i":19,"h":"d3429023","k":"rows","cols":["atan2_x_axis"],"rows":[["1"]]}
+{"i":20,"h":"9cfd41c2","k":"rows","cols":["atan2_y_axis"],"rows":[["1"]]}
+{"i":21,"h":"0f7ec1e5","k":"err","code":1305,"msg":"FUNCTION test.SINH does not exist"}
+{"i":22,"h":"6d7b33ab","k":"err","code":1305,"msg":"FUNCTION test.COSH does not exist"}
+{"i":23,"h":"99e42467","k":"err","code":1305,"msg":"FUNCTION test.TANH does not exist"}
+{"i":24,"h":"264814b3","k":"err","code":1305,"msg":"FUNCTION test.TANH does not exist"}
+{"i":25,"h":"e1f39f97","k":"err","code":1305,"msg":"FUNCTION test.TANH does not exist"}
+{"i":26,"h":"ccbc6575","k":"err","code":1305,"msg":"FUNCTION test.ASINH does not exist"}
+{"i":27,"h":"10208308","k":"err","code":1305,"msg":"FUNCTION test.ACOSH does not exist"}
+{"i":28,"h":"659a526e","k":"err","code":1305,"msg":"FUNCTION test.ATANH does not exist"}
+{"i":29,"h":"143e0cdf","k":"err","code":1305,"msg":"FUNCTION test.ACOSH does not exist"}
+{"i":30,"h":"bf0b0ca5","k":"err","code":1305,"msg":"FUNCTION test.ACOSH does not exist"}
+{"i":31,"h":"f899d022","k":"err","code":1305,"msg":"FUNCTION test.ATANH does not exist"}
+{"i":32,"h":"51d27062","k":"err","code":1305,"msg":"FUNCTION test.ATANH does not exist"}
+{"i":33,"h":"14002cee","k":"err","code":1305,"msg":"FUNCTION test.ATANH does not exist"}
+{"i":34,"h":"901aca7a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'PI'"}
+{"i":35,"h":"479c6413","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'PI'"}
+{"i":36,"h":"9b0f1bfd","k":"rows","cols":["sin_null"],"rows":[["1"]]}
+{"i":37,"h":"d537d138","k":"rows","cols":["cos_null"],"rows":[["1"]]}
+{"i":38,"h":"bf91c154","k":"rows","cols":["tan_null"],"rows":[["1"]]}
+{"i":39,"h":"0e9358ac","k":"rows","cols":["cot_null"],"rows":[["1"]]}
+{"i":40,"h":"f4555330","k":"rows","cols":["asin_null"],"rows":[["1"]]}
+{"i":41,"h":"9feaa008","k":"rows","cols":["acos_null"],"rows":[["1"]]}
+{"i":42,"h":"8c2cc696","k":"rows","cols":["atan_null"],"rows":[["1"]]}
+{"i":43,"h":"7a240c5f","k":"rows","cols":["atan2_y_null"],"rows":[["1"]]}
+{"i":44,"h":"d9e012c6","k":"rows","cols":["atan2_x_null"],"rows":[["1"]]}
+{"i":45,"h":"2a3d0872","k":"err","code":1305,"msg":"FUNCTION test.SINH does not exist"}
+{"i":46,"h":"799e1f72","k":"err","code":1305,"msg":"FUNCTION test.COSH does not exist"}
+{"i":47,"h":"1e4fb496","k":"err","code":1305,"msg":"FUNCTION test.TANH does not exist"}
+{"i":48,"h":"d086a67f","k":"err","code":1305,"msg":"FUNCTION test.ASINH does not exist"}
+{"i":49,"h":"309bb24b","k":"err","code":1305,"msg":"FUNCTION test.ACOSH does not exist"}
+{"i":50,"h":"97adc163","k":"err","code":1305,"msg":"FUNCTION test.ATANH does not exist"}
+{"i":51,"h":"337ba8ac","k":"rows","cols":["degrees_null"],"rows":[["1"]]}
+{"i":52,"h":"cb4f4350","k":"rows","cols":["radians_null"],"rows":[["1"]]}
+{"i":53,"h":"37376c97","k":"rows","cols":["log2_null"],"rows":[["1"]]}
+{"i":54,"h":"100ea84b","k":"rows","cols":["log10_null"],"rows":[["1"]]}
+{"i":55,"h":"d17b5149","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SIN'"}
+{"i":56,"h":"e28f95f6","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SIN'"}
+{"i":57,"h":"b8d9e462","k":"err","code":1305,"msg":"FUNCTION test.COSH does not exist"}
+{"i":58,"h":"8d6d0a69","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LOG2'"}
+{"i":59,"h":"c7d8a6a7","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'LOG2'"}
+{"i":60,"h":"f8eec150","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DEGREES'"}
+{"i":61,"h":"032370bc","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ATAN'"}
+{"i":62,"h":"f44892f0","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ATAN'"}
+{"i":63,"h":"dc9ee12e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ATAN2'"}
+{"i":64,"h":"103eca57","k":"rows","cols":["ATAN2(1)"],"rows":[["0.7853981633974483"]]}
+{"i":65,"h":"9385b02d","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ATAN2'"}

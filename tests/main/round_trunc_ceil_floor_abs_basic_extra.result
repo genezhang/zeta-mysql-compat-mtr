@@ -18,16 +18,15 @@ SELECT ABS(-2147483648)                  AS neg_i32_min;
 neg_i32_min
 2147483648
 SELECT ABS(-9223372036854775808)         AS abs_i64_min;
-abs_i64_min
-9223372036854775808
+ERROR 1690: BIGINT value is out of range in 'abs(-(9223372036854775808))'
 === ABS: NULL + arity ===
 SELECT ABS(NULL) IS NULL                 AS null_passes;
 null_passes
 1
 SELECT ABS();
-ERROR 1105: execution error: ABS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'ABS'
 SELECT ABS(1, 2);
-ERROR 1105: execution error: ABS requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'ABS'
 === ROUND: 1-arg form ===
 SELECT ROUND(3.4)                        AS down;
 down
@@ -53,10 +52,10 @@ tie_2_5_half_away
 3
 SELECT FORMAT(2.5, 0)                    AS tie_2_5_bankers;
 tie_2_5_bankers
-2
+3
 SELECT ROUND(2.5) <> FORMAT(2.5, 0)      AS round_vs_format_diverge;
 round_vs_format_diverge
-1
+0
 SELECT ROUND(0.5)   = 1                  AS half_0_5_to_1;
 half_0_5_to_1
 1
@@ -101,7 +100,7 @@ int_neg_precision
 === ROUND on Float64 ties (f64::round path, separate from Decimal) ===
 SELECT ROUND(2.5e0)                      AS float_tie_half_away;
 float_tie_half_away
-3
+2
 === ROUND: NULL + arity ===
 SELECT ROUND(NULL)         IS NULL       AS null_passes;
 null_passes
@@ -110,9 +109,9 @@ SELECT ROUND(1.5, NULL)    IS NULL       AS null_precision;
 null_precision
 1
 SELECT ROUND();
-ERROR 1105: execution error: ROUND requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'ROUND'
 SELECT ROUND(1.5, 2, 3);
-ERROR 1105: execution error: ROUND requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'ROUND'
 === TRUNCATE: positive precision ===
 SELECT TRUNCATE(3.999, 0)                AS to_int;
 to_int
@@ -154,13 +153,14 @@ SELECT TRUNCATE(1.5, NULL) IS NULL       AS null_n;
 null_n
 1
 SELECT TRUNCATE('3.999', 2);
-ERROR 1105: execution error: cannot convert '3.999' to number
+TRUNCATE('3.999', 2)
+3.99
 SELECT TRUNCATE();
-ERROR 1105: execution error: TRUNCATE requires 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT TRUNCATE(1.5);
-ERROR 1105: execution error: TRUNCATE requires 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT TRUNCATE(1.5, 2, 3);
-ERROR 1105: execution error: TRUNCATE requires 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 3)' at line 1
 === CEIL / CEILING ===
 SELECT CEIL(3.1)                         AS dec_up;
 dec_up
@@ -181,13 +181,11 @@ SELECT CEILING(3.1) = CEIL(3.1)          AS ceiling_alias;
 ceiling_alias
 1
 SELECT CEIL();
-ERROR 1105: execution error: CEIL requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'CEIL'
 SELECT CEIL(1, 2)                        AS ceil_extra_args_dropped;
-ceil_extra_args_dropped
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'CEIL'
 SELECT CEIL(1, 2) = 1                    AS ceil_extras_first_arg_survives;
-ceil_extras_first_arg_survives
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'CEIL'
 === FLOOR ===
 SELECT FLOOR(3.9)                        AS dec_down;
 dec_down
@@ -205,13 +203,11 @@ SELECT FLOOR(NULL) IS NULL               AS null_passes;
 null_passes
 1
 SELECT FLOOR();
-ERROR 1105: execution error: FLOOR requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FLOOR'
 SELECT FLOOR(1, 2)                       AS floor_extra_args_dropped;
-floor_extra_args_dropped
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'FLOOR'
 SELECT FLOOR(1, 2) = 1                   AS floor_extras_first_arg_survives;
-floor_extras_first_arg_survives
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'FLOOR'
 === Cross-family invariants ===
 SELECT FLOOR(3.7) <= ROUND(3.7) AND ROUND(3.7) <= CEIL(3.7) AS bounds_invariant;
 bounds_invariant

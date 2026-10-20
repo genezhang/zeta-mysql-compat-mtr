@@ -1,24 +1,25 @@
 === DEALLOCATE on missing — silent ok (both forms) ===
 DEALLOCATE no_such_pg;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'no_such_pg' at line 1
 DEALLOCATE PREPARE no_such_mysql;
+ERROR 1243: Unknown prepared statement handler (no_such_mysql) given to DEALLOCATE PREPARE
 === KNOWN GAP: PG-style PREPARE ... AS ... — errno 1105 ===
 PREPARE p1 AS SELECT 1 + 1;
-ERROR 1105: plan error: statement is handled before planning
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'AS SELECT 1 + 1' at line 1
 === KNOWN GAP: PG-style EXECUTE — errno 1105 ===
 EXECUTE p1;
-ERROR 1105: plan error: statement is handled before planning
+ERROR 1243: Unknown prepared statement handler (p1) given to EXECUTE
 === KNOWN GAP: PG-style PREPARE with parameter — errno 1105 ===
 PREPARE p3(INT) AS SELECT $1 + 10;
-ERROR 1105: plan error: statement is handled before planning
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(INT) AS SELECT $1 + 10' at line 1
 === KNOWN GAP: PG-style EXECUTE with arg list — errno 1105 ===
 EXECUTE p3(5);
-ERROR 1105: plan error: statement is handled before planning
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(5)' at line 1
 === KNOWN GAP: MySQL PREPARE FROM string — errno 1064 ===
 PREPARE p2 FROM 'SELECT 2 + 2';
-ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: FROM at Line: 1, Column: 12
 === KNOWN GAP: MySQL PREPARE FROM @var — errno 1064 ===
 PREPARE p4 FROM @s;
-ERROR 1064: SQL parse error: sql parser error: Expected: AS, found: FROM at Line: 1, Column: 12
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL' at line 1
 === KNOWN GAP: EXECUTE IMMEDIATE — errno 1105 ===
 EXECUTE IMMEDIATE 'SELECT 99';
-ERROR 1105: plan error: statement is handled before planning
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''SELECT 99'' at line 1

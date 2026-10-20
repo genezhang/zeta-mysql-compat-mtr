@@ -122,13 +122,13 @@ ld_null
 1
 === Arity errors ===
 SELECT DAYOFWEEK();
-ERROR 1105: execution error: DAYOFWEEK requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'DAYOFWEEK'
 SELECT WEEKDAY();
-ERROR 1105: execution error: WEEKDAY requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'WEEKDAY'
 SELECT DAYOFYEAR();
-ERROR 1105: execution error: DAYOFYEAR requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'DAYOFYEAR'
 SELECT LAST_DAY();
-ERROR 1105: execution error: LAST_DAY requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'LAST_DAY'
 === Determinism ===
 SELECT DAYOFWEEK('2024-01-08') = DAYOFWEEK('2024-01-08') AS dow_det;
 dow_det

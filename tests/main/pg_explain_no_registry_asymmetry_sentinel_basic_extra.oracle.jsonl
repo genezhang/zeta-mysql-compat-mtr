@@ -1,0 +1,19 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":18}
+{"i":1,"h":"834d6f22","k":"ok","affected":0}
+{"i":2,"h":"6a3e82b2","k":"ok","affected":0}
+{"i":3,"h":"4cb8da5e","k":"ok","affected":2}
+{"i":4,"h":"daf904b9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'GENERIC_PLAN) SELECT * FROM e' at line 1"}
+{"i":5,"h":"7a08f08e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'GENERIC_PLAN TRUE) SELECT * FROM e' at line 1"}
+{"i":6,"h":"6dbf2000","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MEMORY) SELECT * FROM e' at line 1"}
+{"i":7,"h":"fa9916b3","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SUMMARY) SELECT * FROM e' at line 1"}
+{"i":8,"h":"ea40d00a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SUMMARY TRUE) SELECT * FROM e' at line 1"}
+{"i":9,"h":"8b3fc99c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMING) SELECT * FROM e' at line 1"}
+{"i":10,"h":"e983ee08","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WAL) SELECT * FROM e' at line 1"}
+{"i":11,"h":"71b16780","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WAL, ANALYZE) SELECT * FROM e' at line 1"}
+{"i":12,"h":"99938bca","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FORMAT YAML, MEMORY ON) SELECT * FROM e' at line 1"}
+{"i":13,"h":"80c38804","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOSUCHOPT) SELECT * FROM e' at line 1"}
+{"i":14,"h":"ea1226bf","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ANALYZE, BUFFERS, VERBOSE, COSTS OFF, SUMMARY, TIMING) SELECT * FROM e' at line 1"}
+{"i":15,"h":"881f63c9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'GENERIC_PLAN SELECT * FROM e' at line 1"}
+{"i":16,"h":"edba7834","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', BUFFERS SELECT * FROM e' at line 1"}
+{"i":17,"h":"faba2e3d","k":"rows","cols":["id","select_type","table","partitions","type","possible_keys","key","key_len","ref","rows","filtered","Extra"],"rows":[["1","SIMPLE","e",null,"ALL",null,null,null,null,"2","100.00",null]]}
+{"i":18,"h":"46ef9adc","k":"ok","affected":0}

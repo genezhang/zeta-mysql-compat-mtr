@@ -1,0 +1,18 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":17}
+{"i":1,"h":"834d63f2","k":"ok","affected":0}
+{"i":2,"h":"4b94db3c","k":"ok","affected":0}
+{"i":3,"h":"22362757","k":"ok","affected":0}
+{"i":4,"h":"75651043","k":"ok","affected":0}
+{"i":5,"h":"aee54e61","k":"ok","affected":2}
+{"i":6,"h":"3fe563da","k":"rows","cols":["id","email"],"rows":[["1","a@x"],["2","b@x"]]}
+{"i":7,"h":"f66237ad","k":"err","code":1062,"msg":"Duplicate entry 'a@x' for key 'u.idx_email'"}
+{"i":8,"h":"7c3a7165","k":"ok","affected":0}
+{"i":9,"h":"19379fec","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS idx_age ON u(age)' at line 1"}
+{"i":10,"h":"6cc70e8d","k":"ok","affected":0}
+{"i":11,"h":"3d47c743","k":"ok","affected":0}
+{"i":12,"h":"e7a86da3","k":"ok","affected":0}
+{"i":13,"h":"a4bfe8eb","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["u","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null],["u","0","idx_email","1","email","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null]],"nd":"cells","masked":[6,7],"sorted":true}
+{"i":14,"h":"04c3ce23","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["mc","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null],["mc","1","idx_ab","1","a","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null],["mc","1","idx_ab","2","b","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null]],"nd":"cells","masked":[6,7],"sorted":true}
+{"i":15,"h":"9cad1313","k":"rows","cols":["TABLE_NAME","INDEX_NAME","COLUMN_NAME"],"rows":[["mc","PRIMARY","id"],["mc","idx_ab","a"],["mc","idx_ab","b"],["u","PRIMARY","id"],["u","idx_email","email"]],"nd":"order","unordered":true,"sorted":true}
+{"i":16,"h":"46ef8f8c","k":"ok","affected":0}
+{"i":17,"h":"c0febd30","k":"ok","affected":0}

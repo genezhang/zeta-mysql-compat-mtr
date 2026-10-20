@@ -1,0 +1,18 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":17}
+{"i":1,"h":"6cd551b8","k":"ok","affected":0}
+{"i":2,"h":"9d25d849","k":"ok","affected":0}
+{"i":3,"h":"442efffb","k":"ok","affected":2}
+{"i":4,"h":"2241bbbd","k":"rows","cols":["id","select_type","table","partitions","type","possible_keys","key","key_len","ref","rows","filtered","Extra"],"rows":[["1","SIMPLE","ep",null,"ALL",null,null,null,null,"2","100.00",null]]}
+{"i":5,"h":"0a7c36dc","k":"rows","cols":["id","select_type","table","partitions","type","possible_keys","key","key_len","ref","rows","filtered","Extra"],"rows":[["1","SIMPLE","ep",null,"const","PRIMARY","PRIMARY","4","const","1","100.00",null]]}
+{"i":6,"h":"92c376f8","k":"rows","cols":["id","select_type","table","partitions","type","possible_keys","key","key_len","ref","rows","filtered","Extra"],"rows":[["1","UPDATE","ep",null,"range","PRIMARY","PRIMARY","4","const","1","100.00","Using where"]]}
+{"i":7,"h":"eac0866d","k":"rows","cols":["id","select_type","table","partitions","type","possible_keys","key","key_len","ref","rows","filtered","Extra"],"rows":[["1","DELETE","ep",null,"range","PRIMARY","PRIMARY","4","const","1","100.00","Using where"]]}
+{"i":8,"h":"6cc88a25","k":"ok","affected":0}
+{"i":9,"h":"14f454fe","k":"ok","affected":0}
+{"i":10,"h":"b5c81c8b","k":"rows","cols":["id","select_type","table","partitions","type","possible_keys","key","key_len","ref","rows","filtered","Extra"],"rows":[["1","SIMPLE","j2",null,"ALL","PRIMARY",null,null,null,"1","100.00",null],["1","SIMPLE","ep",null,"eq_ref","PRIMARY","PRIMARY","4","test.j2.id","1","100.00",null]]}
+{"i":11,"h":"e8ef601e","k":"rows","cols":["id","select_type","table","partitions","type","possible_keys","key","key_len","ref","rows","filtered","Extra"],"rows":[["1","SIMPLE","ep",null,"ALL",null,null,null,null,"2","100.00","Using filesort"]]}
+{"i":12,"h":"651e98b3","k":"rows","cols":["EXPLAIN"],"rows":[["{\n  \"query_block\": {\n    \"select_id\": 1,\n    \"cost_info\": {\n      \"query_cost\": \"0.45\"\n    },\n    \"table\": {\n      \"table_name\": \"ep\",\n      \"access_type\": \"ALL\",\n      \"rows_examined_per_scan\": 2,\n      \"rows_produced_per_join\": 2,\n      \"filtered\": \"100.00\",\n      \"cost_info\": {\n        \"read_cost\": \"0.25\",\n        \"eval_cost\": \"0.20\",\n        \"prefix_cost\": \"0.45\",\n        \"data_read_per_join\": \"192\"\n      },\n      \"used_columns\": [\n        \"id\",\n        \"name\",\n        \"age\"\n      ]\n    }\n  }\n}"]]}
+{"i":13,"h":"25aa1828","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VERBOSE) SELECT * FROM ep' at line 1"}
+{"i":14,"h":"1b96bea8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT * FROM ep' at line 1"}
+{"i":15,"h":"46ec42eb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT * FROM ep' at line 1"}
+{"i":16,"h":"c0cfbba1","k":"ok","affected":0}
+{"i":17,"h":"c0d317d8","k":"ok","affected":0}

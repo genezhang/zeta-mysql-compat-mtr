@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"53e9c8dc","k":"rows","cols":["fwd"],"rows":[["5"]]}
+{"i":2,"h":"32118879","k":"rows","cols":["bwd"],"rows":[["-5"]]}
+{"i":3,"h":"f4195f44","k":"rows","cols":["same"],"rows":[["0"]]}
+{"i":4,"h":"a9e0cf35","k":"rows","cols":["leap_year"],"rows":[["366"]]}
+{"i":5,"h":"20ead0b4","k":"rows","cols":["minus_365"],"rows":[["-365"]]}
+{"i":6,"h":"26829912","k":"rows","cols":["time_ignored"],"rows":[["0"]]}
+{"i":7,"h":"8c16312e","k":"rows","cols":["mixed_types"],"rows":[["5"]]}
+{"i":8,"h":"5b714dfc","k":"rows","cols":["n_left"],"rows":[[null]]}
+{"i":9,"h":"b51ee2b6","k":"rows","cols":["n_right"],"rows":[[null]]}
+{"i":10,"h":"8992f162","k":"rows","cols":["mixed_case"],"rows":[["5"]]}
+{"i":11,"h":"54e248c1","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'DATEDIFF'"}
+{"i":12,"h":"d6ffff37","k":"ok","affected":0}
+{"i":13,"h":"1de2386d","k":"ok","affected":0}
+{"i":14,"h":"3be10532","k":"ok","affected":3}
+{"i":15,"h":"acd3972d","k":"rows","cols":["id","days_from_start"],"rows":[["1","0"],["2","166"],["3","365"]]}
+{"i":16,"h":"8f6b978b","k":"ok","affected":0}

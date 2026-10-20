@@ -17,8 +17,8 @@ INSERT INTO t1 VALUES (11, NULL);
 # Read back, ordered by the integer key for stable output.
 SELECT i, j FROM t1 ORDER BY i;
 i	j
-1	{"a":2}
-2	[1,2,3]
+1	{"a": 2}
+2	[1, 2, 3]
 3	"scalar string"
 4	true
 5	false
@@ -32,7 +32,7 @@ i	j
 INSERT INTO t1 VALUES (12, '{"a":"b", "c":"d", "ab":"abc", "bc": ["x", "y"]}');
 SELECT j FROM t1 WHERE i = 12;
 j
-{"a":"b","c":"d","ab":"abc","bc":["x","y"]}
+{"a": "b", "c": "d", "ab": "abc", "bc": ["x", "y"]}
 # Count by JSON-null vs SQL-null to confirm they are distinct rows.
 SELECT COUNT(*) AS total FROM t1;
 total

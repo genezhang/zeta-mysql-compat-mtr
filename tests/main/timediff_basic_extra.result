@@ -45,10 +45,10 @@ neg_subsec
 === Mixed-type inputs (impl coerces each side independently) ===
 SELECT TIMEDIFF('14:30:45', '2024-03-15 14:30:45')    AS mixed_time_minus_ts;
 mixed_time_minus_ts
--475128:00:00
+NULL
 SELECT TIMEDIFF('2024-03-15 14:30:45', '14:30:45')    AS mixed_ts_minus_time;
 mixed_ts_minus_time
-475128:00:00
+NULL
 === Typed-value inputs via CAST (exercises Value::Time / Value::Timestamp arms) ===
 SELECT TIMEDIFF(CAST('14:30:45' AS TIME),
                 CAST('12:15:30' AS TIME))             AS typed_time_minus_time;
@@ -57,8 +57,9 @@ typed_time_minus_time
 SELECT TIMEDIFF(CAST('2024-03-15 14:30:45' AS TIMESTAMP),
                 CAST('2024-03-15 12:15:30' AS TIMESTAMP))
                                                       AS typed_ts_minus_ts;
-typed_ts_minus_ts
-02:15:15
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TIMESTAMP),
+                CAST('2024-03-15 12:15:30' AS TIMESTAMP))
+          ' at line 1
 SELECT TIMEDIFF(CAST('14:30:45' AS TIME),
                 CAST('12:15:30' AS TIME))
      = TIMEDIFF('14:30:45', '12:15:30')               AS typed_eq_string;
@@ -76,20 +77,24 @@ null_both
 1
 === Wrong-type inputs → ERROR (zeta strict; MySQL coerces/NULLs) ===
 SELECT TIMEDIFF(1, '00:00:00');
-ERROR 1105: execution error: TIMEDIFF left requires time, timestamp, or parseable string
+TIMEDIFF(1, '00:00:00')
+00:00:01
 SELECT TIMEDIFF('00:00:00', 1);
-ERROR 1105: execution error: TIMEDIFF right requires time, timestamp, or parseable string
+TIMEDIFF('00:00:00', 1)
+-00:00:01
 SELECT TIMEDIFF('not a time', '00:00:00');
-ERROR 1105: execution error: TIMEDIFF left: cannot parse "not a time" as a time or timestamp
+TIMEDIFF('not a time', '00:00:00')
+NULL
 SELECT TIMEDIFF('00:00:00', 'not a time');
-ERROR 1105: execution error: TIMEDIFF right: cannot parse "not a time" as a time or timestamp
+TIMEDIFF('00:00:00', 'not a time')
+NULL
 === Arity errors ===
 SELECT TIMEDIFF();
-ERROR 1105: execution error: TIMEDIFF requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'TIMEDIFF'
 SELECT TIMEDIFF('14:30:00');
-ERROR 1105: execution error: TIMEDIFF requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'TIMEDIFF'
 SELECT TIMEDIFF('14:30:00', '12:00:00', 'extra');
-ERROR 1105: execution error: TIMEDIFF requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'TIMEDIFF'
 === Wide diffs (>838:59:59) emit unbounded hours (zeta divergence) ===
 SELECT TIMEDIFF('2024-03-15 00:00:00', '2024-03-01 00:00:00')
                                                       AS wide_336h;
@@ -98,9 +103,8 @@ wide_336h
 SELECT TIMEDIFF('2024-06-09 00:00:00', '2024-03-01 00:00:00')
                                                       AS wide_2400h;
 wide_2400h
-2400:00:00
+838:59:59
 === Determinism ===
 SELECT TIMEDIFF('14:30:45', '12:15:30')
      = TIMEDIFF('14:30:45', '12:15:30')               AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 2

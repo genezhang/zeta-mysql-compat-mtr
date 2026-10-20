@@ -1,96 +1,73 @@
 === OVERLAY: SQL-standard PLACING/FROM/FOR syntax ===
 SELECT OVERLAY('Txxxxas' PLACING 'hom' FROM 2 FOR 4)          AS thomas;
-thomas
-Thomas
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''hom' FROM 2 FOR 4)          AS thomas' at line 1
 SELECT OVERLAY('yabadoo' PLACING 'daba' FROM 5 FOR 0)         AS yabadabadoo;
-yabadabadoo
-yabadabadoo
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''daba' FROM 5 FOR 0)         AS yabadabadoo' at line 1
 SELECT OVERLAY('babosa' PLACING 'ubb' FROM 2 FOR 4)           AS bubba;
-bubba
-bubba
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''ubb' FROM 2 FOR 4)           AS bubba' at line 1
 === OVERLAY: positional function-call form (same impl) ===
 SELECT OVERLAY('Txxxxas', 'hom', 2, 4)                        AS thomas_positional;
-thomas_positional
-Thomas
+ERROR 1305: FUNCTION test.OVERLAY does not exist
 SELECT OVERLAY('yabadoo', 'daba', 5, 0)                       AS yabadabadoo_positional;
-yabadabadoo_positional
-yabadabadoo
+ERROR 1305: FUNCTION test.OVERLAY does not exist
 SELECT OVERLAY('babosa',  'ubb',  2, 4)                       AS bubba_positional;
-bubba_positional
-bubba
+ERROR 1305: FUNCTION test.OVERLAY does not exist
 === OVERLAY: PLACING form ≡ positional form ===
 SELECT OVERLAY('Txxxxas' PLACING 'hom' FROM 2 FOR 4)
      = OVERLAY('Txxxxas', 'hom', 2, 4)                        AS forms_equivalent;
-forms_equivalent
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''hom' FROM 2 FOR 4)
+     = OVERLAY('Txxxxas', 'hom', 2, 4)                      ' at line 1
 === OVERLAY: 3-arg form (length defaults to repl.chars().count()) ===
 SELECT OVERLAY('hello' PLACING 'X' FROM 1)                    AS hello_X_at_1;
-hello_X_at_1
-Xello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 1)                    AS hello_X_at_1' at line 1
 SELECT OVERLAY('helloworld' PLACING 'abc' FROM 4)             AS helabcorld;
-helabcorld
-helabcorld
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''abc' FROM 4)             AS helabcorld' at line 1
 === OVERLAY: edge cases at start position ===
 SELECT OVERLAY('hello' PLACING 'X' FROM 0 FOR 1)              AS start_0_clamps_to_1;
-start_0_clamps_to_1
-Xello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 0 FOR 1)              AS start_0_clamps_to_1' at line 1
 SELECT OVERLAY('hello' PLACING 'X' FROM -5 FOR 1)             AS start_neg_clamps_to_1;
-start_neg_clamps_to_1
-Xello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM -5 FOR 1)             AS start_neg_clamps_to_1' at line 1
 SELECT OVERLAY('hi' PLACING 'XYZ' FROM 10 FOR 5)              AS start_beyond_appends;
-start_beyond_appends
-hiXYZ
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''XYZ' FROM 10 FOR 5)              AS start_beyond_appends' at line 1
 === OVERLAY: length variations ===
 SELECT OVERLAY('hello' PLACING 'BIG' FROM 3 FOR 0)            AS insert_at_3;
-insert_at_3
-heBIGllo
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''BIG' FROM 3 FOR 0)            AS insert_at_3' at line 1
 SELECT OVERLAY('hi' PLACING 'XYZ' FROM 1 FOR 100)             AS length_overshoots;
-length_overshoots
-XYZ
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''XYZ' FROM 1 FOR 100)             AS length_overshoots' at line 1
 SELECT OVERLAY('hello' PLACING 'X' FROM 2 FOR -3)             AS neg_length_is_zero;
-neg_length_is_zero
-hXello
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 2 FOR -3)             AS neg_length_is_zero' at line 1
 === OVERLAY: UTF-8 multibyte (char-indexed, NOT byte-indexed) ===
 SELECT OVERLAY('café' PLACING 'X' FROM 3 FOR 1)               AS utf8_replace_char_3;
-utf8_replace_char_3
-caXé
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 3 FOR 1)               AS utf8_replace_char_3' at line 1
 SELECT OVERLAY('café' PLACING 'e' FROM 4 FOR 1)               AS utf8_replace_multibyte;
-utf8_replace_multibyte
-cafe
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''e' FROM 4 FOR 1)               AS utf8_replace_multibyte' at line 1
 === OVERLAY: empty strings ===
 SELECT OVERLAY('' PLACING 'abc' FROM 1 FOR 0)                 AS empty_target_insert;
-empty_target_insert
-abc
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''abc' FROM 1 FOR 0)                 AS empty_target_insert' at line 1
 SELECT OVERLAY('hello' PLACING '' FROM 2 FOR 2)               AS empty_repl_deletes;
-empty_repl_deletes
-hlo
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''' FROM 2 FOR 2)               AS empty_repl_deletes' at line 1
 === OVERLAY: NULL propagation ===
 SELECT OVERLAY(NULL PLACING 'X' FROM 1)                       AS null_target;
-null_target
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 1)                       AS null_target' at line 1
 SELECT OVERLAY('hello' PLACING NULL FROM 1)                   AS null_repl;
-null_repl
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL FROM 1)                   AS null_repl' at line 1
 SELECT OVERLAY('hello' PLACING 'X' FROM NULL)                 AS null_start;
-null_start
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM NULL)                 AS null_start' at line 1
 SELECT OVERLAY('hello' PLACING 'X' FROM 1 FOR NULL)           AS null_length;
-null_length
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 1 FOR NULL)           AS null_length' at line 1
 SELECT OVERLAY(NULL PLACING 'X' FROM 1) IS NULL               AS null_target_pred;
-null_target_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 1) IS NULL               AS null_target_pred' at line 1
 === OVERLAY: wrong-type start/length → ERROR 1105 ===
 SELECT OVERLAY('hello' PLACING 'X' FROM 'not_an_int');
-ERROR 1105: execution error: OVERLAY start must be integer
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 'not_an_int')' at line 1
 SELECT OVERLAY('hello', 'X', 'not_an_int');
-ERROR 1105: execution error: OVERLAY start must be integer
+ERROR 1305: FUNCTION test.OVERLAY does not exist
 SELECT OVERLAY('hello' PLACING 'X' FROM 1 FOR 'not_an_int');
-ERROR 1105: execution error: OVERLAY length must be integer
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''X' FROM 1 FOR 'not_an_int')' at line 1
 === OVERLAY: arity errors → 1105 ===
 SELECT OVERLAY('hello');
-ERROR 1105: execution error: OVERLAY requires 3-4 arguments
+ERROR 1305: FUNCTION test.OVERLAY does not exist
 SELECT OVERLAY('hello', 'X');
-ERROR 1105: execution error: OVERLAY requires 3-4 arguments
+ERROR 1305: FUNCTION test.OVERLAY does not exist
 SELECT OVERLAY('hello', 'X', 1, 2, 3);
-ERROR 1105: execution error: OVERLAY requires 3-4 arguments
+ERROR 1305: FUNCTION test.OVERLAY does not exist

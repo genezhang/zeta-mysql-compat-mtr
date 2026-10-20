@@ -10,7 +10,7 @@ bin_cafe_len_5_bytes
 5
 SELECT LENGTH(BINARY('café')) > LENGTH('café')                AS bytes_gt_chars;
 bytes_gt_chars
-1
+0
 SELECT HEX(BINARY('café'))                                    AS hex_cafe_bytes;
 hex_cafe_bytes
 636166C3A9
@@ -29,69 +29,54 @@ int_str_repr_2_bytes
 2
 SELECT BINARY(TRUE)                                           AS bool_coerce;
 bool_coerce
-true
+1
 === BINARY: arity errors → 1105 ===
 SELECT BINARY();
-ERROR 1105: execution error: BINARY requires 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT BINARY('a', 'b');
-ERROR 1105: execution error: BINARY requires 1 argument
+ERROR 1241: Operand should contain 1 column(s)
 === CAST(x AS BINARY) is DIFFERENT — type-not-recognized ===
 SELECT CAST('hello' AS BINARY);
-ERROR 1105: execution error: unsupported CAST target type: BINARY
+CAST('hello' AS BINARY)
+hello
 === DECIMAL: scalar → Decimal ===
 SELECT DECIMAL(42)                                            AS int_to_dec;
-int_to_dec
-42
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(42)                                            AS int_to_dec' at line 1
 SELECT DECIMAL('3.14')                                        AS str_to_dec;
-str_to_dec
-3.14
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL('3.14')                                        AS str_to_dec' at line 1
 SELECT DECIMAL(3.14)                                          AS dec_passthrough;
-dec_passthrough
-3.14
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(3.14)                                          AS dec_passthrough' at line 1
 SELECT DECIMAL(-5)                                            AS neg_int;
-neg_int
--5
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(-5)                                            AS neg_int' at line 1
 SELECT DECIMAL(3.14) = 3.14                                   AS dec_eq_lit;
-dec_eq_lit
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(3.14) = 3.14                                   AS dec_eq_lit' at line 1
 === DECIMAL: non-finite Float → NULL (rust_decimal can't represent) ===
 SELECT DECIMAL(CAST('NaN'      AS DOUBLE PRECISION))          AS dec_nan_null;
-dec_nan_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('NaN'      AS DOUBLE PRECISION))          AS dec_nan_null' at line 1
 SELECT DECIMAL(CAST('Infinity' AS DOUBLE PRECISION))          AS dec_inf_null;
-dec_inf_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('Infinity' AS DOUBLE PRECISION))          AS dec_inf_null' at line 1
 SELECT DECIMAL(CAST('-Infinity' AS DOUBLE PRECISION))         AS dec_neg_inf_null;
-dec_neg_inf_null
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('-Infinity' AS DOUBLE PRECISION))         AS dec_neg_inf_null' at line 1
 SELECT DECIMAL(CAST('NaN' AS DOUBLE PRECISION)) IS NULL       AS dec_nan_pred;
-dec_nan_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(CAST('NaN' AS DOUBLE PRECISION)) IS NULL       AS dec_nan_pred' at line 1
 === DECIMAL: Bool → 1 / 0 via coerce_value ===
 SELECT DECIMAL(TRUE)                                          AS bool_true_renders_as_1;
-bool_true_renders_as_1
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE)                                          AS bool_true_renders_as_1' at line 1
 SELECT DECIMAL(FALSE)                                         AS bool_false_renders_as_0;
-bool_false_renders_as_0
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(FALSE)                                         AS bool_false_renders_as_' at line 1
 SELECT DECIMAL(TRUE) = 1                                      AS bool_dec_ne_int_1;
-bool_dec_ne_int_1
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE) = 1                                      AS bool_dec_ne_int_1' at line 1
 SELECT DECIMAL(TRUE) = DECIMAL(1)                             AS bool_dec_ne_dec_1;
-bool_dec_ne_dec_1
-0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE) = DECIMAL(1)                             AS bool_dec_ne_dec_1' at line 1
 SELECT DECIMAL(TRUE) = TRUE                                   AS bool_dec_eq_bool_true;
-bool_dec_eq_bool_true
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(TRUE) = TRUE                                   AS bool_dec_eq_bool_true' at line 1
 === DECIMAL: NULL propagation ===
 SELECT DECIMAL(NULL)                                          AS null_propagates;
-null_propagates
-NULL
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(NULL)                                          AS null_propagates' at line 1
 SELECT DECIMAL(NULL) IS NULL                                  AS null_pred;
-null_pred
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(NULL) IS NULL                                  AS null_pred' at line 1
 === DECIMAL: arity errors → 1105 ===
 SELECT DECIMAL();
-ERROR 1105: execution error: DECIMAL requires 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL()' at line 1
 SELECT DECIMAL(1, 2);
-ERROR 1105: execution error: DECIMAL requires 1 argument
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DECIMAL(1, 2)' at line 1

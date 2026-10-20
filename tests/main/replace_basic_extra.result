@@ -105,14 +105,13 @@ int_to
 1bc
 === REPLACE: determinism ===
 SELECT REPLACE('hello', 'l', 'L') = REPLACE('hello', 'l', 'L') AS deterministic;
-deterministic
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'deterministic' at line 1
 === REPLACE: arity errors ===
 SELECT REPLACE();
-ERROR 1105: execution error: REPLACE requires 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT REPLACE('a');
-ERROR 1105: execution error: REPLACE requires 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT REPLACE('a', 'b');
-ERROR 1105: execution error: REPLACE requires 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT REPLACE('a', 'b', 'c', 'd');
-ERROR 1105: execution error: REPLACE requires 3 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 'd')' at line 1

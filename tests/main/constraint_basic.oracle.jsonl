@@ -1,0 +1,53 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":52}
+{"i":1,"h":"2159daa7","k":"ok","affected":0}
+{"i":2,"h":"518da091","k":"ok","affected":0}
+{"i":3,"h":"82aa1234","k":"ok","affected":1}
+{"i":4,"h":"5c2bed51","k":"err","code":1062,"msg":"Duplicate entry '1' for key 'c_pk.PRIMARY'"}
+{"i":5,"h":"f0a42a5d","k":"err","code":1048,"msg":"Column 'id' cannot be null"}
+{"i":6,"h":"b4d7a6d3","k":"ok","affected":0}
+{"i":7,"h":"5dcc4f15","k":"ok","affected":0}
+{"i":8,"h":"bfff6b12","k":"ok","affected":2}
+{"i":9,"h":"a049c1dd","k":"err","code":1062,"msg":"Duplicate entry 'a@x' for key 'c_uniq.email'"}
+{"i":10,"h":"61656b1c","k":"ok","affected":0}
+{"i":11,"h":"caaff13c","k":"ok","affected":0}
+{"i":12,"h":"8be94e88","k":"ok","affected":2}
+{"i":13,"h":"776704bc","k":"err","code":1062,"msg":"Duplicate entry '1-2' for key 'c_uniq2.a'"}
+{"i":14,"h":"d3af6715","k":"ok","affected":0}
+{"i":15,"h":"e8fbf135","k":"ok","affected":0}
+{"i":16,"h":"5773adc0","k":"ok","affected":1}
+{"i":17,"h":"6c35f939","k":"ok","affected":1}
+{"i":18,"h":"33c5edef","k":"rows","cols":["id","status","n"],"rows":[["1","active","0"],["2","pending","0"]]}
+{"i":19,"h":"21495676","k":"ok","affected":0}
+{"i":20,"h":"4407cb63","k":"ok","affected":0}
+{"i":21,"h":"717f40c5","k":"err","code":1048,"msg":"Column 'name' cannot be null"}
+{"i":22,"h":"092cf88c","k":"err","code":1364,"msg":"Field 'name' doesn't have a default value"}
+{"i":23,"h":"84fb3e6a","k":"ok","affected":1}
+{"i":24,"h":"5a895e50","k":"err","code":1048,"msg":"Column 'name' cannot be null"}
+{"i":25,"h":"506b3200","k":"rows","cols":["id","name"],"rows":[["10","alice"]]}
+{"i":26,"h":"3e8e279d","k":"ok","affected":1}
+{"i":27,"h":"506b3200","k":"rows","cols":["id","name"],"rows":[["10","alice2"]]}
+{"i":28,"h":"c433025e","k":"ok","affected":0}
+{"i":29,"h":"d0a908df","k":"ok","affected":0}
+{"i":30,"h":"d32723e2","k":"ok","affected":1}
+{"i":31,"h":"9291ed97","k":"err","code":3819,"msg":"Check constraint 'c_chk_chk_1' is violated."}
+{"i":32,"h":"2d4b12f9","k":"rows","cols":["id","age"],"rows":[["1","30"]]}
+{"i":33,"h":"e0830338","k":"ok","affected":0}
+{"i":34,"h":"67f9a4ba","k":"ok","affected":0}
+{"i":35,"h":"8f33dfb4","k":"ok","affected":0}
+{"i":36,"h":"e071dc23","k":"ok","affected":2}
+{"i":37,"h":"9e8a075f","k":"ok","affected":0}
+{"i":38,"h":"0bee7c56","k":"ok","affected":1}
+{"i":39,"h":"8b1da3e8","k":"err","code":1452,"msg":"Cannot add or update a child row: a foreign key constraint fails (`test`.`c_child`, CONSTRAINT `c_child_ibfk_1` FOREIGN KEY (`parent_id`) REFERENCES `c_parent` (`id`))"}
+{"i":40,"h":"bf995e64","k":"ok","affected":1}
+{"i":41,"h":"17038f96","k":"rows","cols":["id","parent_id"],"rows":[["10","1"],["12",null]]}
+{"i":42,"h":"3bdbe96b","k":"err","code":1451,"msg":"Cannot delete or update a parent row: a foreign key constraint fails (`test`.`c_child`, CONSTRAINT `c_child_ibfk_1` FOREIGN KEY (`parent_id`) REFERENCES `c_parent` (`id`))"}
+{"i":43,"h":"3bdbed52","k":"ok","affected":1}
+{"i":44,"h":"97bc72e2","k":"rows","cols":["id"],"rows":[["1"]]}
+{"i":45,"h":"9cf7091a","k":"ok","affected":0}
+{"i":46,"h":"533676aa","k":"ok","affected":0}
+{"i":47,"h":"ecb72037","k":"ok","affected":0}
+{"i":48,"h":"90ec2964","k":"ok","affected":0}
+{"i":49,"h":"86410e60","k":"ok","affected":0}
+{"i":50,"h":"4354cf25","k":"ok","affected":0}
+{"i":51,"h":"5ae9772d","k":"ok","affected":0}
+{"i":52,"h":"97991a5d","k":"ok","affected":0}

@@ -41,12 +41,12 @@ l_time
 === STRIKING: value-coercive DATE vs TIMESTAMP-at-midnight + first-kept ===
 SELECT CAST(GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00') AS TEXT)
                                                               AS date_first_text;
-date_first_text
-2024-03-15
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT)
+                                                              AS date_firs' at line 1
 SELECT CAST(GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15') AS TEXT)
                                                               AS ts_first_text;
-ts_first_text
-2024-03-15 00:00:00
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TEXT)
+                                                              AS ts_first_' at line 1
 SELECT GREATEST(DATE '2024-03-15', TIMESTAMP '2024-03-15 00:00:00')
      = GREATEST(TIMESTAMP '2024-03-15 00:00:00', DATE '2024-03-15')
                                                               AS order_invariant_under_eq;
@@ -61,10 +61,10 @@ l_bool_returns_value
 1
 SELECT GREATEST(TRUE, FALSE) = 1                              AS g_bool_neq_int_1_strict;
 g_bool_neq_int_1_strict
-0
+1
 SELECT LEAST(TRUE, FALSE)    = 0                              AS l_bool_neq_int_0_strict;
 l_bool_neq_int_0_strict
-0
+1
 SELECT GREATEST(TRUE, FALSE) > LEAST(TRUE, FALSE)             AS g_strictly_greater_than_l;
 g_strictly_greater_than_l
 1
@@ -74,16 +74,16 @@ g_bool_eq_bool_true
 === GREATEST / LEAST: JSONB args ===
 SELECT GREATEST(CAST('{"a":1}' AS JSONB), CAST('{"a":2}' AS JSONB))
                                                               AS g_jsonb_pick;
-g_jsonb_pick
-{"a":2}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), CAST('{"a":2}' AS JSONB))
+                                              ' at line 1
 SELECT LEAST(CAST('{"a":1}' AS JSONB), CAST('{"a":2}' AS JSONB))
                                                               AS l_jsonb_pick;
-l_jsonb_pick
-{"a":1}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), CAST('{"a":2}' AS JSONB))
+                                              ' at line 1
 SELECT GREATEST(CAST('{"a":1}' AS JSONB), CAST('{"a":1}' AS JSONB))
      = CAST('{"a":1}' AS JSONB)                               AS g_jsonb_identity;
-g_jsonb_identity
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB), CAST('{"a":1}' AS JSONB))
+     = CAST('{"a":1}' AS JSONB)               ' at line 1
 === GREATEST / LEAST in WHERE clause ===
 SELECT id FROM gl_temporal
  WHERE GREATEST(id, 2) = 2 ORDER BY id;

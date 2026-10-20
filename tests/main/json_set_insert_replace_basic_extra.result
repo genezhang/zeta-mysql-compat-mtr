@@ -1,61 +1,59 @@
 === Differential: same target, missing path → SET inserts, INSERT inserts, REPLACE no-ops ===
 SELECT JSON_SET    ('{"a":1}', '$.b', 2)         AS set_missing;
 set_missing
-{"a":1,"b":2}
+{"a": 1, "b": 2}
 SELECT JSON_INSERT ('{"a":1}', '$.b', 2)         AS insert_missing;
 insert_missing
-{"a":1,"b":2}
+{"a": 1, "b": 2}
 SELECT JSON_REPLACE('{"a":1}', '$.b', 2)         AS replace_missing;
 replace_missing
-{"a":1}
+{"a": 1}
 === Differential: existing path → SET replaces, INSERT no-ops, REPLACE replaces ===
 SELECT JSON_SET    ('{"a":1}', '$.a', 99)        AS set_existing;
 set_existing
-{"a":99}
+{"a": 99}
 SELECT JSON_INSERT ('{"a":1}', '$.a', 99)        AS insert_existing;
 insert_existing
-{"a":1}
+{"a": 1}
 SELECT JSON_REPLACE('{"a":1}', '$.a', 99)        AS replace_existing;
 replace_existing
-{"a":99}
+{"a": 99}
 === Multi-pair (path, value) variadic ===
 SELECT JSON_SET    ('{"a":1}', '$.b', 2, '$.c', 3)  AS set_two_missing;
 set_two_missing
-{"a":1,"b":2,"c":3}
+{"a": 1, "b": 2, "c": 3}
 SELECT JSON_INSERT ('{"a":1}', '$.b', 2, '$.c', 3)  AS insert_two_missing;
 insert_two_missing
-{"a":1,"b":2,"c":3}
+{"a": 1, "b": 2, "c": 3}
 SELECT JSON_REPLACE('{"a":1}', '$.b', 2, '$.c', 3)  AS replace_two_missing;
 replace_two_missing
-{"a":1}
+{"a": 1}
 SELECT JSON_SET    ('{"a":1}', '$.a', 99, '$.b', 2) AS set_mixed;
 set_mixed
-{"a":99,"b":2}
+{"a": 99, "b": 2}
 SELECT JSON_INSERT ('{"a":1}', '$.a', 99, '$.b', 2) AS insert_mixed;
 insert_mixed
-{"a":1,"b":2}
+{"a": 1, "b": 2}
 SELECT JSON_REPLACE('{"a":1}', '$.a', 99, '$.b', 2) AS replace_mixed;
 replace_mixed
-{"a":99}
+{"a": 99}
 === Value types: int / string / bool / array / object / null ===
 SELECT JSON_SET('{}', '$.k', 42)                 AS val_int;
 val_int
-{"k":42}
+{"k": 42}
 SELECT JSON_SET('{}', '$.k', 'hi')               AS val_string;
 val_string
-{"k":"hi"}
+{"k": "hi"}
 SELECT JSON_SET('{}', '$.k', TRUE)               AS val_bool;
 val_bool
-{"k":true}
+{"k": true}
 SELECT JSON_SET('{}', '$.k', CAST('[1,2,3]' AS JSONB))  AS val_array;
-val_array
-{"k":[1,2,3]}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))  AS val_array' at line 1
 SELECT JSON_SET('{}', '$.k', CAST('{"x":1}' AS JSONB))  AS val_object;
-val_object
-{"k":{"x":1}}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB))  AS val_object' at line 1
 SELECT JSON_SET('{}', '$.k', NULL)               AS val_sql_null;
 val_sql_null
-{"k":null}
+{"k": null}
 === NULL target / NULL path mid-pair → NULL ===
 SELECT JSON_SET(NULL, '$.a', 1)        IS NULL   AS set_null_target;
 set_null_target
@@ -72,50 +70,48 @@ set_null_path
 === Array-index path → NULL (first-pass: object keys only) ===
 SELECT JSON_SET   ('[1,2,3]', '$[0]', 99) IS NULL AS set_array_path_null;
 set_array_path_null
-1
+0
 SELECT JSON_INSERT('[1,2,3]', '$[0]', 99) IS NULL AS insert_array_path_null;
 insert_array_path_null
-1
+0
 === Invalid path syntax → NULL ===
 SELECT JSON_SET('{"a":1}',   'not-a-path', 2) IS NULL AS set_bad_path;
-set_bad_path
-1
+ERROR 3143: Invalid JSON path expression. The error is around character position 1.
 SELECT JSON_INSERT('{"a":1}','not-a-path', 2) IS NULL AS insert_bad_path;
-insert_bad_path
-1
+ERROR 3143: Invalid JSON path expression. The error is around character position 1.
 === Arity: needs target + at least one (path, value) pair ===
 SELECT JSON_SET();
-ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_SET'
 SELECT JSON_SET('{"a":1}');
-ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_SET'
 SELECT JSON_SET('{"a":1}', '$.a');
-ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_SET'
 SELECT JSON_SET('{"a":1}', '$.a', 1, '$.b');
-ERROR 1105: execution error: JSON_SET requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_SET'
 SELECT JSON_INSERT();
-ERROR 1105: execution error: JSON_INSERT requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_INSERT'
 SELECT JSON_INSERT('{"a":1}', '$.a');
-ERROR 1105: execution error: JSON_INSERT requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_INSERT'
 SELECT JSON_REPLACE();
-ERROR 1105: execution error: JSON_REPLACE requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_REPLACE'
 SELECT JSON_REPLACE('{"a":1}', '$.a');
-ERROR 1105: execution error: JSON_REPLACE requires target and one or more (path, value) pairs
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_REPLACE'
 === Nested-key paths (multi-step keys vector) ===
 SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.c', 9)  AS set_nested_missing;
 set_nested_missing
-{"a":{"b":1,"c":9}}
+{"a": {"b": 1, "c": 9}}
 SELECT JSON_INSERT ('{"a":{"b":1}}', '$.a.c', 9)  AS insert_nested_missing;
 insert_nested_missing
-{"a":{"b":1,"c":9}}
+{"a": {"b": 1, "c": 9}}
 SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.c', 9)  AS replace_nested_missing;
 replace_nested_missing
-{"a":{"b":1}}
+{"a": {"b": 1}}
 SELECT JSON_SET    ('{"a":{"b":1}}', '$.a.b', 9)  AS set_nested_existing;
 set_nested_existing
-{"a":{"b":9}}
+{"a": {"b": 9}}
 SELECT JSON_REPLACE('{"a":{"b":1}}', '$.a.b', 9)  AS replace_nested_existing;
 replace_nested_existing
-{"a":{"b":9}}
+{"a": {"b": 9}}
 === Scalar target (non-object): path set fails silently ===
 SELECT JSON_SET('"a string"', '$.k', 1)           AS set_scalar_target;
 set_scalar_target

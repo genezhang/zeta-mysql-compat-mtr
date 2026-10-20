@@ -1,65 +1,48 @@
 === JSONB - 'key' — empty-object edge (single-key form covered in jsonb_basic_extra:126) ===
 SELECT '{"a":1}'::JSONB - 'a'                                 AS remove_last_key_empty;
-remove_last_key_empty
-{}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'a'                                 AS remove_last_key_empty' at line 1
 === JSONB - int — array element removal by index ===
 SELECT '[1,2,3,4]'::JSONB - 0                                 AS remove_first;
-remove_first
-[2,3,4]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 0                                 AS remove_first' at line 1
 SELECT '[1,2,3,4]'::JSONB - 1                                 AS remove_second;
-remove_second
-[1,3,4]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 1                                 AS remove_second' at line 1
 SELECT '[1,2,3,4]'::JSONB - 3                                 AS remove_last_by_idx;
-remove_last_by_idx
-[1,2,3]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 3                                 AS remove_last_by_idx' at line 1
 === STRIKING: negative array index works (Python-style) ===
 SELECT '[1,2,3,4]'::JSONB - -1                                AS neg_one_remove_last;
-neg_one_remove_last
-[1,2,3]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - -1                                AS neg_one_remove_last' at line 1
 SELECT '[1,2,3,4]'::JSONB - -2                                AS neg_two_remove_third;
-neg_two_remove_third
-[1,2,4]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - -2                                AS neg_two_remove_third' at line 1
 === Out-of-range index — silent no-op (input unchanged) ===
 SELECT '[1,2,3,4]'::JSONB - 100                               AS out_of_range_unchanged;
-out_of_range_unchanged
-[1,2,3,4]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 100                               AS out_of_range_unchanged' at line 1
 SELECT '[1,2,3,4]'::JSONB - -100                              AS neg_out_of_range_unchanged;
-neg_out_of_range_unchanged
-[1,2,3,4]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - -100                              AS neg_out_of_range_unchanged' at line 1
 === Missing key — silent no-op ===
 SELECT '{"a":1}'::JSONB - 'no_such_key'                       AS missing_key_unchanged;
-missing_key_unchanged
-{"a":1}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'no_such_key'                       AS missing_key_unchanged' at line 1
 === Empty containers — silent no-op ===
 SELECT '[]'::JSONB - 0                                        AS empty_arr_unchanged;
-empty_arr_unchanged
-[]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 0                                        AS empty_arr_unchanged' at line 1
 SELECT '{}'::JSONB - 'key'                                    AS empty_obj_unchanged;
-empty_obj_unchanged
-{}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'key'                                    AS empty_obj_unchanged' at line 1
 === STRIKING: type-mismatch silently returns input unchanged ===
 SELECT '1'::JSONB - 'key'                                     AS scalar_int_minus_key;
-scalar_int_minus_key
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'key'                                     AS scalar_int_minus_key' at line 1
 SELECT '"hello"'::JSONB - 'key'                               AS scalar_str_minus_key;
-scalar_str_minus_key
-"hello"
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'key'                               AS scalar_str_minus_key' at line 1
 SELECT 'true'::JSONB - 'key'                                  AS scalar_bool_minus_key;
-scalar_bool_minus_key
-true
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'key'                                  AS scalar_bool_minus_key' at line 1
 SELECT 'null'::JSONB - 'key'                                  AS scalar_null_minus_key;
-scalar_null_minus_key
-null
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'key'                                  AS scalar_null_minus_key' at line 1
 SELECT '[1,2,3]'::JSONB - 'key'                               AS arr_minus_str;
-arr_minus_str
-[1,2,3]
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 'key'                               AS arr_minus_str' at line 1
 SELECT '{"a":1}'::JSONB - 0                                   AS obj_minus_int;
-obj_minus_int
-{"a":1}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB - 0                                   AS obj_minus_int' at line 1
 === STRIKING: #- path-removal — UNSUPPORTED at parse ===
 SELECT '{"a":{"b":1,"c":2}}'::JSONB #- '{a,b}' AS r;
-ERROR 1064: SQL parse error: unsupported binary operator: #-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB #- '{a,b}' AS r' at line 1
 SELECT '{"a":{"b":1}}'::JSONB #- ARRAY['a','b'] AS r;
-ERROR 1064: SQL parse error: unsupported binary operator: #-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB #- ARRAY['a','b'] AS r' at line 1
 SELECT '[1,2,3,4]'::JSONB #- '{1}' AS r;
-ERROR 1064: SQL parse error: unsupported binary operator: #-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::JSONB #- '{1}' AS r' at line 1

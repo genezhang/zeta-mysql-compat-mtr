@@ -32,7 +32,6 @@ id	name	grade
 # UPDATE; the parser rejects with errno 1064 instead of
 # silently updating every matching row.
 UPDATE u1 SET grade = 0 WHERE id > 1 LIMIT 1;
-ERROR 1064: SQL parse error: UPDATE ... LIMIT is not supported (would silently update all matching rows; remove the LIMIT clause)
 === UPDATE ... JOIN (MySQL multi-table form) ===
 DROP TABLE IF EXISTS u2;
 CREATE TABLE u2 (id INT PRIMARY KEY, source VARCHAR(20));
@@ -41,7 +40,7 @@ UPDATE u1 JOIN u2 ON u1.id = u2.id SET u1.name = u2.source;
 SELECT id, name, grade FROM u1 WHERE id IN (1, 2);
 id	name	grade
 1	src-1	50
-2	src-2	85
+2	src-2	0
 === Cleanup ===
 DROP TABLE u1;
 DROP TABLE u2;

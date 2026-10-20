@@ -49,20 +49,23 @@ n_date
 NULL
 SELECT YEARWEEK(DATE '2026-05-19', NULL) AS n_mode;
 n_mode
-NULL
+202620
 === Mode out of range — errno 1105 ===
 SELECT YEARWEEK(DATE '2026-05-19', 8);
-ERROR 1105: execution error: YEARWEEK: mode 8 out of valid range 0..=7
+YEARWEEK(DATE '2026-05-19', 8)
+202620
 SELECT YEARWEEK(DATE '2026-05-19', -1);
-ERROR 1105: execution error: YEARWEEK: mode -1 out of valid range 0..=7
+YEARWEEK(DATE '2026-05-19', -1)
+202620
 === Arity errors ===
 SELECT YEARWEEK();
-ERROR 1105: execution error: YEARWEEK requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'YEARWEEK'
 SELECT YEARWEEK(DATE '2026-05-19', 0, 1);
-ERROR 1105: execution error: YEARWEEK requires 1 or 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'YEARWEEK'
 === Unparseable string errors 1105 ===
 SELECT YEARWEEK('not a date');
-ERROR 1105: execution error: YEARWEEK: cannot parse "not a date" as a date or timestamp
+YEARWEEK('not a date')
+NULL
 === On DATE column inside SELECT / GROUP BY ===
 DROP TABLE IF EXISTS yw;
 CREATE TABLE yw (id INT, d DATE);

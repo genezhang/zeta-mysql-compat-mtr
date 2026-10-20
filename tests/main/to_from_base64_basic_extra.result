@@ -12,8 +12,7 @@ SELECT TO_BASE64('hello') AS five_byte;
 five_byte
 aGVsbG8=
 SELECT TO_BASE64('')      AS empty;
-empty
-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 === TO_BASE64: binary input via UNHEX ===
 SELECT TO_BASE64(UNHEX('00FFEEDD')) AS binary_bytes;
 binary_bytes
@@ -84,10 +83,10 @@ rt_binary
 1
 === Arity errors ===
 SELECT TO_BASE64();
-ERROR 1105: execution error: TO_BASE64 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'TO_BASE64'
 SELECT TO_BASE64('a', 'b');
-ERROR 1105: execution error: TO_BASE64 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'TO_BASE64'
 SELECT FROM_BASE64();
-ERROR 1105: execution error: FROM_BASE64 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FROM_BASE64'
 SELECT FROM_BASE64('TWFu', 'extra');
-ERROR 1105: execution error: FROM_BASE64 requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'FROM_BASE64'

@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"6cccbe4d","k":"ok","affected":0}
+{"i":2,"h":"f91b01cd","k":"ok","affected":0}
+{"i":3,"h":"345e6411","k":"ok","affected":5}
+{"i":4,"h":"27ea3966","k":"rows","cols":["a","b"],"rows":[[null,"10"],["1","10"],["1","20"],["2","10"]]}
+{"i":5,"h":"5485f17e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON (a) a, b FROM dt ORDER BY a, b' at line 1"}
+{"i":6,"h":"8200b0c6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON (a) a, b FROM dt ORDER BY a, b DESC' at line 1"}
+{"i":7,"h":"f3ba797f","k":"rows","cols":["d"],"rows":[["3"]]}
+{"i":8,"h":"796ddef9","k":"rows","cols":["d_a","d_b"],"rows":[["2","2"]]}
+{"i":9,"h":"f8108fde","k":"rows","cols":["id","a","b"],"rows":[["1","1","10"],["2","1","20"],["3","2","10"],["4","2","10"],["5",null,"10"]]}
+{"i":10,"h":"4daad8a5","k":"rows","cols":["a"],"rows":[[null],["1"],["2"]]}
+{"i":11,"h":"60ea8206","k":"rows","cols":["a"],"rows":[[null],["1"]]}
+{"i":12,"h":"1c7cc791","k":"rows","cols":["a"],"rows":[[null],["1"],["1"],["2"],["2"]]}
+{"i":13,"h":"92fd731c","k":"rows","cols":["a"],"rows":[[null],["1"],["1"],["2"],["2"]]}
+{"i":14,"h":"c2ee7d88","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON (a) a, b FROM dt ORDER BY b' at line 1"}
+{"i":15,"h":"66346136","k":"err","code":3065,"msg":"Expression #1 of ORDER BY clause is not in SELECT list, references column 'test.dt.a' which is not in SELECT list; this is incompatible with DISTINCT"}
+{"i":16,"h":"c0caead4","k":"ok","affected":0}

@@ -35,8 +35,7 @@ null_pat
 NULL
 === ILIKE — case-insensitive (PG) ===
 SELECT 'Hello' ILIKE 'hello' AS i;
-i
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''hello' AS i' at line 1
 === IS TRUE / IS FALSE / IS UNKNOWN ===
 SELECT TRUE IS TRUE, FALSE IS TRUE, NULL IS TRUE;
 TRUE IS TRUE	FALSE IS TRUE	NULL IS TRUE
@@ -60,4 +59,4 @@ both_present
 1
 === KNOWN GAP: SIMILAR TO — errno 1064 ===
 SELECT 'abc' SIMILAR TO 'a%';
-ERROR 1064: SQL parse error: unsupported expression: 'abc' SIMILAR TO 'a%'
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TO 'a%'' at line 1

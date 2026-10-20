@@ -1,12 +1,10 @@
 === SQL-standard TRIM qualifier rewriting ===
 SELECT TRIM(LEADING 'x' FROM 'xxxhellox')
      = LTRIM('xxxhellox', 'x')                                AS leading_eq_ltrim;
-leading_eq_ltrim
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT TRIM(TRAILING 'x' FROM 'xhelloxxx')
      = RTRIM('xhelloxxx', 'x')                                AS trailing_eq_rtrim;
-trailing_eq_rtrim
-1
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 SELECT TRIM(BOTH 'x' FROM 'xxhelloxx')
      =      TRIM('x' FROM 'xxhelloxx')                        AS both_eq_default;
 both_eq_default
@@ -44,46 +42,41 @@ trailing_no_what_eq_rtrim
 === TRIM/LTRIM/RTRIM with non-string input (bool coercion) ===
 SELECT TRIM(TRUE)                                             AS trim_bool_true;
 trim_bool_true
-true
+1
 SELECT TRIM(FALSE)                                            AS trim_bool_false;
 trim_bool_false
-false
+0
 SELECT LTRIM(TRUE)                                            AS ltrim_bool;
 ltrim_bool
-true
+1
 SELECT RTRIM(FALSE)                                           AS rtrim_bool;
 rtrim_bool
-false
+0
 SELECT LTRIM(TRUE, 't')                                       AS ltrim_bool_with_chars;
-ltrim_bool_with_chars
-rue
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 === TRIM/LTRIM/RTRIM with date input (coerce via Display) ===
 SELECT TRIM('-' FROM DATE '2024-03-15')                       AS trim_date_dashes;
 trim_date_dashes
 2024-03-15
 SELECT LTRIM(DATE '2024-03-15', '2')                          AS ltrim_date_leading_2;
-ltrim_date_leading_2
-024-03-15
+ERROR 1582: Incorrect parameter count in the call to native function 'LTRIM'
 SELECT RTRIM(DATE '2024-03-15', '5')                          AS rtrim_date_trailing_5;
-rtrim_date_trailing_5
-2024-03-1
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 === TRIM with timestamp input (note .000000 padding) ===
 SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45', '0')            AS rtrim_timestamp_zeros;
-rtrim_timestamp_zeros
-2024-03-15 14:30:45
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 SELECT RTRIM(TIMESTAMP '2024-03-15 14:30:45.123000', '0')     AS rtrim_timestamp_nonzero_micros;
-rtrim_timestamp_nonzero_micros
-2024-03-15 14:30:45.123
+ERROR 1582: Incorrect parameter count in the call to native function 'RTRIM'
 SELECT TRIM(TIMESTAMP '2024-03-15 14:30:45')                  AS trim_timestamp_default_ws_noop;
 trim_timestamp_default_ws_noop
 2024-03-15 14:30:45
 === REPLACE with bool input ===
 SELECT REPLACE(TRUE, 'tr', 'TR')                              AS replace_bool_true;
 replace_bool_true
-TRue
+1
 SELECT REPLACE(FALSE, 'al', 'AL')                             AS replace_bool_false;
 replace_bool_false
-fALse
+0
 === REPLACE with date input ===
 SELECT REPLACE(DATE '2024-03-15', '-', '/')                   AS replace_date_dashes;
 replace_date_dashes

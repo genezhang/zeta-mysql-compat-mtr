@@ -78,10 +78,10 @@ null_right
 1
 === Arity / invalid JSON ===
 SELECT JSON_OVERLAPS();
-ERROR 1105: execution error: JSON_OVERLAPS requires exactly 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_OVERLAPS'
 SELECT JSON_OVERLAPS('[1]');
-ERROR 1105: execution error: JSON_OVERLAPS requires exactly 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_OVERLAPS'
 SELECT JSON_OVERLAPS('[1]', '[2]', '[3]');
-ERROR 1105: execution error: JSON_OVERLAPS requires exactly 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_OVERLAPS'
 SELECT JSON_OVERLAPS('not json', '[1]');
-ERROR 1105: execution error: JSON_OVERLAPS argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_overlaps: "Invalid value." at position 1.

@@ -1,0 +1,40 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":39}
+{"i":1,"h":"6dae861f","k":"ok","affected":0}
+{"i":2,"h":"b8acdec6","k":"err","code":1492,"msg":"For RANGE partitions each partition must be defined"}
+{"i":3,"h":"58a7c30c","k":"err","code":1146,"msg":"Table 'test.pr' doesn't exist"}
+{"i":4,"h":"afdaf7cb","k":"err","code":1146,"msg":"Table 'test.pr' doesn't exist"}
+{"i":5,"h":"6daef101","k":"ok","affected":0}
+{"i":6,"h":"051fafcf","k":"err","code":1492,"msg":"For LIST partitions each partition must be defined"}
+{"i":7,"h":"0a97c0ff","k":"err","code":1146,"msg":"Table 'test.pl' doesn't exist"}
+{"i":8,"h":"752f6458","k":"err","code":1146,"msg":"Table 'test.pl' doesn't exist"}
+{"i":9,"h":"6daefc4d","k":"ok","affected":0}
+{"i":10,"h":"ae4d369e","k":"ok","affected":0}
+{"i":11,"h":"cc5ff26e","k":"ok","affected":2}
+{"i":12,"h":"e90f9988","k":"rows","cols":["id"],"rows":[["1"],["2"]]}
+{"i":13,"h":"6daefb80","k":"ok","affected":0}
+{"i":14,"h":"61f3346f","k":"ok","affected":0}
+{"i":15,"h":"585d6933","k":"ok","affected":2}
+{"i":16,"h":"5ca1305b","k":"rows","cols":["id"],"rows":[["1"],["2"]]}
+{"i":17,"h":"88014f84","k":"err","code":1146,"msg":"Table 'test.pr' doesn't exist"}
+{"i":18,"h":"e13d71cd","k":"rows","cols":["PARTITION_NAME","TABLE_NAME"],"rows":[],"nd":"order","unordered":true}
+{"i":19,"h":"c3439aaa","k":"err","code":1051,"msg":"Unknown table 'test.pr'"}
+{"i":20,"h":"c343a648","k":"err","code":1051,"msg":"Unknown table 'test.pl'"}
+{"i":21,"h":"c3439c84","k":"ok","affected":0}
+{"i":22,"h":"c3439a9d","k":"ok","affected":0}
+{"i":23,"h":"9c55a23a","k":"ok","affected":0}
+{"i":24,"h":"1c321273","k":"ok","affected":0}
+{"i":25,"h":"cea3d00f","k":"err","code":1492,"msg":"For RANGE partitions each partition must be defined"}
+{"i":26,"h":"72ade303","k":"err","code":1492,"msg":"For RANGE partitions each partition must be defined"}
+{"i":27,"h":"a623b996","k":"ok","affected":0}
+{"i":28,"h":"d041a9f5","k":"err","code":1492,"msg":"For RANGE partitions each partition must be defined"}
+{"i":29,"h":"2d1ff9aa","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OF pgpr FOR VALUES FROM (1) TO (10)' at line 1"}
+{"i":30,"h":"64aae6b1","k":"err","code":1051,"msg":"Unknown table 'test.pgpr'"}
+{"i":31,"h":"6dae8b56","k":"ok","affected":0}
+{"i":32,"h":"a74dccab","k":"err","code":1492,"msg":"For LIST partitions each partition must be defined"}
+{"i":33,"h":"507b5efa","k":"err","code":1146,"msg":"Table 'test.pa' doesn't exist"}
+{"i":34,"h":"16c58cc3","k":"err","code":1146,"msg":"Table 'test.pa' doesn't exist"}
+{"i":35,"h":"fdf75a11","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ATTACH PARTITION other FOR VALUES IN (1)' at line 1"}
+{"i":36,"h":"af70d479","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DETACH PARTITION other' at line 1"}
+{"i":37,"h":"a7c1445e","k":"err","code":1146,"msg":"Table 'test.pa' doesn't exist"}
+{"i":38,"h":"5a92c7ae","k":"err","code":1146,"msg":"Table 'test.pa' doesn't exist"}
+{"i":39,"h":"c343aacf","k":"err","code":1051,"msg":"Unknown table 'test.pa'"}

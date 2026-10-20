@@ -1,0 +1,8 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":7}
+{"i":1,"h":"9d4277ef","k":"ok","affected":0}
+{"i":2,"h":"0b9139d5","k":"ok","affected":3}
+{"i":3,"h":"bd0ba01f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING <' at line 1"}
+{"i":4,"h":"bd0ba1b5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING >' at line 1"}
+{"i":5,"h":"f9aae83e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING OPERATOR(public.<)' at line 1"}
+{"i":6,"h":"fc953206","k":"rows","cols":["id","v"],"rows":[["1","10"],["2","20"],["3","30"]]}
+{"i":7,"h":"c343a9fb","k":"ok","affected":0}

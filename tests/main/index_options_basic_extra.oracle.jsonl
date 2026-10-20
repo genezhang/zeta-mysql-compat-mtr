@@ -1,0 +1,68 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":67}
+{"i":1,"h":"6cc9cb7e","k":"ok","affected":0}
+{"i":2,"h":"fb43c1b6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VECTOR(3))' at line 1"}
+{"i":3,"h":"278e55c6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING HNSW (e)' at line 1"}
+{"i":4,"h":"074189d8","k":"err","code":1146,"msg":"Table 'test.iv' doesn't exist"}
+{"i":5,"h":"6cc9fd7a","k":"ok","affected":0}
+{"i":6,"h":"7d10d574","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)' at line 1"}
+{"i":7,"h":"833bdc7a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING GIN (j)' at line 1"}
+{"i":8,"h":"07467d2c","k":"err","code":1146,"msg":"Table 'test.ij' doesn't exist"}
+{"i":9,"h":"99d836bf","k":"ok","affected":0}
+{"i":10,"h":"68b93c9f","k":"ok","affected":0}
+{"i":11,"h":"0c7984d9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING FTS (t)' at line 1"}
+{"i":12,"h":"7f0c4ab2","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["ift","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":13,"h":"b4a0a034","k":"ok","affected":0}
+{"i":14,"h":"a8504695","k":"ok","affected":0}
+{"i":15,"h":"e70e10c9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING BRIN (a)' at line 1"}
+{"i":16,"h":"513ba1b1","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["ibrin","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":17,"h":"99c9eb27","k":"ok","affected":0}
+{"i":18,"h":"b46f01de","k":"ok","affected":0}
+{"i":19,"h":"f282ed4e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'icc_a ON icc (a)' at line 1"}
+{"i":20,"h":"7f0e580a","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["icc","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":21,"h":"99463cad","k":"ok","affected":0}
+{"i":22,"h":"0743354c","k":"ok","affected":0}
+{"i":23,"h":"b7372a45","k":"ok","affected":0}
+{"i":24,"h":"7f31d228","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["imc","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null],["imc","1","imc_ab","1","a","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null],["imc","1","imc_ab","2","b","D","<masked>","<masked>",null,"YES","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":25,"h":"99c95a43","k":"ok","affected":0}
+{"i":26,"h":"dfe34a2c","k":"ok","affected":0}
+{"i":27,"h":"27ef5447","k":"ok","affected":0}
+{"i":28,"h":"26a9250b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1"}
+{"i":29,"h":"7f763bc2","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["idn","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null],["idn","1","idn_a","1","a","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":30,"h":"99c95897","k":"ok","affected":0}
+{"i":31,"h":"66dbe5e8","k":"ok","affected":0}
+{"i":32,"h":"c04fe0eb","k":"ok","affected":0}
+{"i":33,"h":"3bcd89c5","k":"ok","affected":0}
+{"i":34,"h":"7f76cef6","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["idr","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":35,"h":"7802c771","k":"ok","affected":0}
+{"i":36,"h":"e90656be","k":"ok","affected":0}
+{"i":37,"h":"aa31b202","k":"ok","affected":0}
+{"i":38,"h":"aa31b202","k":"err","code":1061,"msg":"Duplicate key name 'idup_a'"}
+{"i":39,"h":"a0bce4c7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS idup_a ON idup (a)' at line 1"}
+{"i":40,"h":"bd5efa14","k":"ok","affected":0}
+{"i":41,"h":"8b7eca7f","k":"ok","affected":0}
+{"i":42,"h":"da8f2a26","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INCLUDE (b)' at line 1"}
+{"i":43,"h":"aa9d39b7","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["iinc","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":44,"h":"99c6f790","k":"ok","affected":0}
+{"i":45,"h":"43fbdd56","k":"ok","affected":0}
+{"i":46,"h":"577c5014","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 't))' at line 1"}
+{"i":47,"h":"7f0b0ffd","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["iex","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":48,"h":"4733287f","k":"ok","affected":0}
+{"i":49,"h":"e39dc3bf","k":"ok","affected":0}
+{"i":50,"h":"47b93050","k":"ok","affected":0}
+{"i":51,"h":"58a802b0","k":"rows","cols":["Table","Non_unique","Key_name","Seq_in_index","Column_name","Collation","Cardinality","Sub_part","Packed","Null","Index_type","Comment","Index_comment","Visible","Expression"],"rows":[["ialt","0","PRIMARY","1","id","A","<masked>","<masked>",null,"","BTREE","","","YES",null],["ialt","1","ialt_a","1","a","A","<masked>","<masked>",null,"YES","BTREE","","","YES",null]],"nd":"cells","masked":[6,7]}
+{"i":52,"h":"99d8e509","k":"ok","affected":0}
+{"i":53,"h":"40bd0001","k":"ok","affected":0}
+{"i":54,"h":"5cdbf9a5","k":"ok","affected":0}
+{"i":55,"h":"c0d3d55b","k":"err","code":1051,"msg":"Unknown table 'test.iv'"}
+{"i":56,"h":"c0d35b5f","k":"err","code":1051,"msg":"Unknown table 'test.ij'"}
+{"i":57,"h":"3a02d0b7","k":"ok","affected":0}
+{"i":58,"h":"95a7bf3b","k":"ok","affected":0}
+{"i":59,"h":"3a01495f","k":"ok","affected":0}
+{"i":60,"h":"3bfbd56d","k":"ok","affected":0}
+{"i":61,"h":"3a072357","k":"ok","affected":0}
+{"i":62,"h":"3a071153","k":"ok","affected":0}
+{"i":63,"h":"6714703f","k":"ok","affected":0}
+{"i":64,"h":"35faf036","k":"ok","affected":0}
+{"i":65,"h":"3a0ddcb8","k":"ok","affected":0}
+{"i":66,"h":"12d16901","k":"ok","affected":0}
+{"i":67,"h":"3a035fdd","k":"ok","affected":0}

@@ -1,0 +1,68 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":67}
+{"i":1,"h":"512b3269","k":"rows","cols":["basic_match"],"rows":[["1"]]}
+{"i":2,"h":"a7f655d2","k":"rows","cols":["no_match"],"rows":[["0"]]}
+{"i":3,"h":"9518821c","k":"rows","cols":["anchored"],"rows":[["1"]]}
+{"i":4,"h":"61466df9","k":"rows","cols":["anchored_no_match"],"rows":[["0"]]}
+{"i":5,"h":"304385f0","k":"rows","cols":["alternation"],"rows":[["1"]]}
+{"i":6,"h":"b50033c8","k":"rows","cols":["case_default"],"rows":[["1"]]}
+{"i":7,"h":"497ba788","k":"rows","cols":["case_insensitive"],"rows":[["1"]]}
+{"i":8,"h":"2c54c892","k":"rows","cols":["case_strict"],"rows":[["1"]]}
+{"i":9,"h":"7df51c65","k":"rows","cols":["null_source"],"rows":[["1"]]}
+{"i":10,"h":"7185eaf6","k":"rows","cols":["null_pattern"],"rows":[["1"]]}
+{"i":11,"h":"59c2e6a6","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_LIKE'"}
+{"i":12,"h":"b8091bb3","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_LIKE'"}
+{"i":13,"h":"dd08b662","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_LIKE'"}
+{"i":14,"h":"da5129ed","k":"rows","cols":["find_world"],"rows":[["7"]]}
+{"i":15,"h":"802b4b3f","k":"rows","cols":["find_at_start"],"rows":[["1"]]}
+{"i":16,"h":"1605018f","k":"rows","cols":["no_match_zero"],"rows":[["0"]]}
+{"i":17,"h":"1498ac10","k":"err","code":3685,"msg":"Illegal argument to a regular expression."}
+{"i":18,"h":"0640668c","k":"rows","cols":["start_1"],"rows":[["1"]]}
+{"i":19,"h":"4be42f81","k":"rows","cols":["start_skips_first"],"rows":[["9"]]}
+{"i":20,"h":"0d6d26e4","k":"err","code":3686,"msg":"Index out of bounds in regular expression search."}
+{"i":21,"h":"e0a22fc1","k":"rows","cols":["null_source"],"rows":[["1"]]}
+{"i":22,"h":"c123efaa","k":"rows","cols":["null_pattern"],"rows":[["1"]]}
+{"i":23,"h":"cbc3b811","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_INSTR'"}
+{"i":24,"h":"f7d453cd","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_INSTR'"}
+{"i":25,"h":"aa75db9c","k":"rows","cols":["REGEXP_INSTR('a', 'b', 1, 'extra')"],"rows":[["0"]]}
+{"i":26,"h":"f8c9062a","k":"rows","cols":["substr_word"],"rows":[["world"]]}
+{"i":27,"h":"4d2cdf49","k":"rows","cols":["substr_digits"],"rows":[["42"]]}
+{"i":28,"h":"59c730be","k":"rows","cols":["no_match_null"],"rows":[["1"]]}
+{"i":29,"h":"f3267192","k":"rows","cols":["anchored_match"],"rows":[["foo"]]}
+{"i":30,"h":"700b8e7a","k":"rows","cols":["anchored_no_match"],"rows":[["1"]]}
+{"i":31,"h":"c3a36b7a","k":"rows","cols":["first_digits"],"rows":[["123"]]}
+{"i":32,"h":"fc7df8d3","k":"rows","cols":["skip_to_second"],"rows":[["456"]]}
+{"i":33,"h":"d3ad3926","k":"rows","cols":["null_source"],"rows":[["1"]]}
+{"i":34,"h":"5f44eb6b","k":"rows","cols":["null_pattern"],"rows":[["1"]]}
+{"i":35,"h":"70068ec2","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_SUBSTR'"}
+{"i":36,"h":"a31dc68a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_SUBSTR'"}
+{"i":37,"h":"3c118afa","k":"rows","cols":["REGEXP_SUBSTR('a', 'b', 1, 'extra')"],"rows":[[null]]}
+{"i":38,"h":"36b4b22b","k":"rows","cols":["replace_first"],"rows":[["XXX"]]}
+{"i":39,"h":"676191b4","k":"rows","cols":["replace_first_value"],"rows":[["0"]]}
+{"i":40,"h":"998a0b1e","k":"err","code":1583,"msg":"Incorrect parameters in the call to native function 'regexp_replace'"}
+{"i":41,"h":"5c286bb6","k":"err","code":1583,"msg":"Incorrect parameters in the call to native function 'regexp_replace'"}
+{"i":42,"h":"e830b5e4","k":"err","code":1583,"msg":"Incorrect parameters in the call to native function 'regexp_replace'"}
+{"i":43,"h":"976d49c6","k":"err","code":1583,"msg":"Incorrect parameters in the call to native function 'regexp_replace'"}
+{"i":44,"h":"18e0f709","k":"rows","cols":["swap_names"],"rows":[["John Smith"]]}
+{"i":45,"h":"7a5368b6","k":"rows","cols":["reformat_date"],"rows":[["2024-01-15"]]}
+{"i":46,"h":"c43c80ee","k":"rows","cols":["null_source"],"rows":[["1"]]}
+{"i":47,"h":"56d5dddc","k":"rows","cols":["null_pattern"],"rows":[["1"]]}
+{"i":48,"h":"d3d3acb7","k":"rows","cols":["null_replacement"],"rows":[["1"]]}
+{"i":49,"h":"d5b8a4f0","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_REPLACE'"}
+{"i":50,"h":"feeb2bf4","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_REPLACE'"}
+{"i":51,"h":"5bfe5d8a","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'REGEXP_REPLACE'"}
+{"i":52,"h":"eeef6611","k":"err","code":1583,"msg":"Incorrect parameters in the call to native function 'regexp_replace'"}
+{"i":53,"h":"edc1d843","k":"rows","cols":["utf8_like"],"rows":[["1"]]}
+{"i":54,"h":"f5e60786","k":"rows","cols":["utf8_substr"],"rows":[["é"]]}
+{"i":55,"h":"64c1620e","k":"rows","cols":["utf8_replace"],"rows":[["cafe"]]}
+{"i":56,"h":"3ff64279","k":"rows","cols":["utf8_replace_value"],"rows":[["1"]]}
+{"i":57,"h":"ea11bfc3","k":"rows","cols":["REGEXP_LIKE('abc', '(?<=foo)bar')"],"rows":[["0"]]}
+{"i":58,"h":"ab6fe75a","k":"rows","cols":["REGEXP_REPLACE('abc', '(?<=foo)bar', 'X')"],"rows":[["abc"]]}
+{"i":59,"h":"f014503b","k":"err","code":3887,"msg":"A capture group has an invalid name."}
+{"i":60,"h":"ef37de04","k":"err","code":3887,"msg":"A capture group has an invalid name."}
+{"i":61,"h":"fca5455f","k":"rows","cols":["empty_source_like"],"rows":[["0"]]}
+{"i":62,"h":"4b79dc28","k":"rows","cols":["empty_source_instr"],"rows":[["0"]]}
+{"i":63,"h":"4f4a2fbd","k":"rows","cols":["empty_source_substr"],"rows":[["1"]]}
+{"i":64,"h":"832a360a","k":"rows","cols":["empty_source_replace"],"rows":[[""]]}
+{"i":65,"h":"4ff96014","k":"rows","cols":["empty_source_replace_len"],"rows":[["1"]]}
+{"i":66,"h":"b4138485","k":"rows","cols":["like_det"],"rows":[["1"]]}
+{"i":67,"h":"ce854c23","k":"rows","cols":["instr_det"],"rows":[["1"]]}

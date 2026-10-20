@@ -1,0 +1,36 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":35}
+{"i":1,"h":"964c07b5","k":"rows","cols":["v"],"rows":[["HELLO"]]}
+{"i":2,"h":"ed1f26d3","k":"rows","cols":["v"],"rows":[["world"]]}
+{"i":3,"h":"4f0fe81d","k":"rows","cols":["v"],"rows":[["abc"]]}
+{"i":4,"h":"84ac9c6d","k":"rows","cols":["v"],"rows":[["bcd"]]}
+{"i":5,"h":"08da05ef","k":"rows","cols":["v"],"rows":[["aXXcaXXc"]]}
+{"i":6,"h":"468701c8","k":"rows","cols":["v"],"rows":[["abc"]]}
+{"i":7,"h":"c199b013","k":"rows","cols":["v"],"rows":[["def"]]}
+{"i":8,"h":"2da09e5d","k":"rows","cols":["v"],"rows":[["ababab"]]}
+{"i":9,"h":"0fb336e8","k":"rows","cols":["v"],"rows":[["fedcba"]]}
+{"i":10,"h":"4f171c78","k":"rows","cols":["v"],"rows":[["spaced"]]}
+{"i":11,"h":"911a3c52","k":"rows","cols":["v"],"rows":[["left"]]}
+{"i":12,"h":"e51abdb3","k":"rows","cols":["v"],"rows":[["right"]]}
+{"i":13,"h":"ddf8f473","k":"rows","cols":["char_count"],"rows":[["5"]]}
+{"i":14,"h":"c81fb96f","k":"rows","cols":["byte_count"],"rows":[["5"]]}
+{"i":15,"h":"bd93edf7","k":"err","code":1305,"msg":"FUNCTION test.LENGTHB does not exist"}
+{"i":16,"h":"109ffa62","k":"rows","cols":["bit_count"],"rows":[["40"]]}
+{"i":17,"h":"1eb14719","k":"rows","cols":["v"],"rows":[["4"]]}
+{"i":18,"h":"9bf5942c","k":"rows","cols":["v"],"rows":[["4"]]}
+{"i":19,"h":"549fe046","k":"rows","cols":["v"],"rows":[["3"]]}
+{"i":20,"h":"1ebfe385","k":"rows","cols":["v"],"rows":[["3"]]}
+{"i":21,"h":"06be2f62","k":"rows","cols":["v"],"rows":[["65"]]}
+{"i":22,"h":"474be4a8","k":"rows","cols":["v"],"rows":[["ABC"]]}
+{"i":23,"h":"8b34943a","k":"rows","cols":["v"],"rows":[["1,234,567.89"]]}
+{"i":24,"h":"d50e66b4","k":"rows","cols":["v"],"rows":[["world"]]}
+{"i":25,"h":"a7105553","k":"rows","cols":["v"],"rows":[["HELLO"]]}
+{"i":26,"h":"1e930efc","k":"rows","cols":["v"],"rows":[["bcd"]]}
+{"i":27,"h":"0d354cf6","k":"rows","cols":["v"],"rows":[["2"]]}
+{"i":28,"h":"65706ded","k":"rows","cols":["v"],"rows":[["2"]]}
+{"i":29,"h":"b43a0abc","k":"rows","cols":["v"],"rows":[["b"]]}
+{"i":30,"h":"acb53008","k":"rows","cols":["v"],"rows":[["aXYZef"]]}
+{"i":31,"h":"b2f4bd8e","k":"rows","cols":["v"],"rows":[["4142"]]}
+{"i":32,"h":"f8f1383e","k":"rows","cols":["v"],"rows":[["AB"]]}
+{"i":33,"h":"7f819ce3","k":"rows","cols":["v"],"rows":[["[   ]"]]}
+{"i":34,"h":"35c9308b","k":"rows","cols":["v"],"rows":[["'it\\'s a\test'"]]}
+{"i":35,"h":"7fb01ffa","k":"rows","cols":["v"],"rows":[["R163"]]}

@@ -4,6 +4,7 @@ CREATE TABLE uex (id INT PRIMARY KEY, name VARCHAR(20), age INT);
 INSERT INTO uex VALUES (1, 'alice', 30), (2, 'bob', 17), (3, 'cara', 22);
 === CREATE INDEX … WHERE <predicate> (partial index, PG ext) ===
 CREATE INDEX idx_uex_adult ON uex(name) WHERE age >= 18;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WHERE age >= 18' at line 1
 === CREATE INDEX USING BTREE (explicit storage clause) ===
 DROP TABLE IF EXISTS sb;
 CREATE TABLE sb (id INT PRIMARY KEY, x INT);
@@ -15,9 +16,9 @@ CREATE INDEX idx_sh_x USING HASH ON sh(x);
 # SHOW INDEX reports Index_type as BTREE — the requested
 # HASH storage was silently coerced.
 SHOW INDEX FROM sh;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-sh	0	PRIMARY	1	id	BTREE
-sh	1	idx_sh_x	1	x	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+sh	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+sh	1	idx_sh_x	1	x	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === CREATE INDEX <col> DESC — sort direction accepted, ignored ===
 DROP TABLE IF EXISTS sd;
 CREATE TABLE sd (id INT PRIMARY KEY, x INT);
@@ -34,23 +35,25 @@ a	b	c
 2	2	102
 === Composite UNIQUE — duplicate tuple errno 1062 ===
 INSERT INTO comp VALUES (1, 2, 999);
-ERROR 1062: duplicate key value violates unique constraint "idx_comp_ab": Key already exists in index "idx_comp_ab"
+ERROR 1062: Duplicate entry '1-2' for key 'comp.idx_comp_ab'
 === DROP INDEX IF EXISTS — silent no-op on missing ===
 DROP INDEX IF EXISTS idx_does_not_exist_xyz ON comp;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF EXISTS idx_does_not_exist_xyz ON comp' at line 1
 === KNOWN GAP: DROP INDEX … CASCADE — errno 1064 ===
 DROP INDEX idx_comp_ab ON comp CASCADE;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: CASCADE at Line: 1, Column: 32
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CASCADE' at line 1
 === KNOWN GAP: DROP INDEX … RESTRICT — errno 1064 ===
 DROP INDEX idx_comp_ab ON comp RESTRICT;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: RESTRICT at Line: 1, Column: 32
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'RESTRICT' at line 1
 === KNOWN GAP: ALTER INDEX RENAME — silent no-op ===
 # Statement returns OK but the rename is not applied.
 # SHOW INDEX still lists the original name.
 ALTER INDEX idx_comp_ab RENAME TO idx_comp_ab_renamed;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INDEX idx_comp_ab RENAME TO idx_comp_ab_renamed' at line 1
 SHOW INDEX FROM comp;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-comp	0	idx_comp_ab	1	a	BTREE
-comp	0	idx_comp_ab	2	b	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+comp	0	idx_comp_ab	1	a	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
+comp	0	idx_comp_ab	2	b	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === Cleanup ===
 DROP TABLE uex;
 DROP TABLE sb;

@@ -1,0 +1,24 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":23}
+{"i":1,"h":"f1817be5","k":"rows","cols":["canonical"],"rows":[["Y,N,Y,N"]]}
+{"i":2,"h":"367e21ea","k":"rows","cols":["all_zero"],"rows":[["0|0|0"]]}
+{"i":3,"h":"4005b30c","k":"rows","cols":["three_set"],"rows":[["on/on/on/off"]]}
+{"i":4,"h":"92d4bd0c","k":"rows","cols":["default_prefix_ok"],"rows":[["1"]]}
+{"i":5,"h":"39bd5497","k":"rows","cols":["comma_count"],"rows":[["63"]]}
+{"i":6,"h":"1cd1ab29","k":"rows","cols":["nbits_zero"],"rows":[[""]]}
+{"i":7,"h":"63c15443","k":"rows","cols":["nbits_clamped_high"],"rows":[["64"]]}
+{"i":8,"h":"77061824","k":"rows","cols":["nbits_clamped_low"],"rows":[["Y,Y,Y,Y,Y,Y,Y,Y,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N"]]}
+{"i":9,"h":"926cacda","k":"rows","cols":["neg_all_set"],"rows":[["11111111"]]}
+{"i":10,"h":"73d2e439","k":"rows","cols":["n1"],"rows":[[null]]}
+{"i":11,"h":"8b890072","k":"rows","cols":["n2"],"rows":[[null]]}
+{"i":12,"h":"ad4992ce","k":"rows","cols":["n3"],"rows":[[null]]}
+{"i":13,"h":"e05ee727","k":"rows","cols":["n4"],"rows":[[null]]}
+{"i":14,"h":"544ba893","k":"rows","cols":["n5"],"rows":[[null]]}
+{"i":15,"h":"5fffa8b9","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'EXPORT_SET'"}
+{"i":16,"h":"9bffef3b","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'EXPORT_SET'"}
+{"i":17,"h":"0b1f6d2d","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'EXPORT_SET'"}
+{"i":18,"h":"836a6749","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'EXPORT_SET'"}
+{"i":19,"h":"4d9f7a9d","k":"ok","affected":0}
+{"i":20,"h":"740c5d10","k":"ok","affected":0}
+{"i":21,"h":"42de9374","k":"ok","affected":4}
+{"i":22,"h":"5ff9fdf8","k":"rows","cols":["id","rendered"],"rows":[["1","NNN"],["2","YNN"],["3","YYN"],["4","YYY"]]}
+{"i":23,"h":"0fc51688","k":"ok","affected":0}

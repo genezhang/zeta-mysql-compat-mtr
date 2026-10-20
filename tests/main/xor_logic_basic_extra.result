@@ -23,7 +23,7 @@ or_xor_paren
 # Use explicit parentheses with mixed AND / XOR.
 SELECT FALSE AND TRUE XOR TRUE AS and_xor_zeta;
 and_xor_zeta
-0
+1
 SELECT (FALSE AND TRUE) XOR TRUE AS and_xor_mysql_equiv;
 and_xor_mysql_equiv
 1
@@ -84,9 +84,9 @@ k	l	m	n	o	p
 # convention). For MySQL NULL-safe equal, use
 # `a IS NOT DISTINCT FROM b`.
 SELECT 1 <=> 1 AS nsl;
-ERROR 1105: execution error: <=> requires vector operands
+nsl
+1
 SELECT 1 IS NOT DISTINCT FROM 1 AS sub1, NULL IS NOT DISTINCT FROM NULL AS sub2, 1 IS NOT DISTINCT FROM NULL AS sub3;
-sub1	sub2	sub3
-1	1	0
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DISTINCT FROM 1 AS sub1, NULL IS NOT DISTINCT FROM NULL AS sub2, 1 IS NOT DISTIN' at line 1
 DROP TABLE xt;
 DROP TABLE bxt;

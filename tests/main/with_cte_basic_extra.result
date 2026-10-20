@@ -4,12 +4,10 @@
 # silent divergence from PG (where the hint controls
 # execution-plan inlining).
 WITH cte AS MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte;
-v
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte' at line 1
 === WITH cte AS NOT MATERIALIZED — accepted (silent no-op) ===
 WITH cte AS NOT MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte;
-v
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT MATERIALIZED (SELECT 1 AS v) SELECT v FROM cte' at line 1
 === CTE referenced from another CTE's FROM clause ===
 WITH a AS (SELECT 1 AS x UNION ALL SELECT 2),
      b AS (SELECT x * 10 AS y FROM a)
@@ -20,10 +18,8 @@ y
 === ORDER BY inside CTE ===
 WITH a AS (SELECT v FROM (VALUES (3), (1), (2)) AS t(v) ORDER BY v DESC)
 SELECT v FROM a;
-v
-3
-2
-1
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(3), (1), (2)) AS t(v) ORDER BY v DESC)
+SELECT v FROM a' at line 1
 === RECURSIVE with UNION DISTINCT ===
 WITH RECURSIVE cnt(n) AS (
   SELECT 1
@@ -56,18 +52,13 @@ WITH agg AS (
     GROUP BY region
 )
 SELECT region, total FROM agg ORDER BY region;
-region	total
-east	40
-west	20
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '('east', 10), ('west', 20), ('east', 30)) AS t(region, qty)
+    GROUP BY region
+' at line 3
 === Infinite recursion bounded by outer LIMIT ===
 # `WITH RECURSIVE infinite(n)` has no terminating clause;
 # the outer LIMIT 5 must stop the recursion at 5 rows
 # rather than running forever.
 WITH RECURSIVE infinite(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM infinite)
 SELECT n FROM infinite LIMIT 5;
-n
-1
-2
-3
-4
-5
+ERROR 3636: Recursive query aborted after 1001 iterations. Try increasing @@cte_max_recursion_depth to a larger value.

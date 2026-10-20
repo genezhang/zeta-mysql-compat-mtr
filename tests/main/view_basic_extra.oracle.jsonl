@@ -1,0 +1,28 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":27}
+{"i":1,"h":"834d1d3d","k":"ok","affected":0}
+{"i":2,"h":"dc305f94","k":"ok","affected":0}
+{"i":3,"h":"c143d31e","k":"ok","affected":3}
+{"i":4,"h":"f41b8070","k":"ok","affected":0}
+{"i":5,"h":"0d3e8a3a","k":"rows","cols":["uid","who"],"rows":[["1","a"],["2","b"],["3","c"]],"sorted":true}
+{"i":6,"h":"72b31986","k":"ok","affected":0}
+{"i":7,"h":"d381f01b","k":"rows","cols":["name","total"],"rows":[["a","10"],["b","20"],["c","30"]],"sorted":true}
+{"i":8,"h":"619778ea","k":"ok","affected":0}
+{"i":9,"h":"b34ecbac","k":"ok","affected":0}
+{"i":10,"h":"e33bdc3e","k":"rows","cols":["id"],"rows":[["2"],["3"]],"sorted":true}
+{"i":11,"h":"137a21a4","k":"rows","cols":["val","who"],"rows":[["10","a"],["20","b"],["30","c"]]}
+{"i":12,"h":"f550d5ff","k":"ok","affected":0}
+{"i":13,"h":"1cd0854d","k":"ok","affected":0}
+{"i":14,"h":"9d8de000","k":"ok","affected":1}
+{"i":15,"h":"c11f4890","k":"ok","affected":1}
+{"i":16,"h":"4f3cf96e","k":"ok","affected":1}
+{"i":17,"h":"1b6bbcb2","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS v_rename AS SELECT id FROM t' at line 1"}
+{"i":18,"h":"0d3e8a3a","k":"rows","cols":["uid","who"],"rows":[["2","b"],["3","c"],["99","z"]],"sorted":true}
+{"i":19,"h":"be21ba58","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS v_new_ifne AS SELECT id FROM t' at line 1"}
+{"i":20,"h":"ccc870ad","k":"err","code":1146,"msg":"Table 'test.v_new_ifne' doesn't exist","sorted":true}
+{"i":21,"h":"6febcdb4","k":"ok","affected":0}
+{"i":22,"h":"e33bdc3e","k":"err","code":1356,"msg":"View 'test.v_on_v' references invalid table(s) or column(s) or function(s) or definer/invoker of view lack rights to use them"}
+{"i":23,"h":"81430c35","k":"ok","affected":0}
+{"i":24,"h":"30b4d2ba","k":"ok","affected":0}
+{"i":25,"h":"384d31bb","k":"ok","affected":0}
+{"i":26,"h":"0e1de33c","k":"ok","affected":0}
+{"i":27,"h":"46ef815f","k":"ok","affected":0}

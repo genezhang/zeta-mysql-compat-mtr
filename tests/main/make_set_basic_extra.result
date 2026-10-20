@@ -10,8 +10,7 @@ all_three
 a,b,c
 === Empty set (bits = 0) → empty string, not NULL ===
 SELECT MAKE_SET(0, 'a', 'b', 'c') AS empty;
-empty
-
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'empty' at line 1
 SELECT MAKE_SET(0, 'a', 'b', 'c') IS NULL AS is_null;
 is_null
 0
@@ -33,9 +32,9 @@ neg_all
 x,y,z
 === Arity errors ===
 SELECT MAKE_SET();
-ERROR 1105: execution error: MAKE_SET requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'MAKE_SET'
 SELECT MAKE_SET(1);
-ERROR 1105: execution error: MAKE_SET requires at least 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'MAKE_SET'
 === Against an INT column ===
 DROP TABLE IF EXISTS ms_test;
 CREATE TABLE ms_test (id INT, mask INT);

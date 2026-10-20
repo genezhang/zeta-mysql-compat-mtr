@@ -1,0 +1,25 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":24}
+{"i":1,"h":"880be63c","k":"ok","affected":0}
+{"i":2,"h":"405effe1","k":"ok","affected":0}
+{"i":3,"h":"8081043c","k":"ok","affected":6}
+{"i":4,"h":"3a461207","k":"rows","cols":["id","name","depth"],"rows":[["1","CEO","0"],["2","VP-A","1"],["3","VP-B","1"],["4","M-A1","2"],["5","M-A2","2"],["6","E-A1a","3"]]}
+{"i":5,"h":"9046dec3","k":"rows","cols":["id","name"],"rows":[["1","CEO"],["2","VP-A"],["3","VP-B"],["4","M-A1"],["5","M-A2"]]}
+{"i":6,"h":"df34e34c","k":"ok","affected":0}
+{"i":7,"h":"65f2aa7d","k":"rows","cols":["n"],"rows":[["1"],["2"],["3"],["10"],["11"],["12"]]}
+{"i":8,"h":"c7d513c5","k":"rows","cols":["n"],"rows":[["1"],["2"],["3"]]}
+{"i":9,"h":"93ea0a57","k":"rows","cols":["exists_match"],"rows":[["1"]]}
+{"i":10,"h":"0dd8f385","k":"rows","cols":["a_n","b_n"],"rows":[["1","1"],["1","2"],["1","3"]]}
+{"i":11,"h":"11db51df","k":"rows","cols":["i","a"],"rows":[["1","0"],["2","1"],["3","1"],["4","2"],["5","3"],["6","5"],["7","8"],["8","13"]]}
+{"i":12,"h":"80f4ca4b","k":"ok","affected":0}
+{"i":13,"h":"cd3e3728","k":"ok","affected":0}
+{"i":14,"h":"e0c2cf5d","k":"ok","affected":3}
+{"i":15,"h":"71372734","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '[id] FROM cyc WHERE id = 1\n  UNION ALL\n  SELECT c2.id, c2.next, path || c2.id\n  ' at line 2"}
+{"i":16,"h":"3c8b29d7","k":"ok","affected":0}
+{"i":17,"h":"be3e6026","k":"ok","affected":0}
+{"i":18,"h":"23b6fdf3","k":"ok","affected":0}
+{"i":19,"h":"2a7222d4","k":"ok","affected":2}
+{"i":20,"h":"aa98290d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SEARCH DEPTH FIRST BY id SET seq\nSELECT id, name FROM chain' at line 5"}
+{"i":21,"h":"85180d0c","k":"ok","affected":0}
+{"i":22,"h":"aa55eb75","k":"err","code":1146,"msg":"Table 'test.even' doesn't exist"}
+{"i":23,"h":"3d173241","k":"err","code":3573,"msg":"Recursive Common Table Expression 'r' should contain a UNION"}
+{"i":24,"h":"4289d14f","k":"err","code":3575,"msg":"Recursive Common Table Expression 'bad' can contain neither aggregation nor window functions in recursive query block"}

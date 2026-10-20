@@ -1,0 +1,31 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":30}
+{"i":1,"h":"8242a107","k":"rows","cols":["canonical"],"rows":[["6CCD780CBABA102695645B8C656024DB"]]}
+{"i":2,"h":"52c31016","k":"rows","cols":["all_zero"],"rows":[["00000000000000000000000000000000"]]}
+{"i":3,"h":"426f5c11","k":"rows","cols":["all_ones"],"rows":[["FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"]]}
+{"i":4,"h":"eb143eaa","k":"rows","cols":["no_dash"],"rows":[["6CCD780CBABA102695645B8C656024DB"]]}
+{"i":5,"h":"aaecb4a5","k":"rows","cols":["swapped"],"rows":[["1026BABA6CCD780C95645B8C656024DB"]]}
+{"i":6,"h":"a0886097","k":"rows","cols":["swap_zero_matches_default"],"rows":[["1"]]}
+{"i":7,"h":"8947b0a1","k":"rows","cols":["swap_two_truthy"],"rows":[["1"]]}
+{"i":8,"h":"9441e880","k":"rows","cols":["swap_true_bool"],"rows":[["1"]]}
+{"i":9,"h":"9ee51c46","k":"rows","cols":["swap_false_bool"],"rows":[["1"]]}
+{"i":10,"h":"660a0817","k":"rows","cols":["mixed_case_equiv"],"rows":[["1"]]}
+{"i":11,"h":"3f800657","k":"rows","cols":["null_arg"],"rows":[["1"]]}
+{"i":12,"h":"688de1e3","k":"rows","cols":["null_swap"],"rows":[["0"]]}
+{"i":13,"h":"be49ef95","k":"rows","cols":["decode_canonical"],"rows":[["6ccd780c-baba-1026-9564-5b8c656024db"]]}
+{"i":14,"h":"d10faf27","k":"rows","cols":["decode_ones"],"rows":[["ffffffff-ffff-ffff-ffff-ffffffffffff"]]}
+{"i":15,"h":"e35193e0","k":"rows","cols":["unswapped"],"rows":[["6ccd780c-baba-1026-9564-5b8c656024db"]]}
+{"i":16,"h":"dc1b52c3","k":"rows","cols":["null_arg"],"rows":[["1"]]}
+{"i":17,"h":"5843c801","k":"rows","cols":["null_swap"],"rows":[["0"]]}
+{"i":18,"h":"02321fc4","k":"rows","cols":["rt_default"],"rows":[["1"]]}
+{"i":19,"h":"c7f9400f","k":"rows","cols":["rt_swap"],"rows":[["1"]]}
+{"i":20,"h":"4973158f","k":"rows","cols":["rt_len_default"],"rows":[["1"]]}
+{"i":21,"h":"0983289e","k":"rows","cols":["rt_len_swap"],"rows":[["1"]]}
+{"i":22,"h":"ecefdf91","k":"err","code":1411,"msg":"Incorrect string value: '6ccd780c-baba-1026-9564' for function uuid_to_bin"}
+{"i":23,"h":"de936d6d","k":"err","code":1411,"msg":"Incorrect string value: '6ccd780c-baba-1026-9564-5b8c656024db-extra' for function uuid_to_bin"}
+{"i":24,"h":"921d9d72","k":"err","code":1411,"msg":"Incorrect string value: 'zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz' for function uuid_to_bin"}
+{"i":25,"h":"0a3d6746","k":"err","code":1411,"msg":"Incorrect string value: '\\x00\\x11\"3' for function bin_to_uuid"}
+{"i":26,"h":"28997fcd","k":"err","code":1411,"msg":"Incorrect string value: '\\x00\\x11\"3DUfw\\x88\\x99\\xAA\\xBB\\xCC\\xDD\\xEE\\xFF\\xAA' for function bin_to_uuid"}
+{"i":27,"h":"ea60d85c","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UUID_TO_BIN'"}
+{"i":28,"h":"116a2a0e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UUID_TO_BIN'"}
+{"i":29,"h":"22d15e2c","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'BIN_TO_UUID'"}
+{"i":30,"h":"ac454f7b","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'BIN_TO_UUID'"}

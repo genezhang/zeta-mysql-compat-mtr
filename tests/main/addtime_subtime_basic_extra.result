@@ -26,7 +26,7 @@ rollback
 === String inputs accepted (TIME shape and TIMESTAMP shape) ===
 SELECT ADDTIME('10:00:00', '02:30:00')              AS str_time;
 str_time
-1970-01-01 12:30:00
+12:30:00
 SELECT ADDTIME('2026-05-19 10:00:00', '02:30:00')   AS str_ts;
 str_ts
 2026-05-19 12:30:00
@@ -39,18 +39,21 @@ n_in_b
 NULL
 === DIVERGENCE: TIME overflow errors (MySQL allows up to 838:59:59) ===
 SELECT ADDTIME(TIME '23:00:00', TIME '02:00:00');
-ERROR 1105: execution error: ADDTIME: result 90000000000 µs out of TIME range 0..=86400s
+ADDTIME(TIME '23:00:00', TIME '02:00:00')
+25:00:00
 === SUBTIME TIME underflow errors ===
 SELECT SUBTIME(TIME '00:30:00', TIME '01:00:00');
-ERROR 1105: execution error: SUBTIME: result -1800000000 µs out of TIME range 0..=86400s
+SUBTIME(TIME '00:30:00', TIME '01:00:00')
+-00:30:00
 === Bad-string offset errors 1105 ===
 SELECT ADDTIME(TIME '10:00:00', 'not a time');
-ERROR 1105: execution error: ADDTIME: cannot parse "not a time" as a time offset
+ADDTIME(TIME '10:00:00', 'not a time')
+NULL
 === Arity errors ===
 SELECT ADDTIME(TIME '10:00:00');
-ERROR 1105: execution error: ADDTIME requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'ADDTIME'
 SELECT SUBTIME(TIME '10:00:00', TIME '01:00:00', TIME '02:00:00');
-ERROR 1105: execution error: SUBTIME requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'SUBTIME'
 === ADDTIME on column inside SELECT and WHERE ===
 DROP TABLE IF EXISTS tt;
 CREATE TABLE tt (id INT, t TIMESTAMP);

@@ -1,0 +1,26 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":25}
+{"i":1,"h":"1c9403a0","k":"rows","cols":["dashed"],"rows":[["123E4567E89B12D3A456426614174000"]]}
+{"i":2,"h":"9e245981","k":"rows","cols":["dashless"],"rows":[["123E4567E89B12D3A456426614174000"]]}
+{"i":3,"h":"067df6b4","k":"rows","cols":["no_swap"],"rows":[["123E4567E89B12D3A456426614174000"]]}
+{"i":4,"h":"0db330f9","k":"rows","cols":["swapped"],"rows":[["12D3E89B123E4567A456426614174000"]]}
+{"i":5,"h":"6c95e663","k":"rows","cols":["rt_no_swap"],"rows":[["123e4567-e89b-12d3-a456-426614174000"]]}
+{"i":6,"h":"74bdc20a","k":"rows","cols":["rt_with_swap"],"rows":[["123e4567-e89b-12d3-a456-426614174000"]]}
+{"i":7,"h":"7a0f1f75","k":"rows","cols":["encoded_swapped_decoded_plain"],"rows":[["12d3e89b-123e-4567-a456-426614174000"]]}
+{"i":8,"h":"7a1d06e9","k":"rows","cols":["n_to"],"rows":[[null]]}
+{"i":9,"h":"26d55955","k":"err","code":1411,"msg":"Incorrect string value: 'uuid' for function uuid_to_bin"}
+{"i":10,"h":"1c173cbe","k":"rows","cols":["n_from"],"rows":[[null]]}
+{"i":11,"h":"195e632e","k":"rows","cols":["n_from_swap"],"rows":[["00112233-4455-6677-8899-aabbccddeeff"]]}
+{"i":12,"h":"8d2bac2c","k":"err","code":1411,"msg":"Incorrect string value: 'not-a-uuid' for function uuid_to_bin"}
+{"i":13,"h":"3d759578","k":"err","code":1411,"msg":"Incorrect string value: '123e4567-e89b-12d3-a456' for function uuid_to_bin"}
+{"i":14,"h":"d7bb72a5","k":"err","code":1411,"msg":"Incorrect string value: '\\xAA\\xBB' for function bin_to_uuid"}
+{"i":15,"h":"6a34c561","k":"err","code":1411,"msg":"Incorrect string value: '\\x00' for function bin_to_uuid"}
+{"i":16,"h":"ea60d85c","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UUID_TO_BIN'"}
+{"i":17,"h":"8562908b","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'UUID_TO_BIN'"}
+{"i":18,"h":"22d15e2c","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'BIN_TO_UUID'"}
+{"i":19,"h":"769a0448","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'BIN_TO_UUID'"}
+{"i":20,"h":"9edbe12b","k":"ok","affected":0}
+{"i":21,"h":"06030533","k":"ok","affected":0}
+{"i":22,"h":"0a83e5e6","k":"ok","affected":2}
+{"i":23,"h":"89920449","k":"rows","cols":["id","packed"],"rows":[["1","123E4567E89B12D3A456426614174000"],["2","AAAAAAAABBBBCCCCDDDDEEEEEEEEEEEE"]]}
+{"i":24,"h":"0367d69a","k":"rows","cols":["id"],"rows":[["1"],["2"]]}
+{"i":25,"h":"56812822","k":"ok","affected":0}

@@ -10,11 +10,11 @@ INSERT INTO gb VALUES
 === GROUP BY expression / function ===
 SELECT LOWER(name) AS lname, COUNT(*) AS c FROM gb GROUP BY LOWER(name) ORDER BY lname;
 lname	c
+NULL	1
 alice	1
 bob	1
 carol	1
 dan	1
-NULL	1
 SELECT id % 2 AS parity, COUNT(*) AS c FROM gb GROUP BY id % 2 ORDER BY parity;
 parity	c
 0	2
@@ -22,57 +22,45 @@ parity	c
 === GROUP BY SELECT alias (MySQL/PG extension) ===
 SELECT LOWER(name) AS lname, COUNT(*) AS c FROM gb GROUP BY lname ORDER BY lname;
 lname	c
+NULL	1
 alice	1
 bob	1
 carol	1
 dan	1
-NULL	1
 === GROUP BY positional with multiple cols ===
 SELECT region, name, COUNT(*) AS c FROM gb GROUP BY 1, 2 ORDER BY 1, 2;
 region	name	c
+NULL	NULL	1
 east	Alice	1
 east	BOB	1
-west	Dan	1
 west	carol	1
-NULL	NULL	1
+west	Dan	1
 === ROLLUP — adds grand-total NULL row ===
 SELECT region, SUM(amt) AS s FROM gb GROUP BY ROLLUP(region) ORDER BY region;
 region	s
-east	300
-west	450
 NULL	50
 NULL	800
+east	300
+west	450
 === CUBE — same as ROLLUP for single col ===
 SELECT region, SUM(amt) AS s FROM gb GROUP BY CUBE(region) ORDER BY region;
-region	s
-east	300
-west	450
-NULL	50
-NULL	800
+ERROR 3889: Secondary engine operation failed. Reason: "No secondary engine defined for at least one of the query tables".
 === GROUPING SETS — multi-set ===
 SELECT region, name, SUM(amt) AS s FROM gb GROUP BY GROUPING SETS ((region), (name)) ORDER BY region, name;
-region	name	s
-east	NULL	300
-west	NULL	450
-NULL	Alice	100
-NULL	BOB	200
-NULL	Dan	300
-NULL	carol	150
-NULL	NULL	50
-NULL	NULL	50
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SETS ((region), (name)) ORDER BY region, name' at line 1
 === GROUPING() function — distinguishes real vs grand-total NULL ===
 SELECT region, SUM(amt) AS s, GROUPING(region) AS g FROM gb GROUP BY ROLLUP(region) ORDER BY region;
 region	s	g
-east	300	0
-west	450	0
 NULL	50	0
 NULL	800	1
+east	300	0
+west	450	0
 === GROUP BY NULL — all NULLs collapse to one group ===
 SELECT region, COUNT(*) AS c FROM gb GROUP BY region ORDER BY region;
 region	c
+NULL	1
 east	2
 west	2
-NULL	1
 === HAVING with raw aggregate predicate ===
 SELECT COUNT(*) AS c FROM gb HAVING c > 0;
 c
@@ -86,8 +74,12 @@ v
 1
 === KNOWN GAP: GROUP BY col WITH ROLLUP (MySQL suffix) — errno 1064 ===
 SELECT region, SUM(amt) FROM gb GROUP BY region WITH ROLLUP;
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: WITH at Line: 1, Column: 49
+region	SUM(amt)
+NULL	50
+east	300
+west	450
+NULL	800
 === KNOWN GAP: GROUP BY ALL (Spark / SQL Server) — errno 1064 ===
 SELECT region, COUNT(*) FROM gb GROUP BY ALL;
-ERROR 1064: SQL parse error: GROUP BY ALL not supported
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ALL' at line 1
 DROP TABLE gb;

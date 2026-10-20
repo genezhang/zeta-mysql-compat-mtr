@@ -71,18 +71,18 @@ x
 NULL
 === Arity errors ===
 SELECT JSON_PRETTY();
-ERROR 1105: execution error: JSON_PRETTY requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_PRETTY'
 SELECT JSON_PRETTY('{"a":1}', '{"b":2}');
-ERROR 1105: execution error: JSON_PRETTY requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_PRETTY'
 SELECT JSON_STORAGE_SIZE();
-ERROR 1105: execution error: JSON_STORAGE_SIZE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_STORAGE_SIZE'
 SELECT JSON_STORAGE_SIZE('{"a":1}', '{"b":2}');
-ERROR 1105: execution error: JSON_STORAGE_SIZE requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'JSON_STORAGE_SIZE'
 === Invalid JSON rejected ===
 SELECT JSON_PRETTY('not json');
-ERROR 1105: execution error: JSON_PRETTY first argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_pretty: "Invalid value." at position 1.
 SELECT JSON_STORAGE_SIZE('not json');
-ERROR 1105: execution error: JSON_STORAGE_SIZE first argument is not valid JSON: JSONB error: expected 'null' at position 1
+ERROR 3141: Invalid JSON text in argument 1 to function json_storage_size: "Invalid value." at position 1.
 === Filter on a TEXT column of stored JSON strings ===
 DROP TABLE IF EXISTS j;
 CREATE TABLE j (id INT, doc TEXT);

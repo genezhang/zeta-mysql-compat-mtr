@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"5363d976","k":"rows","cols":["len_1"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":2,"h":"af9d90a3","k":"rows","cols":["len_16"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":3,"h":"0812209d","k":"rows","cols":["len_64"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":4,"h":"6b586939","k":"rows","cols":["len_max"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":5,"h":"62739bcd","k":"rows","cols":["differ"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":6,"h":"10d159bf","k":"rows","cols":["non_null_1"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":7,"h":"8108dbea","k":"rows","cols":["non_null_256"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":8,"h":"acc1c7e6","k":"rows","cols":["null_in"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":9,"h":"30af0859","k":"err","code":1690,"msg":"length value is out of range in 'random_bytes'"}
+{"i":10,"h":"0ec28266","k":"err","code":1690,"msg":"length value is out of range in 'random_bytes'"}
+{"i":11,"h":"ebd40973","k":"err","code":1690,"msg":"length value is out of range in 'random_bytes'"}
+{"i":12,"h":"98d9a08f","k":"err","code":1690,"msg":"length value is out of range in 'random_bytes'"}
+{"i":13,"h":"1c120cbb","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RANDOM_BYTES'"}
+{"i":14,"h":"8798409e","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'RANDOM_BYTES'"}
+{"i":15,"h":"5c0b9452","k":"rows","cols":["hex_len"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}
+{"i":16,"h":"78311ecd","k":"rows","cols":["uuid_hex_len"],"rows":[["<masked>"]],"nd":"volatile","class":"random"}

@@ -1,0 +1,20 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":19}
+{"i":1,"h":"1d0ba2c6","k":"ok","affected":0}
+{"i":2,"h":"45e1c4c4","k":"ok","affected":0}
+{"i":3,"h":"6bbe1046","k":"ok","affected":0}
+{"i":4,"h":"be3ddfe0","k":"ok","affected":0}
+{"i":5,"h":"6bbe1115","k":"ok","affected":0}
+{"i":6,"h":"e36ab1ae","k":"ok","affected":0}
+{"i":7,"h":"ddf4aa30","k":"ok","affected":3}
+{"i":8,"h":"1dc9a9ba","k":"err","code":1327,"msg":"Undeclared variable: si_dst"}
+{"i":9,"h":"e522f85b","k":"err","code":1146,"msg":"Table 'test.si_dst' doesn't exist"}
+{"i":10,"h":"5cf5dff0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'si_dst_t FROM si_src ORDER BY id' at line 1"}
+{"i":11,"h":"4488586b","k":"err","code":1146,"msg":"Table 'test.si_dst_t' doesn't exist"}
+{"i":12,"h":"4f93f3ed","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'si_dst_t2 FROM si_src ORDER BY id' at line 1"}
+{"i":13,"h":"99bb42d8","k":"err","code":1146,"msg":"Table 'test.si_dst_t2' doesn't exist"}
+{"i":14,"h":"1e32fab9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'si_dst_u FROM si_src ORDER BY id' at line 1"}
+{"i":15,"h":"44885fb8","k":"err","code":1146,"msg":"Table 'test.si_dst_u' doesn't exist"}
+{"i":16,"h":"cc8babb3","k":"ok","affected":1}
+{"i":17,"h":"0f5c048c","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'v_id FROM si_src LIMIT 1' at line 1"}
+{"i":18,"h":"6b5b642b","k":"skip","why":"INTO OUTFILE / DUMPFILE"}
+{"i":19,"h":"1fc6eec0","k":"ok","affected":0}

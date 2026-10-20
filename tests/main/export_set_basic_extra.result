@@ -25,7 +25,7 @@ nbits_clamped_high
 64
 SELECT EXPORT_SET(255, 'Y', 'N', ',', -1) AS nbits_clamped_low;
 nbits_clamped_low
-
+Y,Y,Y,Y,Y,Y,Y,Y,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N,N
 === Negative bits — two's complement (-1 = all 64 bits set) ===
 SELECT EXPORT_SET(-1, '1', '0', '', 8) AS neg_all_set;
 neg_all_set
@@ -48,13 +48,13 @@ n5
 NULL
 === Arity errors ===
 SELECT EXPORT_SET();
-ERROR 1105: execution error: EXPORT_SET requires 3 to 5 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'EXPORT_SET'
 SELECT EXPORT_SET(1);
-ERROR 1105: execution error: EXPORT_SET requires 3 to 5 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'EXPORT_SET'
 SELECT EXPORT_SET(1, 'a');
-ERROR 1105: execution error: EXPORT_SET requires 3 to 5 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'EXPORT_SET'
 SELECT EXPORT_SET(1, 'a', 'b', ',', 4, 5);
-ERROR 1105: execution error: EXPORT_SET requires 3 to 5 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'EXPORT_SET'
 === Against a TEXT/INT column ===
 DROP TABLE IF EXISTS es_test;
 CREATE TABLE es_test (id INT, mask INT);

@@ -22,15 +22,15 @@ mixed_case
 4
 === Arity errors ===
 SELECT COERCIBILITY();
-ERROR 1105: execution error: COERCIBILITY requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'COERCIBILITY'
 SELECT COERCIBILITY('a', 'b');
-ERROR 1105: execution error: COERCIBILITY requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'COERCIBILITY'
 === Against a TEXT column (still returns 4 — no column-collation tracking yet) ===
 DROP TABLE IF EXISTS coerc_t;
 CREATE TABLE coerc_t (id INT, s TEXT);
 INSERT INTO coerc_t VALUES (1, 'hello'), (2, NULL);
 SELECT id, COERCIBILITY(s) AS lvl FROM coerc_t ORDER BY id;
 id	lvl
-1	4
-2	6
+1	2
+2	2
 DROP TABLE coerc_t;

@@ -37,7 +37,7 @@ mixed_case
 5
 === Arity error ===
 SELECT DATEDIFF('2024-03-15');
-ERROR 1105: execution error: DATEDIFF requires 2 arguments
+ERROR 1582: Incorrect parameter count in the call to native function 'DATEDIFF'
 === Against a DATE column ===
 DROP TABLE IF EXISTS dd_test;
 CREATE TABLE dd_test (id INT, d DATE);

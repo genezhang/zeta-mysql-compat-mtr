@@ -1,0 +1,23 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":22}
+{"i":1,"h":"722c3d77","k":"rows","cols":["sum_t"],"rows":[["12:30:00"]]}
+{"i":2,"h":"d1236b8a","k":"rows","cols":["day_boundary"],"rows":[["24:00:00"]]}
+{"i":3,"h":"0f0f4136","k":"rows","cols":["from_zero"],"rows":[["02:00:00"]]}
+{"i":4,"h":"313d0f40","k":"rows","cols":["same_day"],"rows":[["2026-05-19 12:30:00"]]}
+{"i":5,"h":"23ba1cb8","k":"rows","cols":["rollover"],"rows":[["2026-05-20 01:00:00"]]}
+{"i":6,"h":"78c55a5f","k":"rows","cols":["diff_t"],"rows":[["07:30:00"]]}
+{"i":7,"h":"45c7ed60","k":"rows","cols":["rollback"],"rows":[["2026-05-18 23:00:00"]]}
+{"i":8,"h":"440a7f9f","k":"rows","cols":["str_time"],"rows":[["12:30:00"]]}
+{"i":9,"h":"e1f5cb39","k":"rows","cols":["str_ts"],"rows":[["2026-05-19 12:30:00"]]}
+{"i":10,"h":"73258e8f","k":"rows","cols":["n_in_a"],"rows":[[null]]}
+{"i":11,"h":"5a2502b1","k":"rows","cols":["n_in_b"],"rows":[[null]]}
+{"i":12,"h":"9d0e7a2c","k":"rows","cols":["ADDTIME(TIME '23:00:00', TIME '02:00:00')"],"rows":[["25:00:00"]]}
+{"i":13,"h":"e72ac972","k":"rows","cols":["SUBTIME(TIME '00:30:00', TIME '01:00:00')"],"rows":[["-00:30:00"]]}
+{"i":14,"h":"18c37b31","k":"rows","cols":["ADDTIME(TIME '10:00:00', 'not a time')"],"rows":[[null]]}
+{"i":15,"h":"0dfc21c2","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'ADDTIME'"}
+{"i":16,"h":"1cb7fb81","k":"err","code":1582,"msg":"Incorrect parameter count in the call to native function 'SUBTIME'"}
+{"i":17,"h":"6d54cedd","k":"ok","affected":0}
+{"i":18,"h":"17f59c3c","k":"ok","affected":0}
+{"i":19,"h":"0fbb27c5","k":"ok","affected":2}
+{"i":20,"h":"f8956c24","k":"rows","cols":["id","plus1h"],"rows":[["1","2026-05-19 11:00:00"],["2","2026-05-19 23:30:00"]]}
+{"i":21,"h":"7e4c2d22","k":"rows","cols":["id"],"rows":[["2"]]}
+{"i":22,"h":"c34e7944","k":"ok","affected":0}

@@ -1,0 +1,34 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":33}
+{"i":1,"h":"a228e621","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":2,"h":"25ea13d6","k":"rows","cols":["current_user_kw"],"rows":[["root@localhost"]]}
+{"i":3,"h":"fbabaf90","k":"err","code":1054,"msg":"Unknown column 'SESSION_USER' in 'field list'"}
+{"i":4,"h":"a2c2777d","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":5,"h":"609ff270","k":"err","code":1054,"msg":"Unknown column 'SESSION_USER' in 'field list'"}
+{"i":6,"h":"6330af21","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":7,"h":"a9efd495","k":"rows","cols":["USER()"],"rows":[["root@localhost"]]}
+{"i":8,"h":"47e044f7","k":"rows","cols":["CURRENT_USER()"],"rows":[["root@localhost"]]}
+{"i":9,"h":"267b97e1","k":"rows","cols":["SESSION_USER()"],"rows":[["root@localhost"]]}
+{"i":10,"h":"4aa7fce1","k":"rows","cols":["current_role_paren"],"rows":[["NONE"]]}
+{"i":11,"h":"d4e068a5","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":12,"h":"c4c07235","k":"err","code":1054,"msg":"Unknown column 'CURRENT_ROLE' in 'field list'"}
+{"i":13,"h":"175370fc","k":"rows","cols":["db_returns_session"],"rows":[["test"]]}
+{"i":14,"h":"edfab178","k":"rows","cols":["schema_returns_session"],"rows":[["test"]]}
+{"i":15,"h":"38bbacde","k":"err","code":1305,"msg":"FUNCTION test.CURRENT_DATABASE does not exist"}
+{"i":16,"h":"f8137162","k":"err","code":1054,"msg":"Unknown column 'CURRENT_CATALOG' in 'field list'"}
+{"i":17,"h":"ba4980e2","k":"rows","cols":["this_alias_dropped"],"rows":[["0"]]}
+{"i":18,"h":"716d1a6e","k":"rows","cols":["this_alias_dropped_too"],"rows":[["0"]]}
+{"i":19,"h":"e892772a","k":"rows","cols":["this_alias_dropped_3"],"rows":[["1"]]}
+{"i":20,"h":"36ee28db","k":"rows","cols":["via_concat_returns_zeta"],"rows":[["test"]]}
+{"i":21,"h":"17b02812","k":"rows","cols":["concat_eq_zeta_via_runtime"],"rows":[["0"]]}
+{"i":22,"h":"3b75371f","k":"err","code":1305,"msg":"FUNCTION test.CURRENT_DATABASE does not exist"}
+{"i":23,"h":"88add6d1","k":"err","code":1305,"msg":"FUNCTION test.CURRENT_DATABASE does not exist"}
+{"i":24,"h":"0e8b66c0","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":25,"h":"e49f2816","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":26,"h":"6f8c1839","k":"err","code":1305,"msg":"FUNCTION test.CURRENT_DATABASE does not exist"}
+{"i":27,"h":"4dbf750c","k":"rows","cols":["current_user_char_len"],"rows":[["14"]]}
+{"i":28,"h":"d60d65b9","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":29,"h":"1626103a","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":30,"h":"9d45f458","k":"err","code":1054,"msg":"Unknown column 'USER' in 'field list'"}
+{"i":31,"h":"bcbf45ed","k":"err","code":1305,"msg":"FUNCTION test.CURRENT_DATABASE does not exist"}
+{"i":32,"h":"a64f5b5b","k":"err","code":1054,"msg":"Unknown column 'SYSTEM_USER' in 'field list'"}
+{"i":33,"h":"3a7c3249","k":"rows","cols":["SYSTEM_USER()"],"rows":[["root@localhost"]]}

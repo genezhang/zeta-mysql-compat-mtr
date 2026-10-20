@@ -1,0 +1,19 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":18}
+{"i":1,"h":"1036cdc5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::POINT' at line 1"}
+{"i":2,"h":"73b621e5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::LINE' at line 1"}
+{"i":3,"h":"d79db437","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::LSEG' at line 1"}
+{"i":4,"h":"bda12713","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::BOX' at line 1"}
+{"i":5,"h":"2d601274","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::PATH' at line 1"}
+{"i":6,"h":"0adde7a7","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::POLYGON' at line 1"}
+{"i":7,"h":"badd0146","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::CIRCLE' at line 1"}
+{"i":8,"h":"98c375e5","k":"ok","affected":0}
+{"i":9,"h":"697b09dc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BOX)' at line 1"}
+{"i":10,"h":"11d0dcf5","k":"ok","affected":0}
+{"i":11,"h":"d6a21b73","k":"rows","cols":["point(1, 2)"],"rows":[["0x000000000101000000000000000000f03f0000000000000040"]]}
+{"i":12,"h":"629947dc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::BOX)' at line 1"}
+{"i":13,"h":"4abc1376","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::POINT, '(3,4)'::POINT)' at line 1"}
+{"i":14,"h":"62fa2cb1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::CIRCLE)' at line 1"}
+{"i":15,"h":"5c81cd39","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::LSEG)' at line 1"}
+{"i":16,"h":"c12a61a9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::POINT <-> '(4,5)'::POINT' at line 1"}
+{"i":17,"h":"80d3208a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::POINT @ '((0,0),(5,5))'::BOX' at line 1"}
+{"i":18,"h":"4918c59e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '::BOX && '((1,1),(3,3))'::BOX' at line 1"}

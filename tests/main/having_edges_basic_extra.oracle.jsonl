@@ -1,0 +1,29 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":28}
+{"i":1,"h":"834d1739","k":"ok","affected":0}
+{"i":2,"h":"b21339f2","k":"ok","affected":0}
+{"i":3,"h":"5b326771","k":"ok","affected":6}
+{"i":4,"h":"864e951c","k":"rows","cols":["grp","s"],"rows":[["2","70"]]}
+{"i":5,"h":"59c0770f","k":"rows","cols":["grp","c"],"rows":[["1","2"],["2","2"],["3","2"]]}
+{"i":6,"h":"1fd0a13e","k":"rows","cols":["grp","s"],"rows":[["2","70"]]}
+{"i":7,"h":"76639faa","k":"rows","cols":["grp","s"],"rows":[["1","30"],["2","70"]]}
+{"i":8,"h":"eb532cf9","k":"rows","cols":["grp","s"],"rows":[["2","70"],["3","5"]]}
+{"i":9,"h":"96a243f3","k":"rows","cols":["grp","c"],"rows":[]}
+{"i":10,"h":"4c7d1d14","k":"rows","cols":["grp","s"],"rows":[["1","30"],["2","70"]]}
+{"i":11,"h":"8cb7cb01","k":"rows","cols":["grp","mn","mx"],"rows":[["1","10","20"]]}
+{"i":12,"h":"623a9b57","k":"rows","cols":["grp","c"],"rows":[["1","2"],["3","2"]]}
+{"i":13,"h":"6e024121","k":"rows","cols":["grp","s"],"rows":[["1","30"]]}
+{"i":14,"h":"6cd7bea7","k":"ok","affected":0}
+{"i":15,"h":"f953baa3","k":"ok","affected":0}
+{"i":16,"h":"c57492f0","k":"ok","affected":4}
+{"i":17,"h":"4215c6d2","k":"rows","cols":["grp","s"],"rows":[["2",null]]}
+{"i":18,"h":"0c94028a","k":"rows","cols":["grp","s"],"rows":[["1","10"]]}
+{"i":19,"h":"c0d02b92","k":"ok","affected":0}
+{"i":20,"h":"bbd1a8cd","k":"rows","cols":["grp","s"],"rows":[["2","70"]]}
+{"i":21,"h":"33dbbf1f","k":"err","code":1054,"msg":"Unknown column 'v' in 'having clause'"}
+{"i":22,"h":"d398f6a8","k":"rows","cols":["grp","s"],"rows":[["1","30"],["2","70"]]}
+{"i":23,"h":"daa0d537","k":"rows","cols":["grp","s"],"rows":[["2","70"]]}
+{"i":24,"h":"f1c5e295","k":"rows","cols":["grp","is_n","c"],"rows":[["1","0","2"],["2","0","2"],["3","0","1"],["3","1","1"]]}
+{"i":25,"h":"09a98ec1","k":"rows","cols":["s"],"rows":[["105"]]}
+{"i":26,"h":"56aa581d","k":"rows","cols":["s"],"rows":[["105"]]}
+{"i":27,"h":"b5970d10","k":"err","code":1056,"msg":"Can't group on 's'"}
+{"i":28,"h":"46efbdcb","k":"ok","affected":0}

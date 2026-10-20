@@ -1,0 +1,39 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":38}
+{"i":1,"h":"60d1811f","k":"ok","affected":0}
+{"i":2,"h":"906c00ea","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":3,"h":"60d182e2","k":"ok","affected":0}
+{"i":4,"h":"4a7bdbde","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":5,"h":"60d18fb1","k":"ok","affected":0}
+{"i":6,"h":"73721c38","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":7,"h":"60d18d04","k":"ok","affected":0}
+{"i":8,"h":"edeb6d92","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":9,"h":"60d184cb","k":"ok","affected":0}
+{"i":10,"h":"628634a5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON NULL INPUT LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":11,"h":"60d1879e","k":"ok","affected":0}
+{"i":12,"h":"a40851bb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULL ON NULL INPUT LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":13,"h":"60d19f87","k":"ok","affected":0}
+{"i":14,"h":"ef84b67b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'PARALLEL SAFE LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":15,"h":"4993a291","k":"ok","affected":0}
+{"i":16,"h":"fc80e0ff","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'PARALLEL RESTRICTED LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":17,"h":"4993a25e","k":"ok","affected":0}
+{"i":18,"h":"26def903","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'PARALLEL UNSAFE LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":19,"h":"4993ac65","k":"ok","affected":0}
+{"i":20,"h":"cac68d32","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'DEFINER LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":21,"h":"4993af12","k":"ok","affected":0}
+{"i":22,"h":"835960ef","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INVOKER LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":23,"h":"4993a70b","k":"ok","affected":0}
+{"i":24,"h":"ef814453","k":"err","code":1193,"msg":"Unknown system variable 'search_path'"}
+{"i":25,"h":"4993a4b8","k":"ok","affected":0}
+{"i":26,"h":"b1cef762","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TO 'UTC' LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":27,"h":"60d1856d","k":"ok","affected":0}
+{"i":28,"h":"e80fb8de","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":29,"h":"60d19a30","k":"ok","affected":0}
+{"i":30,"h":"3323db68","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'LEAKPROOF LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":31,"h":"49926037","k":"ok","affected":0}
+{"i":32,"h":"a2a6647f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '100 LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":33,"h":"49926c09","k":"ok","affected":0}
+{"i":34,"h":"a091fe11","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FOR TYPE int LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":35,"h":"49926fb6","k":"ok","affected":0}
+{"i":36,"h":"b603c226","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'WINDOW LANGUAGE SQL AS 'SELECT 1'' at line 1"}
+{"i":37,"h":"49f2f21a","k":"ok","affected":0}
+{"i":38,"h":"a638499e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IMMUTABLE PARALLEL SAFE COST 5 LANGUAGE SQL AS 'SELECT 1'' at line 1"}

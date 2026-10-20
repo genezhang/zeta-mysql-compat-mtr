@@ -1,0 +1,30 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":29}
+{"i":1,"h":"1bcf7373","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_LOCK does not exist"}
+{"i":2,"h":"af525dc6","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_LOCK does not exist"}
+{"i":3,"h":"2b0e1777","k":"err","code":1305,"msg":"FUNCTION test.PG_TRY_ADVISORY_LOCK does not exist"}
+{"i":4,"h":"8e0584a3","k":"err","code":1305,"msg":"FUNCTION test.PG_TRY_ADVISORY_LOCK does not exist"}
+{"i":5,"h":"519418db","k":"err","code":1305,"msg":"FUNCTION test.PG_TRY_ADVISORY_LOCK does not exist"}
+{"i":6,"h":"74d698b3","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":7,"h":"74d69eaa","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":8,"h":"ac0ce6c2","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":9,"h":"e4fa0e03","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":10,"h":"8abd49aa","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK_ALL does not exist"}
+{"i":11,"h":"b0c30a96","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK_ALL does not exist"}
+{"i":12,"h":"8e9d5d76","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":13,"h":"6eb4329d","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":14,"h":"031fd679","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INTEGER))              AS int_key_true' at line 1"}
+{"i":15,"h":"0a9b80fe","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'BIGINT))               AS bigint_key_true' at line 1"}
+{"i":16,"h":"60dce211","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK_ALL does not exist"}
+{"i":17,"h":"38ea0a30","k":"err","code":1305,"msg":"FUNCTION test.PG_TRY_ADVISORY_LOCK does not exist"}
+{"i":18,"h":"bdf65fdc","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":19,"h":"34b9f7e9","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_LOCK does not exist"}
+{"i":20,"h":"6b2ba79a","k":"err","code":1305,"msg":"FUNCTION test.PG_TRY_ADVISORY_LOCK does not exist"}
+{"i":21,"h":"045766a5","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":22,"h":"93fd4815","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_LOCK does not exist"}
+{"i":23,"h":"6071effd","k":"err","code":1305,"msg":"FUNCTION test.PG_TRY_ADVISORY_LOCK does not exist"}
+{"i":24,"h":"1f18469f","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":25,"h":"130c709e","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_LOCK does not exist"}
+{"i":26,"h":"6f6b4935","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_LOCK does not exist"}
+{"i":27,"h":"8fd5dfa5","k":"err","code":1305,"msg":"FUNCTION test.PG_TRY_ADVISORY_LOCK does not exist"}
+{"i":28,"h":"29b2f299","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK does not exist"}
+{"i":29,"h":"8778f0a1","k":"err","code":1305,"msg":"FUNCTION test.PG_ADVISORY_UNLOCK_ALL does not exist"}

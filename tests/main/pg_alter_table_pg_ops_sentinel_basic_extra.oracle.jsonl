@@ -1,0 +1,29 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":28}
+{"i":1,"h":"21a4e841","k":"ok","affected":0}
+{"i":2,"h":"73c46634","k":"ok","affected":0}
+{"i":3,"h":"8e3d9871","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OWNER TO admin_user' at line 1"}
+{"i":4,"h":"d4762b8e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OWNER TO CURRENT_USER' at line 1"}
+{"i":5,"h":"42d589ec","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER USER' at line 1"}
+{"i":6,"h":"6d1f95fe","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'TRIGGER ALL' at line 1"}
+{"i":7,"h":"f45b400b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ROW LEVEL SECURITY' at line 1"}
+{"i":8,"h":"eaeb97a9","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NO FORCE ROW LEVEL SECURITY' at line 1"}
+{"i":9,"h":"c7250e00","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REPLICA IDENTITY DEFAULT' at line 1"}
+{"i":10,"h":"f4923cd6","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REPLICA IDENTITY FULL' at line 1"}
+{"i":11,"h":"dfe46598","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REPLICA IDENTITY NOTHING' at line 1"}
+{"i":12,"h":"23ee86fa","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'REPLICA IDENTITY USING INDEX idx_x' at line 1"}
+{"i":13,"h":"4f6fdb2d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VALIDATE CONSTRAINT some_c' at line 1"}
+{"i":14,"h":"7adb86bb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'OF some_type' at line 1"}
+{"i":15,"h":"268c7d72","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NOT OF' at line 1"}
+{"i":16,"h":"70bb193d","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INHERIT parent_t' at line 1"}
+{"i":17,"h":"0971f2b0","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NO INHERIT parent_t' at line 1"}
+{"i":18,"h":"f8b36f9f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CLUSTER ON some_idx' at line 1"}
+{"i":19,"h":"ff3e4977","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET LOGGED' at line 1"}
+{"i":20,"h":"8d686f47","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET UNLOGGED' at line 1"}
+{"i":21,"h":"03766383","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET SCHEMA public' at line 1"}
+{"i":22,"h":"86bef6fc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SET WITHOUT CLUSTER' at line 1"}
+{"i":23,"h":"b4ca9686","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'STATISTICS 100' at line 1"}
+{"i":24,"h":"3fadc603","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'STORAGE PLAIN' at line 1"}
+{"i":25,"h":"abc2108f","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'STORAGE EXTERNAL' at line 1"}
+{"i":26,"h":"dd24b2a8","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'STORAGE EXTENDED' at line 1"}
+{"i":27,"h":"05d18972","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'STORAGE MAIN' at line 1"}
+{"i":28,"h":"bcccf217","k":"ok","affected":0}

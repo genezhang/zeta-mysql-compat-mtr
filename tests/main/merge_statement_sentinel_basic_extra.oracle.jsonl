@@ -1,0 +1,16 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":15}
+{"i":1,"h":"e4ce2656","k":"ok","affected":0}
+{"i":2,"h":"d99c3620","k":"ok","affected":2}
+{"i":3,"h":"6a948d0d","k":"ok","affected":0}
+{"i":4,"h":"916c36dd","k":"ok","affected":2}
+{"i":5,"h":"2d84d8e5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED THEN UPDATE SET n =' at line 1"}
+{"i":6,"h":"baed119b","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED THEN DELETE' at line 1"}
+{"i":7,"h":"b83d2eeb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN NOT MATCHED THEN DO NOTHING' at line 1"}
+{"i":8,"h":"6b76eceb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED AND s.n > 50 THEN U' at line 1"}
+{"i":9,"h":"ff004ca5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MERGE INTO m_tgt t USING (SELECT 5 AS id, 500 AS n) s ON t.id = s.id WHEN NOT MA' at line 1"}
+{"i":10,"h":"4d47ebfc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'MERGE INTO m_tgt t USING m_src s ON t.id = s.id WHEN MATCHED THEN UPDATE SET n =' at line 1"}
+{"i":11,"h":"1ffb2259","k":"ok","affected":2}
+{"i":12,"h":"123c5564","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'CONFLICT DO NOTHING' at line 1"}
+{"i":13,"h":"e9a03316","k":"rows","cols":["id","n"],"rows":[["1","100"],["2","20"]]}
+{"i":14,"h":"f12a3c0b","k":"ok","affected":0}
+{"i":15,"h":"edd36422","k":"ok","affected":0}

@@ -4,16 +4,16 @@ log_one_is_zero
 0
 SELECT LOG(10)                           AS log_ten_is_one;
 log_ten_is_one
-1
+2.302585092994046
 SELECT LOG(100)                          AS log_hundred_is_two;
 log_hundred_is_two
-2
+4.605170185988092
 SELECT LOG(1000)                         AS log_thousand_is_three;
 log_thousand_is_three
-3
+6.907755278982137
 SELECT LOG(EXP(1)) <> 1                  AS log_is_log10_not_ln;
 log_is_log10_not_ln
-1
+0
 SELECT ROUND(LN(EXP(1)), 10) > 0.99
    AND ROUND(LN(EXP(1)), 10) < 1.01      AS ln_inverse_exp_range;
 ln_inverse_exp_range
@@ -24,7 +24,7 @@ log2_eight_is_three
 3
 SELECT LOG(10, 1000)                     AS log10_thousand_is_three;
 log10_thousand_is_three
-2.9999999999999995559107901487
+2.9999999999999996
 SELECT LOG(3, 27)                        AS log3_27_is_three;
 log3_27_is_three
 3
@@ -34,19 +34,26 @@ log_pow_round_trip_range
 1
 === LOG / LN / EXP: error on invalid input (zeta strict, MySQL NULL) ===
 SELECT LOG(0);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LOG(0)
+NULL
 SELECT LOG(-1);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LOG(-1)
+NULL
 SELECT LN(0);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LN(0)
+NULL
 SELECT LN(-1);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LN(-1)
+NULL
 SELECT LOG(-2, 8);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LOG(-2, 8)
+NULL
 SELECT LOG(2, -8);
-ERROR 1105: execution error: cannot take logarithm of zero or negative number
+LOG(2, -8)
+NULL
 SELECT LOG(1, 100);
-ERROR 1105: execution error: logarithm base must not equal 1
+LOG(1, 100)
+NULL
 === LN: known vectors ===
 SELECT LN(1)                             AS ln_one_is_zero;
 ln_one_is_zero
@@ -69,8 +76,7 @@ exp_neg_one_range
 1
 === EXP: overflow returns +Infinity (NOT error) ===
 SELECT EXP(1000) > 1e308                 AS overflow_is_inf;
-overflow_is_inf
-1
+ERROR 1690: DOUBLE value is out of range in 'exp(1000)'
 SELECT EXP(-1000) < 1e-300               AS underflow_below_1e_neg_300;
 underflow_below_1e_neg_300
 1
@@ -80,10 +86,10 @@ underflow_non_neg
 === Cross-family inverse: LN(EXP(x)) ≈ x ===
 SELECT ROUND(LN(EXP(5)), 9)              AS inverse_5;
 inverse_5
-5.000000000
+5
 SELECT ROUND(LN(EXP(-3)), 9)             AS inverse_neg_3;
 inverse_neg_3
--3.000000000
+-3
 === NULL passthrough ===
 SELECT LOG(NULL)         IS NULL         AS log1_null;
 log1_null
@@ -102,17 +108,17 @@ exp_null
 1
 === Arity errors ===
 SELECT LOG();
-ERROR 1105: execution error: LOG requires 1 or 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ')' at line 1
 SELECT LOG(2, 8, 3);
-ERROR 1105: execution error: LOG requires 1 or 2 arguments
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ', 3)' at line 1
 SELECT LN();
-ERROR 1105: execution error: LN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'LN'
 SELECT LN(1, 2);
-ERROR 1105: execution error: LN requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'LN'
 SELECT EXP();
-ERROR 1105: execution error: EXP requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'EXP'
 SELECT EXP(1, 2);
-ERROR 1105: execution error: EXP requires 1 argument
+ERROR 1582: Incorrect parameter count in the call to native function 'EXP'
 === Determinism ===
 SELECT LOG(10)   = LOG(10)              AS log_det;
 log_det

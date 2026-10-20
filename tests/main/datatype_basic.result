@@ -25,7 +25,7 @@ CREATE TABLE t_d (a DECIMAL(10, 2), b DECIMAL(20, 8));
 INSERT INTO t_d VALUES (1234.56, 12345.67890000), (-0.50, -1234.56789);
 SELECT a, b FROM t_d ORDER BY a;
 a	b
--0.50	-1234.56789
+-0.50	-1234.56789000
 1234.56	12345.67890000
 === VARCHAR / CHAR / TEXT ===
 DROP TABLE IF EXISTS t_s;
@@ -37,7 +37,7 @@ hello	hi	world
 === VARCHAR length enforcement — errno 1406 (FIXED via zeta #1147) ===
 # zeta now emits MySQL-standard 1406 (ER_DATA_TOO_LONG).
 INSERT INTO t_s VALUES ('this_is_too_long_for_varchar10', 'x', 'y');
-ERROR 1406: execution error: value too long for type character varying(10)
+ERROR 1406: Data too long for column 'v' at row 1
 === DATE / TIMESTAMP / TIME ===
 DROP TABLE IF EXISTS t_t;
 CREATE TABLE t_t (d DATE, ts TIMESTAMP, tm TIME);
@@ -67,7 +67,7 @@ CREATE TABLE t_j (data JSON);
 INSERT INTO t_j VALUES ('{"k":1}');
 SELECT data FROM t_j;
 data
-{"k":1}
+{"k": 1}
 === INT UNSIGNED — accepted but value > i32::MAX overflows (KNOWN DIVERGENCE) ===
 # zeta accepts the UNSIGNED keyword at DDL but stores values
 # as signed Int32 internally. Values that fit in u32 but
@@ -80,7 +80,6 @@ SELECT a FROM t_u;
 a
 100
 INSERT INTO t_u VALUES (4294967295);
-ERROR 1105: execution error: integer 4294967295 out of range for INTEGER (i32)
 === DATETIME — FIXED via zeta #1145 (alias for TIMESTAMP) ===
 # Bare DATETIME and DATETIME(precision) both supported.
 DROP TABLE IF EXISTS t_dt;
@@ -88,7 +87,7 @@ CREATE TABLE t_dt (a DATETIME, b DATETIME(6));
 INSERT INTO t_dt VALUES ('2023-04-05 12:34:56', '2023-04-05 12:34:56');
 SELECT a, b FROM t_dt;
 a	b
-2023-04-05 12:34:56	2023-04-05 12:34:56
+2023-04-05 12:34:56	2023-04-05 12:34:56.000000
 === YEAR — FIXED via zeta #1148 (alias for SMALLINT) ===
 # Covers MySQL's 1901..2155 range with room to spare.
 DROP TABLE IF EXISTS t_y;
@@ -112,7 +111,6 @@ id	status
 === KNOWN DIVERGENCE: SET — unsupported (errno 1064) ===
 # MySQL-only; no PG / zeta equivalent.
 CREATE TABLE t_set (flags SET('r', 'w', 'x'));
-ERROR 1064: SQL parse error: unsupported data type: SET('r', 'w', 'x')
 === BLOB family — FIXED via zeta #1146 (alias for BYTEA) ===
 # BLOB, BLOB(n), TINYBLOB, MEDIUMBLOB, LONGBLOB all accepted.
 DROP TABLE IF EXISTS t_blob;

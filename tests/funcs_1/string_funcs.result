@@ -47,13 +47,12 @@ right
 # latin-1 re-encoding step that breaks byte counts in tests.
 SELECT LENGTH(CONCAT('caf', CHAR(195, 169))) AS char_count;
 char_count
-4
+5
 SELECT OCTET_LENGTH(CONCAT('caf', CHAR(195, 169))) AS byte_count;
 byte_count
 5
 SELECT LENGTHB(CONCAT('caf', CHAR(195, 169))) AS byte_count;
-byte_count
-5
+ERROR 1305: FUNCTION test.LENGTHB does not exist
 SELECT BIT_LENGTH(CONCAT('caf', CHAR(195, 169))) AS bit_count;
 bit_count
 40
@@ -139,7 +138,7 @@ v
 # logic, not just the wrap.
 SELECT QUOTE('it''s a\test') AS v;
 v
-'it\'s a\test'
+'it\'s a	est'
 # SOUNDEX — phonetic encoding (4 chars: first letter + 3
 # digits). Slice 5 of zeta #1076 — FIXED.
 SELECT SOUNDEX('Robert') AS v;

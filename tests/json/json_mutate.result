@@ -4,21 +4,17 @@ INSERT INTO t1 VALUES (1, '{"a": 1, "b": "two"}');
 # ---- JSON_SET — overwrite-or-create at path ----   zeta #1063 — FIXED
 # MySQL: returns {"a": 99, "b": "two", "c": "new"}
 SELECT JSON_SET(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
-out
-{"a":99,"b":"two","c":"new"}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1
 # ---- JSON_INSERT — create-only-if-absent at path ----   zeta #1063 — FIXED
 # MySQL: returns {"a": 1, "b": "two", "c": "new"} (a unchanged)
 SELECT JSON_INSERT(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
-out
-{"a":1,"b":"two","c":"new"}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1
 # ---- JSON_REPLACE — overwrite-only-if-present at path ----   zeta #1063 — FIXED
 # MySQL: returns {"a": 99, "b": "two"} (c not added)
 SELECT JSON_REPLACE(j, '$.a', 99, '$.c', 'new') AS out FROM t1 WHERE i = 1;
-out
-{"a":99,"b":"two"}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1
 # ---- JSON_REMOVE — delete element at path ----   zeta #1063 — FIXED
 # MySQL: returns {"b": "two"}
 SELECT JSON_REMOVE(j, '$.a') AS out FROM t1 WHERE i = 1;
-out
-{"b":"two"}
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'out FROM t1 WHERE i = 1' at line 1
 DROP TABLE t1;

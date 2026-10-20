@@ -1,0 +1,17 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":16}
+{"i":1,"h":"e0ef6dfb","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'POLICY p ON t' at line 1"}
+{"i":2,"h":"7d19ef40","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'POLICY p ON t FOR SELECT USING (true)' at line 1"}
+{"i":3,"h":"e4596e2a","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'POLICY p ON t FOR INSERT WITH CHECK (true)' at line 1"}
+{"i":4,"h":"86a34696","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'POLICY p ON t AS PERMISSIVE FOR ALL TO PUBLIC USING (true)' at line 1"}
+{"i":5,"h":"0726dfbc","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'POLICY p ON t AS RESTRICTIVE FOR ALL USING (true)' at line 1"}
+{"i":6,"h":"ad51bea5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'POLICY p ON t RENAME TO p2' at line 1"}
+{"i":7,"h":"51aa8576","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'POLICY p ON t' at line 1"}
+{"i":8,"h":"030478e4","k":"ok","affected":0}
+{"i":9,"h":"24740ca8","k":"ok","affected":2}
+{"i":10,"h":"94b36ae4","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ROW LEVEL SECURITY' at line 1"}
+{"i":11,"h":"b77ba1d9","k":"rows","cols":["id","owner"],"rows":[["1","alice"],["2","bob"]]}
+{"i":12,"h":"2dfdb7a1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ROW LEVEL SECURITY' at line 1"}
+{"i":13,"h":"b77ba1d9","k":"rows","cols":["id","owner"],"rows":[["1","alice"],["2","bob"]]}
+{"i":14,"h":"c3870fd1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ROW LEVEL SECURITY' at line 1"}
+{"i":15,"h":"adbd2252","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NO FORCE ROW LEVEL SECURITY' at line 1"}
+{"i":16,"h":"f16fa732","k":"ok","affected":0}

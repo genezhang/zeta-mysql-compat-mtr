@@ -1,0 +1,20 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":19}
+{"i":1,"h":"aaacb36b","k":"ok","affected":0}
+{"i":2,"h":"3c2ab022","k":"ok","affected":0}
+{"i":3,"h":"78412e3a","k":"ok","affected":4}
+{"i":4,"h":"8653ac12","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS c FROM pfhl' at line 1"}
+{"i":5,"h":"299d6613","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS c2 FROM pfhl' at line 1"}
+{"i":6,"h":"dc7fa592","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS s FROM pfhl' at line 1"}
+{"i":7,"h":"544b6b10","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS a FROM pfhl' at line 1"}
+{"i":8,"h":"90eda4d1","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS mn, MAX(v) FILTER (WHERE v > 15) AS mx FROM pfhl' at line 1"}
+{"i":9,"h":"e44750b5","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS gt15,\n       COUNT(*) FILTER (WHERE v <= 15) AS le15\nFROM pfhl' at line 1"}
+{"i":10,"h":"b1a2c32e","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 1000) AS none,\n       SUM(v)   FILTER (WHERE v > 1000) AS s_none\nFROM' at line 1"}
+{"i":11,"h":"d8c1e59e","k":"ok","affected":0}
+{"i":12,"h":"06d4cf11","k":"ok","affected":0}
+{"i":13,"h":"a3c4c5c9","k":"ok","affected":4}
+{"i":14,"h":"e76b2a11","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS c FROM pfhl_g GROUP BY bucket ORDER BY bucket' at line 1"}
+{"i":15,"h":"d43e2a76","k":"err","code":1064,"msg":"You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(WHERE v > 15) AS s FROM pfhl_g GROUP BY bucket ORDER BY bucket' at line 1"}
+{"i":16,"h":"dffc7d36","k":"rows","cols":["X'AB'"],"rows":[["0xab"]]}
+{"i":17,"h":"c61a3ff7","k":"rows","cols":["X'CAFE'"],"rows":[["0xcafe"]]}
+{"i":18,"h":"37b8d705","k":"rows","cols":["length(X'CAFE')"],"rows":[["2"]]}
+{"i":19,"h":"e47d0d9f","k":"rows","cols":["X'AB' || X'CD'"],"rows":[["1"]]}

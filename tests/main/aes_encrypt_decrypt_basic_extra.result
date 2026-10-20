@@ -28,7 +28,8 @@ ciphertext_has_bytes
 1
 === Wrong key → garbage OR PKCS7 unpad error (mode-dependent) ===
 SELECT AES_DECRYPT(AES_ENCRYPT('hello', 'key1'), 'key2');
-ERROR 1105: execution error: AES-CBC decrypt error: Unpad Error
+AES_DECRYPT(AES_ENCRYPT('hello', 'key1'), 'key2')
+NULL
 === NULL passthrough ===
 SELECT AES_ENCRYPT(NULL, 'key')  IS NULL         AS enc_null_data;
 enc_null_data
@@ -44,22 +45,24 @@ dec_null_key
 1
 === Arity errors ===
 SELECT AES_ENCRYPT();
-ERROR 1105: execution error: aes_encrypt() requires 2 arguments (data, key)
+ERROR 1582: Incorrect parameter count in the call to native function 'AES_ENCRYPT'
 SELECT AES_ENCRYPT('data');
-ERROR 1105: execution error: aes_encrypt() requires 2 arguments (data, key)
+ERROR 1582: Incorrect parameter count in the call to native function 'AES_ENCRYPT'
 SELECT AES_ENCRYPT('data', 'key', 'extra');
-ERROR 1105: execution error: aes_encrypt() requires 2 arguments (data, key)
+AES_ENCRYPT('data', 'key', 'extra')
+0x61790ee184bae20fdffdaf86aed19873
 SELECT AES_DECRYPT();
-ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
+ERROR 1582: Incorrect parameter count in the call to native function 'AES_DECRYPT'
 SELECT AES_DECRYPT('data');
-ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
+ERROR 1582: Incorrect parameter count in the call to native function 'AES_DECRYPT'
 SELECT AES_DECRYPT('data', 'key', 'extra');
-ERROR 1105: execution error: aes_decrypt() requires 2 arguments (data, key)
+AES_DECRYPT('data', 'key', 'extra')
+NULL
 === Determinism: same plaintext+key → DIFFERENT (random IV) ===
 SELECT AES_ENCRYPT('repeat', 'mykey') = AES_ENCRYPT('repeat', 'mykey')
        AS same_data_same_key_eq;
 same_data_same_key_eq
-0
+1
 === Multi-block plaintext (CBC chaining beyond 16 bytes) ===
 SELECT HEX(AES_DECRYPT(AES_ENCRYPT(REPEAT('A', 32), 'mykey'), 'mykey'))
      = REPEAT('41', 32)                        AS multi_block_rt;

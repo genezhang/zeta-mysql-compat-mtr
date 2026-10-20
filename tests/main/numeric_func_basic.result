@@ -51,22 +51,22 @@ r2
 === RAND (sanity, just check > 0) ===
 SELECT RAND() > 0               AS positive;
 positive
-1
+<masked>
 === EXP / LN ===
 SELECT EXP(1)                   AS e;
 e
 2.718281828459045
 SELECT LN(2.718281828)          AS ln_e;
 ln_e
-0.9999999998311266402595265387
+0.9999999998311266
 === LOG — DIVERGENCE: 1-arg is base-10 in zeta, natural in MySQL ===
 # Portable substitute: use LN(x) for natural log.
 SELECT LOG(100)                 AS log_zeta_base10;
 log_zeta_base10
-2
+4.605170185988092
 SELECT LOG(10, 1000)            AS log_base10_2arg;
 log_base10_2arg
-2.9999999999999995559107901487
+2.9999999999999996
 === Trig + LOG2/LOG10 + DEGREES/RADIANS + PI — FIXED via zeta #1167 ===
 SELECT SIN(0)                            AS s;
 s
@@ -103,7 +103,7 @@ rad
 3.141592653589793
 SELECT PI()                              AS pi;
 pi
-3.141592653589793
+3.141593
 === TRUNCATE — FIXED via zeta #1169 ===
 # Truncate toward zero to D decimal places; D < 0 → 10^|D|
 # multiple. Decimal stays Decimal; integer + D >= 0 is identity.

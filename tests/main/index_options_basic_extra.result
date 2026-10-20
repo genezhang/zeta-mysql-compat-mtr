@@ -1,108 +1,113 @@
 === CREATE INDEX … USING HNSW on VECTOR column ===
 DROP TABLE IF EXISTS iv;
 CREATE TABLE iv (id INT PRIMARY KEY, e VECTOR(3));
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'VECTOR(3))' at line 1
 CREATE INDEX iv_hnsw ON iv USING HNSW (e);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING HNSW (e)' at line 1
 SHOW INDEX FROM iv;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-iv	0	PRIMARY	1	id	BTREE
-iv	1	iv_hnsw	1	e	HNSW
+ERROR 1146: Table 'test.iv' doesn't exist
 === KNOWN DIVERGENCE: USING GIN reports as FULLTEXT in SHOW INDEX ===
 DROP TABLE IF EXISTS ij;
 CREATE TABLE ij (id INT PRIMARY KEY, j JSONB);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'JSONB)' at line 1
 CREATE INDEX ij_gin ON ij USING GIN (j);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING GIN (j)' at line 1
 SHOW INDEX FROM ij;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-ij	0	PRIMARY	1	id	BTREE
-ij	1	ij_gin	1	j	FULLTEXT
+ERROR 1146: Table 'test.ij' doesn't exist
 === KNOWN DIVERGENCE: USING FTS reports as BTREE in SHOW INDEX ===
 DROP TABLE IF EXISTS ift;
 CREATE TABLE ift (id INT PRIMARY KEY, t TEXT);
 CREATE INDEX ift_fts ON ift USING FTS (t);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING FTS (t)' at line 1
 SHOW INDEX FROM ift;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-ift	0	PRIMARY	1	id	BTREE
-ift	1	ift_fts	1	t	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+ift	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === USING BRIN — silently coerced to BTREE ===
 DROP TABLE IF EXISTS ibrin;
 CREATE TABLE ibrin (id INT PRIMARY KEY, a INT);
 CREATE INDEX ibrin_a ON ibrin USING BRIN (a);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING BRIN (a)' at line 1
 SHOW INDEX FROM ibrin;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-ibrin	0	PRIMARY	1	id	BTREE
-ibrin	1	ibrin_a	1	a	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+ibrin	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === CREATE INDEX CONCURRENTLY (PG) — supported ===
 DROP TABLE IF EXISTS icc;
 CREATE TABLE icc (id INT PRIMARY KEY, a INT);
 CREATE INDEX CONCURRENTLY icc_a ON icc (a);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'icc_a ON icc (a)' at line 1
 SHOW INDEX FROM icc;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-icc	0	PRIMARY	1	id	BTREE
-icc	1	icc_a	1	a	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+icc	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === Multi-col index with mixed ASC/DESC ===
 DROP TABLE IF EXISTS imc;
 CREATE TABLE imc (id INT PRIMARY KEY, a INT, b INT);
 CREATE INDEX imc_ab ON imc (a ASC, b DESC);
 SHOW INDEX FROM imc;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-imc	0	PRIMARY	1	id	BTREE
-imc	1	imc_ab	1	a	BTREE
-imc	1	imc_ab	2	b	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+imc	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+imc	1	imc_ab	1	a	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
+imc	1	imc_ab	2	b	D	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === DROP INDEX without ON <table> (PG syntax) ===
 DROP TABLE IF EXISTS idn;
 CREATE TABLE idn (id INT PRIMARY KEY, a INT);
 CREATE INDEX idn_a ON idn (a);
 DROP INDEX idn_a;
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1
 SHOW INDEX FROM idn;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-idn	0	PRIMARY	1	id	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+idn	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+idn	1	idn_a	1	a	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === ALTER TABLE … DROP INDEX (MySQL spelling) ===
 DROP TABLE IF EXISTS idr;
 CREATE TABLE idr (id INT PRIMARY KEY, a INT);
 CREATE INDEX idr_a ON idr (a);
 ALTER TABLE idr DROP INDEX idr_a;
 SHOW INDEX FROM idr;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-idr	0	PRIMARY	1	id	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+idr	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === Duplicate index name → errno 1061 ===
 DROP TABLE IF EXISTS idup;
 CREATE TABLE idup (id INT PRIMARY KEY, a INT);
 CREATE INDEX idup_a ON idup (a);
 CREATE INDEX idup_a ON idup (a);
-ERROR 1061: schema mismatch for table 108: index 'idup_a' already exists
+ERROR 1061: Duplicate key name 'idup_a'
 === KNOWN BUG: CREATE INDEX IF NOT EXISTS does NOT suppress 1061 ===
 CREATE INDEX IF NOT EXISTS idup_a ON idup (a);
-ERROR 1061: schema mismatch for table 108: index 'idup_a' already exists
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'IF NOT EXISTS idup_a ON idup (a)' at line 1
 === KNOWN BUG: INCLUDE (col) parses but covering col missing from SHOW INDEX ===
 DROP TABLE IF EXISTS iinc;
 CREATE TABLE iinc (id INT PRIMARY KEY, a INT, b INT);
 CREATE INDEX iinc_a ON iinc (a) INCLUDE (b);
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INCLUDE (b)' at line 1
 SHOW INDEX FROM iinc;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-iinc	0	PRIMARY	1	id	BTREE
-iinc	1	iinc_a	1	a	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+iinc	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === KNOWN BUG: Expression index silently no-op ===
 DROP TABLE IF EXISTS iex;
 CREATE TABLE iex (id INT PRIMARY KEY, t TEXT);
 CREATE INDEX iex_lower ON iex (LOWER(t));
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 't))' at line 1
 SHOW INDEX FROM iex;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-iex	0	PRIMARY	1	id	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+iex	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
 === KNOWN BUG: ALTER TABLE ADD INDEX silently no-op ===
 DROP TABLE IF EXISTS ialt;
 CREATE TABLE ialt (id INT PRIMARY KEY, a INT);
 ALTER TABLE ialt ADD INDEX ialt_a (a);
 # SHOW INDEX confirms ONLY PRIMARY remains — the ADD INDEX did nothing:
 SHOW INDEX FROM ialt;
-Table	Non_unique	Key_name	Seq_in_index	Column_name	Index_type
-ialt	0	PRIMARY	1	id	BTREE
+Table	Non_unique	Key_name	Seq_in_index	Column_name	Collation	Cardinality	Sub_part	Packed	Null	Index_type	Comment	Index_comment	Visible	Expression
+ialt	0	PRIMARY	1	id	A	<masked>	<masked>	NULL		BTREE			YES	NULL
+ialt	1	ialt_a	1	a	A	<masked>	<masked>	NULL	YES	BTREE			YES	NULL
 === KNOWN GAP: CREATE FULLTEXT INDEX (MySQL spelling) — errno 1064 ===
 DROP TABLE IF EXISTS iff;
 CREATE TABLE iff (id INT PRIMARY KEY, t TEXT);
 CREATE FULLTEXT INDEX iff_ft ON iff (t);
-ERROR 1064: SQL parse error: sql parser error: Expected: an object type after CREATE, found: FULLTEXT at Line: 1, Column: 8
 === Cleanup ===
 DROP TABLE iv;
+ERROR 1051: Unknown table 'test.iv'
 DROP TABLE ij;
+ERROR 1051: Unknown table 'test.ij'
 DROP TABLE ift;
 DROP TABLE ibrin;
 DROP TABLE icc;

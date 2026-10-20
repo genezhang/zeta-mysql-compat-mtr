@@ -1,0 +1,13 @@
+{"format":"zeta-mysql-oracle-record","version":1,"mysql_version":"8.4.6","sql_mode":"ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION","time_zone":"+00:00","lower_case_table_names":"0","passes":2,"statements":12}
+{"i":1,"h":"c41c8f18","k":"ok","affected":0}
+{"i":2,"h":"c41c8855","k":"ok","affected":0}
+{"i":3,"h":"e693e6ce","k":"ok","affected":0}
+{"i":4,"h":"c39fd974","k":"ok","affected":0}
+{"i":5,"h":"0b76a303","k":"rows","cols":["Database"],"rows":[["information_schema"],["mysql"],["performance_schema"],["sys"],["test"]]}
+{"i":6,"h":"13599f25","k":"rows","cols":["Tables_in_test"],"rows":[["sh1"],["sh2"]],"sorted":true}
+{"i":7,"h":"d88afcf6","k":"rows","cols":["Tables_in_test","Table_type"],"rows":[["sh1","BASE TABLE"],["sh2","BASE TABLE"]],"sorted":true}
+{"i":8,"h":"8d4172ee","k":"rows","cols":["Field","Type","Null","Key","Default","Extra"],"rows":[["id","int","NO","PRI",null,""],["name","varchar(20)","YES","",null,""]]}
+{"i":9,"h":"a8ee9315","k":"rows","cols":["Table","Create Table"],"rows":[["sh2","CREATE TABLE `sh2` (\n  `id` int NOT NULL,\n  `name` varchar(20) DEFAULT NULL,\n  PRIMARY KEY (`id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"]]}
+{"i":10,"h":"414684e1","k":"rows","cols":["Tables_in_test (sh%)"],"rows":[["sh1"],["sh2"]],"sorted":true}
+{"i":11,"h":"9813c5d8","k":"ok","affected":0}
+{"i":12,"h":"9813da0d","k":"ok","affected":0}

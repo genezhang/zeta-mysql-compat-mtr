@@ -25,6 +25,7 @@ SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 === SET SESSION / SET GLOBAL TRANSACTION ISOLATION LEVEL ===
 SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
 SET GLOBAL  TRANSACTION ISOLATION LEVEL READ COMMITTED;
+<skipped: global or persisted server variable>
 === SET autocommit toggles ===
 SET autocommit = 0;
 SET autocommit = 1;
@@ -36,23 +37,20 @@ COMMIT;
 === KNOWN GAP: COMMIT AND CHAIN — errno 1105 ===
 BEGIN;
 COMMIT AND CHAIN;
-ERROR 1105: plan error: transaction control statements are not planned
 ROLLBACK;
 === KNOWN GAP: ROLLBACK AND CHAIN — errno 1105 ===
 BEGIN;
 ROLLBACK AND CHAIN;
-ERROR 1105: plan error: transaction control statements are not planned
 ROLLBACK;
 === KNOWN GAP: START TRANSACTION READ ONLY — errno 1235 ===
 START TRANSACTION READ ONLY;
-ERROR 1235: START TRANSACTION READ ONLY is not supported
 === KNOWN GAP: START TRANSACTION ISOLATION LEVEL inline — errno 1235 ===
 START TRANSACTION ISOLATION LEVEL SERIALIZABLE;
-ERROR 1235: START TRANSACTION ISOLATION LEVEL is not supported (use SET TRANSACTION ISOLATION LEVEL before BEGIN)
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ISOLATION LEVEL SERIALIZABLE' at line 1
 === RELEASE SAVEPOINT on missing — errno 1105 ===
 BEGIN;
 RELEASE SAVEPOINT no_such_sp;
-ERROR 1105: execution error: savepoint "no_such_sp" does not exist
+ERROR 1305: SAVEPOINT no_such_sp does not exist
 ROLLBACK;
 === Cleanup ===
 DROP TABLE txv;

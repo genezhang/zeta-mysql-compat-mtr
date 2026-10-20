@@ -1,52 +1,62 @@
 === GRANT ALL ON test.* TO <role> — silent no-op ===
 GRANT ALL ON test.* TO u2;
+<skipped: accounts and privileges>
 === GRANT USAGE ON SCHEMA — silent no-op ===
 GRANT USAGE ON SCHEMA public TO r1;
+<skipped: accounts and privileges>
 === REVOKE ALL ON test.* FROM <role> — silent no-op ===
 REVOKE ALL ON test.* FROM u2;
+<skipped: accounts and privileges>
 === SET ROLE <role> — silent no-op ===
 SET ROLE r1;
+ERROR 3530: `r1`@`%` is not granted to `root`@`localhost`
 === SHOW GRANTS — empty result ===
 SHOW GRANTS;
+Grants for root@localhost
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, RELOAD, SHUTDOWN, PROCESS, FILE, REFERENCES, INDEX, ALTER, SHOW DATABASES, SUPER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, REPLICATION SLAVE, REPLICATION CLIENT, CREATE VIEW, SHOW VIEW, CREATE ROUTINE, ALTER ROUTINE, CREATE USER, EVENT, TRIGGER, CREATE TABLESPACE, CREATE ROLE, DROP ROLE ON *.* TO `root`@`localhost` WITH GRANT OPTION
+GRANT ALLOW_NONEXISTENT_DEFINER,APPLICATION_PASSWORD_ADMIN,AUDIT_ABORT_EXEMPT,AUDIT_ADMIN,AUTHENTICATION_POLICY_ADMIN,BACKUP_ADMIN,BINLOG_ADMIN,BINLOG_ENCRYPTION_ADMIN,CLONE_ADMIN,CONNECTION_ADMIN,ENCRYPTION_KEY_ADMIN,FIREWALL_EXEMPT,FLUSH_OPTIMIZER_COSTS,FLUSH_PRIVILEGES,FLUSH_STATUS,FLUSH_TABLES,FLUSH_USER_RESOURCES,GROUP_REPLICATION_ADMIN,GROUP_REPLICATION_STREAM,INNODB_REDO_LOG_ARCHIVE,INNODB_REDO_LOG_ENABLE,OPTIMIZE_LOCAL_TABLE,PASSWORDLESS_USER_ADMIN,PERSIST_RO_VARIABLES_ADMIN,REPLICATION_APPLIER,REPLICATION_SLAVE_ADMIN,RESOURCE_GROUP_ADMIN,RESOURCE_GROUP_USER,ROLE_ADMIN,SENSITIVE_VARIABLES_OBSERVER,SERVICE_CONNECTION_ADMIN,SESSION_VARIABLES_ADMIN,SET_ANY_DEFINER,SHOW_ROUTINE,SYSTEM_USER,SYSTEM_VARIABLES_ADMIN,TABLE_ENCRYPTION_ADMIN,TELEMETRY_LOG_ADMIN,TRANSACTION_GTID_TAG,XA_RECOVER_ADMIN ON *.* TO `root`@`localhost` WITH GRANT OPTION
+GRANT PROXY ON ``@`` TO `root`@`localhost` WITH GRANT OPTION
 === SHOW GRANTS FOR 'u'@'h' — accepted, empty result ===
 SHOW GRANTS FOR 'u2'@'localhost';
+ERROR 1141: There is no such grant defined for user 'u2' on host 'localhost'
 === SET PASSWORD = '...' — silent no-op ===
 SET PASSWORD = 'newpw';
+<skipped: accounts and privileges>
 === SET PASSWORD FOR 'u'@'h' = '...' — silent no-op ===
 SET PASSWORD FOR 'u1'@'%' = 'newpw';
+<skipped: accounts and privileges>
 === KNOWN GAP: CREATE ROLE — errno 1064 ===
 CREATE ROLE r1;
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+<skipped: accounts and privileges>
 === KNOWN GAP: CREATE ROLE WITH LOGIN — errno 1064 ===
 CREATE ROLE r2 WITH LOGIN;
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+<skipped: accounts and privileges>
 === KNOWN GAP: DROP ROLE — errno 1064 ===
 DROP ROLE r1;
-ERROR 1064: SQL parse error: unsupported DROP ROLE statement
+<skipped: accounts and privileges>
 === KNOWN GAP: DROP ROLE IF EXISTS — errno 1064 ===
 DROP ROLE IF EXISTS no_such;
-ERROR 1064: SQL parse error: unsupported DROP ROLE statement
+<skipped: accounts and privileges>
 === KNOWN GAP: MySQL CREATE USER 'u'@'h' — errno 1064 ===
 CREATE USER 'u1'@'%' IDENTIFIED BY 'pw';
-ERROR 1064: SQL parse error: sql parser error: Expected: another option, EOF, SemiColon, Comma or ')', found: '%' at Line: 1, Column: 18
+<skipped: accounts and privileges>
 === KNOWN GAP: PG CREATE USER u — errno 1064 ===
 CREATE USER u1;
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+<skipped: accounts and privileges>
 === KNOWN GAP: MySQL DROP USER 'u'@'h' — errno 1064 ===
 DROP USER 'u1'@'%';
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: @ at Line: 1, Column: 15
+<skipped: accounts and privileges>
 === KNOWN GAP: PG DROP USER u — errno 1064 ===
 DROP USER u1;
-ERROR 1064: SQL parse error: unsupported DROP USER statement
+<skipped: accounts and privileges>
 === KNOWN GAP: RESET ROLE — errno 1064 ===
 RESET ROLE;
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ERROR 1064: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ROLE' at line 1
 === KNOWN GAP: ALTER USER u IDENTIFIED BY '...' — errno 1064 ===
 ALTER USER u1 IDENTIFIED BY 'newpw';
-ERROR 1064: SQL parse error: sql parser error: Expected: end of statement, found: IDENTIFIED at Line: 1, Column: 15
+<skipped: accounts and privileges>
 === KNOWN GAP: ALTER ROLE r WITH PASSWORD '...' — errno 1064 ===
 ALTER ROLE r1 WITH PASSWORD 'newpw';
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+<skipped: accounts and privileges>
 === KNOWN GAP: FLUSH PRIVILEGES — errno 1064 ===
 FLUSH PRIVILEGES;
-ERROR 1064: SQL parse error: sql parser error: Unsupported statement FLUSH at Line: 1, Column: 7
