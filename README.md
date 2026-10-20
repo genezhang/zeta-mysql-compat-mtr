@@ -20,6 +20,10 @@ runner/                  # MTR-dialect runner (GPL v2)
     oracle.rs            # differential mode: run both servers, compare, summarise
     outcome.rs           # one statement's outcome on one server, and how two are compared
     hazard.rs            # statements the differential mode never runs
+    side.rs              # one server connection: reset to empty, run within a budget, kill on timeout
+    record.rs            # oracle records: format, nondeterminism classes, merge of passes, staleness
+    class.rs             # tests/zeta_only.list: PostgreSQL-grammar and sentinel tests, kept apart
+    result_file.rs       # renders a record into the .result text
 
 tests/
   main/                  # adapted from MySQL mysql-test/t + r/
@@ -75,6 +79,33 @@ One row per file on stdout, tab separated: `file statements same first_divergenc
 A *hard* divergence is one that points at a defect in zeta: a result that differs on a statement MySQL itself accepted, an error from zeta where MySQL succeeded, or a `transport` failure. A statement that MySQL rejects and zeta accepts (`zeta-accepts`) is leniency, and two different error numbers (`error-code`) are an error-code gap; neither is hard. `row-order` (same rows, other order) is not hard either when the statement did not ask for an order, because a SELECT without ORDER BY has no defined order: it is counted in `mysql_ok_order`, never in `mysql_ok_same`, and listed in the kind counts. A row-order difference on a statement with a top-level ORDER BY (and no `--sorted_result`) is a `values` divergence. `mysql_ok` counts statements MySQL ran without error; `mysql_ok_same` those zeta matched exactly.
 
 Totals and histograms (files identical to MySQL, statement agreement, MySQL-accepted statements zeta matched, skipped statements by class, first divergence per file by kind, all divergences by kind) go to stderr. The `--report` file holds statement text and both outcomes, so keep it local if the test content is GPL.
+
+## Oracle records: MySQL's answers, committed
+
+A live `mysqld` is the right oracle for a developer, but a nightly job should not need one, and "what does MySQL do here" should be a reviewable artefact rather than a server's mood. So the oracle's answers are recorded, and zeta is compared with the recording.
+
+**Record** (needs a throwaway MySQL, no zeta): `--record-oracle [DIR] --oracle-url URL` runs every test file against the oracle and writes `tests/<suite>/<name>.oracle.jsonl` next to the test. The file is JSON Lines: a header (format version, MySQL version, `sql_mode`, `time_zone`, number of passes) and one object per statement with its full outcome: result set (column names and rows, `null` for SQL NULL), or affected rows, or error number and message. Errors are compared by number; the message is informational. A cell over 4 KiB is stored as its length and a hash. Each statement carries a short hash of its exact text (and whether `--sorted_result` precedes it), so a record that no longer matches its `.test` is reported as stale instead of being compared out of step. The file is deterministic: recording the same corpus again on the same MySQL version gives the same bytes.
+
+**Nondeterminism is found, not guessed, and counted, not hidden.** The corpus is run `--record-passes` times (default 2), the oracle restored before each pass (`--oracle-restore-cmd`), the second pass in reverse file order and on a clock shifted by weeks (`SET timestamp` in every session), so that values derived from the date differ between the passes too; the passes are compared statement by statement:
+
+| class | how it is found | what replay compares |
+|---|---|---|
+| `volatile` (with a `class`: `time`, `random`, `session`, `server`, `server-state`) | the statement text calls `NOW()`, `RAND()`, `UUID()`, `CONNECTION_ID()`, reads `@@hostname`, `@@version`, `SHOW STATUS`, ... | the shape (column names, row count, error number, affected rows), not the values |
+| `cells` | the passes differ in some columns only | everything except those columns (masking is by column, because the passes may return the rows in another order), stored as `<masked>` |
+| `order` | the passes return the same rows in another order, or the query reads `information_schema` without ORDER BY | the rows as a sorted set |
+| `excluded` | the passes differ in any other way | nothing; zeta still runs the statement, so later statements see its effects |
+
+Statements that are never run at all (SHUTDOWN, SET GLOBAL, accounts, ...; see "Statements that are not run") are stored as `skip`. Replay prints how many statements fall in each class, next to the numbers they are part of, and how many of the statements zeta matched were compared with masked or order-insensitive values. A statement the oracle could not answer stably is excluded, but zeta not answering it at all (a crash, a timeout) still counts against zeta.
+
+**Replay** (needs zeta, no MySQL): `--replay-oracle [DIR] --zeta-bin ...` compares zeta with the records and prints exactly what the live differential mode prints (the per-file rows and the summary), plus `masked`, `excluded` and `class` columns. A file without a record, or whose record is stale, is reported and not compared, and the run then exits non-zero.
+
+**Classes.** `tests/zeta_only.list` names the tests that pin zeta's handling of PostgreSQL grammar and unsupported-feature probes (the `pg_*` and `*sentinel*` tests): MySQL rejects most of that by design, so they are not judged against MySQL. Their `.result` files stay pinned to zeta's own output and are maintained by hand, and the summary reports them as a separate class (`class zeta-only: ...`) so they do not pollute the MySQL number. Every test not listed is MySQL-targeted. Nothing is moved, so paths stay stable. `--class mysql|zeta-only` restricts any mode (the normal mode too) to one class.
+
+**The normal mode** (`--zeta-bin ... --suite ...` without `--oracle-url` or `--replay-oracle`, the one the nightly runs per test) works like this for a MySQL-targeted test once the repository has adopted records (`tests/zeta_only.list` exists): the verdict is zeta against the record, statement by statement: the test passes only if zeta agrees with MySQL on every compared statement, row order included (`  OK`), and fails with a list of the first divergences otherwise. The `.result` file is no longer an independent expectation: it is MySQL's output in the runner's format, generated from the record (`--write-results`), and the normal mode fails if it is not what the record renders to. A MySQL-targeted test without a record fails and says so. The zeta-only tests keep the old behaviour (compare with the hand-maintained `.result`).
+
+**Refreshing** after an oracle upgrade, or after adding or editing a test, is one command: `scripts/refresh-oracle.sh` (see its header for `ORACLE_URL` and `ORACLE_RESTORE_CMD`), then commit the changed `.oracle.jsonl` and `.result` files. `--filter` re-records only matching tests. To start an oracle: unpack a MySQL 8.4 server, initialise a data directory, keep a pristine copy of it for the restore command, and start `mysqld --default-time-zone=+00:00` on a spare port with default settings; `root` without a password on localhost is what the runner expects.
+
+The records contain statement text and MySQL's output for tests that live in this GPL-2.0 repository, which is where they belong: never copy them into a permissively licensed repository or into a pull-request description.
 
 ## License
 
