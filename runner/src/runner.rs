@@ -21,7 +21,9 @@ use anyhow::{anyhow, Context, Result};
 use mysql_async::prelude::Queryable;
 use walkdir::WalkDir;
 
+use crate::class;
 use crate::mtr_parser::{parse, Directive};
+use crate::oracle;
 use crate::result_diff::compare;
 use crate::skip_list::SkipList;
 
@@ -78,7 +80,20 @@ pub async fn run_suite(
             continue;
         }
         eprintln!("→ {}", test_path.display());
-        match run_one(test_path, &url).await {
+        // A MySQL-targeted test is judged against the oracle's recorded answers (see record.rs); the
+        // zeta-only tests stay pinned to zeta's own output.
+        let outcome = if class::of(test_path) == class::MYSQL && class::records_adopted() {
+            if oracle::sibling_record(test_path).exists() {
+                oracle::check_against_record(test_path, mysql_url_base).await
+            } else {
+                Err(anyhow!(
+                    "no oracle record for a MySQL-targeted test: record it with --record-oracle against a MySQL server (see README)"
+                ))
+            }
+        } else {
+            run_one(test_path, &url).await
+        };
+        match outcome {
             Ok(()) => {
                 passed += 1;
                 eprintln!("  OK");
@@ -195,7 +210,7 @@ async fn execute_capturing(
     }
 }
 
-fn returns_rows(sql: &str) -> bool {
+pub(crate) fn returns_rows(sql: &str) -> bool {
     let head = sql.trim_start();
     let head = head
         .lines()
@@ -272,7 +287,7 @@ fn to_hex(bytes: &[u8]) -> String {
 
 /// Sort the data rows within a result block. The header row (first line)
 /// stays in place; everything below it is sorted lexicographically.
-fn sort_block(block: &str) -> String {
+pub(crate) fn sort_block(block: &str) -> String {
     let mut lines = block.lines();
     let Some(header) = lines.next() else {
         return String::new();
