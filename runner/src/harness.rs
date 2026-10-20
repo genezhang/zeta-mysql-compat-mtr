@@ -101,6 +101,25 @@ impl ZetaServer {
         self.listener_port
     }
 
+    /// `false` once the server process has exited (crash, kill, or a clean exit nobody asked for).
+    /// The exit status is logged the first time it is seen.
+    pub fn is_alive(&mut self) -> bool {
+        let Some(child) = self.child.as_mut() else {
+            return false;
+        };
+        match child.try_wait() {
+            Ok(None) => true,
+            Ok(Some(status)) => {
+                eprintln!("[zeta] server process exited: {status}");
+                false
+            }
+            Err(e) => {
+                eprintln!("[zeta] cannot query the server process: {e}");
+                false
+            }
+        }
+    }
+
     pub async fn shutdown(&mut self) -> Result<()> {
         let Some(mut child) = self.child.take() else {
             return Ok(());
@@ -145,6 +164,20 @@ fn send_sigterm(child: &Child) {
     );
 }
 
+/// Reads one line as raw bytes and decodes it lossily. `Lines::next_line` fails with `InvalidData` on a
+/// non-UTF-8 byte (a binary value in a log line is enough), and a drain that bails out drops the read end of
+/// the pipe: zeta's next log write then fails or blocks, which is the failure the drain exists to prevent.
+async fn next_lossy_line<R: AsyncBufReadExt + Unpin>(r: &mut R) -> std::io::Result<Option<String>> {
+    let mut raw = Vec::new();
+    if r.read_until(b'\n', &mut raw).await? == 0 {
+        return Ok(None);
+    }
+    while matches!(raw.last(), Some(b'\n' | b'\r')) {
+        raw.pop();
+    }
+    Ok(Some(String::from_utf8_lossy(&raw).into_owned()))
+}
+
 /// Streams zeta's stderr until it prints the MySQL listener-ready banner.
 /// All lines are forwarded to our stderr (prefixed `[zeta]`) so test
 /// failures aren't blind.
@@ -154,8 +187,8 @@ async fn await_ready(stderr: tokio::process::ChildStderr, expected_port: u16) ->
     let banner =
         Regex::new(r"Zeta MySQL wire listener ready on \S+:(\d+)").expect("static regex compiles");
 
-    let mut buf = BufReader::new(stderr).lines();
-    while let Some(line) = buf.next_line().await? {
+    let mut buf = BufReader::new(stderr);
+    while let Some(line) = next_lossy_line(&mut buf).await? {
         eprintln!("[zeta] {}", line);
         let Some(caps) = banner.captures(&line) else {
             continue;
@@ -167,10 +200,21 @@ async fn await_ready(stderr: tokio::process::ChildStderr, expected_port: u16) ->
             ));
         }
         // Keep draining: a closed read end makes zeta's later log writes fail, a full one
-        // blocks them. Forward the lines so a crash or panic is still visible.
+        // blocks them. Forward the lines so a crash or panic is still visible, and say when the
+        // stream ends (the server exited or closed stderr) so a crash is not silent.
         tokio::spawn(async move {
-            while let Ok(Some(line)) = buf.next_line().await {
-                eprintln!("[zeta] {}", line);
+            loop {
+                match next_lossy_line(&mut buf).await {
+                    Ok(Some(line)) => eprintln!("[zeta] {}", line),
+                    Ok(None) => {
+                        eprintln!("[zeta] stderr closed: the server exited or closed its log");
+                        break;
+                    }
+                    Err(e) => {
+                        eprintln!("[zeta] stderr read failed: {e}");
+                        break;
+                    }
+                }
             }
         });
         return Ok(());
