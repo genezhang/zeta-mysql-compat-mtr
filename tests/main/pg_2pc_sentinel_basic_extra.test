@@ -7,25 +7,29 @@
 #     PREPARED: ZERO prior coverage.
 #
 # Pre-existing rejection shape patterns:
-#   - "Expected: AS, found: <X>" — pre-existing at
-#     prepare_basic_extra (MySQL PREPARE p FROM '...'
-#     form rejection). Same fingerprint applies here
-#     because sqlparser's PREPARE parser expects
-#     `PREPARE name AS stmt` and treats TRANSACTION
-#     as an identifier-position name token.
+#   - MySQL's own syntax-error wording
+#     ("You have an error in your SQL syntax; ... near
+#     <what the parser could not place>"), which is what
+#     the MySQL wire answers a rejected statement in
+#     now. The parser still takes TRANSACTION as the
+#     PREPARE name and stalls on the gid; only the
+#     message changed, from the parser library's own
+#     text to MySQL's.
 #   - "Expected: end of statement, found: <KW>" —
 #     pre-existing (RESET TIME ZONE / RESET SESSION
 #     AUTHORIZATION at PR #399, many others).
 #
 # This slice pins:
 #
-#   PREPARE TRANSACTION 'gid' (2 forms) — "Expected:
-#   AS, found: '<gid>'" at col 21:
+#   PREPARE TRANSACTION 'gid' (2 forms) — MySQL's
+#     syntax error, whose "near" clause quotes the gid:
 #     - sqlparser parses `PREPARE TRANSACTION` as
-#       `PREPARE name=TRANSACTION` and then expects
-#       `AS stmt`, gets the gid string-literal,
-#       errors. PG 2PC PREPARE TRANSACTION cannot
-#       be expressed in zeta.
+#       `PREPARE name=TRANSACTION`, then expects
+#       `AS stmt` and chokes on the gid string-literal.
+#       PG 2PC PREPARE TRANSACTION cannot be expressed
+#       in zeta; the refusal is 1064 either way, so
+#       nothing became parseable here — only the
+#       wording moved.
 #
 #   COMMIT PREPARED 'gid' (2 forms) — "Expected: end
 #   of statement, found: PREPARED" at col 8:
@@ -59,7 +63,7 @@
 #     direct substitute for X/Open XA-style 2PC.
 #     Use Saga compensating-txn pattern app-side.
 
---echo === PREPARE TRANSACTION 'gid' (2 forms) → "Expected: AS, found: '<gid>'" at col 21 ===
+--echo === PREPARE TRANSACTION 'gid' (2 forms) → MySQL's syntax error, quoting the gid ===
 
 # sqlparser's PREPARE arm parses `TRANSACTION` as the
 # prepared-statement name; then expects `AS stmt`,
