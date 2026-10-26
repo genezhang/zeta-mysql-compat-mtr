@@ -1,10 +1,10 @@
-=== KILL variants — shape (c) "unsupported statement" ===
+=== KILL of a thread that is not there → ER_NO_SUCH_THREAD (1094), three spellings ===
 KILL 123;
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ERROR 1094: Unknown thread id: 123
 KILL QUERY 456;
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ERROR 1094: Unknown thread id: 456
 KILL CONNECTION 789;
-ERROR 1064: SQL parse error: unsupported statement: sqlparser::ast::Statement
+ERROR 1094: Unknown thread id: 789
 === BACKUP / RESTORE / PURGE — shape (d) "Expected: an SQL statement" ===
 BACKUP DATABASE test TO 'foo';
 ERROR 1064: SQL parse error: sql parser error: Expected: an SQL statement, found: BACKUP at Line: 1, Column: 1
